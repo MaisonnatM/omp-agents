@@ -84,9 +84,9 @@ describe("McpServerItem", () => {
 describe("ownServers", () => {
 	test("keeps the servers that are not integrations and names each integration once, in Settings › Integrations' order", () => {
 		const local = notion({ kind: "local" }, false);
-		const integration = (name: string, id: "gmail" | "linear" | "slack"): McpServerRow => ({ ...local, name, status: { kind: "integration", id } });
-		const { own, integrations } = ownServers([integration("gmail-work", "gmail"), local, integration("slack", "slack"), integration("gmail-home", "gmail"), integration("linear", "linear")]);
+		const integration = (name: string, id: "gmail" | "slack"): McpServerRow => ({ ...local, name, status: { kind: "integration", id } });
+		const { own, integrations } = ownServers([integration("gmail-work", "gmail"), local, integration("gmail-home", "gmail"), integration("slack", "slack")]);
 		expect(own.map(server => server.name)).toEqual(["notion"]);
-		expect(integrations).toEqual(["linear", "slack", "gmail"]);
+		expect(integrations).toEqual(["slack", "gmail"]);
 	});
 });

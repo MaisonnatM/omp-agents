@@ -18,7 +18,7 @@ import {
 	type TodoFilter,
 } from "../../todo-filter";
 import { DisplayButton, dayField, type FilterField, GroupingSubmenu, ListFilterBar, setField } from "../list-filter-bar";
-import { PRIORITY_ICON } from "../tickets/ticket-row";
+import { PRIORITY_ICON } from "./fields";
 
 /** Each field of **Filter**, in menu order; **Link** offers the kinds `todos` carry. */
 function filterFields(todos: readonly UserTodo[], filter: TodoFilter, onFilter: (filter: TodoFilter) => void): FilterField[] {

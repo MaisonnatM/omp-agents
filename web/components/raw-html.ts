@@ -1,9 +1,9 @@
-/** The rehype plugins that render GitHub and Linear text's raw HTML, a chunk of their own that `MessageMarkdown` loads for the first such text. */
+/** The rehype plugins that render GitHub text's raw HTML, a chunk of their own that `MessageMarkdown` loads for the first such text. */
 import type { Options } from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 
-/** GitHub's schema, plus the `<video>` a Linear issue's recording or a GitHub upload becomes, with its `<source>`. */
+/** GitHub's schema, plus the `<video>` a GitHub upload becomes, with its `<source>`. */
 const SANITIZE_SCHEMA = {
 	...defaultSchema,
 	tagNames: [...(defaultSchema.tagNames ?? []), "video", "source"],

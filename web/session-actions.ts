@@ -3,9 +3,7 @@ import { pullRequestUrl } from "../src/shared/github";
 import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { ActionGroup, ActionRun } from "./command-palette";
 import { CONFIRM_PRIVATE_END } from "./labels";
-import { PAGE_ICON } from "./page-icons";
 import type { OpenMode } from "./routing";
-import { hashForTickets } from "./tickets-model";
 import { isPrivateHost } from "./sessions";
 
 /** A session as a row lists it: running, or past. */
@@ -85,7 +83,6 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 			icon: IconPullRequest,
 			run: { kind: "link", href: pullRequestUrl(pr), external: true } as const,
 		})),
-		...row.tickets.map(id => ({ id: `ticket:${id}`, title: `Open ${id}`, icon: PAGE_ICON.tickets, run: { kind: "link", href: hashForTickets(id) } as const })),
 		...(context.workspaceSettings ? [{ id: "settings", title: "Workspace settings", icon: IconSettingsGear1, run: { kind: "do", fn: context.workspaceSettings } } as const] : []),
 	];
 	const copies: ActionGroup<SessionRun> = [

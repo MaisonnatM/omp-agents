@@ -45,7 +45,7 @@ interface TodoEditingOptions {
 	workspace: string | null;
 }
 
-/** Where a todo added right below `todo` goes, and its status: after it, in its status, as Linear adds one within a group. */
+/** Where a todo added right below `todo` goes, and its status: after it, in its status, so it stays within its group. */
 const below = (todo: UserTodoLeaf): Pick<Draft, "afterId" | "status"> => ({ afterId: todo.id, status: todo.status });
 
 /** What the page's rows and drafts ask of its typing. */

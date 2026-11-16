@@ -106,7 +106,7 @@ describe("next move", () => {
 
 	test("a session asking you beats one that works, and an idle session leaves the move with you", () => {
 		const host = (instanceId: string, status: RosterHost["status"], number: number) =>
-			({ instanceId, status, pullRequests: [{ owner: "acme", repo: "webapp", number, link: "worked" }], tickets: [] }) as unknown as RosterHost;
+			({ instanceId, status, pullRequests: [{ owner: "acme", repo: "webapp", number, link: "worked" }] }) as unknown as RosterHost;
 		const agent = agentOn([host("a", "working", 1), host("b", "needs-input", 1), host("c", "idle", 2), host("d", "working", 3)]);
 		expect([pr(1), pr(2), pr(3), pr(4)].map(agent)).toEqual(["needs-input", null, "working", null]);
 	});

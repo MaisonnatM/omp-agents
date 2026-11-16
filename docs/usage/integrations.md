@@ -1,6 +1,6 @@
 # Integrations
 
-- **Integrations** is a section of [Settings](settings.md): a row for each service omp's sessions reach through an MCP server, Linear, Slack, Google Calendar, and Gmail so far.
+- **Integrations** is a section of [Settings](settings.md): a row for each service omp's sessions reach through an MCP server, Slack, Google Calendar, and Gmail so far.
   **Connected** lists the services that hold a sign-in, working or not, and **Available** lists the rest.
 - Each MCP row shows whether omp is connected, by listing the server's tools with omp's sign-in: **Connected** with the server's host and the number of tools, which unfolds to their names, each with its description on hover, **Needs reconnecting** when the server refuses the sign-in, **Unreachable** with the server's error and **Check again**, or **Not connected** or **Signed out** when omp has no server or no sign-in for it.
   When Google's MCP server answers HTTP 403, the Google Calendar or Gmail row says the MCP API is most often off in the OAuth client's Google Cloud project, and adds **Enable Calendar MCP API** or **Enable Gmail MCP API**, which opens Google's page that turns it on in that project, the number the client ID starts with.
@@ -17,13 +17,12 @@
 - With the same extension, a session whose Gmail or Google Calendar tool call fails with HTTP 401 stops using that service and asks you to sign in again here, and the bell shows a sign-in notice that opens this page; see [Notifications](notifications.md).
   The dashboard never signs in for you: **Connect** or **Reconnect** on the account's row does, and the notice goes once the account works again.
 - omp's own `/mcp reauth` or `/mcp unauth` on an added account writes it back under its URL and can merge two accounts into one; reconnect it from this page instead.
-- **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, `https://mcp.slack.com/mcp`, `https://calendarmcp.googleapis.com/mcp/v1`, or `https://gmailmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
+- **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.slack.com/mcp`, `https://calendarmcp.googleapis.com/mcp/v1`, or `https://gmailmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
   A service whose server omp's `/mcp disable` turned off is turned back on by **Connect**, which skips the browser while omp still holds its sign-in.
-  Linear sends the browser back to `localhost:3000`, so that port must be free while you sign in.
   Slack sends the browser to the HTTPS redirect saved for the app, and omp listens for HTTP on the saved callback port.
   Google Calendar and Gmail send the browser back to `localhost` on the saved callback port, 3119 unless you change it.
   While it waits, the row says so, links to the sign-in page again, and hides its other buttons.
-- A connected Linear or Slack row's ⋯ menu holds **Reconnect**, which signs in again over a sign-in that the server refused or that still works, and **Sign out**.
+- A connected Slack row's ⋯ menu holds **Reconnect**, which signs in again over a sign-in that the server refused or that still works, and **Sign out**.
   **Sign out** asks first, then removes the sign-ins omp manages for the service, as omp's `/mcp unauth` does, so omp's sessions lose its tools too; the server stays in `mcp.json`.
   When the sign-out fails, the question stays with the reason, to try again or cancel.
 - Slack shows **Not set up** and **Set up** until its app settings are saved.

@@ -4,7 +4,7 @@ import { type McpServer, type McpToolDefinition, McpUnauthorized } from "./omp/m
 import { ApiError } from "./signed-fetch";
 import type { McpRemoteStatus } from "./shared/mcp-status";
 
-const server: McpServer = { name: "linear", url: "https://mcp.linear.app/mcp", credentialId: "mcp:linear", config: { type: "http", url: "https://mcp.linear.app/mcp" } };
+const server: McpServer = { name: "sentry", url: "https://mcp.sentry.dev/mcp", credentialId: "mcp:sentry", config: { type: "http", url: "https://mcp.sentry.dev/mcp" } };
 
 const failing = (err: Error) => async (): Promise<never> => {
 	throw err;
@@ -29,14 +29,14 @@ describe("remoteStatusOf", () => {
 	});
 
 	test("discovery's 401 is a sign-in to start when omp holds none, and a refused one when it does", async () => {
-		const unauthorized = failing(new McpUnauthorized("linear answered 401 Unauthorized"));
+		const unauthorized = failing(new McpUnauthorized("sentry answered 401 Unauthorized"));
 		expect(await remoteStatusOf(server, { signedIn: false, signInRequired: false }, false, unauthorized)).toEqual({ kind: "signed-out" });
 		expect(await remoteStatusOf(server, { signedIn: true, signInRequired: true }, false, unauthorized)).toEqual({ kind: "refused", error: "The server refused omp's sign-in. Reconnect to sign in again." });
 	});
 
 	test("any other failure is failing with its message and the HTTP status the server answered, if any", async () => {
-		const forbidden = failing(new ApiError('The "linear" MCP server answered HTTP 403', 403));
-		expect(await remoteStatusOf(server, { signedIn: true, signInRequired: true }, false, forbidden)).toEqual({ kind: "failing", error: 'The "linear" MCP server answered HTTP 403', status: 403 });
+		const forbidden = failing(new ApiError('The "sentry" MCP server answered HTTP 403', 403));
+		expect(await remoteStatusOf(server, { signedIn: true, signInRequired: true }, false, forbidden)).toEqual({ kind: "failing", error: 'The "sentry" MCP server answered HTTP 403', status: 403 });
 		const timedOut = failing(new Error("The operation timed out."));
 		expect(await remoteStatusOf(server, { signedIn: false, signInRequired: false }, false, timedOut)).toEqual({ kind: "failing", error: "The operation timed out.", status: null });
 	});

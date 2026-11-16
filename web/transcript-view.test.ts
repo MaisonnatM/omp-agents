@@ -217,7 +217,7 @@ describe("outline", () => {
 	test("a later prompt led by go, or of approval words alone, approves or resumes; ok with more words, or a bare publish, is a prompt", () => {
 		const nudge = (text: string, extra: Partial<Extract<Item, { kind: "user" }>> = {}) =>
 			outline([prompt("first", "Plan it"), reply("plan", "The plan"), prompt("next", text, extra)], false)[1]!.nudge;
-		expect(["go", "Yes go!", "go all don't commit", "fix all then push", "LGTM", "ok, continue", "go with the defaults", "go on https://linear.app/x/issue/ENG-1"].map(text => nudge(text))).toEqual(Array(8).fill("approve"));
+		expect(["go", "Yes go!", "go all don't commit", "fix all then push", "LGTM", "ok, continue", "go with the defaults", "go on https://github.com/x/y/issues/1"].map(text => nudge(text))).toEqual(Array(8).fill("approve"));
 		expect(["continue", "Continue please"].map(text => nudge(text))).toEqual(["resume", "resume"]);
 		expect(["ok but rename it", "push", "Ship it", "gone", "continue with the tests", ""].map(text => nudge(text))).toEqual(Array(6).fill(null));
 		expect(nudge("go", { skill: "review" })).toBeNull();

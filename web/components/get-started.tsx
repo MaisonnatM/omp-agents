@@ -29,7 +29,7 @@ const STEPS = [
 	{ id: "provider", label: "Model provider", need: "required", title: "Sign in to a model provider", summary: "omp needs a model to answer you. Connect a provider you already use, with its sign-in or an API key." },
 	{ id: "terminal", label: "Terminal sessions", need: "recommended", title: "Show terminal sessions", summary: "omp sessions you start in a terminal can show here, next to the ones you start in the dashboard. Choose what the dashboard can do with them." },
 	{ id: "kit", label: "Starter kit", need: "optional", title: "Install the starter kit", summary: "The setup this dashboard is built around, ready for every new session." },
-	{ id: "tools", label: "Tools and workflows", need: "optional", title: "Connect your tools and workflows", summary: "Bring pull requests, tickets, and messages into the dashboard, and load pstack, the skills /ship plans with and poteto mode runs on." },
+	{ id: "tools", label: "Tools and workflows", need: "optional", title: "Connect your tools and workflows", summary: "Bring pull requests and messages into the dashboard, and load pstack, the skills /ship plans with and poteto mode runs on." },
 	{ id: "session", label: "First session", need: "required", title: "Start your first session", summary: "Pick a first task for omp, or start from a blank prompt." },
 ] as const satisfies readonly { id: string; label: string; need: Need; title: string; summary: string }[];
 

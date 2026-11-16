@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { TICKET_ID } from "../src/shared/tickets";
 import type { View } from "../src/shared/sessions";
 import { isWebModuleId, moduleHome, type WebModuleId } from "./modules";
 import { type CorePage, type Layout, openView, type Page, type SettingsRoute, settingsSection, type SidebarTab } from "./routing";
@@ -24,16 +23,6 @@ export function useSettingsRoute(page: Page | null): SettingsRoute {
 	return useMemo(() => ({ section }), [section]);
 }
 
-/** The issue the Tickets tab opens: the last one open on the Tickets page, which this browser remembers, else `null` for the list alone. */
-export function useLatestTicket(page: Page | null): string | null {
-	const [last, setLast] = useStoredState("omp-agents.tickets-last", raw => (raw !== null && TICKET_ID.test(raw) ? raw : null));
-	const open = page?.kind === "tickets" ? page.target : null;
-	useEffect(() => {
-		if (open) setLast(open);
-	}, [open, setLast]);
-	return open ?? last;
-}
-
 interface SidebarTabInput {
 	page: Page | null;
 	/** The tabs that neither show nor apply, since they are signed out or turned off; a page of one selects no row. */
@@ -43,29 +32,26 @@ interface SidebarTabInput {
 	latestSession: View | null;
 	/** The Bot the Bots tab opens, the first of its list, the one spoken to most recently; `null` for the gallery while there is none. */
 	latestBot: string | null;
-	/** The issue the Tickets tab opens, {@link useLatestTicket}; `null` for the list alone. */
-	latestTicket: string | null;
 	navigate: (page: Page) => void;
 	show: (layout: Layout) => void;
 }
 
 /**
  * The row of the page list the page on screen selects, {@link navRowOf}, and the way to show another tab or the sessions.
- * Sessions keeps the panes, or opens the latest session when no pane shows one; Bots opens the latest Bot's page; Tickets reopens the last issue open.
+ * Sessions keeps the panes, or opens the latest session when no pane shows one; Bots opens the latest Bot's page.
  * `showTab` keeps its identity across renders.
  */
-export function useSidebarTab({ page, absentTabs, layout, latestSession, latestBot, latestTicket, navigate, show }: SidebarTabInput): {
+export function useSidebarTab({ page, absentTabs, layout, latestSession, latestBot, navigate, show }: SidebarTabInput): {
 	row: NavRow | null;
 	showTab: (tab: SidebarTab | "sessions") => void;
 } {
 	const row = navRowOf(page, absentTabs);
-	const latest = useRef({ layout, latestSession, latestBot, latestTicket });
-	latest.current = { layout, latestSession, latestBot, latestTicket };
+	const latest = useRef({ layout, latestSession, latestBot });
+	latest.current = { layout, latestSession, latestBot };
 	const showTab = useCallback(
 		(next: SidebarTab | "sessions"): void => {
-			const { latestBot: bot, latestTicket: ticket } = latest.current;
+			const { latestBot: bot } = latest.current;
 			if (next === "bots" && bot !== null) return navigate({ kind: "bots", target: bot, routine: null });
-			if (next === "tickets" && ticket !== null) return navigate({ kind: "tickets", target: ticket });
 			if (next !== "sessions") return navigate(isWebModuleId(next) ? moduleHome(next) : TAB_PAGE[next]);
 			const { layout: panes, latestSession: session } = latest.current;
 			show(panes.panes.length === 0 && session ? openView(panes, session, "replace") : panes);

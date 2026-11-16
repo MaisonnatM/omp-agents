@@ -4,13 +4,11 @@ import { type Analytics, decodeAnalytics, type Usage } from "./analytics";
 import { type CalendarEventsAnswer, decodeCalendarEventsAnswer, decodeGoogleStatus, decodeLocalEventsAnswer, type GoogleStatus, type LocalEventsAnswer } from "./calendar";
 import { decodePullRequestList, type PullRequestList, type PullRequestSummary } from "./github";
 import { decodeEmailAnswer, type EmailAnswer } from "./gmail";
-import { decodeTicketsAnswer, type TicketsAnswer } from "./tickets";
 
-const server = { name: "linear", url: "https://mcp.linear.app/mcp", host: "mcp.linear.app" };
+const server = { name: "slack", url: "https://mcp.slack.com/mcp", host: "mcp.slack.com" };
 const googleSetup = { clientId: null, hasClientSecret: false, callbackPort: 3119, configured: false };
 const integrations: IntegrationsAnswer = {
 	integrations: {
-		linear: { id: "linear", connection: { kind: "ready", server, tools: [{ name: "list_issues", description: null }] }, signIn: null, setup: null },
 		slack: {
 			id: "slack",
 			connection: { kind: "failing", server, error: "timeout", status: null },
@@ -52,27 +50,6 @@ const email: EmailAnswer = {
 	threads: [{ account: "gmail", id: "t1", from: "Ada", subject: "Hi", snippet: "Hello", at: 1, unread: true, count: 2, url: "https://mail.google.com/t1" }],
 };
 
-const tickets: TicketsAnswer = {
-	tickets: [
-		{
-			id: "ENG-1",
-			title: "Ticket",
-			url: "https://linear.app/team/issue/ENG-1",
-			status: "Todo",
-			statusType: "unstarted",
-			priority: 3,
-			labels: [{ name: "bug", color: "#f00" }],
-			project: null,
-			team: "ENG",
-			dueDate: null,
-			createdAt: "2026-09-01T12:00:00.000Z",
-			updatedAt: "2026-10-01T12:00:00.000Z",
-			branch: "eng-1-ticket",
-			parentId: null,
-		},
-	],
-};
-
 const person = { login: "ada", avatarUrl: null };
 const pr: PullRequestSummary = {
 	owner: "acme",
@@ -110,12 +87,12 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 		decode: decodeIntegrationsAnswer,
 		whole: integrations,
 		partial: {
-			"every integration an empty record": { integrations: { linear: {}, slack: {}, "google-calendar": {}, gmail: {} } },
-			"an integration without its connection": { integrations: { ...integration, linear: { ...integration.linear, connection: undefined } } },
+			"every integration an empty record": { integrations: { slack: {}, "google-calendar": {}, gmail: {} } },
+			"an integration without its connection": { integrations: { ...integration, slack: { ...integration.slack, connection: undefined } } },
 			"a connection of an unknown kind": { integrations: { ...integration, slack: { ...integration.slack, connection: { kind: "maybe", server } } } },
 			"an account's connection that is absent": { integrations: { ...integration, gmail: { ...integration.gmail, accounts: [{ name: "gmail", address: null, addressError: null, connection: { kind: "absent" } }] } } },
-			"a ready connection without its server": { integrations: { ...integration, linear: { ...integration.linear, connection: { kind: "ready", tools: [] } } } },
-			"a ready connection that lists tool names": { integrations: { ...integration, linear: { ...integration.linear, connection: { kind: "ready", server, tools: ["list_issues"] } } } },
+			"a ready connection without its server": { integrations: { ...integration, slack: { ...integration.slack, connection: { kind: "ready", tools: [] } } } },
+			"a ready connection that lists tool names": { integrations: { ...integration, slack: { ...integration.slack, connection: { kind: "ready", server, tools: ["send_message"] } } } },
 			"a Google setup without its callback port": { integrations: { ...integration, gmail: { ...integration.gmail, setup: { ...googleSetup, callbackPort: undefined } } } },
 			"an integration under another id": { integrations: { ...integration, gmail: { ...integration.gmail, id: "slack" } } },
 		},
@@ -161,16 +138,6 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 		decode: decodeEmailAnswer,
 		whole: email,
 		partial: { "a conversation without its unread flag": { ...email, threads: [{ ...email.threads[0], unread: undefined }] } },
-	},
-	{
-		name: "tickets",
-		decode: decodeTicketsAnswer,
-		whole: tickets,
-		partial: {
-			"a ticket from before its opening date": { tickets: [{ ...tickets.tickets[0], createdAt: undefined }] },
-			"a ticket from before its parent": { tickets: [{ ...tickets.tickets[0], parentId: undefined }] },
-			"a ticket of an unknown status type": { tickets: [{ ...tickets.tickets[0], statusType: "doing" }] },
-		},
 	},
 	{
 		name: "pull requests",

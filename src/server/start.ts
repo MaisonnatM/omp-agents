@@ -1,7 +1,7 @@
 /** Starting a dashboard session: a new one, a fork of a transcript, or a past session resumed. All three spawn omp the same way. */
 import { withPinnedSkill } from "../commands";
 import { DashboardSession, type DashboardUpdate, recordedCwd } from "../dashboard-session";
-import { checkoutDir, worktreeAt } from "../git";
+import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { endedTurn, skipRefused } from "../live-session";
 import { type AdmittedLaunch, keptSessions, type RpcLaunch } from "../omp/rpc";
@@ -9,7 +9,7 @@ import { continuationOf } from "../omp/sessions";
 import { directoryOf, displayPath } from "../paths";
 import { formatOf } from "../session-formats";
 import { type PromptImage, type SessionFacts, type StartFailure, type StartRequest, type StartResult, type TaskOwner, type View } from "../shared/sessions";
-import { pullRequestTask, taskConflict, taskIdentity, ticketTask } from "../task-claims";
+import { pullRequestTask, taskConflict, taskIdentity } from "../task-claims";
 import { portFromEnv } from "./address";
 import type { LiveSessions } from "./live-sessions";
 import type { PrivateSessions } from "./private-sessions";
@@ -132,8 +132,7 @@ export function createStarter(env: StartEnv): Starter {
 				const { branch, model, thinking, skill, images } = request;
 				return claimed(taskIdentity(request), dir, async allocated => {
 					let cwd = dir;
-					// A ticket names no repository, so its branch applies only when the workspace it starts from is a git checkout.
-					if (branch && (branch.kind !== "work" || (await worktreeAt(dir)))) {
+					if (branch) {
 						try {
 							cwd = await checkoutDir(dir, branch);
 						} catch (err) {
@@ -186,10 +185,8 @@ export function createStarter(env: StartEnv): Starter {
 							resuming.add(held);
 						}
 						path = copy?.path ?? asked;
-						const facts = env.factsFor(sessionId);
-						const ticket = facts.tickets[0];
-						const pr = facts.pullRequests[0];
-						identity = sessions.savedTask(sessionId) ?? (ticket ? ticketTask(ticket) : pr ? pullRequestTask(pr) : null);
+						const pr = env.factsFor(sessionId).pullRequests[0];
+						identity = sessions.savedTask(sessionId) ?? (pr ? pullRequestTask(pr) : null);
 						// Ending the session removed the worktree it worked in, which its own directory or its agent's commands name.
 						await env.restoreWorktree(held === null ? [sessionId] : [held, sessionId]);
 						cwd = await recordedCwd(path);

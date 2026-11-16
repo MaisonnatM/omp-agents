@@ -69,8 +69,6 @@ export function parseTodoLink(value: unknown): UserTodoLink | null {
 				? { kind: "pull-request", owner, repo, number }
 				: null;
 		}
-		case "ticket":
-			return isNonEmpty(value.identifier) ? { kind: "ticket", identifier: value.identifier } : null;
 		default:
 			return null;
 	}
@@ -108,7 +106,9 @@ function parseTodo(raw: unknown, fields: Fields): UserTodo | null {
 	const todo = parseLeaf(raw, fields);
 	if (!todo || !isObject(raw)) return null;
 	const children = parseAll(raw.children, child => parseLeaf(child, fields));
-	const links = parseAll(raw.links ?? [], parseTodoLink);
+	// Todos saved before the dashboard dropped Linear may link a Linear issue; such a link reads as none, so the todo still reads.
+	const stored = Array.isArray(raw.links) ? raw.links.filter(link => !isObject(link) || link.kind !== "ticket") : (raw.links ?? []);
+	const links = parseAll(stored, parseTodoLink);
 	const { categoryId = null, workspace = null, addedBy = null } = raw;
 	if (!children || !links || !isOptional(categoryId, fields.id) || !isOptional(workspace, fields.workspace) || !isOptional(addedBy, fields.id)) return null;
 	return { ...todo, categoryId, workspace, children, links, addedBy };

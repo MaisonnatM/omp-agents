@@ -1,4 +1,3 @@
-import { errorText } from "../json";
 import type { Integrations } from "../integrations";
 import {
 	addMcpServerFrom,
@@ -9,38 +8,14 @@ import {
 	signOutMcpServer,
 	startMcpServerSignIn,
 } from "../mcp-servers";
-import {
-	attachToTicket,
-	createTicket,
-	loadLinearUsers,
-	loadTeams,
-	loadTicketDetail,
-	loadTicketMedia,
-	loadTicketOptions,
-	loadTickets,
-	saveTicket,
-} from "../tickets";
-import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
 import { GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
 import { answer, checked, fail } from "./http";
-import {
-	parseGoogleClient,
-	parseIntegrationTarget,
-	parseMcpServerAdd,
-	parseMcpServerEnabled,
-	parseMcpServerName,
-	parseSlackClient,
-	parseTicketAttachment,
-	parseTicketDraft,
-	parseTicketEdit,
-	UUID,
-} from "./wire";
-import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID } from "../shared/tickets";
+import { parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseSlackClient } from "./wire";
 import type { Handler, RouteKit, Routes } from "./route-kit";
 
-/** The MCP integrations, the other MCP servers omp loads, and Linear tickets. */
-export function integrationRoutes({ get, media, write }: RouteKit, integrations: Integrations): Routes {
+/** The MCP integrations and the other MCP servers omp loads. */
+export function integrationRoutes({ get, write }: RouteKit, integrations: Integrations): Routes {
 	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server or accounts, and the sign-in the page last started. */
 	const loaded = get((params) => answer(() => integrations.load(params.has("fresh"))));
 
@@ -95,61 +70,6 @@ export function integrationRoutes({ get, media, write }: RouteKit, integrations:
 		return {};
 	});
 
-	/** `GET /api/tickets[?fresh]`: the viewer's assigned Linear issues, or why they could not be read. */
-	const tickets = get((params) => answer(() => loadTickets(params.has("fresh"))));
-
-	/** `GET /api/ticket?id=<identifier>`: that Linear issue in full, for the tickets page's main content. */
-	const ticket = get((params) => {
-		const id = params.get("id") ?? "";
-		return TICKET_ID.test(id) ? answer(() => loadTicketDetail(id)) : fail(400, "Expected ?id= naming a Linear issue, such as ENG-123");
-	});
-
-	/** `PUT /api/ticket`: `TicketEdit`, applied in Linear; answers the issue in full as it is after it. */
-	const ticketWrite = write((body) => checked(parseTicketEdit(body), "Expected { id } naming a Linear issue and at least one field to change"), saveTicket);
-
-	/** `PUT /api/ticket/new`: `TicketDraft`, opened in Linear; answers `{ identifier }`. */
-	const ticketCreate = write(
-		(body) => checked(parseTicketDraft(body), "Expected { title, description, team } naming a Linear team by id, and fields of their own types"),
-		createTicket,
-	);
-
-	/** `PUT /api/ticket/attachment`: `TicketAttachmentUpload`, attached to the issue in Linear; answers `{}`. */
-	const ticketAttach = write(
-		(body) =>
-			checked(
-				parseTicketAttachment(body),
-				`Expected { issue, name, type, data } naming a Linear issue, with a file of at most ${MAX_TICKET_ATTACHMENT_BYTES / 1024 / 1024} MB in base64`,
-			),
-		async (upload) => {
-			await attachToTicket(upload);
-			return {};
-		},
-	);
-
-	/** `GET /api/linear/teams`: the workspace's Linear teams, `{ id, name, key }`, for the team a new issue goes in. */
-	const teams = get(() => answer(loadTeams));
-
-	/** `GET /api/linear/users`: the workspace's active Linear members, `{ id, name }`, for the composer's People. */
-	const linearUsers = get(() => answer(loadLinearUsers));
-
-	/** `GET /api/ticket/options?team=<id>`: what the field pickers offer for an issue of that Linear team. */
-	const ticketOptions = get((params) => {
-		const team = params.get("team") ?? "";
-		return UUID.test(team) ? answer(() => loadTicketOptions(team)) : fail(400, "Expected ?team= naming a Linear team by id");
-	});
-
-	/** `GET /api/ticket/media?issue=<identifier>&path=<upload path>`: a file that the issue or its comments embed, from Linear. */
-	const ticketMedia = media(async (params, req) => {
-		const issue = params.get("issue") ?? "";
-		const path = params.get("path") ?? "";
-		if (!TICKET_ID.test(issue) || !isUploadPath(path)) return fail(400, "Expected ?issue= naming a Linear issue and ?path= naming one of its files");
-		try {
-			return (await loadTicketMedia(issue, path, req.headers.get("range"), req.signal)) ?? fail(404, `${issue} embeds no file ${path}`);
-		} catch (err) {
-			return fail(502, errorText(err));
-		}
-	});
-
 	return {
 		"/api/integrations": { GET: loaded },
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
@@ -162,13 +82,5 @@ export function integrationRoutes({ get, media, write }: RouteKit, integrations:
 		"/api/mcp-servers/remove": { PUT: mcpServerRemove },
 		"/api/integrations/slack/client": { PUT: slackClient },
 		...Object.fromEntries(GOOGLE_SERVICES.map((id) => [`/api/integrations/${id}/client`, { PUT: googleClient(id) }])),
-		"/api/tickets": { GET: tickets },
-		"/api/linear/teams": { GET: teams },
-		"/api/linear/users": { GET: linearUsers },
-		"/api/ticket": { GET: ticket, PUT: ticketWrite },
-		"/api/ticket/new": { PUT: ticketCreate },
-		"/api/ticket/attachment": { PUT: ticketAttach },
-		"/api/ticket/options": { GET: ticketOptions },
-		"/api/ticket/media": { GET: ticketMedia },
 	};
 }

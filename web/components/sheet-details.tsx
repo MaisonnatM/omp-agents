@@ -1,4 +1,4 @@
-/** The parts shared by a pull request's details and the tickets page's issue details. */
+/** The parts of a pull request's details. */
 import { IconSquareArrowTopRight } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
@@ -47,10 +47,7 @@ export function OutLink({ href, children }: { href: string; children: ReactNode 
 	);
 }
 
-/**
- * Markdown from GitHub or Linear. Linear's can hold raw HTML too, which GitHub's sanitizing renders safely and whose
- * unknown tags it unwraps.
- */
+/** Markdown from GitHub, whose raw HTML GitHub's sanitizing renders safely and whose unknown tags it unwraps. */
 export function Markdown({ text, className }: { text: string; className?: string }) {
 	return (
 		<div className={cn("text-sm [&_img]:max-w-full", className)}>

@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, the text files agent text names through, each module's own routes, and the dashboard's own build and update.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, the text files agent text names through, each module's own routes, and the dashboard's own build and update.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { isObject } from "../json";
@@ -25,7 +25,6 @@ import { pullRequestRoutes, type PullRequestRoutesEnv } from "./pull-request-rou
 import { sessionRoutes } from "./session-routes";
 import { phoneAccessRoutes, type PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { syncRoutes, type SyncRoutesEnv } from "./sync-routes";
-import { todoRoutes, type TodoRoutesEnv } from "./todo-routes";
 import { artifactRoutes, type ArtifactRoutesEnv } from "./artifact-routes";
 
 /** Everything the HTTP API reads, by concern. */
@@ -38,7 +37,6 @@ export interface RouteEnv {
 	gmail: GmailAccounts;
 	files: FileRoutesEnv;
 	artifacts: ArtifactRoutesEnv;
-	todos: TodoRoutesEnv;
 	pullRequests: PullRequestRoutesEnv;
 	dashboard: DashboardRoutesEnv;
 	sync: SyncRoutesEnv;
@@ -72,7 +70,6 @@ export function createRoutes(env: RouteEnv): Routes {
 		...pullRequestRoutes(kit, env.pullRequests),
 		...fileRoutes(kit, env.files),
 		...artifactRoutes(kit, env.artifacts),
-		...todoRoutes(kit, env.todos),
 		...dashboardRoutes(kit, env.dashboard),
 		...syncRoutes(kit, env.sync),
 		...processRoutes(kit, env.processes),

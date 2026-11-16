@@ -10,11 +10,10 @@ import { localDay } from "../../../src/shared/days";
 import { ALL_WORKSPACES, folderName } from "../../labels";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
-import { PRIORITY_LABEL } from "../../tickets-model";
 import { sectionId } from "../../section";
 import { groupFoldKey, groupTodos, keepsTodo, NO_FILTER, filters, type TodoGroup } from "../../todo-filter";
 import { useTodoDisplay, useTodoFilter } from "../../todo-state";
-import { inScope, LIST_KINDS, lastOf, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf, leftIn } from "../../todo-views";
+import { inScope, LIST_KINDS, lastOf, placeIn, PRIORITY_LABEL, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf, leftIn } from "../../todo-views";
 import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
@@ -48,7 +47,6 @@ interface TodoPageProps {
 	newSessionCwd: string;
 	/** The Workspaces a todo's Workspace picker offers. */
 	workspaces: Workspace[];
-	linearConnected: boolean;
 }
 
 /** The groups you folded or unfolded, by `groupFoldKey`; Done and Canceled start folded. */
@@ -142,7 +140,7 @@ export function TodoPage({ list, ...props }: TodoPageProps) {
 	return <LoadedTodoPage list={list} {...props} />;
 }
 
-function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, workspaces, linearConnected }: TodoPageProps & { list: UserTodoList }) {
+function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, workspaces }: TodoPageProps & { list: UserTodoList }) {
 	// The sidebar's workspace narrows the list.
 	const { scope } = useDashboardStatus();
 	/** The Workspace a todo added here names, which its sessions start in: the sidebar's; `null` for none. */
@@ -383,7 +381,6 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 							sessions={sessions}
 							newSessionCwd={newSessionCwd}
 							workspaces={workspaces}
-							linearConnected={linearConnected}
 						/>
 					)
 				}

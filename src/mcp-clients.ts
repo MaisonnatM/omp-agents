@@ -4,7 +4,6 @@
  */
 import { type McpServerConfig, readMcpServers, serversOnHost, userMcpConfigPath } from "./omp/mcp";
 import {
-	type ClientService,
 	type ClientSetups,
 	DEFAULT_GOOGLE_CALLBACK_PORT,
 	GOOGLE_SCOPES,
@@ -81,15 +80,11 @@ export function googleSetupFrom(server: McpServerConfig | undefined): GoogleSetu
 const savedServer = async (host: string): Promise<McpServerConfig | undefined> => serversOnHost(await readMcpServers(userMcpConfigPath()), host)[0]?.config;
 
 const SETUP_OF: { [C in McpClient]: (host: string) => Promise<ClientSetups[C]> } = {
-	none: async () => null,
 	"slack-app": async host => slackSetupFrom(await savedServer(host)),
 	"google-oauth": async host => googleSetupFrom(await savedServer(host)),
 };
 
-/**
- * Service `id`'s setup from the user MCP file, as its `client` decides: an unconfigured app or client still gets its
- * defaults, and a service that registers its own client, Linear, has `null` without reading the file.
- */
+/** Service `id`'s setup from the user MCP file, as its `client` decides: an unconfigured app or client still gets its defaults. */
 export function clientSetup<Id extends McpIntegrationId>(id: Id): Promise<McpSetup<Id>> {
 	const client: (typeof MCP_SERVICES)[Id]["client"] = MCP_SERVICES[id].client;
 	return SETUP_OF[client](MCP_SERVICES[id].host);
@@ -100,7 +95,7 @@ export function clientSetup<Id extends McpIntegrationId>(id: Id): Promise<McpSet
  * server on its host for a service of many accounts, since each account signs in with the same client.
  * An omitted secret is copied from the same client ID. Changing the client ID without a new secret throws.
  */
-async function planClientSave(filePath: string, id: ClientService, clientId: string, submitted: string | undefined, oauth: NonNullable<McpServerConfig["oauth"]>): Promise<ClientSave> {
+async function planClientSave(filePath: string, id: McpIntegrationId, clientId: string, submitted: string | undefined, oauth: NonNullable<McpServerConfig["oauth"]>): Promise<ClientSave> {
 	const { label, host, url, serverName, accounts } = MCP_SERVICES[id];
 	const servers = await readMcpServers(filePath);
 	const onHost = serversOnHost(servers, host);

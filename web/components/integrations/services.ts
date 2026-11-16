@@ -1,6 +1,6 @@
 /** What Settings › Integrations shows of each MCP-backed service, shared by its rows and Settings › MCP servers. */
 import { googleMcpEnableUrl, hasAccounts, isGoogleIntegration, type McpConnection, type McpIntegration, type McpIntegrationId, signedIn } from "../../../src/shared/accounts";
-import { type BrandLogo, GMAIL_LOGO, GOOGLE_CALENDAR_LOGO, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
+import { type BrandLogo, GMAIL_LOGO, GOOGLE_CALENDAR_LOGO, SLACK_LOGO } from "./brand-logos";
 import { GOOGLE_TEXT } from "./google-client-form";
 import { REMOTE_STATUS, type StatusLabel, WAITING_STATUS } from "./mcp-connection-controls";
 
@@ -8,15 +8,11 @@ interface Service {
 	logo: BrandLogo;
 	/** What the connection gives the dashboard and omp's sessions. */
 	gives: string;
-	/** What the service's own OAuth client is called, for a service that needs one. */
-	client?: string;
+	/** What the service's own OAuth client is called. */
+	client: string;
 }
 
 export const SERVICES: Record<McpIntegrationId, Service> = {
-	linear: {
-		logo: LINEAR_LOGO,
-		gives: "Your assigned issues on the Linear tickets tab, and Linear's tools in every omp session.",
-	},
 	slack: {
 		logo: SLACK_LOGO,
 		gives: "Search, read, and send in the conversations you grant, in every omp session.",
@@ -47,7 +43,7 @@ export function integrationStatus(integration: McpIntegration): StatusLabel {
 	}
 	const { signIn, setup, connection } = integration;
 	if (signIn?.phase === "waiting") return WAITING_STATUS;
-	return setup !== null && !setup.configured && !signedIn(connection) ? { label: "Not set up", color: "gray" } : STATUS[connection.kind];
+	return !setup.configured && !signedIn(connection) ? { label: "Not set up", color: "gray" } : STATUS[connection.kind];
 }
 
 /** For a Google server that answered 403, the API to turn on and Google's page that turns it on; otherwise `null`. */

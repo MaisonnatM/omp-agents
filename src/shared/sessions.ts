@@ -7,7 +7,6 @@ import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullReq
 import type { ModelOption } from "./models";
 import type { TrustAsk } from "./project-trust";
 import type { AdvisorState, CompactionState, GoalSlot } from "./session-controls";
-import { TICKET_ID } from "./tickets";
 import type { Workspace } from "./workspaces";
 
 export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
@@ -97,15 +96,10 @@ export interface SessionBranch {
 	pullRequest: PullRequest | null;
 }
 
-/** What the index of session files knows of a session: the pull requests and Linear issues it worked on, its /ship stage, its worktree, its branch, and its workspace. */
+/** What the index of session files knows of a session: the pull requests it worked on, its /ship stage, its worktree, its branch, and its workspace. */
 export interface SessionFacts {
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
-	/**
-	 * The Linear issues the session and its subagents changed, opened, or commented on, its /ship run's, and the one a Linear link in its own
-	 * prompt names, by identifier; an issue read or named only links once two of a read, the session's own prompt, and its branch agree. The session's own first.
-	 */
-	tickets: string[];
 	ship: ShipProgress | null;
 	/** The arenas the session recorded, in the order it started them. */
 	arenas: readonly ArenaRecord[];
@@ -338,12 +332,11 @@ export type ControlPhase =
 	| { phase: "reconnecting"; reason: string }
 	| { phase: "ended"; reason: string };
 
-/** What a session started from a quick action works on: a pull request, or a Linear issue by its identifier. */
-export type WorkItem = { kind: "pull-request"; pr: PullRequest } | { kind: "ticket"; id: string };
+/** What a session started from a quick action works on: a pull request. */
+export type WorkItem = { kind: "pull-request"; pr: PullRequest };
 
-/** Whether `links`, a session's pull requests and Linear issues, name `item`. */
-export const worksOn = (links: Pick<RosterHost, "pullRequests" | "tickets">, item: WorkItem): boolean =>
-	item.kind === "ticket" ? links.tickets.includes(item.id) : links.pullRequests.some(pr => samePullRequest(pr, item.pr));
+/** Whether `links`, a session's pull requests, name `item`. */
+export const worksOn = (links: Pick<RosterHost, "pullRequests">, item: WorkItem): boolean => links.pullRequests.some(pr => samePullRequest(pr, item.pr));
 
 /**
  * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` and `images` as
@@ -444,7 +437,8 @@ export function parseBranchChoice(value: unknown): Parsed<BranchChoice | null> {
 function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
 	if (value === null || value === undefined) return { ok: null };
 	if (!isObject(value)) return null;
-	if (value.kind === "ticket") return typeof value.id === "string" && TICKET_ID.test(value.id) ? { ok: { kind: "ticket", id: value.id } } : null;
+	// A start scheduled on a Linear issue before the dashboard dropped Linear works on nothing in particular.
+	if (value.kind === "ticket") return { ok: null };
 	if (value.kind !== "pull-request" || !isObject(value.pr)) return null;
 	const pr = parsePullRequest(value.pr.owner, value.pr.repo, value.pr.number);
 	return pr && { ok: { kind: "pull-request", pr: pr.ok } };

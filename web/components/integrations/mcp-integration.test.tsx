@@ -41,8 +41,13 @@ describe("McpIntegrationRow", () => {
 	});
 
 	test("a 403 from a server that is not Google's gets no enable link", () => {
-		const linear: McpIntegration = { id: "linear", connection: { ...failing(403, 'The "linear" MCP server answered HTTP 403'), server: { name: "linear", url: "https://mcp.linear.app/mcp", host: "mcp.linear.app" } }, signIn: null, setup: null };
-		const html = row(linear);
+		const slack: McpIntegration = {
+			id: "slack",
+			connection: { ...failing(403, 'The "slack" MCP server answered HTTP 403'), server: { name: "slack", url: "https://mcp.slack.com/mcp", host: "mcp.slack.com" } },
+			signIn: null,
+			setup: { clientId: "1.2", hasClientSecret: true, redirectUri: null, callbackPort: 3118, scope: "", configured: true },
+		};
+		const html = row(slack);
 		expect(html).toContain("answered HTTP 403");
 		expect(html).not.toContain("console.developers.google.com");
 	});

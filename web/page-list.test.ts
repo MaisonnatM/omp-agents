@@ -5,13 +5,12 @@ import type { Page } from "./routing";
 const BOTS: Page = { kind: "bots", target: null, adding: false };
 const TODO: Page = { kind: "todo", list: { kind: "all" }, open: null };
 
-test("only a tab's or Settings' own page has a list; the panes, New session, Notifications, the Pull requests and Tickets pages, and a page its row does not match have none", () => {
+test("only a tab's or Settings' own page has a list; the panes, New session, Notifications, the Pull requests page, and a page its row does not match have none", () => {
 	expect(listPageOf(BOTS, "bots")).toBe(BOTS);
 	expect(listPageOf(null, null)).toBeNull();
 	expect(listPageOf({ kind: "new" } as Page, "new")).toBeNull();
 	expect(listPageOf({ kind: "notifications" }, "notifications")).toBeNull();
 	expect(listPageOf({ kind: "pull-requests", target: null }, "pull-requests")).toBeNull();
-	expect(listPageOf({ kind: "tickets", target: null }, "tickets")).toBeNull();
 	expect(listPageOf({ kind: "calendar" } as Page, "calendar")).not.toBeNull();
 	expect(listPageOf(BOTS, null)).toBeNull();
 });

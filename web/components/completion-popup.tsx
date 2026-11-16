@@ -6,12 +6,9 @@ import { activityControl } from "../activity";
 import { completionTrigger, type Trigger } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
-import type { TicketChoice } from "../../src/shared/tickets";
-import { useMailAndEvents, useRead, useSearchSources } from "../reads";
+import { useMailAndEvents, useSearchedPullRequests } from "../reads";
 import { useDashboardStatus, useMentionLists } from "./dashboard-context";
 import type { PromptEditorHandle } from "./prompt-editor";
-
-const NO_USERS: TicketChoice[] = [];
 
 export function CompletionPopup({ id, sections, active, onPick, error }: {
 	id: string;
@@ -94,7 +91,7 @@ interface Completion {
 /**
  * omp's commands behind `/`, its skills behind `$`, and the `@` menu, for a composer: suggestions follow the caret, and the open list
  * owns Esc, the arrows, Tab, and Enter. Live sessions, the new-session draft, and a Bot's composer share it, so all offer the same commands and skills.
- * The `@` menu adds todos, tickets, pull requests, people, email, events, and sessions to omp's files; it asks the server only for files.
+ * The `@` menu adds todos, pull requests, people, email, events, and sessions to omp's files; it asks the server only for files.
  */
 export function useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer }: CompletionOptions): Completion {
 	/** What opened the list, and the `complete` request whose answer it shows, if it sent one. */
@@ -107,14 +104,13 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 	const token = menu?.trigger.kind === "mention" ? menu.trigger.token : null;
 	const query = token && mentionQuery(token);
 	const { pullRequestsScope } = useDashboardStatus();
-	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), pullRequestsScope);
+	const pullRequestRepos = useSearchedPullRequests(pullRequestsScope);
 	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"));
-	const linearUsers = useRead<TicketChoice[]>(query !== null && wants(query, "person") ? "/api/linear/users" : null).data ?? NO_USERS;
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	// omp answers `/` with a `skill:` row besides its commands, and `/skill:` with skills only; each list keeps its own kind.
 	const ompItems = menu && menu.trigger.kind !== "mention" ? (answer?.items ?? []).filter(item => item.kind === menu.trigger.kind) : [];
 	const sections: MenuSection[] = token
-		? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos, linearUsers, threads, events }, composer, files: answer?.items ?? null })
+		? mentionMenu({ text: draft, token, data: { ...lists, pullRequestRepos, threads, events }, composer, files: answer?.items ?? null })
 		: ompItems.length
 			? [{ title: null, options: ompItems.map(completionOption) }]
 			: [];

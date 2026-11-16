@@ -1,10 +1,9 @@
 /** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
-import { IconBubbleText, IconCalendarDays, IconEmail1, IconRunShortcut, IconFileBend, IconFolder1, IconPullRequest, IconSparklesTwo, IconTicket, IconTodos, IconUser } from "central-icons";
+import { IconBubbleText, IconCalendarDays, IconEmail1, IconRunShortcut, IconFileBend, IconFolder1, IconPullRequest, IconSparklesTwo, IconTodos, IconUser } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { everyWord } from "../src/shared/every-word";
 import { isBotAuthor, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
-import type { Ticket as LinearTicket, TicketChoice } from "../src/shared/tickets";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
 import type { UserTodo } from "../src/user-todos-shared";
 import type { MailThread } from "../src/shared/gmail";
@@ -14,7 +13,7 @@ import { hostLabel, pastLabel } from "./labels";
 import { listedPullRequests } from "./pull-requests-model";
 import type { MentionEvent } from "./reads";
 
-export type CategoryId = "file" | "todo" | "ticket" | "pull-request" | "person" | "mail" | "event" | "session";
+export type CategoryId = "file" | "todo" | "pull-request" | "person" | "mail" | "event" | "session";
 
 /** The page's lists that every composer shares. */
 export interface MentionLists {
@@ -23,12 +22,9 @@ export interface MentionLists {
 	past: PastSession[];
 }
 
-/** What the sources list: the page's lists, then what the menu polls while it needs them, tickets, mail, and events, and the selected workspace's pull requests. */
+/** What the sources list: the page's lists, then what the menu polls while it needs them, mail and events, and the selected workspace's pull requests. */
 export interface MentionData extends MentionLists {
-	tickets: LinearTicket[];
 	pullRequestRepos: RepoPullRequests[];
-	/** The Linear workspace's active members. */
-	linearUsers: TicketChoice[];
 	threads: MailThread[];
 	events: MentionEvent[];
 }
@@ -159,13 +155,6 @@ const CATEGORIES: readonly Category[] = [
 			),
 	}),
 	source({
-		id: "ticket",
-		prefix: "ticket",
-		title: "Tickets",
-		icon: IconTicket,
-		list: ({ tickets }) => tickets.map(ticket => ({ label: ticket.title, detail: ticket.id, reference: `[${linkText(`${ticket.id} ${ticket.title}`)}](${ticket.url})` })),
-	}),
-	source({
 		id: "pull-request",
 		prefix: "pr",
 		title: "Pull requests",
@@ -181,10 +170,7 @@ const CATEGORIES: readonly Category[] = [
 		prefix: "person",
 		title: "People",
 		icon: IconUser,
-		list: ({ pullRequestRepos, linearUsers }) => [
-			...pullRequestPeople(pullRequestRepos),
-			...linearUsers.map(user => ({ label: user.name, detail: "Linear", reference: `Linear user ${JSON.stringify(user.name)} (id ${user.id})` })),
-		],
+		list: ({ pullRequestRepos }) => pullRequestPeople(pullRequestRepos),
 	}),
 	source({
 		id: "mail",

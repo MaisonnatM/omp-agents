@@ -31,7 +31,7 @@ import { age, ALL_WORKSPACES, folderName, hostLabel, pastLabel } from "../../lab
 import { MODULE_LIST } from "../../modules";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
-import { useConversationHits, useRead, useSearchSources } from "../../reads";
+import { useConversationHits, useRead, useSearchedPullRequests } from "../../reads";
 import { isPhonePage } from "../../api";
 import { DASHBOARD_UPDATE_URL, updateDashboard } from "../../dashboard-update";
 import { hashForSettings, type OpenMode, SETTINGS_GROUP_LABEL, SETTINGS_SECTIONS } from "../../routing";
@@ -70,7 +70,6 @@ const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	settings: PAGE_ICON.settings,
 	help: IconKeyboard,
 	"pull-requests": PAGE_ICON["pull-requests"],
-	newTicket: PAGE_ICON.tickets,
 	bots: PAGE_ICON.bots,
 	sessions: PAGE_ICON.sessions,
 	todo: PAGE_ICON.todo,
@@ -99,16 +98,12 @@ interface CommandPaletteProps {
 	todoCategories: readonly UserTodoCategory[] | null;
 	/** The todo list's top-level todos, which a search lists. */
 	todos: readonly UserTodo[];
-	/** Linear answers and the sidebar shows Tickets, so a search lists the tickets assigned to you. */
-	ticketsCallable: boolean;
-	/** Open the new-ticket dialog with a title, which a search offers while tickets are callable. */
-	onCreateTicket: (title: string) => void;
 }
 
 /**
  * Searches running and past sessions in every workspace, the page's commands, and workspaces, and for a search
- * also the todos, your Linear tickets, the sidebar workspace's pull requests, and the settings sections; Enter runs the highlighted entry's first
- * action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title. Its props hold no closure
+ * also the todos, the sidebar workspace's pull requests, and the settings sections; Enter runs the highlighted entry's first
+ * action, ⌘K lists the rest, and what you type can become a todo. Its props hold no closure
  * built per render, so a socket update that touches none of them skips it, and a closed palette renders and reads nothing.
  */
 export const CommandPalette = memo(function CommandPalette({ state, ...props }: CommandPaletteProps) {
@@ -128,7 +123,7 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.filter(({ value
 	actions: [[{ id: "open", title: "Open", icon, run: { kind: "link", href: hashForSettings(value) } }]],
 }));
 
-function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, unavailable, todoCategories, todos, ticketsCallable, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
+function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, unavailable, todoCategories, todos }: CommandPaletteProps & { state: PaletteState }) {
 	// What the page's shortcuts run as the palette opens; each with a command title lists as a command.
 	const [handlers] = useState(registeredHandlers);
 	const { send, start, end, changeTodo, workspaceSettings } = useDashboardActions();
@@ -136,7 +131,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const focusInput = useCallback(() => inputRef.current?.focus(), []);
-	const { tickets, pullRequestRepos } = useSearchSources(ticketsCallable, pullRequestsScope);
+	const pullRequestRepos = useSearchedPullRequests(pullRequestsScope);
 	// One clock for as long as the palette is open, so a row's frecency does not decay and reorder the list under the pointer.
 	const [now] = useState(() => Date.now());
 	const frame = topFrame(state);
@@ -164,7 +159,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 				end,
 				workspaceSettings: workspaceSettings(cwd),
 			});
-			const keywords = [...row.pullRequests.map(pr => `${pr.repo}#${pr.number}`), ...row.tickets];
+			const keywords = row.pullRequests.map(pr => `${pr.repo}#${pr.number}`);
 			return entry.kind === "live"
 				? {
 						id: `session:${entry.host.instanceId}`,
@@ -271,7 +266,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 		];
 	}, [workspaces, workspace, onPickWorkspace]);
 
-	const records = useMemo((): PaletteItem[] => recordItems({ todos, tickets, pullRequestRepos }), [todos, tickets, pullRequestRepos]);
+	const records = useMemo((): PaletteItem[] => recordItems({ todos, pullRequestRepos }), [todos, pullRequestRepos]);
 	const conversations = useMemo(
 		(): PaletteItem[] =>
 			conversationItems(hits, hosts, past, (opened, cwd, mode, messageId) => {
@@ -302,30 +297,13 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 						},
 					]
 				: [];
-		/** What you typed, as the title of a new Linear issue in the dialog that opens it. */
-		const ticketItem = (): PaletteItem[] =>
-			ticketsCallable && search
-				? [
-						{
-							id: "fallback:create-ticket",
-							section: "fallback",
-							title: `Create ticket “${search}”`,
-							keywords: [],
-							icon: PAGE_ICON.tickets,
-							accessories: [],
-							kind: "Ticket",
-							actions: [[{ id: "create", title: "Create ticket", icon: PAGE_ICON.tickets, run: { kind: "do", fn: () => onCreateTicket(search) } }]],
-						},
-					]
-				: [];
-
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
-			root: () => [...sessionItems, ...records, ...conversations, ...commandItems, ...SETTINGS_ITEMS, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
+			root: () => [...sessionItems, ...records, ...conversations, ...commandItems, ...SETTINGS_ITEMS, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`)],
 			workspaces: () => workspaceItems,
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems, search, todoCategories, workspace, changeTodo, ticketsCallable, onCreateTicket]);
+	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems, search, todoCategories, workspace, changeTodo]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;

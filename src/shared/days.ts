@@ -1,4 +1,4 @@
-/** Local days as todos, tickets, the calendar, and Settings › Activity name them: `YYYY-MM-DD`, which sorts as the days do; and the `HH:MM` of a time input. */
+/** Local days as todos, the calendar, and Settings › Activity name them: `YYYY-MM-DD`, which sorts as the days do; and the `HH:MM` of a time input. */
 
 /** A day's milliseconds, ignoring daylight saving's long and short days. */
 export const DAY_MS = 86_400_000;

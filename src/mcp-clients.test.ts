@@ -188,11 +188,10 @@ test("a Google client without a saved callback port is not set up, since omp wou
 	});
 });
 
-test("each service's setup follows its client: Linear has none, Slack its app, and a Google service its OAuth client or the defaults", async () => {
+test("each service's setup follows its client: Slack its app, and a Google service its OAuth client or the defaults", async () => {
 	const path = userMcpConfigPath();
 	try {
 		await save(path, app);
-		expect(await clientSetup("linear")).toBeNull();
 		expect(await clientSetup("slack")).toEqual({ clientId: "111.222", hasClientSecret: true, redirectUri: app.redirectUri, callbackPort: 8787, scope: app.scope, configured: true });
 		expect(await clientSetup("gmail")).toEqual(googleSetupFrom(undefined));
 	} finally {

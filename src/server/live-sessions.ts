@@ -10,7 +10,7 @@ import type { HostSnapshot } from "../omp/collab";
 import { displayPath, unreadFile } from "../paths";
 import { oneLine } from "../session-entries";
 import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
-import { pullRequestTask, TaskClaims, ticketTask } from "../task-claims";
+import { pullRequestTask, TaskClaims } from "../task-claims";
 import { portFromEnv } from "./address";
 import { TurnWaits } from "./turn-waits";
 
@@ -39,7 +39,7 @@ const unreadTurn = ({ at, reply }: EndedTurn): UnreadTurn => ({ at, reply: first
 /** `facts` with `subject` first among the session's links, unless its tool calls named it already. */
 export function withSubject(facts: SessionFacts, subject: WorkItem | undefined): SessionFacts {
 	if (!subject || worksOn(facts, subject)) return facts;
-	return subject.kind === "ticket" ? { ...facts, tickets: [subject.id, ...facts.tickets] } : { ...facts, pullRequests: [{ ...subject.pr, link: "worked" }, ...facts.pullRequests] };
+	return { ...facts, pullRequests: [{ ...subject.pr, link: "worked" }, ...facts.pullRequests] };
 }
 
 /** The first line of `reply` that holds text, as one summary line. */
@@ -141,7 +141,7 @@ export class LiveSessions {
 			let matches = savedIdentity === identity;
 			if (!savedIdentity) {
 				const facts = withSubject(factsOf(session.sessionId), this.#subjects.get(session.instanceId));
-				matches = facts.tickets.some(id => identity === ticketTask(id)) || facts.pullRequests.some(pr => identity === pullRequestTask(pr));
+				matches = facts.pullRequests.some(pr => identity === pullRequestTask(pr));
 			}
 			if (matches && (await repositoryAt(session.cwd) ?? session.cwd) === repository) {
 				return { identity, instanceId: session.instanceId, sessionId: session.sessionId, cwd: session.cwd, port: portFromEnv() };

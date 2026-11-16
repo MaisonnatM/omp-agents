@@ -9,14 +9,13 @@ const FEATURES: Feature[] = [
 	{ kind: "command", key: "help", label: "Help" },
 	{ kind: "command", key: "tools", label: "Toggle tool calls" },
 	{ kind: "view", key: "todo", label: "Todo" },
-	{ kind: "view", key: "calendar", label: "Calendar" },
-	{ kind: "view", key: "email", label: "Email", tab: "email" },
+	{ kind: "view", key: "sport", label: "Sport", tab: "sport" },
 ];
 
 const use = (kind: ActivityUse["kind"], key: string, count: number): ActivityUse => ({ kind, key, count, days: 1, lastAt: 10, keyboard: 0, palette: 0 });
 
 describe("inventory", () => {
-	const features = inventory(["/api/todo", "/api/ticket/new", "/api/gmail/send"]);
+	const features = inventory(["/api/todo"]);
 	const keys = (kind: Feature["kind"]): string[] => features.filter(feature => feature.kind === kind).map(({ key }) => key);
 
 	test("lists every view the recorder names: each of VIEWS and each settings section", () => {
@@ -29,15 +28,9 @@ describe("inventory", () => {
 		expect(features.filter(({ key }) => !ACTIVITY_KEY.test(key))).toEqual([]);
 	});
 
-	test("gates the Tickets and Email views, commands, and routes on their tab", () => {
+	test("leaves a feature ungated when no gated module owns it", () => {
 		const tabOf = (kind: Feature["kind"], key: string) => features.find(feature => feature.kind === kind && feature.key === key)?.tab;
-		expect(tabOf("view", "tickets/item")).toBe("tickets");
-		expect(tabOf("view", "email/new")).toBe("email");
-		expect(tabOf("command", "new-ticket")).toBe("tickets");
-		expect(tabOf("command", "tickets-new")).toBe("tickets");
-		expect(tabOf("command", "email-reply")).toBe("email");
-		expect(tabOf("action", "put /api/ticket/new")).toBe("tickets");
-		expect(tabOf("action", "put /api/gmail/send")).toBe("email");
+		expect(tabOf("view", "todo")).toBeUndefined();
 		expect(tabOf("action", "put /api/todo")).toBeUndefined();
 	});
 });
@@ -48,17 +41,17 @@ describe("report", () => {
 			uses: [use("command", "new-session", 5), use("view", "todo", 2), use("view", "notes", 9)],
 			lastUsed: [{ kind: "command" as const, key: "help", at: 3 }],
 		};
-		const result = report(FEATURES, answer, new Set(["email"]));
+		const result = report(FEATURES, answer, new Set(["sport"]));
 		expect(result.used.map(({ key }) => key)).toEqual(["new-session"]);
 		expect(result.rarely.map(({ key }) => key)).toEqual(["todo"]);
-		expect(result.never.map(({ key, lastAt }) => [key, lastAt])).toEqual([["help", 3], ["tools", null], ["calendar", null]]);
-		expect(result.notSetUp.map(({ key }) => key)).toEqual(["email"]);
+		expect(result.never.map(({ key, lastAt }) => [key, lastAt])).toEqual([["help", 3], ["tools", null]]);
+		expect(result.notSetUp.map(({ key }) => key)).toEqual(["sport"]);
 	});
 
 	test("a gated feature counts once its tab is signed in", () => {
 		const result = report(FEATURES, { uses: [], lastUsed: [] }, new Set());
 		expect(result.notSetUp).toEqual([]);
-		expect(result.never.map(({ key }) => key)).toContain("email");
+		expect(result.never.map(({ key }) => key)).toContain("sport");
 	});
 
 	test("most used is the used then the rarely used, most first, at most 20", () => {

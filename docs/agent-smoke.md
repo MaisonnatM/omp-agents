@@ -82,7 +82,6 @@ Besides a live session's own hash, the routes are:
 
 - `#past/<session id>`, `#session/<session id>`;
 - `#pull-requests`, `#pull-requests/<owner>/<repo>/<number>`, `#pull-requests/<owner>/<repo>/<number>/files`, `#pull-requests/<owner>/<repo>/<number>/files/<encoded path>`;
-- `#tickets`, `#tickets/<identifier>`;
 - `#email`, `#email/new`, `#email/<account>/<thread id>`;
 - `#sport`, `#sport?day=<YYYY-MM-DD>`, `#sport/journal`, `#sport/journal?open=<log id>`, `#sport/progress`;
 - `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;

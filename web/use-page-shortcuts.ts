@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef } from "react";
+import { type Dispatch, useEffect, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
 import type { PaletteEvent, PaletteState } from "./command-palette";
 import { followMouseHistoryButtons, goInHeaderTab, useHeaderTabHistory } from "./header-tab-history";
@@ -18,8 +18,6 @@ export interface PageShortcutInput {
 	view: View | null;
 	/** The sidebar tabs signed out or turned off; their shortcuts and commands do not apply. */
 	absentTabs: ReadonlySet<SidebarTab>;
-	/** The dashboard can create Linear issues, and the sidebar shows Tickets, so the new-ticket shortcut applies. */
-	ticketsCallable: boolean;
 	/** The right sidebar has a session to show. */
 	hasDetails: boolean;
 	/** Sends the focused session **Open pull request**'s prompt, or `null` while its branch can take no pull request, as `offeredPrompt` says, or a press of it is under way. */
@@ -28,7 +26,6 @@ export interface PageShortcutInput {
 	setGoal: (() => void) | null;
 	palette: PaletteState | null;
 	dispatchPalette: Dispatch<PaletteEvent>;
-	setNewTicket: Dispatch<SetStateAction<string | null>>;
 	openNewSession: (cwd?: string) => void;
 	open: (view: View, mode: "replace") => void;
 	show: (layout: Layout) => void;
@@ -109,11 +106,6 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (page?.kind === "pull-requests" && !page.target) return;
 				latest.current.showTab("pull-requests");
 			},
-			newTicket: () => {
-				const { ticketsCallable, setNewTicket } = latest.current;
-				if (!ticketsCallable) return false;
-				setNewTicket(current => current ?? "");
-			},
 			bots: goToTab("bots"),
 			sessions: () => {
 				if (!latest.current.page) return;
@@ -150,7 +142,7 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 	}, []);
 	useShortcuts(handlers);
 	useEffect(followMouseHistoryButtons, []);
-	const { absentTabs, ticketsCallable, hasDetails } = input;
+	const { absentTabs, hasDetails } = input;
 	const canOpenPullRequest = input.openPullRequest !== null;
 	const canSetGoal = input.setGoal !== null;
 	const canMaximize = input.page === null && input.layout.panes.length > 1;
@@ -161,7 +153,6 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 			new Set<ShortcutId>([
 				// A sidebar tab's shortcut has the tab's id.
 				...(absentTabs satisfies ReadonlySet<ShortcutId>),
-				...(ticketsCallable ? [] : ["newTicket" as const]),
 				...(hasDetails ? [] : ["detailsSidebar" as const, "detailsBrowser" as const]),
 				...(canMaximize ? [] : ["maximizePane" as const]),
 				...(canOpenPullRequest ? [] : ["openPullRequest" as const]),
@@ -169,7 +160,7 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				...(canGoBack ? [] : ["back" as const]),
 				...(canGoForward ? [] : ["forward" as const]),
 			]),
-		[absentTabs, ticketsCallable, hasDetails, canMaximize, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
+		[absentTabs, hasDetails, canMaximize, canOpenPullRequest, canSetGoal, canGoBack, canGoForward],
 	);
 	return unavailable;
 }

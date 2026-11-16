@@ -18,25 +18,19 @@
   **Merge stack**, under the rail, merges the whole stack into the bottom one's base, bottom first, after a confirmation with the merge methods the repository allows.
   The dashboard's server merges each one once the one below it merged, retargeting it onto that base, marking a draft ready, and updating its branch as GitHub requires, as a merge that waits until it is ready does; the line under the rail says which one it is on and what it waits on, with **Cancel**.
   It stops at the first one that fails, with the reason, and leaves the ones above it as they are.
-- A session's row menu has **Open ENG-2368** for each Linear issue the session worked on, by identifier, and so does the ticket button in its header.
-  It opens the issue's details beside the tickets list (`#tickets/<identifier>`), and shows the **Tickets** tab's icon.
-  An issue counts when the session or one of its subagents changed or opened it (`save_issue`) or commented on it (`save_comment`), when the session names it in its `/ship` step, or when a Linear link to it is in the session's own prompt.
-  Weaker evidence counts once two kinds of it agree: a read with omp's Linear tools (`get_issue`, `list_comments`), its identifier in the session's own prompt, and the session's branch, such as `eng-2716-agent-templates` or `me/eng-2712`.
-  So an issue a subagent only read for context does not count, and neither does one that a `list_issues` search only listed.
 - Agents start `/ship` on their own when a request will end in a pull request, and say so in their first reply; answer "no ship" to work without it.
   A /ship run has nine steps: ticket, plan, implementation, draft PR, interface review, thermonuclear review, ready gate, live review, and merged.
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.
   In the plan step the agent compares up to three ways to build the change and posts the one it chose on the Linear issue, or in the PR body when there is no issue.
   omp writes each step to its session file, and the dashboard reads those entries for running and past sessions; a todo whose linked session's run reached merged shows **Shipped**, as [Todo list](todo-list.md) says.
-- The sidebar's page list switches pages: **Pull requests**, **Linear tickets**, **Bots**, **Calendar**, **Todo**, **Sport**, and **Email**, each but **Pull requests** and **Linear tickets** with its page's own list in a column at the page's left while it is open.
+- The sidebar's page list switches pages: **Pull requests**, **Bots**, **Calendar**, **Todo**, **Sport**, and **Email**, each but **Pull requests** with its page's own list in a column at the page's left while it is open.
   Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
-  **Linear tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
   **Email** shows only once Gmail is connected; see [Email](email.md).
   **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](todo-list.md).
   The sessions live in the workspace list under the page list; click one to leave a page for its pane, and each workspace counts the live sessions that wait on you.
   The command menu's **Go to sessions**, while a page shows, opens the panes, or with none open the selected workspace's live session started last, else its past session saved last.
   **Bots** lists your Bots, each with its routines; see [Bots](bots.md) and [Routines](routines.md).
-  **Calendar** opens a month of Google events, routine runs, and due todos and tickets; see [Calendar](calendar.md).
+  **Calendar** opens a month of Google events, routine runs, and due todos; see [Calendar](calendar.md).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone, the row only as wide as its tabs; hover an icon for its name.
   The tabs never spill past the sidebar.
   **Pull requests** opens the Pull requests page, a table of your pull requests, with no list of its own at its left.
@@ -130,7 +124,7 @@
 - **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section** lists the sections, **Repository** and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.
   A repository or author you checked that lists nothing now, such as a repository you hid since, stays in its submenu with none, so you can uncheck it.
   Each field you set adds a chip under the tabs, such as **Author is MaisonnatM** or **Repository is any of 2 repositories**, whose tooltip names them; click the value to change it, or its × to drop the field, and **Clear all** drops every field once two chips show.
-  After a × the focus moves to the next chip's ×, or the previous one's, or **Filter** when no chip is left, and after **Clear all** to **Filter**; the Linear tickets, Todo, and Notifications bars do the same.
+  After a × the focus moves to the next chip's ×, or the previous one's, or **Filter** when no chip is left, and after **Clear all** to **Filter**; the Todo and Notifications bars do the same.
   The last section shown stays on.
   The author, date, and search filters apply before stacks join, so a stack keeps only the pull requests that match.
   While any filter or search is set, a repository with nothing left leaves the page, unless **Show empty sections** in **Display** is on; when nothing is left, a note names the search or the filters with a button that clears them and moves the focus to the list.

@@ -7,7 +7,7 @@ import { REVIEW_DRAFT_TOOL } from "./shared/review-drafts";
 
 export type PullRequestActionId = "fix-ci-and-conflicts" | "fix-ci" | "resolve-conflicts" | "address-comments" | "review" | "thermonuclear-review";
 
-/** An action that starts a session on a `Subject`: a pull request here, a Linear issue on the tickets page, a todo on the Todo page. */
+/** An action that starts a session on a `Subject`: a pull request here, a todo on the Todo page. */
 export interface QuickAction<Subject> {
 	label: string;
 	/** One sentence, for the tooltip and the menu. */

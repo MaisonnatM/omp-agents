@@ -194,7 +194,7 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tab
 
 export function DetailsSidebarFrame<T extends string>({ label, storageKey, defaultTab, cwd, tabs, menuSections }: DetailsSidebarFrameProps<T>) {
 	const [stored, setStored] = useStoredState(storageKey, decodeDetailsTabs, encodeDetailsTabs);
-	// Resolved each render: a stored tab that shows only once its items arrive, such as Tickets, comes back then.
+	// Resolved each render: a stored tab that shows only once its items arrive, such as Pull requests, comes back then.
 	const first = tabs.find(each => each.value === defaultTab);
 	const shown = [...(first ? [first] : []), ...stored.open.flatMap(value => (value !== defaultTab && tabs.find(each => each.value === value)) || [])];
 	const shownValues = shown.map(each => each.value);

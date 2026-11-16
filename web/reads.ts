@@ -25,7 +25,6 @@ import { decodePullRequestList, type PullRequest, type PullRequestChange, type P
 import type { MergeQueueAnswer, MergeQueueChange } from "../src/shared/merge-queue";
 import type { ModelEntry } from "../src/shared/models";
 import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
-import { decodeTicketsAnswer, type Ticket, type TicketsAnswer } from "../src/shared/tickets";
 import type { ProvidersAnswer } from "../src/shared/providers";
 import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import type { DevServerRequest, DevServerStart, LiveSessionProcesses, ProcessStop } from "../src/shared/processes";
@@ -166,24 +165,14 @@ export async function writeStartServer(instanceId: string): Promise<DevServerSta
 	return answer;
 }
 
-/** The Linear issues assigned to you, which the sidebar and the tickets page share; Linear is not per workspace, so there is one entry. */
-export const ticketsStore = createPolledStore<TicketsAnswer>({
-	url: (_, fresh) => `/api/tickets${fresh ? "?fresh" : ""}`,
-	cache: { key: "omp-agents.tickets-cache", decode: decodeTicketsAnswer },
-});
-
-const NO_TICKETS: Ticket[] = [];
 const NO_REPOS: RepoPullRequests[] = [];
 
 /**
- * What the `@` menu and the command palette search besides the page's lists: the Linear issues assigned to you, read
- * only while `ticketsWanted`, and the pull requests of `scope`, a workspace or every one, as {@link pullRequestsStore} keys them.
- * That is the entry `App` polls; the unscoped read would ask GitHub about every repository.
+ * The pull requests the `@` menu and the command palette search: those of `scope`, a workspace or every one, as
+ * {@link pullRequestsStore} keys them. That is the entry `App` polls; the unscoped read would ask GitHub about every repository.
  */
-export function useSearchSources(ticketsWanted: boolean, scope: string): { tickets: Ticket[]; pullRequestRepos: RepoPullRequests[] } {
-	const tickets = ticketsStore.usePolling(null, ticketsWanted).read?.data.tickets;
-	const pullRequestRepos = pullRequestsStore.use(scope).read?.data.repos ?? NO_REPOS;
-	return { tickets: (ticketsWanted && tickets) || NO_TICKETS, pullRequestRepos };
+export function useSearchedPullRequests(scope: string): RepoPullRequests[] {
+	return pullRequestsStore.use(scope).read?.data.repos ?? NO_REPOS;
 }
 
 const NO_THREADS: MailThread[] = [];
@@ -265,7 +254,7 @@ export const activityStore = createPolledStore<ActivityRead>({
 /** The context sources of Settings › Analytics; the scope is the request's query (range, workspace, session), so reads stay in memory. */
 export const contextStore = createPolledStore<ContextReport>({ url: scope => `/api/analytics/context?${scope ?? ""}` });
 
-/** Where omp stands with each MCP integration, which the sidebar's tabs, the tickets page, and the integrations page share. */
+/** Where omp stands with each MCP integration, which the sidebar's tabs and the integrations page share. */
 export const integrationsStore = createPolledStore<IntegrationsAnswer>({
 	url: (_scope, fresh) => (fresh ? "/api/integrations?fresh" : "/api/integrations"),
 	cache: { key: "omp-agents.integrations-cache", decode: decodeIntegrationsAnswer },

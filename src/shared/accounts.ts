@@ -12,7 +12,7 @@ export type AccountId = string;
 export type IntegrationSignIn = (NonNullable<SignInState> & { account: AccountId | null }) | null;
 
 /** The services whose MCP server the integrations page signs omp in to. */
-export const MCP_INTEGRATIONS = ["linear", "slack", "google-calendar", "gmail"] as const;
+export const MCP_INTEGRATIONS = ["slack", "google-calendar", "gmail"] as const;
 export type McpIntegrationId = (typeof MCP_INTEGRATIONS)[number];
 
 /**
@@ -67,8 +67,8 @@ export function slackRedirectError(redirectUri: string, callbackPort: number): s
 	return null;
 }
 
-/** Where a service's sign-in gets its OAuth client: Linear registers its own, Slack uses a Slack app of yours, and Google Calendar and Gmail a Google OAuth client of yours. */
-export type McpClient = "none" | "slack-app" | "google-oauth";
+/** Where a service's sign-in gets its OAuth client: Slack uses a Slack app of yours, and Google Calendar and Gmail a Google OAuth client of yours. */
+export type McpClient = "slack-app" | "google-oauth";
 
 export interface McpService {
 	label: string;
@@ -89,7 +89,6 @@ export interface McpService {
 }
 
 export const MCP_SERVICES = {
-	linear: { label: "Linear", host: "mcp.linear.app", url: "https://mcp.linear.app/mcp", serverName: "linear", client: "none", requireRefresh: false, accounts: "one" },
 	slack: { label: "Slack", host: "mcp.slack.com", url: "https://mcp.slack.com/mcp", serverName: "slack", client: "slack-app", requireRefresh: true, accounts: "one" },
 	"google-calendar": {
 		label: "Google Calendar",
@@ -124,12 +123,9 @@ export const GOOGLE_SERVICES: readonly GoogleService[] = MCP_INTEGRATIONS.filter
 
 /** The services that hold an account per server on their host: Gmail and Google Calendar. */
 export type AccountsService = { [K in McpIntegrationId]: AccountsOf<K> extends "many" ? K : never }[McpIntegrationId];
-/** The services that sign in to the first server on their host: Linear and Slack. */
+/** The services that sign in to the first server on their host: Slack. */
 export type SingleService = Exclude<McpIntegrationId, AccountsService>;
 export const holdsAccounts = (id: McpIntegrationId): id is AccountsService => MCP_SERVICES[id].accounts === "many";
-
-/** The services whose OAuth client Settings › Integrations saves; Linear registers its own. */
-export type ClientService = { [K in McpIntegrationId]: ClientOf<K> extends "none" ? never : K }[McpIntegrationId];
 
 /**
  * What each Google sign-in asks for. Google Calendar: events, to read them here and let omp sessions write them, the
@@ -218,7 +214,7 @@ export const serverConnection = ({ name, url }: { name: string; url: string }, s
 	server: { name, url, host: new URL(url).host },
 });
 
-/** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and its tab, Linear's Tickets or Gmail's Email, shows. */
+/** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and its tab, Gmail's Email, shows. */
 export const signedIn = (connection: McpConnection): boolean => connection.kind !== "absent" && connection.kind !== "signed-out";
 
 /** Whether the dashboard calls the service's tools: the server took omp's sign-in, or failed for a reason a retry may clear. */
@@ -244,9 +240,8 @@ export interface IntegrationTarget {
 	account: AccountId | null;
 }
 
-/** The saved OAuth client of each kind, without the secret: `null` for a service that registers its own. */
+/** The saved OAuth client of each kind, without the secret. */
 export interface ClientSetups {
-	none: null;
 	"slack-app": SlackSetup;
 	"google-oauth": GoogleSetup;
 }
@@ -326,7 +321,6 @@ const manyAccounts = <K extends McpIntegrationId, S>(id: K, setup: Guard<S>) =>
 export const decodeIntegrationsAnswer = decoder(
 	fields<IntegrationsAnswer>({
 		integrations: fields<IntegrationsAnswer["integrations"]>({
-			linear: oneServer("linear", oneOf([null])),
 			slack: oneServer("slack", isSlackSetup),
 			"google-calendar": manyAccounts("google-calendar", isGoogleSetup),
 			gmail: manyAccounts("gmail", isGoogleSetup),
