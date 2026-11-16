@@ -1,5 +1,6 @@
 /** What the Pull requests page's list keeps and how it groups them: its tabs, **Filter**, search, and **Display**. */
 import { isObject, isTexts, oneOf, parseJson } from "../src/json";
+import { DAY, type DayRange, type FilterOption, isDayRange, withToggled } from "./list-filter";
 import type { AgentOn } from "../src/shared/moves";
 import { type PullRequestSummary, type RepoPullRequests, repoKey, repoName } from "../src/shared/github";
 import { GROUP_TITLES, listedPullRequests, type MoveGroup, type PullRequestOrder, type PullRequestSection, pullRequestSections, type SectionRow, sectionTitles } from "./pull-requests-model";
@@ -29,29 +30,12 @@ const sameSections = (a: ShownSections, b: ShownSections): boolean => a.size ===
 /** The tab whose preset `shown` is, `null` for sections you picked one by one. */
 export const viewOf = (shown: ShownSections): PullRequestView | null => PULL_REQUEST_VIEWS.find(view => sameSections(VIEW_PRESETS[view].sections, shown)) ?? null;
 
-/** `set` with `value` flipped. */
-export function withToggled<T>(set: ReadonlySet<T>, value: T): ReadonlySet<T> {
-	const next = new Set(set);
-	if (!next.delete(value)) next.add(value);
-	return next;
-}
 
 /** `shown` with `title` flipped; the same set when that would leave no section. */
 export function withSectionToggled(shown: ShownSections, title: MoveGroup): ShownSections {
 	const next = withToggled(shown, title);
 	return next.size === 0 ? shown : next;
 }
-
-/** How far back **Created** or **Updated** reaches, in days, in menu order. */
-export const DAY_RANGES = [1, 3, 7, 14, 30] as const;
-
-export type DayRange = (typeof DAY_RANGES)[number];
-
-export const DAY_RANGE_LABELS: Record<DayRange, string> = { 1: "Last day", 3: "Last 3 days", 7: "Last week", 14: "Last 2 weeks", 30: "Last month" };
-
-const DAY = 86_400_000;
-
-const isDayRange = oneOf(DAY_RANGES);
 
 /** What **Filter** keeps; an empty set keeps every repository or author, and `null` any date. */
 export interface PullRequestFilter {
@@ -88,12 +72,6 @@ export function decodeFilter(raw: string | null): PullRequestFilter {
 export const encodeFilter = ({ sections, repos, authors, created, updated }: PullRequestFilter): string =>
 	JSON.stringify({ sections: GROUP_TITLES.filter(title => sections.has(title)), repos: [...repos], authors: [...authors], created, updated });
 
-/** A value a field of **Filter** checks, with how many pull requests it holds where the menu says so. */
-export interface FilterOption<K extends string = string> {
-	key: K;
-	label: string;
-	count?: number;
-}
 
 /**
  * The repositories **Filter** offers, those of `repos` in their order, each with how many pull requests it lists, then

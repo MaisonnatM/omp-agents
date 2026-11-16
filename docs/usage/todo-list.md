@@ -29,9 +29,11 @@
   It can be assigned to **You** or to an **Agent**, or to no one, as a new todo is; assigning an agent only records who should do it, and starts no session and changes no status.
 - Every list but **Archive** groups its top-level todos by status, **In Progress**, **Todo**, **Backlog**, **Done**, then **Canceled**, each under a header with the status's icon, its name, and how many todos it holds; click a header to fold or unfold its group.
   **Done** and **Canceled** start folded, the app keeps what you fold, and a search unfolds every group.
+  **Display**, at the end of the bar above the list, groups them by **Priority**, Urgent first, by **Assignee**, **You**, **Agent**, then no one, or not at all with **No grouping**, and the app keeps that choice in this browser; each grouping keeps its own folds.
+  Outside the grouping by status, **Add a todo** at the end of the list adds a **Todo** todo last, and todos cannot be dragged or moved.
   A group with no todo hides, except **Todo** in a list you can add to.
   Within a group, todos keep the list's own order: the one you set, or the earliest due day for **Today**.
-- Drag a todo by its row to move it among the todos of its status beside it, top-level ones in **All** and a category, and a todo under another among its parent's.
+- Under the grouping by status, drag a todo by its row to move it among the todos of its status beside it, top-level ones in **All** and a category, and a todo under another among its parent's.
   A dragged todo keeps its category; change it from the open todo.
   Alt+Shift+↑ and Alt+Shift+↓ move the focused todo one place the same way.
   **Today** sorts by due day and **Archive** by when it was cleared, so neither moves todos.
@@ -61,6 +63,9 @@
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
 - Right-click a todo, or focus it and press the context-menu key or Shift+F10, for **Open**, **Rename**, **Add a todo under it** on a top-level todo, and **Delete**.
 - The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
+  **Filter**, in the bar above every list, keeps the top-level todos of the checked priorities, the checked assignees, or with a link of a checked kind (**Session**, **Pull request**, or **Linear issue**, among those the list's todos carry), those due within the next day to the next month, overdue ones and those with an open todo under them due by then too, and those added within the last day to the last month.
+  Each filter that leaves something out shows as a chip under the bar, such as `Due within the next week`, whose × removes it, with **Clear all** once there are two; the app keeps them in this browser, while the search starts empty.
+  When the search or the filters leave nothing, the list says so with a button that clears them.
   Outside a text field, ↓ and ↑ focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
   While a todo is open, ↓ and ↑ open the next and previous one instead, and Esc closes it.
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.

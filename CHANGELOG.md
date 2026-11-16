@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- Linear tickets has the Pull requests header: a search, All, Active, Todo, and Backlog tabs, a Filter by status, priority, label, project, team, and dates, and a Display menu to group by status, priority, project, or nothing.
+- Todo has Filter and Display above its list: filter by priority, assignee, link, due date, and creation date, and group by status, priority, assignee, or nothing.
+- Notifications has a search, All and Unread tabs, a Filter by source and date in place of the source buttons, and a Display menu to group by new and earlier, source, or nothing.
 - The session sidebar has a Diffs tab: a row per changed file, and a click shows that file's diff, with Previous and Next to step through them.
 - The session sidebar's + menu starts with a search field that narrows its tabs, subagents, and New terminal as you type.
 - Down chevrons, on menus, pickers, and folding rows, use the smaller chevron-down-small icon.

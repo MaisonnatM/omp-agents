@@ -2,8 +2,8 @@
 
 - The **Linear tickets** tab, or a `#tickets` address, opens the Linear issues assigned to you, as Linear's **My issues › Assigned** lists them.
   The tab, and its go-to shortcut, reopen the last issue you had open on the page, in this browser; until you open one they show the list alone.
-  The sidebar shows no list under the tab; the page's own state headings fold and unfold the groups.
-- The page groups the issues by workflow state.
+  The sidebar shows no list under the tab; the page's own headings fold and unfold the groups.
+- The page groups the issues by workflow state unless **Display** picks another grouping.
   **In Review** comes first, with a green circle-dot icon.
   The other states follow Linear's order: triage, started (such as **In Progress**), unstarted (**Todo**), backlog, completed, and canceled.
   Duplicates count as canceled.
@@ -12,16 +12,28 @@
 - A sub-issue whose parent is also listed shows indented under its parent's row, in the parent's state, whatever its own state; a sub-issue of a sub-issue nests under the topmost listed one.
   Sub-issues under a row sort by state, then by identifier number, and a state's count includes them.
   A sub-issue whose parent is not listed, such as one assigned to someone else, is a row of its own with the parent's identifier as a chip.
-- With no issue open the list spans the page's width, like Linear's, and each state's heading stays at the top of the list while its issues scroll under it.
+- A bar above the list holds the tabs **All**, **Active** (started states, In Review included), **Todo** (unstarted states), and **Backlog**, and at its end **Filter** and **Display**.
+  A tab keeps one kind of state; **All**, the default, keeps every issue, triage, completed, and canceled ones included.
+  **Filter** has a submenu per field: **Status**, each state the tab's issues are in with how many there are, **Priority**, **Label**, **Project**, **Team**, shown only while your issues come from more than one team, **Created**, and **Updated**, which keep the issues of the last day, 3 days, week, 2 weeks, or month.
+  Check several values of a field to keep issues with any of them; the tab and every field apply together, so the **Todo** status under the **Active** tab keeps nothing.
+  Each field that leaves something out shows as a chip under the bar, whose value reopens its choices and whose × removes it, with **Clear all** once there are two; **Clear all** keeps the tab.
+  Filtering looks at each issue on its own: a sub-issue whose parent it leaves out shows as a row of its own, with the parent's identifier as a chip.
+  **Display › Grouping** groups by **Status**, the default described above, **Priority**, urgent first and no priority last, **Project**, by name with **No project** last, or **No grouping**, one list with no heading.
+  Outside **Status**, every issue is a row of its own, sub-issues included, sorted by priority then latest update, and a grouping shows only headings with issues.
+  Each grouping keeps its own folded headings.
+  The tab, the filters, and the grouping stay across reloads, in this browser.
+- **Search tickets**, in the page header, keeps the issues whose identifier, title, labels, project, or team hold every word you type, in any order and any case; Escape clears it, and a reload forgets it.
+  When the search, the filters, or the tab leave nothing, the list says so with a button that clears the search and the filters, or, for the tab alone, **Show all issues**.
+- With no issue open the list spans the page's width, like Linear's, and each group's heading stays at the top of the list while its issues scroll under it.
 - A row shows the priority, the identifier, the state, and the title, then the due date when there is one, the labels, and the project as chips, then the day Linear opened the issue and the day it last changed.
   A day this year reads `Oct 6`, an earlier one `Mar 2025`; hover a day for its full time.
   On a narrow page the chips that do not fit drop out first, from the project back, then the opening day, so the title keeps its room.
   Each label's dot has the color Linear gives that label.
   Hover an icon to read what it means.
-  Click a state's heading to fold it; the app keeps folded ones folded across reloads.
+  Click a heading to fold it; the app keeps folded ones folded across reloads.
 - Click a row to show the issue's details on the right, beside the list, as the Email page shows a conversation.
   The open issue's row is highlighted, and drag the line between them to resize the list.
-  A bar above the details shows the issue's place in the list, such as `10 of 63`, with the previous and next issues, sub-issues included, and **Close**, which returns to the list alone with its folded states preserved.
+  A bar above the details shows the issue's place in the list, such as `10 of 63`, with the previous and next issues the list shows, sub-issues included, and **Close**, which returns to the list alone with its folded groups preserved.
   On a page too narrow for both, the details take the list's place.
   The details are laid out as a pull request's **Summary** is.
   The header names the team and the identifier, a link to the issue on Linear tinted with its state, with the quick actions on the right; then the title, then who opened the issue, when it last changed, and Linear's branch name for it, which copies itself on click.
@@ -42,7 +54,7 @@
   When Linear refuses a change, the detail view undoes it, keeps the changes made after it, and says why.
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens the list with that issue's details beside it, even when the tickets list does not include it or cannot load.
-- **New ticket**, before **Refresh** in the page header, Cmd+Shift+O (Ctrl+Shift+O off macOS) on the tickets page, where it starts no session, C outside text fields on any page but the Todo, Calendar, and Email pages, where C adds a todo, an event, or a new mail, or **Create ticket** in the command menu opens the new-issue dialog over the page you are on, laid out like Linear's.
+- **New ticket**, after **Search tickets** and before **Refresh** in the page header, Cmd+Shift+O (Ctrl+Shift+O off macOS) on the tickets page, where it starts no session, C outside text fields on any page but the Todo, Calendar, and Email pages, where C adds a todo, an event, or a new mail, or **Create ticket** in the command menu opens the new-issue dialog over the page you are on, laid out like Linear's.
   Its header names the team by its key, such as ENG, in a pill that picks another team; the team starts as the last one an issue was created in, from here or from a todo, else Linear's first.
   Below come the title, a markdown description, and a pill for each field: the status, which starts as the team's first backlog state, the priority, the assignee, which starts as you, the project, and the labels, each a searchable list as in an issue's details, and **…** for a due date.
   The lists come from the team in Linear, and another team clears the status, labels, and project picked for the last one.

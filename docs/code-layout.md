@@ -97,7 +97,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - The empty home, with **New session** and **Get started**: `EmptyHome` in `web/components/empty-home.tsx`, which `PageSwitch` draws.
   - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, which docks the composer at the page's bottom with a new session's directory and branch pickers above it, draws `RetroGrid` from `web/components/dithercn/retro-grid.tsx` behind a new session, and shows a private draft's `PrivateFacts` from `web/components/new-session-modes.tsx` under the composer.
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button and the **Repositories** popover at its top, and one pull request in `pr-page.tsx` beside it.
-  - Tickets: `web/components/tickets/tickets-page.tsx`.
+  - Tickets: `web/components/tickets/tickets-page.tsx`, with the bar of tabs, **Filter**, and **Display** above its list in `ticket-view-bar.tsx`.
   - Todo: `web/components/todo/page.tsx`.
   - Calendar: `web/components/calendar/calendar-page.tsx`, with **Show routines** in `web/components/calendar/calendar-nav.tsx`, both reading the saved display preference in `web/use-calendar-display.ts`.
   - Email: `web/components/email/email-page.tsx`.

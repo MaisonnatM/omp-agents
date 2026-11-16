@@ -11,7 +11,10 @@ export const PRIORITY_LABEL: Record<TicketPriority, string> = {
 };
 
 /** Urgent first, then high, medium, and low; no priority after all of them. */
-const priorityRank = (priority: TicketPriority): number => (priority === 0 ? 5 : priority);
+export const priorityRank = (priority: TicketPriority): number => (priority === 0 ? 5 : priority);
+
+/** By priority, then most recently updated first: the order of a group's rows. */
+export const ticketOrder = (a: Ticket, b: Ticket): number => priorityRank(a.priority) - priorityRank(b.priority) || b.updatedAt.localeCompare(a.updatedAt);
 
 /** A top-level row of the page and the listed issues under it, which it nests. */
 export interface TicketEntry {
@@ -52,7 +55,7 @@ export const subIssueOrder = (a: Pick<TicketRelative, "id" | "status" | "statusT
  * The tickets grouped by workflow state, in `statusOrder`. A sub-issue whose parent is listed nests under its topmost
  * listed ancestor, in that ancestor's group whatever its own status; one whose parent is not listed is a row of its own.
  */
-export function ticketGroups(tickets: Ticket[]): TicketGroup[] {
+export function ticketGroups(tickets: readonly Ticket[]): TicketGroup[] {
 	const byId = new Map(tickets.map(ticket => [ticket.id, ticket]));
 	const rootOf = (ticket: Ticket): Ticket => {
 		const seen = new Set([ticket.id]);
@@ -73,7 +76,7 @@ export function ticketGroups(tickets: Ticket[]): TicketGroup[] {
 		else nested.set(root.id, [ticket]);
 	}
 	const groups = new Map<string, TicketGroup>();
-	const sorted = tops.toSorted((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || b.updatedAt.localeCompare(a.updatedAt));
+	const sorted = tops.toSorted(ticketOrder);
 	for (const ticket of sorted) {
 		const entry = { ticket, subIssues: (nested.get(ticket.id) ?? []).toSorted(subIssueOrder) };
 		const group = groups.get(ticket.status);
