@@ -19,6 +19,7 @@ import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { KeyboardTab } from "./keyboard-tab";
 import { McpServersTab } from "./mcp-servers-tab";
+import { ModulesTab } from "./modules-tab";
 import { OmpMemoryTab } from "./omp-memory-tab";
 import { OmpSettingsTab } from "./omp-settings-tab";
 import { ExtensionsTab } from "./extensions-tab";
@@ -201,6 +202,7 @@ export function SettingsPage({
 		"whats-new": <WhatsNewTab />,
 		decisions: <DecisionsTab cwd={cwd} workspaces={workspaces} active={section === "decisions"} />,
 		extensions: <ExtensionsTab cwd={cwd} active={section === "extensions"} onSaved={settings.reload} />,
+		modules: <ModulesTab />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
 	const body = SETTINGS_SECTIONS.filter(({ value }) => value !== "extensions" && !(isPhonePage() && value === "phone")).map(({ value, label }) => (

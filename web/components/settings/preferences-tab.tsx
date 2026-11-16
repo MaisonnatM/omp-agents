@@ -14,7 +14,10 @@ import { useSkills } from "../../use-skills";
 import { ShownOrderList } from "../shown-order-list";
 import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
-import { Section } from "./editor";
+import { LINK, Section } from "./editor";
+import { isWebModuleId } from "../../modules";
+import { useModulesOff } from "../../modules-off";
+import { hashForSettings } from "../../routing";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { putJson } from "../../api";
 import { useEditableRead } from "../../editable-read";
@@ -40,6 +43,7 @@ function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string;
 /** The sidebar's tabs in the order they show, each with a switch to hide it and buttons to move it. */
 function SidebarTabs() {
 	const { layout, setLayout, signedOut } = useSidebarTabs();
+	const [off] = useModulesOff();
 	return (
 		<Section
 			title="Sidebar tabs"
@@ -53,7 +57,18 @@ function SidebarTabs() {
 						label: row.label,
 						shown: !hidden,
 						icon: row.icon,
-						note: row.integration !== undefined && signedOut.has(tab) ? `Shows only while ${MCP_SERVICES[row.integration].label} is connected.` : undefined,
+						note:
+							isWebModuleId(tab) && off.has(tab) ? (
+								<>
+									Shows only while turned on in{" "}
+									<a href={hashForSettings("modules")} className={LINK}>
+										Settings › Modules
+									</a>
+									.
+								</>
+							) : row.integration !== undefined && signedOut.has(tab) ? (
+								`Shows only while ${MCP_SERVICES[row.integration].label} is connected.`
+							) : undefined,
 					};
 				})}
 				onShow={(tab, shown) => setLayout(prev => hideTab(prev, tab, !shown))}

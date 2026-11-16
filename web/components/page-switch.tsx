@@ -5,6 +5,7 @@ import { botRows, type OpenBot } from "../bots-model";
 import { newDraftKey } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
 import { isModulePage } from "../modules";
+import { useModulesOff } from "../modules-off";
 import type { SplitAxis } from "../pane-navigation";
 import type { Layout, Page, TodoListView } from "../routing";
 import { hashForNewSession } from "../routing";
@@ -14,6 +15,7 @@ import { todoCwd } from "../todo-views";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { useDashboardActions } from "./dashboard-context";
 import { EmptyHome } from "./empty-home";
+import { ModuleOffPage } from "./module-off-page";
 import { ModulePageView } from "./module-views";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { NewSession } from "./new-session";
@@ -112,8 +114,10 @@ export const PageSwitch = memo(function PageSwitch({
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
+	const [modulesOff] = useModulesOff();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	if (page && isModulePage(page)) {
+		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
 		const core = { routines, bots, todos: userTodos, ticketsShown: ticketsCallable, listed, cwd: defaultWorkspace, hosts: visible.hosts, section: sectionTarget };
 		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
 	}

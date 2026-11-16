@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage } from "central-icons";
+import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage, IconWidgets } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
@@ -70,6 +70,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "activity", label: "Activity", icon: IconCursorClick, group: "usage", keywords: ["features", "used", "time"] },
 	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
 	{ value: "keyboard", label: "Keyboard", icon: IconKeyboard, group: "general", keywords: ["shortcuts", "keys", "hotkeys", "keybindings"] },
+	{ value: "modules", label: "Modules", icon: IconWidgets, group: "general", keywords: [...MODULE_LIST.map(({ tab }) => tab.label.toLowerCase()), "turn off", "enable", "disable", "add", "new"] },
 	{ value: "workspaces", label: "Workspaces", icon: IconFolders, group: "general", keywords: ["directories", "folders", "hide"] },
 	{ value: "sync", label: "Sync", icon: IconArrowRotateCounterClockwise, group: "general", keywords: ["git", "remote", "machines"] },
 	{ value: "phone", label: "Phone access", icon: IconPhone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
@@ -94,6 +95,15 @@ export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 
 /** The settings section `segment` names, else Analytics, which bare `#settings`, an unknown section, and nothing remembered open. */
 export const settingsSection = (segment: string | null): SettingsSection => SETTINGS_SECTIONS.find(({ value }) => value === segment)?.value ?? "analytics";
+
+/** The settings sidebar's groups holding a section whose label or a keyword contains `query`, ignoring case, each with those sections in the sidebar's order; `phone` drops Phone access, which a paired phone does not list. */
+export const settingsMatching = (query: string, { phone }: { phone: boolean }) => {
+	const needle = query.trim().toLowerCase();
+	const sections = SETTINGS_SECTIONS.filter(
+		entry => !(phone && entry.value === "phone") && (!needle || [entry.label, ...entry.keywords].some(text => text.toLowerCase().includes(needle))),
+	);
+	return SETTINGS_GROUPS.map(group => ({ group, entries: sections.filter(entry => entry.group === group.value) })).filter(({ entries }) => entries.length > 0);
+};
 
 /** The open section of the settings page; its workspace sections read the sidebar's workspace. */
 export interface SettingsRoute {

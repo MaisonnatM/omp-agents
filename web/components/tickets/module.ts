@@ -15,6 +15,7 @@ export interface TicketsRoute {
 export const TICKETS_PAGE: PageModule<"tickets", TicketsRoute, "ticketsNew"> = {
 	id: "tickets",
 	tab: { label: "Tickets", icon: PAGE_ICON.tickets, place: 20, integration: "linear" },
+	about: "Your Linear tickets, to open and start a session on.",
 	home: { target: null },
 	/** `#tickets` lists the viewer's assigned Linear issues, and `#tickets/<identifier>` opens that issue's details beside them; any other `#tickets/…` opens the list alone. */
 	address: {

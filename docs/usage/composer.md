@@ -13,6 +13,7 @@
   The text is kept in the app and goes once you send it or empty the composer.
   The new-session draft keeps its text the same way, one for the plain draft and one for each todo it starts from, until the session it starts opens.
   Attached files and images are not kept.
+- The new-session draft's text field takes the cursor when the page opens, once the dashboard connects, and each time its project changes, from the composer's directory picker or a workspace's **New session in** button.
 - Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**, as Cursor lists its queue.
   Hovering a row, or focusing it, shows three buttons; a touch screen shows them always.
   **Send now** (↑ icon, or Cmd+Enter on the focused row) turns a follow-up into a steer, which the running turn takes at its next step; on a steer it stops the turn so omp runs its held steers at once.

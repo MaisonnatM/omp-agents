@@ -10,6 +10,7 @@ export const PORTABLE_PREFERENCES = [
 	"omp-agents.hide-tool-calls",
 	"omp-agents.hide-thinking",
 	"omp-agents.sidebar-tabs",
+	"omp-agents.modules-off",
 	"omp-agents.pinned-skill",
 	"omp-agents.session-notifications",
 	"omp-agents.notify-turns",

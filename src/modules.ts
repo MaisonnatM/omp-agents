@@ -5,6 +5,8 @@
 import type { InboxOptions, JsonInboxDir } from "./server/json-inbox";
 import type { RouteKit, Routes } from "./server/route-kit";
 import type { SessionJoin } from "./server/start";
+import { MODULES_OFF_KEY, parseModulesOff } from "./shared/modules-off";
+import type { PagePreferences } from "./shared/preferences";
 import { SPORT_MODULE } from "./sport-module";
 
 /** A module's state as the server holds it, read from its file once; the server is the file's one writer. */
@@ -83,8 +85,13 @@ export function moduleInboxes(files: ModuleFiles, apply: <I extends StoredModule
 	return STORED_IDS.flatMap(id => inboxOf(id) ?? []);
 }
 
-/** What every session joins with for the modules. */
-export const MODULE_JOINS: readonly SessionJoin[] = Object.values(SERVER_MODULES).flatMap(module => module.join ?? []);
+const isModuleId = (id: string): id is ModuleId => Object.hasOwn(SERVER_MODULES, id);
+
+/** What a new session joins with for the modules, less those the user turned off in Settings › Modules, as `preferences` hold it. */
+export const moduleJoins = (preferences: PagePreferences | null): SessionJoin[] => {
+	const off = parseModulesOff(preferences?.[MODULES_OFF_KEY], isModuleId);
+	return Object.values(SERVER_MODULES).flatMap(module => (off.includes(module.id) ? [] : (module.join ?? [])));
+};
 
 /** Every module's `/api/*` routes. */
 export const moduleRoutes = (kit: RouteKit): Routes => Object.assign({}, ...Object.values(SERVER_MODULES).map(module => module.routes?.(kit) ?? {}));

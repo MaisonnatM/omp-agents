@@ -12,10 +12,17 @@ The dashboard shows the same lines in Settings › What's new.
 - While you hide any repository, the Repositories button says how many, and a page with every repository hidden offers Show all repositories.
 - In Settings, the up and down arrows that move a sidebar tab, an account, or a list entry keep focus at the top or bottom of the list, and their tooltip says why they do nothing there.
 - Behind the scenes: the Pull requests page and Settings › Preferences share one list of switches and arrows.
+- Settings has a search field above its sections: type a name or a related word, such as git, to list only the matching sections, and press Enter to open the first one.
+- The message box of a new session now takes the cursor when you pick its project, start a new session from a workspace in the sidebar, or open the page before the dashboard has connected.
 - The sidebar's foot now shows plan usage as full-width rows with a bar, instead of a grid of rings, so long account emails read in full.
 - The Mac's CPU, free memory, and free disk no longer show in the sidebar; Settings › Storage still shows the free disk space.
 - A workspace's new-session button in the sidebar now sits level with the workspace name and its chevron, instead of a few pixels lower.
 - In the desktop app, the sidebar toggle and the back and forward buttons above the sidebar respond to clicks again, instead of dragging the window.
+- Settings has a new Modules page listing Tickets, Calendar, Sport, and Email, each with a switch to turn it on or off.
+- A module you turn off leaves the sidebar, and its shortcuts and commands stop working; opening its page says it is off and links to Modules.
+- Turning Sport off also stops new sessions from getting the sport tool.
+- New module, Edit, and Delete on the Modules page open a new session with a request already written for an agent to add, change, or remove the module; you review it and send it.
+- Delete turns the module off right away, and its saved data stays on your computer.
 - In poteto mode, a Babysit run's todo list now holds only the steps its mode runs, so a one-time rebase or a review-thread fix no longer ends with a turn spent ticking off polling and merge steps.
 - A session's subagents now show only in the right sidebar's Overview tab. The conversation no longer lists them under the task call that started them, so that call's tool group folds like any other once it finishes.
 - Clicking a subagent in the right sidebar now opens its conversation in a sidebar tab named after it, with its composer, so the session's own conversation stays in the main pane. Cmd-click still opens it in a split.

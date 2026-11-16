@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef } from "react";
+import { parseStrings } from "../src/json";
 import { isPortablePreference, PORTABLE_PREFERENCES, type PagePreferences, type PreferenceChange } from "../src/shared/preferences";
 import { keyedStore } from "./keyed-store";
 
@@ -108,14 +109,7 @@ export function useStoredState<T>(key: string, decode: (raw: string | null) => T
 	return [value, store];
 }
 
-function decodeKeys(raw: string | null): ReadonlySet<string> {
-	try {
-		const keys: unknown = JSON.parse(raw ?? "[]");
-		return new Set(Array.isArray(keys) ? keys.filter(key => typeof key === "string") : []);
-	} catch {
-		return new Set();
-	}
-}
+const decodeKeys = (raw: string | null): ReadonlySet<string> => new Set(parseStrings(raw));
 
 /** A set of keys that localStorage keeps under `storageKey`, such as folded sections, with a toggle that flips each key it names. */
 export function useStoredKeys(storageKey: string): [ReadonlySet<string>, (...keys: string[]) => void] {
