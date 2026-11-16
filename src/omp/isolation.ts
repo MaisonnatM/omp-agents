@@ -1,14 +1,18 @@
 /** omp's task-isolation sandboxes: where they live, which omp process owns each, the ovnfs checkout an ovnfs-backed one records, and their teardown. */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { arrayOf, fields, isNonEmpty, isString, optional } from "../json";
+import { arrayOf, fields, isNonEmpty, isNumber, isString, optional } from "../json";
 import type { IsolationSweepDeps, OvnfsRecord } from "../server/isolation-sweep";
-import { dirs, isolationOwnership, ovnfsClient, ovnfsDaemon, ovnfsTask, worktreeCli } from "./modules";
+import { dirs, isolationOwnership, ovnfsClient, ovnfsTask, worktreeCli } from "./modules";
 
 /** omp's `CheckoutRecord`: the ovnfs executable that opened a sandbox's checkout, the checkout's name, and its baseline checkout while one exists. */
 const isRecord = fields<{ command: string; checkout: string; start?: string }>({ command: isNonEmpty, checkout: isNonEmpty, start: optional(isNonEmpty) });
 /** The part of ovnfs's `api.LsReply` the sweep reads: every live checkout, by name, and the folder it is served in. */
 const isLsReply = fields<{ checkouts: { name: string; path: string }[] }>({ checkouts: arrayOf(fields({ name: isString, path: isString })) });
+/** The part of ovnfs's `api.Status`, which `ovnfs --json status` prints, the sweep reads: the admin protocol and socket of the daemon that runs. */
+const isStatus = fields<{ version: number; socket: string }>({ version: isNumber, socket: isNonEmpty });
+/** How long `ovnfs status` may take before the sweep counts no daemon, as omp's own status query allowed. */
+const STATUS_TIMEOUT_MS = 5_000;
 
 /** The parts of {@link IsolationSweepDeps} that omp decides, read as omp's `omp worktree clear` reads them. */
 export function ompSandboxes(): Pick<IsolationSweepDeps, "root" | "ownerFile" | "ownerLive" | "ovnfsRecord" | "stopMount" | "releaseOvnfs"> {
@@ -48,30 +52,42 @@ async function ovnfsRecord(dir: string): Promise<OvnfsRecord | null> {
 		throw error;
 	}
 	const { command, checkout, start } = parseOvnfsRecord(text);
-	const daemon = await ovnfsDaemon.runningDaemon(command);
+	const daemon = await runningDaemon(command);
 	if (!daemon) throw new Error(`no ovnfs daemon of ${command} runs to say where ${checkout} is.`);
-	const reply = await call(command, daemon.socket, "ls");
+	const reply = await ovnfsClient.callSocket(daemon.socket, "ls", {});
 	return { command, checkout, start, socket: daemon.socket, served: servedPath(reply, checkout) };
 }
 
+/**
+ * The admin socket of the daemon `command` runs, asked with `ovnfs --json status`, which never starts one; `undefined`
+ * when none answers, the command fails or hangs, or the daemon speaks another admin protocol than omp's client.
+ * omp 18.21 dropped its own `runningDaemon`, so the sweep asks the command as that function did.
+ */
+async function runningDaemon(command: string): Promise<{ socket: string } | undefined> {
+	let child: Bun.Subprocess<"ignore", "pipe", "ignore">;
+	try {
+		child = Bun.spawn([command, "--json", "status"], { stdin: "ignore", stdout: "pipe", stderr: "ignore", timeout: STATUS_TIMEOUT_MS, killSignal: "SIGKILL" });
+	} catch {
+		return undefined;
+	}
+	const [stdout, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
+	if (code !== 0) return undefined;
+	let status: unknown;
+	try {
+		status = JSON.parse(stdout);
+	} catch {
+		return undefined;
+	}
+	return isStatus(status) && status.version === ovnfsClient.PROTOCOL_VERSION ? { socket: status.socket } : undefined;
+}
+
 /** Removes the judged checkout, after its baseline checkout as omp's `releaseOvnfsCheckout` does, on the daemon that listed it, never starting a daemon; one already gone counts as removed. */
-async function releaseOvnfs({ command, checkout, start, socket }: OvnfsRecord): Promise<void> {
+async function releaseOvnfs({ checkout, start, socket }: OvnfsRecord): Promise<void> {
 	for (const name of start === undefined ? [checkout] : [start, checkout]) {
 		try {
-			await call(command, socket, "rm", { checkout: name });
+			await ovnfsClient.callSocket(socket, "rm", { checkout: name });
 		} catch (error) {
 			if (!(error instanceof ovnfsClient.OvnfsError && error.code === "not_found")) throw error;
 		}
-	}
-}
-
-/** One operation on the daemon at `socket`; a socket that stopped answering is forgotten, as omp's own `call` does, so the next sweep asks `command` again. */
-async function call(command: string, socket: string, op: "ls" | "rm", args: object = {}): Promise<unknown> {
-	try {
-		return await ovnfsClient.callSocket(socket, op, args);
-	} catch (error) {
-		const code = (error as NodeJS.ErrnoException).code;
-		if (code === "ECONNREFUSED" || code === "ENOENT") ovnfsDaemon.forgetDaemon(command);
-		throw error;
 	}
 }
