@@ -1,7 +1,7 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a row of the tabs open in it with + to open more, and the open tab's panel. */
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import type { IconComponent } from "@/lib/icon-context";
-import { IconPlusLarge } from "central-icons";
+import { IconMagnifyingGlass, IconPlusLarge } from "central-icons";
 import { type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { Button } from "@/components/ui/button";
@@ -53,8 +53,14 @@ interface DetailsSidebarFrameProps<T extends string> {
 	cwd: string | null;
 	/** Every tab the view can show, in the + menu's order. */
 	tabs: readonly DetailsTab<T>[];
-	/** What the + menu lists after the tabs, such as a session's subagents and terminals, each section after a separator. */
-	menuSections?: ReactNode;
+	/** What the + menu lists after the tabs for the search `query`, such as a session's subagents and terminals, each section after a separator; `null` when nothing matches. */
+	menuSections?: (query: string) => ReactNode;
+}
+
+/** Whether any of `texts` holds `query`, ignoring case; an empty query matches everything. */
+export function menuMatches(query: string, ...texts: (string | null | undefined)[]): boolean {
+	const needle = query.trim().toLowerCase();
+	return needle === "" || texts.some(text => text?.toLowerCase().includes(needle));
 }
 
 /** A tab with nothing to show yet. */
@@ -112,11 +118,25 @@ function DetailsTabChip({ tab, active, onClose }: DetailsTabChipProps) {
 	);
 }
 
-/** The + menu: every tab the view can show, the one on screen checked; picking one opens it, or shows it when already open. */
-function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tabs: readonly DetailsTab<T>[]; active: string; onPick: (value: unknown) => void; sections: ReactNode }) {
+/** The + menu: a search field, then every tab the view can show, the one on screen checked; picking one opens it, or shows it when already open. */
+function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tabs: readonly DetailsTab<T>[]; active: string; onPick: (value: unknown) => void; sections?: (query: string) => ReactNode }) {
 	const [open, setOpen] = useState(false);
+	const [query, setQuery] = useState("");
+	const search = useRef<HTMLInputElement>(null);
+	const matching = tabs.filter(each => menuMatches(query, each.name));
+	const rest = sections?.(query) ?? null;
+	const toggle = (next: boolean): void => {
+		setOpen(next);
+		if (!next) setQuery("");
+	};
+	useEffect(() => {
+		if (!open) return;
+		// The popup takes focus as it opens, so the field takes it on the next frame.
+		const frame = requestAnimationFrame(() => search.current?.focus());
+		return () => cancelAnimationFrame(frame);
+	}, [open]);
 	return (
-		<DropdownMenu open={open} onOpenChange={setOpen}>
+		<DropdownMenu open={open} onOpenChange={toggle}>
 			<Tooltip content="Open a tab" side="bottom" forceOpen={open ? false : undefined}>
 				<DropdownMenuTrigger
 					{...activityControl("details.tab.add")}
@@ -126,8 +146,30 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tab
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="start" className="min-w-52">
+				<label className="-mx-1 -mt-1 mb-1 flex items-center gap-2 border-b border-border px-3 py-2 text-muted-foreground">
+					<IconMagnifyingGlass aria-hidden="true" className="size-3.5 shrink-0" />
+					<input
+						ref={search}
+						type="text"
+						aria-label="Search tabs"
+						placeholder="Search"
+						value={query}
+						onChange={event => setQuery(event.target.value)}
+						onKeyDown={event => {
+							// The menu's own keys move between rows; every other key types, rather than jumping to a row by its letter.
+							if (event.key === "Enter" && matching[0]) {
+								event.preventDefault();
+								onPick(matching[0].value);
+								toggle(false);
+								return;
+							}
+							if (!["ArrowDown", "ArrowUp", "Escape", "Tab"].includes(event.key)) event.stopPropagation();
+						}}
+						className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+					/>
+				</label>
 				<MenuRadioGroup value={active} onValueChange={onPick}>
-					{tabs.map(each => {
+					{matching.map(each => {
 						const Icon = each.icon;
 						return (
 							<MenuRadioItem key={each.value} value={each.value} closeOnClick {...activityControl(each.control)}>
@@ -143,7 +185,8 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tab
 						);
 					})}
 				</MenuRadioGroup>
-				{sections}
+				{rest}
+				{matching.length === 0 && rest === null && <p className="px-2 py-1.5 text-sm text-muted-foreground">No matches</p>}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

@@ -127,6 +127,7 @@ export const CONTROLS = [
 	{ id: "notices.clear", label: "Notification cleared", area: "Notifications" },
 	{ id: "session-details.tab.overview", label: "Session details Overview tab", area: "Right sidebar" },
 	{ id: "session-details.tab.pull-requests", label: "Session details PRs tab", area: "Right sidebar" },
+	{ id: "session-details.tab.diffs", label: "Session details Diffs tab", area: "Right sidebar" },
 	{ id: "session-details.tab.browser", label: "Session details Browser tab", area: "Right sidebar" },
 	{ id: "session-details.tab.tickets", label: "Session details Tickets tab", area: "Right sidebar" },
 	{ id: "session-details.tab.artifacts", label: "Session details Artifacts tab", area: "Right sidebar" },
