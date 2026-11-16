@@ -181,7 +181,7 @@ export default function botExtension(pi: ExtensionApi): void {
 				Type.Array(Type.Object({ kind: Type.Union(TRIGGER_KINDS.map(kind => Type.Literal(kind))) }), {
 					uniqueItems: true,
 					description:
-						"What else runs it, each kind at most once: slack, a Slack message that waits on the user; pull-request, a pull request that becomes the user's move; event, a calendar event about to start; gmail, unread mail in a Gmail inbox.",
+						"What else runs it, each kind at most once: slack, a Slack message that waits on the user; pull-request, a pull request that becomes the user's move.",
 				}),
 			),
 			task: Type.Optional(task),

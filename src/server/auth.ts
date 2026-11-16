@@ -57,7 +57,7 @@ export function bearerToken(header: string | null): string | null {
 const keyed = (token: string, purpose: string): string => createHmac("sha256", token).update(purpose).digest("base64url");
 
 /**
- * The key that an image, a video, or a mail frame sends as `?key=`, since a tag sends no header. It opens only the
+ * The key that an image or a video sends as `?key=`, since a tag sends no header. It opens only the
  * routes that such tags load, and the token cannot be worked back from it.
  */
 export const mediaKey = (token: string): string => keyed(token, "omp-agents media key");

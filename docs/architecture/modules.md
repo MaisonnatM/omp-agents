@@ -3,7 +3,7 @@
 A module is a feature the core runs without naming it, such as Sport.
 Its whole wiring sits behind two definitions, one for the server and one for the page.
 The core lists the modules in two registries and iterates them, so no hub file names a module.
-The core keeps the sessions, pull requests, todos, Bots and their routines, Settings, and the Google sign-ins.
+The core keeps the sessions, pull requests, todos, Bots and their routines, Settings, and the Slack sign-in.
 
 ## The module list
 
@@ -12,13 +12,9 @@ The core keeps the sessions, pull requests, todos, Bots and their routines, Sett
 
 | Module | Server definition | Page definition | Page components |
 | --- | --- | --- | --- |
-| Calendar | none | `CALENDAR_PAGE` in `web/components/calendar/module.ts` | `CalendarPage` and `CalendarNav` |
 | Sport | `SPORT_MODULE` in `src/sport-module.ts` | `SPORT_PAGE` in `web/components/sport/module.ts` | `SportPage` and `SportNav` |
-| Email | none | `EMAIL_PAGE` in `web/components/email/module.ts` | `EmailPage` and `EmailNav` |
 
 A module without a server definition keeps its server side in the core.
-Calendar's routes, its Google and local event stores, and its calendar choices stay in `Dashboard`, because the bell's event notices, routine event triggers, and settings sync share those same instances.
-Email's Gmail routes and accounts stay there too, because routine mail triggers read the same `GmailAccounts`.
 
 The list is fixed when the code is built.
 There is no runtime plugin loading and no dynamic import.

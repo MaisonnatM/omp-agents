@@ -91,17 +91,15 @@ Removing a Bot removes its routines first, in the same `bot` change, and every s
 
 ## Triggers
 
-A trigger is a kind of thing that happened, `slack`, `pull-request`, `event`, or `gmail`, that also starts a run of each enabled routine that lists it.
-Triggers add no integration of their own: they read what the bell's checks already fetch, in `src/server/notices.ts`, and the Gmail inboxes the Email page reads through `GmailAccounts.inbox`.
-The `Dashboard` wraps four of the `NoticeSources`, `pullRequests`, `slack`, `localEvents`, and `googleEvents`, so each answer also goes, unchanged, through the helpers in `src/server/routine-triggers.ts`, which turn it into sightings.
+A trigger is a kind of thing that happened, `slack` or `pull-request`, that also starts a run of each enabled routine that lists it.
+Triggers add no integration of their own: they read what the bell's checks already fetch, in `src/server/notices.ts`.
+The `Dashboard` wraps two of the `NoticeSources`, `pullRequests` and `slack`, so each answer also goes, unchanged, through the helpers in `src/server/routine-triggers.ts`, which turn it into sightings.
 A sighting has an id that names what it saw in the state it saw it, and a scope, which one answer covers:
 
 - **Pull requests**: each pull request of a repository GitHub answered for whose move is yours, by that move as `moveOf` reads it with the sessions on it, as the bell reads it; scope `pull-request:<owner/repo>`.
   A pull request is new when its move becomes yours or changes to another of yours, so a draft, checks still running, or a session at work on it, such as a Bot pushing a fix, fires nothing until it ends in a move of yours.
 - **Slack**: each conversation's newest message that waits on you, by Slack's id for it; scope `slack`.
   While Slack is signed out, the check forgets the scope, so the first answer after signing in sets a new baseline and fires nothing for messages already waiting.
-- **Gmail**: each unread conversation of an inbox that answered, by its last message's arrival, so new mail, in a new conversation or an old one, is new; scope `gmail:<account>`.
-- **Calendar events**: each timed event that starts within the bell's 10-minute lead, by its event and start, so it is new once as it comes within the lead and again if it moves; scope `event:local`, or `event:google/<account>` for an account that answered.
 
 `TriggerWatch` keeps the ids of each scope's last answer in memory, and keeps the ids it had not seen as news until the `Dashboard` takes them once the check ends, so the sources of one check start one run of a routine.
 A scope's first answer since the server started only sets what it knows, so a restart, or what happened while the dashboard was stopped, starts nothing; a scope whose check failed keeps what it knew.
@@ -116,22 +114,20 @@ A command gets the events as a JSON list in the `ROUTINE_TRIGGERS` environment v
 Each event carries its kind, a title, a detail of at most 2,000 characters, and a link when it has one.
 The pull request and Slack checks run on the 2-minute activity tick, which checks both while a page listens; while none does, the owner checks only the kinds an enabled routine has a trigger for, by `watchedKinds`, and another server checks nothing.
 A page that opens after a tick checked only some kinds checks both again.
-On the same tick, the owner reads the Gmail inboxes, 50 conversations each as the Email page lists them, while an enabled routine has a `gmail` trigger, and fires once both reads end.
-Calendar events are checked on the minute tick.
 
 ## One server runs the unattended work
 
 Servers on different ports share `~/.config/omp-agents`: your app and a smoke run, say.
-Routines, the todo, sport, event, sign-in, routine, bot, and shepherd inboxes, the daily clean-up of checked todos, the daily sweep of omp's isolation sandboxes, and the idle stop of sessions' processes write that directory or omp's, or end processes, without anyone asking, so one server at a time runs them.
+Routines, the todo, sport, routine, bot, and shepherd inboxes, the daily clean-up of checked todos, the daily sweep of omp's isolation sandboxes, and the idle stop of sessions' processes write that directory or omp's, or end processes, without anyone asking, so one server at a time runs them.
 `OwnerLock` in `templates/omp/agent/extensions/github/owner-lock.ts` decides which, with `server.lock`, a file that holds `{pid, port}` of the owner.
 A server creates it whole through a draft file and a hard link, so a reader never sees half of it.
 Taking over a dead or invalid owner holds a short ownership lock at `<path>.reap` and rereads the original file before removal, so competing reclaimers cannot remove a new owner's lock.
 The same mechanism recovers a crashed reclaimer's lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
-On a takeover the server logs it, reads `routines.json`, `bots.json`, `todos.json`, and `events.json` again, since the previous owner kept saving them, fails the runs left sending a prompt or running a command and the scheduled sends left sending, and drains the todo, sport, event, sign-in, routine, bot, and shepherd inboxes.
+On a takeover the server logs it, reads `routines.json`, `bots.json`, and `todos.json` again, since the previous owner kept saving them, fails the runs left sending a prompt or running a command and the scheduled sends left sending, and drains the todo, sport, routine, bot, and shepherd inboxes.
 A server that exits normally deletes its lock.
-The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the todo, sport, event, sign-in, routine, bot, and shepherd inboxes, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
+The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the todo, sport, routine, bot, and shepherd inboxes, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
 `scheduled.json` is the exception: `ScheduledFile` is a `shared` `ReducerFile`, so a send added on any server reaches the owner and only one process can claim it.
 Each mutation holds an `OwnerLock` at `<path>.lock` across reload, reduction, and the immediate JSON replacement, so independent server processes keep one another's changes.

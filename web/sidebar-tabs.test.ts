@@ -15,12 +15,9 @@ import {
 
 const DEFAULT: TabLayout = [
 	{ tab: "pull-requests", hidden: false },
-	{ tab: "tickets", hidden: false },
 	{ tab: "bots", hidden: false },
-	{ tab: "calendar", hidden: false },
 	{ tab: "todo", hidden: false },
 	{ tab: "sport", hidden: false },
-	{ tab: "email", hidden: false },
 ];
 
 test("the default layout is every tab in SIDEBAR_TABS order, none hidden", () => {
@@ -33,51 +30,29 @@ test("nothing stored, or anything unreadable, decodes to the default", () => {
 	}
 });
 
-test("decoding keeps each known tab once, drops a stored Settings tab, and puts a missing tab at its default place", () => {
+test("decoding keeps each known tab once, drops a stored tab of a page that left, and puts a missing tab at its default place", () => {
 	const raw = JSON.stringify([
 		{ tab: "settings", hidden: false },
-		{ tab: "email", hidden: true },
+		{ tab: "sport", hidden: true },
 		{ tab: "bogus", hidden: true },
-		{ tab: "email", hidden: false },
+		{ tab: "sport", hidden: false },
+		{ tab: "calendar", hidden: false },
 		{ tab: "todo", hidden: "yes" },
 		{ tab: "sessions" },
+		{ tab: "email", hidden: false },
+		{ tab: "inbox", hidden: true },
 	]);
 	expect(decodeTabLayout(raw)).toEqual([
 		{ tab: "pull-requests", hidden: false },
-		{ tab: "tickets", hidden: false },
 		{ tab: "bots", hidden: false },
-		{ tab: "calendar", hidden: false },
-		{ tab: "email", hidden: true },
-		{ tab: "sport", hidden: false },
+		{ tab: "sport", hidden: true },
 		{ tab: "todo", hidden: false },
 	]);
 });
 
 test("a layout stored before the Bots tab gets it at its default place and loses the Routines and Sessions tabs", () => {
-	const before = ["pull-requests", "tickets", "sessions", "todo", "routines", "notes", "calendar", "email"].map(tab => ({ tab, hidden: false }));
+	const before = ["pull-requests", "sessions", "todo", "routines", "notes"].map(tab => ({ tab, hidden: false }));
 	expect(decodeTabLayout(JSON.stringify(before))).toEqual(DEFAULT);
-});
-
-test("a layout stored before the Email tab's rename reads its inbox entry as the Email tab, in its place and hidden as it was", () => {
-	const raw = JSON.stringify([
-		{ tab: "inbox", hidden: true },
-		{ tab: "pull-requests", hidden: false },
-		{ tab: "tickets", hidden: false },
-		{ tab: "bots", hidden: false },
-		{ tab: "sessions", hidden: false },
-		{ tab: "todo", hidden: false },
-		{ tab: "notes", hidden: false },
-		{ tab: "calendar", hidden: false },
-	]);
-	expect(decodeTabLayout(raw)).toEqual([
-		{ tab: "email", hidden: true },
-		{ tab: "pull-requests", hidden: false },
-		{ tab: "tickets", hidden: false },
-		{ tab: "bots", hidden: false },
-		{ tab: "todo", hidden: false },
-		{ tab: "sport", hidden: false },
-		{ tab: "calendar", hidden: false },
-	]);
 });
 
 test("a layout stored before the Sport tab gets it at its default place, shown", () => {
@@ -87,57 +62,54 @@ test("a layout stored before the Sport tab gets it at its default place, shown",
 });
 
 test("a layout stored with the Notes tab drops it and keeps every other tab where it was", () => {
-	const saved = ["pull-requests", "tickets", "bots", "sessions", "notes", "calendar", "todo", "sport", "email"].map(tab => ({ tab, hidden: tab === "notes" }));
+	const saved = ["pull-requests", "bots", "sessions", "notes", "todo", "sport"].map(tab => ({ tab, hidden: tab === "notes" }));
 	expect(decodeTabLayout(JSON.stringify(saved))).toEqual(DEFAULT);
-	const todoFirst = ["todo", "pull-requests", "notes", "tickets", "bots", "sessions", "calendar", "sport", "email"].map(tab => ({ tab, hidden: false }));
-	expect(decodeTabLayout(JSON.stringify(todoFirst)).map(({ tab }) => tab)).toEqual(["todo", "pull-requests", "tickets", "bots", "calendar", "sport", "email"]);
+	const todoFirst = ["todo", "pull-requests", "notes", "bots", "sessions", "sport"].map(tab => ({ tab, hidden: false }));
+	expect(decodeTabLayout(JSON.stringify(todoFirst)).map(({ tab }) => tab)).toEqual(["todo", "pull-requests", "bots", "sport"]);
 });
 
 test("a stored layout decodes back to itself", () => {
-	const layout = hideTab(moveTab(DEFAULT_TAB_LAYOUT, "email", -1), "todo", true);
+	const layout = hideTab(moveTab(DEFAULT_TAB_LAYOUT, "sport", -1), "todo", true);
 	expect(decodeTabLayout(encodeTabLayout(layout))).toEqual(layout);
 });
 
 test("moveTab swaps a tab with its neighbor and leaves a tab at either end where it is", () => {
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", -1)).toBe(DEFAULT_TAB_LAYOUT);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "email", 1)).toBe(DEFAULT_TAB_LAYOUT);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "email", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "tickets", "bots", "calendar", "todo", "email", "sport"]);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["tickets", "pull-requests", "bots", "calendar", "todo", "sport", "email"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "sport", 1)).toBe(DEFAULT_TAB_LAYOUT);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "sport", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "bots", "sport", "todo"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["bots", "pull-requests", "todo", "sport"]);
 });
 
 test("hideTab hides and shows any tab", () => {
-	expect(hideTab(DEFAULT_TAB_LAYOUT, "todo", true)[4]).toEqual({ tab: "todo", hidden: true });
-	expect(hideTab(DEFAULT_TAB_LAYOUT, "email", true)[6]).toEqual({ tab: "email", hidden: true });
+	expect(hideTab(DEFAULT_TAB_LAYOUT, "todo", true)[2]).toEqual({ tab: "todo", hidden: true });
+	expect(hideTab(DEFAULT_TAB_LAYOUT, "sport", true)[3]).toEqual({ tab: "sport", hidden: true });
 	expect(hideTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "todo", false)).toEqual(DEFAULT);
 });
 
-test("shownTabs drops hidden and signed-out tabs and keeps the order", () => {
-	const layout = moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "email", -1);
-	expect(shownTabs(layout, new Set(["tickets"]))).toEqual(["pull-requests", "bots", "calendar", "email", "sport"]);
+test("shownTabs drops hidden and absent tabs and keeps the order", () => {
+	const layout = moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "sport", -1);
+	expect(shownTabs(layout, new Set(["bots"]))).toEqual(["pull-requests", "sport"]);
 });
 
-test("a saved order that still has Todo immediately before Notes puts it between Calendar and Sport", () => {
-	const saved = ["sessions", "bots", "pull-requests", "tickets", "todo", "notes", "calendar", "email"].map(tab => ({ tab, hidden: false }));
-	expect(decodeTabLayout(JSON.stringify(saved)).map(({ tab }) => tab)).toEqual(["bots", "pull-requests", "tickets", "calendar", "todo", "sport", "email"]);
+test("a saved order that still has Todo immediately before Notes puts it just before Sport", () => {
+	const saved = ["sessions", "todo", "notes", "bots", "pull-requests", "sport"].map(tab => ({ tab, hidden: false }));
+	expect(decodeTabLayout(JSON.stringify(saved)).map(({ tab }) => tab)).toEqual(["bots", "pull-requests", "todo", "sport"]);
 });
 
-test("a layout stored in the old order, Todo in the bar before Notes, puts Todo between Calendar and Sport and keeps what was hidden", () => {
+test("a layout stored in the old order, Todo in the bar before Notes, puts Todo just before Sport and keeps what was hidden", () => {
 	const before = [
-		{ tab: "pull-requests", hidden: false },
-		{ tab: "tickets", hidden: false },
-		{ tab: "bots", hidden: false },
-		{ tab: "sessions", hidden: false },
 		{ tab: "todo", hidden: true },
 		{ tab: "notes", hidden: false },
-		{ tab: "calendar", hidden: false },
-		{ tab: "email", hidden: false },
+		{ tab: "pull-requests", hidden: false },
+		{ tab: "bots", hidden: false },
+		{ tab: "sessions", hidden: false },
 		{ tab: "sport", hidden: false },
 	];
 	expect(decodeTabLayout(JSON.stringify(before))).toEqual(hideTab(DEFAULT, "todo", true));
 });
 
-test("until the integrations answer, the tabs that wait on one are signed out", () => {
-	expect(tabsSignedOut(undefined)).toEqual(["tickets", "email"]);
+test("no tab waits on an integration, so none is signed out, even before the integrations answer", () => {
+	expect(tabsSignedOut(undefined)).toEqual([]);
 });
 
 const pageAt = (hash: string): Page => {
@@ -157,8 +129,8 @@ test("the page list's current row is the page's tab, and none for the panes or a
 });
 
 test("the absent tabs are the signed-out ones and the modules turned off, each once", () => {
-	const signedOut: ReadonlySet<SidebarTab> = new Set(["tickets", "email"]);
-	expect([...mergeAbsent(signedOut, new Set())]).toEqual(["tickets", "email"]);
-	expect([...mergeAbsent(signedOut, new Set(["sport", "email"]))]).toEqual(["tickets", "email", "sport"]);
+	const signedOut: ReadonlySet<SidebarTab> = new Set(["todo", "bots"]);
+	expect([...mergeAbsent(signedOut, new Set())]).toEqual(["todo", "bots"]);
+	expect([...mergeAbsent(signedOut, new Set(["sport", "bots"]))]).toEqual(["todo", "bots", "sport"]);
 	expect(shownTabs(DEFAULT, mergeAbsent(new Set(), new Set(["sport"])))).not.toContain("sport");
 });

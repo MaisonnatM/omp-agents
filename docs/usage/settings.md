@@ -43,7 +43,7 @@
 - **Activity** shows how you use the dashboard over the last 30 days; choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
   It counts the pages and settings sections you open, the shortcuts and command menu commands you run, the changes you send, and clicks on a few controls that change nothing else, by name only, never what they show or what you typed.
   **Not used** lists every feature with no use in the range and when you last used it, or **Never**; features used once or twice follow.
-  The pages, commands, and changes of a service omp is not signed in to, such as **Email** and its commands without Gmail, are listed apart and not counted.
+  The pages, commands, and changes of a service omp is not signed in to are listed apart and not counted.
   **Most used** lists the top 20 features, with how many days you used each and, for a command, how often you ran it by its keys and from the command menu.
   **Navigation** lists the 15 most common moves from one view to another and the time spent on each view.
   **Active time** charts the minutes you used the dashboard each day, up to five minutes between two uses, with a table of each day's active time, visits, and changes sent.
@@ -165,11 +165,10 @@
   A record's **Supersedes** and **Superseded by** open and scroll to the records they name, and a link to another file in the repository opens it in the file dialog.
   The section only reads the records, since a record changes in the same commit as the code it covers.
   With **All workspaces**, the same timeline is grouped by workspace, one section per repository that keeps records, and a record's links stay inside its own repository. A workspace with no records is left out of the list.
-- **Modules** lists every module the app is built with: **Calendar**, **Sport**, and **Email**.
+- **Modules** lists every module the app is built with: **Sport**.
   Each row has the module's icon, what it is for, a switch that turns it on or off, and a **⋯** menu with **Edit** and **Delete**; every module is on at first.
   A module turned off loses its page, its sidebar tab, its shortcuts, and its commands, and its address shows that it is turned off, with a link back to **Modules**.
   Turning **Sport** off also stops new sessions from getting the sport tool; sessions already running keep it.
-  While omp holds no sign-in to Gmail, that service's row says so, with a link to **Integrations**.
   The choice is saved like **Preferences**, so every window and, through **Sync**, your other machines follow it.
   Modules are code, so an agent writes them: **New module** asks for a **Name** and **What should it do?**, **Edit** asks **What should change?**, and each opens the New session page in the omp agents checkout with a request in the message box for you to review and send.
   **Delete** asks first under the row; **Turn off and open session** turns the module off at once and opens a draft asking to remove its code, leaving its saved data on disk.
@@ -179,9 +178,8 @@
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
-  **Sidebar tabs** lists the eight sidebar tabs in the order they show, each with a switch that shows or hides it, and buttons that move it up or down.
+  **Sidebar tabs** lists the sidebar tabs in the order they show, each with a switch that shows or hides it, and buttons that move it up or down.
   A hidden tab only leaves the sidebar's page list: its page, its command in the command menu, its G pair, and links to it still work.
-  While omp holds no sign-in to Gmail, that service's row says its tab shows only once the service is connected.
   A module turned off in **Modules** says its tab shows only while it is turned on there.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.
@@ -193,7 +191,7 @@
   Choose **None** to unpin.
 - **Keyboard** lists every keyboard shortcut by category, and `?` outside a text field opens it; see [Keyboard shortcuts](keyboard-shortcuts.md).
 - **Providers** signs omp in to the model providers its sessions call, as `/login` and `omp login` do; see [Providers](providers.md).
-- **Integrations** connects omp to Slack and the dashboard to Google Calendar and Gmail; see [Integrations](integrations.md).
+- **Integrations** connects omp to Slack; see [Integrations](integrations.md).
 - **MCP servers** lists every MCP server omp loads and adds more from a catalog or by address; see [MCP servers](mcp-servers.md).
 - **Source control** shows whether the `gh` command-line tool is installed and signed in, under **Command-line tools**; **Check again** reads it again.
   **Automatically pull** keeps the default branch current when the checkout has no local changes or commits; it is off by default, and the server checks every five minutes and right after a change.

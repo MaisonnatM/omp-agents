@@ -46,7 +46,6 @@ Alt is Option on macOS.
 | V / R / D / E | Browser while picking, outside text fields, the app in it too | Switch to Select, Region, Draw, or Erase |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
-| G then M | Outside text fields | Go to your email, when connected |
 | Cmd+, | Anywhere | Open or close Settings |
 | G then W | Outside text fields | Choose the sidebar's workspace |
 | ↓ / J | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
@@ -64,13 +63,6 @@ Alt is Option on macOS.
 | Shift+D | Todo page, outside text fields | Change the focused or open todo's due day |
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
-| C | Calendar page, outside text fields | Add an event |
-| ↓ / ↑ or J / K | Email page, outside text fields | Focus the next or previous conversation, or open it while one is open |
-| Esc | Email page, outside text fields | Close the open conversation |
-| O | Email page, outside text fields | Open the focused or open conversation in Gmail |
-| R / A | Email page, outside text fields | Reply, or reply to all, to the open conversation's last message |
-| # | Email page, outside text fields | Move the open conversation to Gmail's Trash |
-| C | Email page, outside text fields | Write a new mail |
 | ← / → | Sport page's week, outside text fields | Open the day before or after |
 | ← / → | Sport page's demo dialog, outside text fields | Show the workout's previous or next demo |
 | ↓ / ↑ or J / K | Sport page's journal, outside text fields | Focus the next or previous session, or open it while one is open |
@@ -80,12 +72,12 @@ Alt is Option on macOS.
 | ↓ / ↑ or J / K | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - **Settings › Keyboard** lists the keyboard shortcuts; press `?` outside a text field to open it, and `?` there goes back to the panes.
-  It lists them in sections by category: General, Sessions, Pull requests, Todo, Email, Calendar, Sport, and Changes.
+  It lists them in sections by category: General, Sessions, Pull requests, Todo, Sport, and Changes.
   Its first line states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **Archive session**, the composer's paperclip, Stop, and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, the Sport demo dialog's **Précédent** and **Suivant**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **Archive session**, the composer's paperclip, Stop, and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, and the Sport demo dialog's **Précédent** and **Suivant**.
 - Cmd+1 through Cmd+9 go to the first through ninth header tab, even while typing, as in Capy; a number with no tab is left to the window.
   Alt+1 through Alt+9 (Option on macOS) open the first through ninth session of the sidebar's list, in the order it shows them, in the focused pane.
-  The sidebar's page list takes no number keys: each tab keeps its command in the command menu, and Email keeps G then M.
+  The sidebar's page list takes no number keys: each tab keeps its command in the command menu.
   Off macOS, Ctrl+Shift+F is also the session search's key, which takes it first while the sidebar shows.
   Cmd with N, R, D, Q, P, S, Tab, or 0 is left to the window, whose menu takes Cmd+R, Cmd+Q, and Cmd+0, and Cmd+Shift+W to close it; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
@@ -133,9 +125,9 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in the app.
-- **Go to pull requests** in the command menu opens the Pull requests page; C on the Todo, Calendar, and Email pages adds a todo, an event, or a new mail.
-  **Go to sessions** goes back from the Pull requests page, the todo list, the calendar, the email, a Bot, Settings, or the new-session draft to the panes.
-  The **Todo** and **Calendar** buttons in the header open those pages, and G then M the **Email** page when connected to Gmail.
+- **Go to pull requests** in the command menu opens the Pull requests page; C on the Todo page adds a todo.
+  **Go to sessions** goes back from the Pull requests page, the todo list, a Bot, Settings, or the new-session draft to the panes.
+  The **Todo** and **Sport** buttons in the header open those pages.
   Cmd+, opens Settings, as the header's gear button does, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.

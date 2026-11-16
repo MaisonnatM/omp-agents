@@ -21,20 +21,6 @@ CREATE INDEX IF NOT EXISTS activity_at ON activity (at);
 CREATE INDEX IF NOT EXISTS activity_feature ON activity (kind, key, at);
 `;
 
-/**
- * Renames the old Inbox page's views and commands to the Email page's, once: `PRAGMA user_version` 1 marks it done, so
- * a later `inbox` row keeps its key. It holds the write lock, so a server opening the store meanwhile waits.
- */
-function renameInboxToEmail(db: Database): void {
-	db.transaction(() => {
-		const { user_version: version } = db.query<{ user_version: number }, []>("PRAGMA user_version").get()!;
-		if (version >= 1) return;
-		db.run("UPDATE activity SET key = 'email' || substr(key, 6) WHERE kind = 'view' AND (key = 'inbox' OR key GLOB 'inbox/*')");
-		db.run("UPDATE activity SET key = 'email' || substr(key, 6) WHERE kind = 'command' AND (key = 'inbox' OR key GLOB 'inbox-*')");
-		db.run("PRAGMA user_version = 1");
-	}).immediate();
-}
-
 export class ActivityStore {
 	readonly #db: Database;
 	readonly #insert: Statement<never, [string, number, number, string, string, string | null]>;
@@ -46,7 +32,6 @@ export class ActivityStore {
 		this.#db.run("PRAGMA journal_mode = WAL");
 		this.#db.run("PRAGMA busy_timeout = 5000");
 		this.#db.run(SCHEMA);
-		renameInboxToEmail(this.#db);
 		this.#insert = this.#db.query<never, [string, number, number, string, string, string | null]>("INSERT OR IGNORE INTO activity (client, seq, at, kind, key, via) VALUES (?, ?, ?, ?, ?, ?)");
 	}
 

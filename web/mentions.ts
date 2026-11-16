@@ -1,19 +1,17 @@
 /** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
-import { IconBubbleText, IconCalendarDays, IconEmail1, IconRunShortcut, IconFileBend, IconFolder1, IconPullRequest, IconSparklesTwo, IconTodos, IconUser } from "central-icons";
+import { IconBubbleText, IconRunShortcut, IconFileBend, IconFolder1, IconPullRequest, IconSparklesTwo, IconTodos, IconUser } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { everyWord } from "../src/shared/every-word";
 import { isBotAuthor, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
 import type { UserTodo } from "../src/user-todos-shared";
-import type { MailThread } from "../src/shared/gmail";
 import type { MentionToken } from "./completion-trigger";
 import { isAbsolutePath } from "./file-paths";
 import { hostLabel, pastLabel } from "./labels";
 import { listedPullRequests } from "./pull-requests-model";
-import type { MentionEvent } from "./reads";
 
-export type CategoryId = "file" | "todo" | "pull-request" | "person" | "mail" | "event" | "session";
+export type CategoryId = "file" | "todo" | "pull-request" | "person" | "session";
 
 /** The page's lists that every composer shares. */
 export interface MentionLists {
@@ -22,11 +20,9 @@ export interface MentionLists {
 	past: PastSession[];
 }
 
-/** What the sources list: the page's lists, then what the menu polls while it needs them, mail and events, and the selected workspace's pull requests. */
+/** What the sources list: the page's lists, then the selected workspace's pull requests, which the menu polls while it needs them. */
 export interface MentionData extends MentionLists {
 	pullRequestRepos: RepoPullRequests[];
-	threads: MailThread[];
-	events: MentionEvent[];
 }
 
 /** The composer the menu opens in. */
@@ -112,12 +108,6 @@ export function completionOption(item: CompletionItem): MenuOption {
 /** Brackets in a Markdown link's text would end it early. */
 const linkText = (text: string): string => text.replace(/[[\]]/g, "\\$&");
 
-/** When an event happens, in this browser's locale: its first day for an all-day one, else its start's day and time. */
-function eventTime(event: MentionEvent): string {
-	if (event.when.allDay) return new Date(`${event.when.firstDay}T00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-	return new Date(event.when.start).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
-
 /**
  * The people and teams on the listed pull requests, their authors and reviewers, each with the pull requests they are on,
  * by the handle GitHub mentions them by; bots and you, the author of those whose role is `author`, are left out.
@@ -171,29 +161,6 @@ const CATEGORIES: readonly Category[] = [
 		title: "People",
 		icon: IconUser,
 		list: ({ pullRequestRepos }) => pullRequestPeople(pullRequestRepos),
-	}),
-	source({
-		id: "mail",
-		prefix: "mail",
-		title: "Email",
-		icon: IconEmail1,
-		list: ({ threads }) =>
-			threads.map(thread => {
-				const subject = thread.subject || "(no subject)";
-				return { label: subject, detail: thread.from, reference: `[${linkText(`email "${subject}" from ${thread.from}`)}](${thread.url})` };
-			}),
-	}),
-	source({
-		id: "event",
-		prefix: "event",
-		title: "Calendar",
-		icon: IconCalendarDays,
-		list: ({ events }) =>
-			events.map(event => {
-				const detail = `${eventTime(event)} · ${event.calendar}`;
-				const text = `event "${event.title}", ${detail}`;
-				return { label: event.title, detail, reference: event.url ? `[${linkText(text)}](${event.url})` : `calendar ${text}` };
-			}),
 	}),
 	source({
 		id: "session",

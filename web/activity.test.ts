@@ -20,10 +20,6 @@ describe("viewOf", () => {
 		expect(pageView({ kind: "bots", target: "b1", routine: null })).toBe("bots/item");
 		expect(pageView({ kind: "bots", target: "b1", routine: { kind: "list" } })).toBe("bots/routines");
 		expect(pageView({ kind: "bots", target: "b1", routine: { kind: "open", id: "r1" } })).toBe("bots/routine");
-		expect(pageView({ kind: "calendar" })).toBe("calendar");
-		expect(pageView({ kind: "email", target: null })).toBe("email");
-		expect(pageView({ kind: "email", target: "new" })).toBe("email/new");
-		expect(pageView({ kind: "email", target: { account: "a", thread: "t" } } as Page)).toBe("email/item");
 		expect(pageView({ kind: "new", cwd: "/Users/me/code", todoId: null })).toBe("new");
 		expect(pageView({ kind: "scheduled", id: null })).toBe("scheduled");
 		expect(pageView({ kind: "scheduled", id: "s1" })).toBe("scheduled/item");

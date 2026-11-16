@@ -9,9 +9,6 @@ import { BASE64, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, 
 import { parseRoutineSpec, type RoutineChange } from "../routines";
 import { parseBotChange } from "../shared/bots";
 import {
-	GOOGLE_CLIENT_ID,
-	type GoogleClientInput,
-	holdsAccounts,
 	type IntegrationTarget,
 	MCP_INTEGRATIONS,
 	normalizeSlackScope,
@@ -19,8 +16,6 @@ import {
 	slackRedirectError,
 } from "../shared/accounts";
 import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
-import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
-import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
 import { parseContextAction, parseGoalChange } from "../shared/session-controls";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
@@ -604,16 +599,8 @@ export function parseRepoQuery(params: URLSearchParams): Parsed<Repo> {
 
 const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
-/**
- * The body of `PUT /api/integrations/sign-in` and `/remove`: `{ id, account }`, an MCP integration and, for one of
- * many accounts, the account's server name, or `null` to add one; a service of one server takes no account.
- */
-export function parseIntegrationTarget(body: unknown): Parsed<IntegrationTarget> {
-	if (!isObject(body) || !isMcpIntegration(body.id)) return null;
-	const account = body.account ?? null;
-	if (account === null) return { ok: { id: body.id, account } };
-	return holdsAccounts(body.id) && isNonEmpty(account) ? { ok: { id: body.id, account } } : null;
-}
+/** The body of `PUT /api/integrations/sign-in` and `/remove`: `{ id }`, an MCP integration. */
+export const parseIntegrationTarget = (body: unknown): Parsed<IntegrationTarget> => (isObject(body) && isMcpIntegration(body.id) ? { ok: { id: body.id } } : null);
 
 /** The body of `PUT /api/mcp-servers/sign-in`, `/sign-out`, and `/remove`: `{ name }` naming a server omp loads. */
 export const parseMcpServerName = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.name) ? { ok: body.name } : null);
@@ -671,78 +658,6 @@ export const parseProviderSignOut = (body: unknown): Parsed<{ provider: string; 
 export const parseAccountOrder = (body: unknown): Parsed<AccountOrderEdit> =>
 	isObject(body) && isNonEmpty(body.provider) && isTexts(body.emails) && body.emails.every(isNonEmpty) ? { ok: { provider: body.provider, emails: body.emails } } : null;
 
-/** The body of `PUT /api/google/calendars`: `{ account, id, shown }`, a Google calendar's account and id and whether the Calendar page shows it. */
-export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
-	isObject(body) && isNonEmpty(body.account) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { ok: { account: body.account, id: body.id, shown: body.shown } } : null;
-
-function parseNewEventCalendar(value: unknown): Parsed<NewEventCalendar> {
-	if (!isObject(value)) return null;
-	if (value.kind === "local") return { ok: { kind: "local" } };
-	return value.kind === "google" && isNonEmpty(value.account) && isNonEmpty(value.calendarId) ? { ok: { kind: "google", account: value.account, calendarId: value.calendarId } } : null;
-}
-
-/** The body of `PUT /api/calendar/events/new`: a trimmed title of at most {@link MAX_EVENT_TITLE} characters, when it happens, and the calendar it goes in. */
-export function parseNewEvent(body: unknown): Parsed<NewEvent> {
-	if (!isObject(body) || !isNonEmpty(body.title)) return null;
-	const title = body.title.trim();
-	const when = parseEventWhen(body.when);
-	const calendar = parseNewEventCalendar(body.calendar);
-	return title.length <= MAX_EVENT_TITLE && when && calendar ? { ok: { title, when: when.ok, calendar: calendar.ok } } : null;
-}
-
-/** The body of `PUT /api/calendar/events/delete`: an event kept on this computer by its id, or a Google event by its account, its calendar's id, and its own. */
-export function parseEventRef(body: unknown): Parsed<EventRef> {
-	if (!isObject(body)) return null;
-	if (body.kind === "local") return isNonEmpty(body.id) ? { ok: { kind: "local", id: body.id } } : null;
-	if (body.kind === "google") {
-		return isNonEmpty(body.account) && isNonEmpty(body.calendarId) && isNonEmpty(body.eventId)
-			? { ok: { kind: "google", account: body.account, calendarId: body.calendarId, eventId: body.eventId } }
-			: null;
-	}
-	return null;
-}
-
-/** The most people one field of a sent mail names. */
-const MAX_RECIPIENTS = 100;
-
-/** A body's `key` as people to write to: each `{ name, address }` with an address holding an `@`, else `null`. */
-function peopleIn(body: Record<string, unknown>, key: string): MailPerson[] | null {
-	const list = body[key];
-	if (!Array.isArray(list) || list.length > MAX_RECIPIENTS) return null;
-	const people = list.flatMap(item =>
-		isObject(item) && typeof item.name === "string" && typeof item.address === "string" && /^[^\s@<>,]+@[^\s@<>,]+$/.test(item.address)
-			? [{ name: item.name.replace(/[\r\n]/g, " "), address: item.address }]
-			: [],
-	);
-	return people.length === list.length ? people : null;
-}
-
-/** A body's draft without its subject, `null` when a field is missing or too long, or it names no one to write to. */
-function draftIn(body: Record<string, unknown>): Omit<MailDraft, "subject"> | null {
-	if (typeof body.html !== "string" || !isNonEmpty(body.text) || body.text.length > MAX_MAIL_BODY || body.html.length > MAX_MAIL_BODY) return null;
-	const [to, cc, bcc] = [peopleIn(body, "to"), peopleIn(body, "cc"), peopleIn(body, "bcc")];
-	if (!to || !cc || !bcc || to.length + cc.length + bcc.length === 0) return null;
-	return { to, cc, bcc, html: body.html, text: body.text };
-}
-
-/** The body of `PUT /api/gmail/reply`: the account and conversation to answer, and the reply. */
-export function parseMailReply(body: unknown): Parsed<MailReply> {
-	if (!isObject(body) || !isNonEmpty(body.account) || !isNonEmpty(body.thread)) return null;
-	const draft = draftIn(body);
-	return draft && { ok: { ...draft, account: body.account, thread: body.thread } };
-}
-
-/** The body of `PUT /api/gmail/send`: a new mail from an account, its subject on one line. */
-export function parseMailSend(body: unknown): Parsed<MailSend> {
-	if (!isObject(body) || !isNonEmpty(body.account) || typeof body.subject !== "string" || body.subject.length > 1000) return null;
-	const draft = draftIn(body);
-	return draft && { ok: { ...draft, account: body.account, subject: body.subject.replace(/[\r\n]/g, " ") } };
-}
-
-/** The body of `PUT /api/gmail/trash`: the account and conversation to move to Trash. */
-export const parseMailTrash = (body: unknown): Parsed<MailTrash> =>
-	isObject(body) && isNonEmpty(body.account) && isNonEmpty(body.thread) ? { ok: { account: body.account, thread: body.thread } } : null;
-
 const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 
 /** A body's `clientSecret`: trimmed, `undefined` when left out or empty so the saved secret can stay, `null` when it is not a string. */
@@ -768,17 +683,6 @@ export function parseSlackClient(body: unknown): Parsed<SlackClientInput, { erro
 	if (redirectError) return { error: redirectError };
 	const clientId = body.clientId.trim();
 	return { ok: clientSecret === undefined ? { clientId, redirectUri, callbackPort: body.callbackPort, scope } : { clientId, clientSecret, redirectUri, callbackPort: body.callbackPort, scope } };
-}
-
-/** The body of `PUT /api/integrations/<google-calendar|gmail>/client`. An empty secret is omitted so the saved secret can stay. */
-export function parseGoogleClient(body: unknown): Parsed<GoogleClientInput, { error: string }> {
-	if (!isObject(body)) return { error: "Expected { clientId, callbackPort } for the Google OAuth client." };
-	const clientId = typeof body.clientId === "string" ? body.clientId.trim() : "";
-	if (!GOOGLE_CLIENT_ID.test(clientId)) return { error: "Enter the OAuth client's ID, which ends in .apps.googleusercontent.com." };
-	const clientSecret = secretOf(body);
-	if (clientSecret === null) return { error: "Expected clientSecret to be a string." };
-	if (!validPort(body.callbackPort)) return { error: "Enter a local callback port from 1 to 65535." };
-	return { ok: clientSecret === undefined ? { clientId, callbackPort: body.callbackPort } : { clientId, clientSecret, callbackPort: body.callbackPort } };
 }
 
 /** Whether `data` is a file's bytes in standard base64, the empty file too, of at most `maxBytes`. */

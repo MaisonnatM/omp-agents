@@ -77,7 +77,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "storage", label: "Storage", icon: IconStorage, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
 	{ value: "whats-new", label: "What's new", icon: IconSparklesTwo, group: "general", keywords: ["changelog", "update", "release notes"] },
 	{ value: "providers", label: "Providers", icon: IconKey1, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
-	{ value: "integrations", label: "Integrations", icon: IconPlugin1, group: "connections", keywords: ["slack", "github", "gmail", "calendar", "connect"] },
+	{ value: "integrations", label: "Integrations", icon: IconPlugin1, group: "connections", keywords: ["slack", "github", "connect"] },
 	{ value: "mcp-servers", label: "MCP servers", icon: IconBlocks, group: "connections", keywords: ["mcp", "tools"] },
 	{ value: "source-control", label: "Source control", icon: IconMerged, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
 	{ value: "models", label: "Models", icon: IconDirection1, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },

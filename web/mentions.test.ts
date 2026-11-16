@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import type { MailThread } from "../src/shared/gmail";
 import type { Person, PullRequestSummary, Reviewer } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import type { ChangedFile, FileChange } from "../src/shared/transcript";
@@ -52,11 +51,6 @@ const data: MentionData = {
 	],
 	hosts: [host("s-self", "Login work"), host("s-live", null)],
 	past: [{ sessionId: "s-old", title: "Login bug hunt", cwdDisplay: "~/code/api" } as PastSession],
-	threads: [{ id: "t1", from: "Ana", subject: "Login [alert]", url: "https://mail.google.com/t1" } as MailThread],
-	events: [
-		{ title: "Login review", when: { allDay: false, start: 0, end: 1 }, calendar: "Work", url: "https://calendar.google.com/e1" },
-		{ title: "Login retro", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-14" }, calendar: "This computer", url: null },
-	],
 };
 
 const tokenAt = (text: string, cursor = text.length): MentionToken => {
@@ -115,7 +109,7 @@ describe("mentionMenu", () => {
 		{ path: "my notes.md", changes: [change(20)] },
 		{ path: "src/c.ts", changes: [change(10)] },
 	];
-	const categories = ["Files & Folders", "Todos", "Pull requests", "People", "Email", "Calendar", "Sessions"];
+	const categories = ["Files & Folders", "Todos", "Pull requests", "People", "Sessions"];
 
 	test("home offers the last three files the agent changed inside its directory, then every category", () => {
 		expect(labels(menu("Read @", { changed }))).toEqual([
@@ -138,8 +132,6 @@ describe("mentionMenu", () => {
 			["Ask @todo:", true],
 			["Ask @pr:", true],
 			["Ask @person:", true],
-			["Ask @mail:", true],
-			["Ask @event:", true],
 			["Ask @session:", true],
 		]);
 		expect(home[2].edit.cursor).toBe(8);
@@ -151,15 +143,11 @@ describe("mentionMenu", () => {
 			["Files & Folders", ["src/login-a.ts", "src/login-b.ts", "src/login-c.ts", "src/login-d.ts", "src/login-e.ts"]],
 			["Todos", ["Fix login redirect", "Write the login test", 'Ask about "SSO" login']],
 			["Pull requests", ["Fix login"]],
-			["Email", ["Login [alert]"]],
-			["Calendar", ["Login review", "Login retro"]],
 			["Sessions", ["Login bug hunt"]],
 		]);
 		expect(labels(menu("@login"))).toEqual([
 			["Todos", ["Fix login redirect", "Write the login test", 'Ask about "SSO" login']],
 			["Pull requests", ["Fix login"]],
-			["Email", ["Login [alert]"]],
-			["Calendar", ["Login review", "Login retro"]],
 			["Sessions", ["Login bug hunt"]],
 		]);
 	});
@@ -172,12 +160,6 @@ describe("mentionMenu", () => {
 		]);
 		expect(labels(menu('@todo:"test redirect'))).toEqual([["Todos", ["Write the login test"]]]);
 		expect(labels(menu("@wiki:login"))).toEqual([]);
-	});
-
-	test("an email or a Google event inserts a Markdown link, an event of this computer its text", () => {
-		expect(pick("See @mail:alert", "Login [alert]")?.text).toBe('See [email "Login \\[alert\\]" from Ana](https://mail.google.com/t1) ');
-		expect(pick("See @event:review", "Login review")?.text).toMatch(/^See \[event "Login review", .+ · Work\]\(https:\/\/calendar\.google\.com\/e1\) $/);
-		expect(pick("See @event:retro", "Login retro")?.text).toMatch(/^See calendar event "Login retro", .+ · This computer $/);
 	});
 
 	test("People lists the listed pull requests' authors, reviewers, and teams once each, without you or bots", () => {

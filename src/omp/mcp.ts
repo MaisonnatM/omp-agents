@@ -261,7 +261,7 @@ export const listMcpTools = (server: McpServer, signedIn: boolean, fresh: boolea
 	);
 };
 
-/** omp's user-level MCP config path. Slack's and Google Calendar's app settings live in that file, not in a second store. */
+/** omp's user-level MCP config path. Slack's app settings live in that file, not in a second store. */
 export const userMcpConfigPath = (): string => dirs.getMCPConfigPath("user");
 
 /** The servers in the MCP config file at `filePath`. */

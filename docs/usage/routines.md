@@ -20,10 +20,8 @@
     What already waits when you sign in starts nothing.
   - **When a pull request waits on you**: one of yours, or one waiting on your review, comes to wait on you, such as a review asked of you, its checks failing, a conflict, comments to address, or it becoming ready to merge.
     A draft, checks still running, or a session at work on it, such as a Bot pushing a fix, starts nothing until it ends waiting on you.
-  - **Before a calendar event starts**: a timed event on this Mac's calendars or a signed-in Google Calendar comes within 10 minutes of its start.
-  - **When unread mail comes in**: a new message, unread, in the inbox of a Gmail account signed in under **Settings › Integrations**, in a new conversation or an old one.
 
-  They watch what the bell and the Email page already read: Slack, pull requests, and Gmail every 2 minutes, calendars every minute.
+  They watch what the bell already reads: Slack and pull requests every 2 minutes.
   Everything that happened between two checks starts one run, and the run gets what the trigger saw: a message gets it after the routine's text, as data rather than as instructions, and a command gets it as a JSON list in `$ROUTINE_TRIGGERS`, which is `[]` when a schedule or **Run now** started it.
   What happened while the dashboard was quit starts nothing when it comes back, nor does what was already there when it started.
   A triggered run leaves the schedules alone: an hourly routine still runs on the hour.
@@ -58,7 +56,7 @@
   The arrow keys move between the routines' names, and between the ticks of a strip.
 - An open row shows the run it picked, the latest one at first, with what triggered it, its command's output, and its errors.
   A message's run reads **Sent to** and the Bot's name, a link to its conversation, once it went in.
-  A triggered run lists each thing it saw, linked to the Slack message, pull request, mail, or event when it can.
+  A triggered run lists each thing it saw, linked to the Slack message or pull request when it can.
   Output longer than 20 lines folds behind **Show output**.
   Then it shows the routine's instructions, its message or command in full, and its schedule: **Hourly**, **Daily**, **Weekdays**, or **Weekly**, with its time and, for **Weekly**, its day, each saved as you change it.
   A routine whose schedules fit none of these lists them with no choice picked, and picking one replaces them; its triggers stay.

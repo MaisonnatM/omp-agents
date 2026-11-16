@@ -1,7 +1,7 @@
 # Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
-The roster uses `sidebar`, and the page switch, **Pull requests**, **Bots**, and **Sessions** in the sidebar and **Calendar**, **Todo**, **Sport**, and **Email** in the header, uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+The roster uses `sidebar`, and the page switch, **Pull requests**, **Bots**, and **Sessions** in the sidebar and **Todo** and **Sport** in the header, uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
 User and assistant turns use `chat-message`, and the composer uses `input-message`.
 Tool calls and the model's thinking use shadcn's Base UI `trace`, vendored as `web/components/ui/trace.tsx` on `web/components/ui/collapsible.tsx`, and code blocks in messages its `code-block`, vendored as `web/components/ui/code-block.tsx`.
 The utilities both use from shadcn's `tailwind.css`, such as `shimmer` and `scroll-fade-x`, are copied into `web/shadcn.css`, since that file's `scroll-fade` would clash with the page's own.
@@ -9,7 +9,7 @@ The utilities both use from shadcn's `tailwind.css`, such as `shimmer` and `scro
 `Button`'s `loading` prop preserves its label's width, shows a spinner, disables the control, and sets `aria-busy`.
 `InputMessage` takes `sending` and `stopping` for its send and Stop controls.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
-The model, thinking, and workspace pickers use shadcn's `popover` and `command` combobox pattern, and the Calendar page's day cards shadcn's `hover-card`.
+The model, thinking, and workspace pickers use shadcn's `popover` and `command` combobox pattern, and the pull request conversation peek and the transcript minimap shadcn's `hover-card`.
 Fluid's sidebar rail, mobile drawer, cookie, and toggle shortcut are removed from the vendored sidebar, which keeps only the bordered panel.
 The dashboard sizes and toggles each sidebar in `web/components/sidebar-panel.tsx`, which gives each its own width and open state, because Fluid's provider held only one of each.
 In a window narrower than 720 px, the sidebar's least width plus the session pane's, an open sidebar floats over the page with a dimmed backdrop instead of taking width from it, and closes on a tap on the backdrop or once the address `App` passes it changes.
@@ -66,7 +66,7 @@ Text from GitHub, which means pull request descriptions and comments, renders it
 Those two plugins are `RAW_HTML` in `web/components/raw-html.ts`, a chunk of its own that `MessageMarkdown` loads for the first such text, which renders nothing until it lands, so its HTML never shows as escaped text; should the chunk fail to load, the text renders with its HTML escaped.
 It shows GitHub's avatars, and shows images and plays videos uploaded to GitHub through `GET /api/github-media`; a video from anywhere else, and any other image, renders as a link.
 `web/index.html` sets the page's `Content-Security-Policy`.
-Its `frame-src` allows `'self'`, for the Email page's message frame, and `https://www.youtube-nocookie.com`, for the Sport page's demo player, which mounts only on a play click.
+Its `frame-src` allows `'self'`, for an HTML artifact's frame, and `https://www.youtube-nocookie.com`, for the Sport page's demo player, which mounts only on a play click.
 
 ## Session visuals
 

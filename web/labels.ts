@@ -139,8 +139,8 @@ export function dayLabel(at: string, now = new Date()): string {
 	return (date.getFullYear() === now.getFullYear() ? DAY_FORMAT : MONTH_FORMAT).format(date);
 }
 
-/** When mail arrived, as Gmail's list dates it: `2:05 PM` on `now`'s day, `Oct 9` earlier in its year, `Oct 9, 2025` before. */
-export function mailTime(at: number, now = new Date()): string {
+/** When something happened, as a list dates it: `2:05 PM` on `now`'s day, `Oct 9` earlier in its year, `Oct 9, 2025` before. */
+export function listTime(at: number, now = new Date()): string {
 	const date = new Date(at);
 	if (date.toDateString() === now.toDateString()) return CLOCK_FORMAT.format(date);
 	return (date.getFullYear() === now.getFullYear() ? DAY_FORMAT : FULL_DAY_FORMAT).format(date);

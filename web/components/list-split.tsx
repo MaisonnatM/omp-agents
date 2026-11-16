@@ -66,7 +66,7 @@ export function DetailBar({ leading, previous, next, children, close }: { leadin
 	);
 }
 
-/** Chevron icons for {@link DetailBar} `previous` and `next`; the Email and Todo pages use them. */
+/** Chevron icons for {@link DetailBar} `previous` and `next`; the Todo page, Settings › Extensions, and the Sport journal use them. */
 export const CH_PREVIOUS: BarAction["icon"] = <IconChevronTopSmall />;
 export const CH_NEXT: BarAction["icon"] = <IconChevronDownSmall />;
 export const CH_CLOSE: BarAction["icon"] = <IconCrossMedium />;

@@ -59,11 +59,13 @@ describe("parseRoutineSpec", () => {
 		expect(parseRoutineSpec({ ...spec, task: { ...quiet, post: true } })).toBeNull();
 	});
 
-	test("takes triggers in place of schedules, but refuses neither, an unknown kind, and a kind twice", () => {
+	test("takes triggers in place of schedules, drops a kind routines no longer watch, and refuses neither, a trigger that is not one, and a kind twice", () => {
 		expect(parseRoutineSpec({ ...spec, schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] })?.ok).toMatchObject({ schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] });
+		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "event" }, { kind: "slack" }] })?.ok.triggers).toEqual([{ kind: "slack" }]);
+		expect(parseRoutineSpec({ ...spec, schedules: [], triggers: [{ kind: "event" }] })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, schedules: [] })).toBeNull();
-		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "jira" }] })).toBeNull();
-		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "event" }, { kind: "event" }] })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, triggers: ["slack"] })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "slack" }, { kind: "slack" }] })).toBeNull();
 	});
 });
 
@@ -100,11 +102,11 @@ describe("watchedKinds", () => {
 		expect(watchedKinds([routine({ triggers: [{ kind: "slack" }] })])).toEqual(["slack"]);
 		expect(
 			watchedKinds([
-				routine({ id: "r1", triggers: [{ kind: "gmail" }, { kind: "slack" }] }),
+				routine({ id: "r1", triggers: [{ kind: "pull-request" }, { kind: "slack" }] }),
 				routine({ id: "r2", triggers: [{ kind: "slack" }] }),
 				routine({ id: "r3", triggers: [{ kind: "pull-request" }], enabled: false }),
 			]),
-		).toEqual(["slack", "gmail"]);
+		).toEqual(["slack", "pull-request"]);
 	});
 });
 
@@ -166,7 +168,7 @@ describe("applyRoutine", () => {
 		const saved = routine({ runs: [{ at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "queued" }, errors: [], triggeredBy: [] }] });
 		const list = [saved];
 		expect(applyRoutine(list, { op: "save", routine: spec }, now)).toBe(list);
-		expect(applyRoutine(list, { op: "save", routine: { ...spec, triggers: [{ kind: "event" }] } }, now)).not.toBe(list);
+		expect(applyRoutine(list, { op: "save", routine: { ...spec, triggers: [{ kind: "slack" }] } }, now)).not.toBe(list);
 		expect(applyRoutine(list, { op: "save", routine: { ...spec, enabled: false } }, now)).not.toBe(list);
 	});
 

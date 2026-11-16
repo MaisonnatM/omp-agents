@@ -8,7 +8,7 @@ import { MAX_CAPTURE_ID } from "../shared/dictation";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequestChange } from "../shared/github";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
-import { MAX_QUEUED_STACK, parseAccountOrder, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTrustChange, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseAccountOrder, parseClientMsg, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTrustChange, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -265,7 +265,7 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "pin", sessionIds: "s1" })).toBeNull();
 	});
 
-	test("preference sets a portable key to a string or null, or seeds portable strings, and refuses any other key or value", () => {
+	test("preference sets a portable key to a string or null, or seeds strings and drops a key that is not portable, and refuses any other key or value", () => {
 		const change = (value: unknown) => msg({ t: "preference", change: value });
 		expect(change({ op: "set", key: "omp-agents.theme", value: "dark", extra: 1 })).toEqual({ t: "preference", change: { op: "set", key: "omp-agents.theme", value: "dark" } });
 		expect(change({ op: "set", key: "omp-agents.theme", value: null })).toEqual({ t: "preference", change: { op: "set", key: "omp-agents.theme", value: null } });
@@ -273,7 +273,7 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "set", key: "omp-agents.split-columns", value: "0.4" })).toBeNull();
 		expect(change({ op: "set", key: "omp-agents.theme", value: 1 })).toBeNull();
 		expect(change({ op: "set", key: "omp-agents.theme" })).toBeNull();
-		expect(change({ op: "seed", values: { "omp-agents.pr-file-tree": "false" } })).toBeNull();
+		expect(change({ op: "seed", values: { "omp-agents.theme": "dark", "omp-agents.pr-file-tree": "false" } })).toEqual({ t: "preference", change: { op: "seed", values: { "omp-agents.theme": "dark" } } });
 		expect(change({ op: "reset" })).toBeNull();
 	});
 
@@ -683,15 +683,10 @@ describe("parseRepoQuery", () => {
 });
 
 describe("parseIntegrationTarget", () => {
-	test("takes an MCP integration, an account only for Gmail or Google Calendar, and null to add one", () => {
-		expect(parseIntegrationTarget({ id: "slack" })?.ok).toEqual({ id: "slack", account: null });
-		expect(parseIntegrationTarget({ id: "slack", account: null })?.ok).toEqual({ id: "slack", account: null });
-		expect(parseIntegrationTarget({ id: "gmail", account: "gmail-2" })?.ok).toEqual({ id: "gmail", account: "gmail-2" });
-		expect(parseIntegrationTarget({ id: "google-calendar", account: null })?.ok).toEqual({ id: "google-calendar", account: null });
-		expect(parseIntegrationTarget({ id: "slack", account: "slack" })).toBeNull();
-		expect(parseIntegrationTarget({ id: "gmail", account: "" })).toBeNull();
+	test("takes an MCP integration and drops anything else", () => {
+		expect(parseIntegrationTarget({ id: "slack" })?.ok).toEqual({ id: "slack" });
+		expect(parseIntegrationTarget({ id: "slack", account: null })?.ok).toEqual({ id: "slack" });
 		expect(parseIntegrationTarget({ id: "Slack" })).toBeNull();
-		expect(parseIntegrationTarget({ id: "google" })).toBeNull();
 		expect(parseIntegrationTarget("slack")).toBeNull();
 		expect(parseIntegrationTarget(null)).toBeNull();
 	});
@@ -704,70 +699,6 @@ describe("parseAccountOrder", () => {
 		expect(parseAccountOrder({ provider: "anthropic", emails: ["maxence@maisonnat.com", ""] })).toBeNull();
 		expect(parseAccountOrder({ provider: "anthropic", emails: [7] })).toBeNull();
 		expect(parseAccountOrder({ provider: "anthropic", emails: "maxence@maisonnat.com" })).toBeNull();
-	});
-});
-
-describe("parseCalendarShown", () => {
-	test("takes an account, a calendar id, and a boolean, and refuses an empty id or another value for shown", () => {
-		expect(parseCalendarShown({ account: "google-calendar", id: "team@group.calendar.google.com", shown: false })?.ok).toEqual({ account: "google-calendar", id: "team@group.calendar.google.com", shown: false });
-		expect(parseCalendarShown({ account: "google-calendar-2", id: "max@example.com", shown: true, extra: 1 })?.ok).toEqual({ account: "google-calendar-2", id: "max@example.com", shown: true });
-		expect(parseCalendarShown({ id: "max@example.com", shown: true })).toBeNull();
-		expect(parseCalendarShown({ account: "google-calendar", id: "", shown: true })).toBeNull();
-		expect(parseCalendarShown({ account: "google-calendar", id: "max@example.com", shown: "false" })).toBeNull();
-	});
-});
-
-describe("parseNewEvent", () => {
-	const timed = { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") };
-
-	test("takes a trimmed title, all-day days or a timed span, and this computer or a Google calendar", () => {
-		expect(parseNewEvent({ title: "  Offsite ", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" }, calendar: { kind: "local", space: "personal" }, extra: 1 })?.ok).toEqual({
-			title: "Offsite",
-			when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" },
-			calendar: { kind: "local" },
-		});
-		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "google", account: "google-calendar", calendarId: "max@example.com" } })?.ok).toEqual({
-			title: "Retro",
-			when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") },
-			calendar: { kind: "google", account: "google-calendar", calendarId: "max@example.com" },
-		});
-		expect(parseNewEvent({ title: "One day", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-14" }, calendar: { kind: "local" } })?.ok.title).toBe("One day");
-	});
-
-	test("refuses an empty or overlong title, an end at or before the start, a last day before the first, a bad day, or an unknown calendar", () => {
-		const local = { kind: "local" };
-		expect(parseNewEvent({ title: "  ", when: timed, calendar: local })).toBeNull();
-		expect(parseNewEvent({ title: "x".repeat(501), when: timed, calendar: local })).toBeNull();
-		expect(parseNewEvent({ title: "Retro", when: { ...timed, end: timed.start }, calendar: local })).toBeNull();
-		expect(parseNewEvent({ title: "Retro", when: { ...timed, end: timed.start - 1 }, calendar: local })).toBeNull();
-		expect(parseNewEvent({ title: "Retro", when: { ...timed, start: 1.5 }, calendar: local })).toBeNull();
-		expect(parseNewEvent({ title: "Trip", when: { allDay: true, firstDay: "2026-10-15", lastDay: "2026-10-14" }, calendar: local })).toBeNull();
-		expect(parseNewEvent({ title: "Trip", when: { allDay: true, firstDay: "2026-02-30", lastDay: "2026-03-01" }, calendar: local })).toBeNull();
-		expect(parseNewEvent({ title: "Trip", when: { allDay: true, firstDay: "14/10/2026", lastDay: "2026-10-15" }, calendar: local })).toBeNull();
-		expect(parseNewEvent({ title: "Trip", when: { allDay: "yes", firstDay: "2026-10-14", lastDay: "2026-10-15" }, calendar: local })).toBeNull();
-		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "google", calendarId: "" } })).toBeNull();
-		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "outlook" } })).toBeNull();
-	});
-});
-
-describe("parseEventRef", () => {
-	test("names an event kept on this computer by its id, or a Google event by its calendar's id and its own", () => {
-		expect(parseEventRef({ kind: "local", id: "e1", extra: 1 })?.ok).toEqual({ kind: "local", id: "e1" });
-		expect(parseEventRef({ kind: "google", account: "google-calendar", calendarId: "max@example.com", eventId: "standup_20261005T073000Z" })?.ok).toEqual({
-			kind: "google",
-			account: "google-calendar",
-			calendarId: "max@example.com",
-			eventId: "standup_20261005T073000Z",
-		});
-	});
-
-	test("refuses an empty id, a Google event without both ids, or another kind", () => {
-		expect(parseEventRef({ kind: "local", id: "" })).toBeNull();
-		expect(parseEventRef({ id: "e1" })).toBeNull();
-		expect(parseEventRef({ kind: "google", calendarId: "max@example.com" })).toBeNull();
-		expect(parseEventRef({ kind: "google", calendarId: "", eventId: "e1" })).toBeNull();
-		expect(parseEventRef({ kind: "outlook", id: "e1" })).toBeNull();
-		expect(parseEventRef("e1")).toBeNull();
 	});
 });
 
@@ -788,21 +719,6 @@ describe("parseSlackClient", () => {
 		expect(parseSlackClient({ ...app, redirectUri: "https://[::1]:8443/callback", callbackPort: 8443 })).toHaveProperty("error");
 		expect(parseSlackClient({ ...app, scope: "constructor" })).toHaveProperty("error");
 		expect(parseSlackClient({ ...app, callbackPort: 3.5 })).toHaveProperty("error");
-	});
-});
-
-describe("parseGoogleClient", () => {
-	test("trims a Google client ID, omits an empty secret, and keeps the port", () => {
-		expect(parseGoogleClient({ clientId: " 1-a.apps.googleusercontent.com ", clientSecret: " ", callbackPort: 3119 })).toEqual({ ok: { clientId: "1-a.apps.googleusercontent.com", callbackPort: 3119 } });
-		expect(parseGoogleClient({ clientId: "1-a.apps.googleusercontent.com", clientSecret: " s ", callbackPort: 3119 })).toEqual({ ok: { clientId: "1-a.apps.googleusercontent.com", clientSecret: "s", callbackPort: 3119 } });
-	});
-
-	test("rejects a client ID that is not Google's, a secret that is not a string, and a bad port", () => {
-		const client = { clientId: "1-a.apps.googleusercontent.com", callbackPort: 3119 };
-		expect(parseGoogleClient({ ...client, clientId: "111.222" })).toHaveProperty("error");
-		expect(parseGoogleClient({ ...client, clientSecret: 7 })).toHaveProperty("error");
-		expect(parseGoogleClient({ ...client, callbackPort: 0 })).toHaveProperty("error");
-		expect(parseGoogleClient({ ...client, callbackPort: "3119" })).toHaveProperty("error");
 	});
 });
 

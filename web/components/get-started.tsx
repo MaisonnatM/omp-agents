@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { connectionsOf, signedIn } from "../../src/shared/accounts";
+import { signedIn } from "../../src/shared/accounts";
 import { providerConnected } from "../../src/shared/providers";
 import { activityControl } from "../activity";
 import { getStartedSurface, known, mapKnown, type Observation, observation } from "../get-started-model";
@@ -181,7 +181,7 @@ export function GetStarted({ route, vacantHome, firstSession, rosterError, onClo
 	const github = mapKnown(sourceControl, answer => answer.github);
 	const kit = observation(starterKitStore.usePolling(null, open));
 	const integrationsEntry = integrationsStore.usePolling(null, open);
-	const integrations = mapKnown(observation(integrationsEntry), answer => Object.values(answer.integrations).filter(item => connectionsOf(item).some(signedIn)).length);
+	const integrations = mapKnown(observation(integrationsEntry), answer => Object.values(answer.integrations).filter(item => signedIn(item.connection)).length);
 
 	const refresh = useCallback(async (): Promise<void> => {
 		await Promise.all([providersStore.refresh(), ...(open ? [terminalSessionsStore.refresh(), sourceControlStore.refresh(), starterKitStore.refresh(), integrationsStore.refresh(null, { fresh: true })] : [])]);

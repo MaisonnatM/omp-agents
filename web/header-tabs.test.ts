@@ -73,12 +73,12 @@ describe("visitHeaderTab", () => {
 
 describe("each tab's own Back and Forward", () => {
 	test("Back and Forward move through what the tab on screen showed and leave the other tabs as they are", () => {
-		const row = browse(["#todo", "#bots", "+#new", "#calendar"]);
+		const row = browse(["#todo", "#bots", "+#new", "#sport"]);
 		const back = walk(select(row, 0), -1);
 		expect(stepHeaderTab(select(row, 0), -1)?.go).toBe("#todo");
-		expect(shown(back)).toEqual(["*#todo", "#calendar"]);
+		expect(shown(back)).toEqual(["*#todo", "#sport"]);
 		expect(back.tabs[1]).toBe(row.tabs[1]);
-		expect(shown(walk(back, 1))).toEqual(["*#bots", "#calendar"]);
+		expect(shown(walk(back, 1))).toEqual(["*#bots", "#sport"]);
 		expect(shown(walk(select(row, 1), -1))).toEqual(["#bots", "*#new"]);
 	});
 
@@ -90,7 +90,7 @@ describe("each tab's own Back and Forward", () => {
 	});
 
 	test("going somewhere after Back drops what Forward would show, as a browser does", () => {
-		const row = browse(["#calendar"], walk(browse(["#todo", "#bots"]), -1));
+		const row = browse(["#sport"], walk(browse(["#todo", "#bots"]), -1));
 		expect(stepHeaderTab(row, 1)).toBeNull();
 		expect(shown(walk(row, -1))).toEqual(["*#todo"]);
 	});
@@ -110,11 +110,11 @@ describe("each tab's own Back and Forward", () => {
 	});
 
 	test("a replace changes the entry on screen and keeps the tab's Back and Forward, as a page that picks what it opens does", () => {
-		const row = browse(["#todo", "#bots", "#calendar"]);
+		const row = browse(["#todo", "#bots", "#sport"]);
 		const replaced = browse(["=#bots/a"], walk(row, -1));
 		expect(shown(replaced)).toEqual(["*#bots/a"]);
 		expect(shown(walk(replaced, -1))).toEqual(["*#todo"]);
-		expect(shown(walk(replaced, 1))).toEqual(["*#calendar"]);
+		expect(shown(walk(replaced, 1))).toEqual(["*#sport"]);
 	});
 
 	test("a tab's Back keeps its latest entries only", () => {
@@ -126,7 +126,7 @@ describe("each tab's own Back and Forward", () => {
 
 	test("a pinned tab follows where you go in it and stays pinned", () => {
 		const row = pinHeaderTab(browse(["#todo"]), "t0", true);
-		expect(shown(browse(["#calendar"], row))).toEqual(["*^#calendar"]);
+		expect(shown(browse(["#sport"], row))).toEqual(["*^#sport"]);
 	});
 });
 
@@ -171,7 +171,7 @@ describe("reopenHeaderTab", () => {
 	});
 
 	test("a reopened tab keeps its own Back and Forward", () => {
-		const walked = walk(browse(["#calendar", "#bots"], row), -1);
+		const walked = walk(browse(["#sport", "#bots"], row), -1);
 		expect(shown(walk(reopen(close(walked, "t2")), -1, 1, 1))).toEqual(["#pull-requests", "#todo", "*#bots"]);
 	});
 
@@ -194,8 +194,8 @@ describe("reopenHeaderTab", () => {
 	test("an unpinned tab comes back after the pinned ones, a pinned one among them", () => {
 		const pinned = pinHeaderTab(pinHeaderTab(row, "t1", true), "t2", true);
 		expect(shown(reopen(close(pinHeaderTab(pinned, "t2", false), "t2")))).toEqual(["^#todo", "*#past/a", "#pull-requests"]);
-		const closedPinned = { ...pinned, closed: [{ tab: { id: "z", hash: "#calendar", back: [], forward: [], pinned: true as const }, index: 5 }] };
-		expect(shown(reopen(closedPinned))).toEqual(["^#todo", "^#past/a", "*^#calendar", "#pull-requests"]);
+		const closedPinned = { ...pinned, closed: [{ tab: { id: "z", hash: "#sport", back: [], forward: [], pinned: true as const }, index: 5 }] };
+		expect(shown(reopen(closedPinned))).toEqual(["^#todo", "^#past/a", "*^#sport", "#pull-requests"]);
 	});
 
 	test("keeps the latest closed tabs only", () => {
@@ -207,15 +207,15 @@ describe("reopenHeaderTab", () => {
 });
 
 describe("closeOtherHeaderTabs", () => {
-	const row = browse(["#pull-requests", "+#todo", "+#past/a", "+#calendar"]);
+	const row = browse(["#pull-requests", "+#todo", "+#past/a", "+#sport"]);
 
 	test("keeps the pinned tabs and the one asked for, which goes on screen, and Reopen closed tab brings the others back from the left", () => {
 		const pinned = pinHeaderTab({ ...row, active: 2 }, "t3", true);
 		const closed = closeOtherHeaderTabs(pinned, "t1");
 		expect(closed?.go).toBe("#todo");
-		expect(shown(closed!.row)).toEqual(["^#calendar", "*#todo"]);
-		expect(shown(reopen(closed!.row))).toEqual(["^#calendar", "*#pull-requests", "#todo"]);
-		expect(shown(reopen(reopen(closed!.row)))).toEqual(["^#calendar", "#pull-requests", "#todo", "*#past/a"]);
+		expect(shown(closed!.row)).toEqual(["^#sport", "*#todo"]);
+		expect(shown(reopen(closed!.row))).toEqual(["^#sport", "*#pull-requests", "#todo"]);
+		expect(shown(reopen(reopen(closed!.row)))).toEqual(["^#sport", "#pull-requests", "#todo", "*#past/a"]);
 	});
 
 	test("closes nothing when only pinned tabs are left beside it", () => {
@@ -224,15 +224,15 @@ describe("closeOtherHeaderTabs", () => {
 });
 
 describe("closeRightHeaderTabs", () => {
-	const row = browse(["#pull-requests", "+#todo", "+#past/a", "+#calendar"]);
+	const row = browse(["#pull-requests", "+#todo", "+#past/a", "+#sport"]);
 
 	test("closes the unpinned tabs after the one asked for, keeping the one on screen, and Reopen closed tab brings them back from the left", () => {
 		const pinned = pinHeaderTab(row, "t3", true);
 		const closed = closeRightHeaderTabs(pinned, "t0");
 		expect(closed?.go).toBeNull();
-		expect(shown(closed!.row)).toEqual(["*^#calendar", "#pull-requests"]);
-		expect(shown(reopen(closed!.row))).toEqual(["^#calendar", "#pull-requests", "*#todo"]);
-		expect(shown(closeRightHeaderTabs(pinned, "t3")!.row)).toEqual(["*^#calendar"]);
+		expect(shown(closed!.row)).toEqual(["*^#sport", "#pull-requests"]);
+		expect(shown(reopen(closed!.row))).toEqual(["^#sport", "#pull-requests", "*#todo"]);
+		expect(shown(closeRightHeaderTabs(pinned, "t3")!.row)).toEqual(["*^#sport"]);
 	});
 
 	test("puts the tab asked for on screen when the one on screen closes", () => {
@@ -257,9 +257,9 @@ describe("duplicateHeaderTab", () => {
 	});
 
 	test("the copy starts with the tab's Back and Forward, then keeps its own", () => {
-		const walked = walk(browse(["#calendar", "#bots"], row), -1);
+		const walked = walk(browse(["#sport", "#bots"], row), -1);
 		const copy = browse(["#todo"], duplicateHeaderTab(walked, "t2", "copy")!.row);
-		expect(shown(walk(copy, -1, -1))).toEqual(["#pull-requests", "#todo", "#calendar", "*#past/a"]);
+		expect(shown(walk(copy, -1, -1))).toEqual(["#pull-requests", "#todo", "#sport", "*#past/a"]);
 		expect(shown(walk(select(copy, 2), 1))).toEqual(["#pull-requests", "#todo", "*#bots", "#todo"]);
 	});
 
@@ -286,7 +286,7 @@ describe("pinHeaderTab", () => {
 	});
 
 	test("pinning a tab keeps its Back and Forward", () => {
-		const pinned = pinHeaderTab(walk(browse(["#calendar", "#bots"], row), -1), "t2", true);
+		const pinned = pinHeaderTab(walk(browse(["#sport", "#bots"], row), -1), "t2", true);
 		expect(shown(walk(pinned, -1))).toEqual(["*^#past/a", "#pull-requests", "#todo"]);
 		expect(shown(walk(pinned, 1))).toEqual(["*^#bots", "#pull-requests", "#todo"]);
 	});
@@ -299,15 +299,15 @@ describe("pinHeaderTab", () => {
 
 describe("storing", () => {
 	test("a reordered row with pinned and closed tabs keeps the tab on screen and survives being stored and read back", () => {
-		const row = browse(["#pull-requests", "+#past/a", "+#todo", "+#calendar"]);
+		const row = browse(["#pull-requests", "+#past/a", "+#todo", "+#sport"]);
 		const moved = close(pinHeaderTab(reorderHeaderTabs(row, [row.tabs[2]!, row.tabs[0]!, row.tabs[1]!, row.tabs[3]!]), "t1", true), "t3");
 		expect(shown(moved)).toEqual(["^#past/a", "#todo", "*#pull-requests"]);
 		expect(decodeHeaderTabs(encodeHeaderTabs(moved))).toEqual(moved);
 	});
 
 	test("keeps each tab's history, also a closed tab's, so a reopened tab has it", () => {
-		const row = close(visitHeaderTab(walk(browse(["#todo", "#bots", "#calendar"]), -1), NEW_TAB_HASH, "new-tab", "n"), "t0");
-		expect(row.closed[0]?.tab).toMatchObject({ hash: "#bots", back: ["#todo"], forward: ["#calendar"] });
+		const row = close(visitHeaderTab(walk(browse(["#todo", "#bots", "#sport"]), -1), NEW_TAB_HASH, "new-tab", "n"), "t0");
+		expect(row.closed[0]?.tab).toMatchObject({ hash: "#bots", back: ["#todo"], forward: ["#sport"] });
 		expect(decodeHeaderTabs(encodeHeaderTabs(row))).toEqual(row);
 	});
 
@@ -318,8 +318,8 @@ describe("storing", () => {
 
 	test("reads a row stored before pinned and closed tabs and tab histories, and puts stored pinned tabs first", () => {
 		expect(decodeHeaderTabs(JSON.stringify({ tabs: [{ id: "a", hash: "#todo" }], active: 0 }))).toEqual({ tabs: [{ id: "a", hash: "#todo", back: [], forward: [] }], active: 0, closed: [] });
-		const stored = { tabs: [{ id: "a", hash: "#todo" }, { id: "b", hash: "#calendar", pinned: true }], active: 0, closed: [{ tab: { id: "c" }, index: 0 }] };
-		expect(shown(decodeHeaderTabs(JSON.stringify(stored)))).toEqual(["^#calendar", "*#todo"]);
+		const stored = { tabs: [{ id: "a", hash: "#todo" }, { id: "b", hash: "#sport", pinned: true }], active: 0, closed: [{ tab: { id: "c" }, index: 0 }] };
+		expect(shown(decodeHeaderTabs(JSON.stringify(stored)))).toEqual(["^#sport", "*#todo"]);
 		expect(decodeHeaderTabs(JSON.stringify(stored)).closed).toEqual([]);
 	});
 });

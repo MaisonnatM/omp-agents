@@ -49,13 +49,6 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Slack.**
   Search, history, and sending in Slack from every omp session, through Slack's MCP server at `https://mcp.slack.com/mcp`.
   Save a dedicated internal Slack app in **Settings › Integrations**, then connect it.
-- **Calendar.**
-  A month of routine runs, due todos, and your Google Calendar's events, read with omp's sign-in to Google Calendar's MCP server.
-- **Email.**
-  Your Gmail inbox's latest conversations, with a rich-text editor to reply and write new mail, and Delete to Trash, each opening in Gmail, read with omp's sign-in to Gmail's MCP server.
-- **Several Google accounts.**
-  Connect more than one Gmail and Google Calendar account; the Email page and the Calendar merge them, tagged by address.
-  omp sessions are told, through the starter kit's `google-accounts` extension, which account each MCP server signs in as.
 - **Your own todo list.**
   Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
   A todo links to the sessions and pull requests it is about, starts a session from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool, check off a todo once they finish its work, and edit or delete one when you ask.
@@ -84,8 +77,6 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 
 - Optional, for the pull request list: the [GitHub CLI](https://cli.github.com) (`gh`), signed in with `gh auth login`.
 - Optional, for Slack in omp sessions: a dedicated internal Slack app, with the MCP server and token rotation turned on, an HTTPS redirect, and the user scopes you choose, saved from **Settings › Integrations**.
-- Optional, for Google Calendar: a Google OAuth client of type Web application, with the Google Calendar API turned on, saved from **Settings › Integrations**.
-- Optional, for the Email page: a Google OAuth client of type Web application, with the Gmail API turned on, saved from **Settings › Integrations**; the Google Calendar client works too.
 
 ## Quick start
 

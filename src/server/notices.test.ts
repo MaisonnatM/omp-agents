@@ -10,8 +10,7 @@ import type { FailedUpdate } from "../shared/dashboard-update";
 import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
 import { InterruptedSessions } from "./interrupted";
-import type { SignedOutAccount } from "../google-accounts";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, type FoundEvent, Notices, type NoticeSources, PROVIDER_KINDS, SIGN_IN_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, Notices, type NoticeSources, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -73,9 +72,6 @@ interface State {
 	plans?: PlanUsage[];
 	usageError?: string;
 	creditRuns?: Omit<CreditsSubject, "kind">[];
-	localEvents?: FoundEvent[];
-	googleEvents?: FoundEvent[];
-	googleError?: string;
 	/** The commits origin's branch holds past the running omp-agents build. */
 	dashboardCommits?: number;
 	/** Why updating omp-agents is refused, when it is. */
@@ -84,8 +80,6 @@ interface State {
 	dashboardFailed?: FailedUpdate;
 	/** How many times the dashboard check fetched omp-agents' branch. */
 	dashboardFetches?: number;
-	/** The Google accounts sessions reported signed out that still do not work. */
-	signedOut?: SignedOutAccount[];
 	/** The dashboard sessions the server tracks, whose mid-turn stops the stopped check lists. */
 	interrupted?: InterruptedSessions;
 	/** What each listed session file gives the stopped check. */
@@ -133,13 +127,7 @@ function sources(state: State): NoticeSources {
 			return state.plans ?? [];
 		},
 		creditRuns: async () => state.creditRuns ?? [],
-		localEvents: () => state.localEvents ?? [],
-		googleEvents: async () => {
-			if (state.googleError) throw new Error(state.googleError);
-			return [{ account: "google-calendar", events: state.googleEvents ?? [] }];
-		},
 		stoppedSessions: () => (state.interrupted?.midTurn() ?? []).map(sessionId => ({ sessionId, title: state.listed?.[sessionId]?.title ?? null, cwdDisplay: state.listed?.[sessionId]?.cwdDisplay ?? null })),
-		signedOut: async () => state.signedOut ?? [],
 		now: () => state.now ?? 0,
 	};
 }
@@ -398,53 +386,6 @@ describe("Notices", () => {
 		state.creditRuns = [];
 		await notices.check(PROVIDER_KINDS);
 		expect(notices.list).toEqual([]);
-	});
-
-	test("a Google account a session found signed out is a notice dated its report, until it works again", async () => {
-		const calendar: SignedOutAccount = { service: "google-calendar", account: "google-calendar", address: "me@example.com", since: 3 * MINUTE };
-		const state: State = { latest: null, installed: "18.8.0", models: [], signedOut: [calendar], now: 10 * MINUTE };
-		const notices = new Notices(noticesPath(), sources(state), () => {});
-		await notices.check(SIGN_IN_KINDS);
-		expect(notices.list).toEqual([
-			{ id: "sign-in:google-calendar:180000", at: 3 * MINUTE, seen: false, read: false, kind: "sign-in", service: "google-calendar", account: "google-calendar", address: "me@example.com" },
-		]);
-
-		state.signedOut = [];
-		await notices.check(SIGN_IN_KINDS);
-		expect(notices.list).toEqual([]);
-	});
-
-	test("an event is a notice from ten minutes before it starts until it ends, dated then, and Google failing keeps only Google's", async () => {
-		const event = (ref: string, start: number): FoundEvent => ({ ref, title: ref, start, end: start + 30 * MINUTE, calendar: null, color: null, url: null, sessionId: null });
-		const state: State = { latest: null, installed: "18.8.0", models: [], localEvents: [event("local/a", 100 * MINUTE)], googleEvents: [event("google/work/b", 105 * MINUTE)] };
-		const notices = new Notices(noticesPath(), sources(state), () => {});
-		const ids = () => notices.list.map(({ id, at }) => [id, at]);
-
-		state.now = 89 * MINUTE;
-		await notices.check(EVENT_KINDS);
-		expect(ids()).toEqual([]);
-
-		state.now = 90 * MINUTE;
-		await notices.check(EVENT_KINDS);
-		expect(ids()).toEqual([[`event:local/a:${100 * MINUTE}`, 90 * MINUTE]]);
-
-		state.now = 96 * MINUTE;
-		await notices.check(EVENT_KINDS);
-		expect(ids()).toEqual([
-			[`event:google/work/b:${105 * MINUTE}`, 95 * MINUTE],
-			[`event:local/a:${100 * MINUTE}`, 90 * MINUTE],
-		]);
-
-		state.googleError = "offline";
-		state.localEvents = [];
-		state.now = 97 * MINUTE;
-		await notices.check(EVENT_KINDS);
-		expect(ids()).toEqual([[`event:google/work/b:${105 * MINUTE}`, 95 * MINUTE]]);
-
-		state.googleError = undefined;
-		state.now = 135 * MINUTE;
-		await notices.check(EVENT_KINDS);
-		expect(ids()).toEqual([]);
 	});
 
 	test("one notice names the sessions that stopped mid-turn, with what their listed files give, and a session that runs again leaves it", async () => {

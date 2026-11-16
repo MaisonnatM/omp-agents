@@ -48,7 +48,7 @@ describe("Bots", () => {
 		expect(openBot({ kind: "bots", target: "ranger", routine: null }, bots, [], [])).toBeNull();
 		expect(openBot({ kind: "bots", target: null, adding: false }, bots, [], [])).toBeNull();
 		expect(openBot({ kind: "bots", target: "scout", routine: null }, null, [], [])).toBeNull();
-		expect(openBot({ kind: "calendar" }, bots, [], [])).toBeNull();
+		expect(openBot({ kind: "sport", tab: "progress" }, bots, [], [])).toBeNull();
 		expect(openBot(null, bots, [], [])).toBeNull();
 	});
 

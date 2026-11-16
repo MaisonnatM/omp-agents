@@ -8,4 +8,4 @@ decision-makers: Maxence Maisonnat
 
 Plan quota comes from `omp usage --json`, and Gmail and Google Calendar use the tokens omp holds for their MCP servers.
 omp already owns that setup and those sign-ins, so the dashboard needs neither a copy of the logic nor a sign-in of its own.
-See [Plan quota](../architecture/plan-quota.md), [Google Calendar](../architecture/http-api-google-calendar.md), and [Gmail](../architecture/http-api-gmail.md).
+See [Plan quota](../architecture/plan-quota.md).

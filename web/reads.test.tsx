@@ -103,8 +103,6 @@ test.each([
 	const setup = { clientId: null, hasClientSecret: false, callbackPort: 3119, configured: false };
 	const integrations = {
 		slack: { id: "slack", connection, signIn: null, setup: { ...setup, redirectUri: null, scope: "chat:write" } },
-		"google-calendar": { id: "google-calendar", accounts: [], signIn: null, setup },
-		gmail: { id: "gmail", accounts: [], signIn: null, setup },
 	};
 	const child = Bun.spawn([process.execPath, "--eval", integrationsScenario], {
 		cwd: import.meta.dir,
@@ -168,55 +166,4 @@ test("useRead is refreshing while a new version reads over the last answer, unti
 		{ n: 2, error: "stats offline", refreshing: false },
 		{ n: null, error: null, refreshing: false },
 	]);
-});
-
-const mailThreadScenario = String.raw`
-import { act, createElement } from "react";
-
-const noop = () => {};
-const document = { addEventListener: noop, removeEventListener: noop };
-const container = { nodeType: 1, nodeName: "DIV", tagName: "DIV", namespaceURI: "http://www.w3.org/1999/xhtml", ownerDocument: document, addEventListener: noop, removeEventListener: noop };
-document.documentElement = container;
-Object.assign(globalThis, { window: globalThis, document, HTMLIFrameElement: class {}, IS_REACT_ACT_ENVIRONMENT: true });
-const requests = [];
-globalThis.fetch = url => {
-	const { promise, resolve } = Promise.withResolvers();
-	requests.push({ url, resolve });
-	return promise;
-};
-const { createRoot } = await import("react-dom/client");
-const { useMailThread } = await import("./reads.ts");
-
-const seen = [];
-function Probe({ arrived }) {
-	const { read, refreshing } = useMailThread("gmail-2", "18f2a", arrived);
-	const state = JSON.stringify({ subject: read?.data.subject ?? null, refreshing });
-	if (seen.at(-1) !== state) seen.push(state);
-	return null;
-}
-const root = createRoot(container);
-const render = arrived => act(async () => root.render(createElement(Probe, { arrived })));
-const answer = (index, subject) => act(async () => requests[index].resolve(Response.json({ id: "18f2a", subject, url: "", messages: [] })));
-await render(null);
-await answer(0, "first");
-await render(0);
-await render(Date.now() + 60_000);
-await answer(1, "after a reply");
-console.log(JSON.stringify({ urls: requests.map(({ url }) => url), seen: seen.map(state => JSON.parse(state)) }));
-`;
-
-test("a conversation is read once and again when the Email page lists a later message arrival", async () => {
-	const child = Bun.spawn([process.execPath, "--eval", mailThreadScenario], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" });
-	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
-	expect(JSON.parse(stdout)).toEqual({
-		urls: ["/api/gmail/thread?account=gmail-2&id=18f2a", "/api/gmail/thread?account=gmail-2&id=18f2a&fresh"],
-		seen: [
-			{ subject: null, refreshing: false },
-			{ subject: null, refreshing: true },
-			{ subject: "first", refreshing: false },
-			{ subject: "first", refreshing: true },
-			{ subject: "after a reply", refreshing: false },
-		],
-	});
 });
