@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- The app opens again after the update that removed Gmail and Google Calendar; it stayed blank while its saved Integrations answer still listed them.
 - The Email, Linear tickets, and Calendar pages are gone from the sidebar, along with everything that used Gmail, Google Calendar, or Linear.
 - Sessions no longer have a Tickets tab, the New ticket shortcut is gone, and todos no longer link to or create Linear tickets.
 - Routines can no longer start from a new email or a calendar event, and agents can no longer add reminders for you to see.

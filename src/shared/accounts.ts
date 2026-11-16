@@ -1,5 +1,5 @@
 /** The integrations: omp's MCP sign-ins and the OAuth clients they use. */
-import { arrayOf, decoder, fields, type Guard, isBoolean, isNumber, isString, nullable, oneOf, tagged } from "../json";
+import { arrayOf, fields, type Guard, isBoolean, isNumber, isString, nullable, oneOf, tagged } from "../json";
 import type { McpRemoteStatus, McpTool } from "./mcp-status";
 
 /** A sign-in that the integrations page started: waiting for the browser at the provider's authorization `url`, or why it failed. */
@@ -187,11 +187,17 @@ const isSlackSetup = fields<SlackSetup>({
 const oneServer = <K extends McpIntegrationId, S>(id: K, setup: Guard<S>) =>
 	fields<{ id: K; connection: McpConnection; signIn: SignInState; setup: S }>({ id: oneOf([id]), connection: isConnection, signIn: isSignIn, setup });
 
-/** A kept {@link IntegrationsAnswer} with every integration, its connection, sign-in, and setup whole, or `null`. */
-export const decodeIntegrationsAnswer = decoder(
-	fields<IntegrationsAnswer>({
-		integrations: fields<IntegrationsAnswer["integrations"]>({
-			slack: oneServer("slack", isSlackSetup),
-		}),
+const isIntegrationsAnswer = fields<IntegrationsAnswer>({
+	integrations: fields<IntegrationsAnswer["integrations"]>({
+		slack: oneServer("slack", isSlackSetup),
 	}),
-);
+});
+
+/**
+ * A kept {@link IntegrationsAnswer} with every integration, its connection, sign-in, and setup whole, or `null`.
+ * It holds only this version's integrations: a cache kept before one was removed, such as Gmail, still names it.
+ */
+export function decodeIntegrationsAnswer(raw: unknown): IntegrationsAnswer | null {
+	if (!isIntegrationsAnswer(raw)) return null;
+	return { integrations: { slack: raw.integrations.slack } };
+}

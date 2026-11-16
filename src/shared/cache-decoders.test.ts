@@ -110,3 +110,9 @@ describe.each(cases)("$name cache", ({ decode, whole, partial }) => {
 		expect(decode(JSON.parse(JSON.stringify(raw)))).toBeNull();
 	});
 });
+
+// The page crashed on start when its cache still held Gmail's record, kept before Gmail was removed.
+test("integrations cache keeps only the integrations this version has", () => {
+	const stale = { integrations: { ...integration, gmail: { id: "gmail", accounts: [] } } };
+	expect(decodeIntegrationsAnswer(JSON.parse(JSON.stringify(stale)))).toEqual(integrations);
+});
