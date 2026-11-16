@@ -1,14 +1,11 @@
 /** The card over a link to another site, shown while the pointer rests on it or keyboard focus reaches it: the site, the page's title and description, and the address. */
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 import type { LinkPreview } from "../../src/shared/link-preview";
 import { getJson } from "../api";
-import { cn } from "@/lib/utils";
+import { Popover, PopoverAnchor, PopoverContent } from "./ui/popover";
 import { labelOf, SiteIcon } from "./sources-section";
 
 const OPEN_DELAY_MS = 400;
-const GAP = 6;
-const MARGIN = 8;
 
 const previews = new Map<string, Promise<LinkPreview | null>>();
 function previewOf(url: string): Promise<LinkPreview | null> {
@@ -28,21 +25,26 @@ function outsideLink(target: EventTarget | null): HTMLAnchorElement | null {
 	return url && (url.protocol === "https:" || url.protocol === "http:") && url.origin !== location.origin ? link : null;
 }
 
+/** A link the card shows over, with what its page says once read. */
+type Shown = { link: HTMLAnchorElement; preview: LinkPreview | null };
+
 export function LinkPreviewCard() {
-	const [link, setLink] = useState<HTMLAnchorElement | null>(null);
+	const [shown, setShown] = useState<Shown | null>(null);
 	useEffect(() => {
 		let target: HTMLAnchorElement | null = null;
 		let timer = 0;
+		// The read runs during the dwell, so the card opens at its final size.
 		const show = (next: HTMLAnchorElement, delay: number) => {
 			if (next === target) return;
 			target = next;
 			clearTimeout(timer);
-			timer = window.setTimeout(() => setLink(next), delay);
+			const read = previewOf(next.href);
+			timer = window.setTimeout(() => void read.then(preview => target === next && setShown({ link: next, preview })), delay);
 		};
 		const hide = () => {
 			target = null;
 			clearTimeout(timer);
-			setLink(null);
+			setShown(null);
 		};
 		const over = (event: PointerEvent) => {
 			const next = event.pointerType === "touch" ? null : outsideLink(event.target);
@@ -78,61 +80,58 @@ export function LinkPreviewCard() {
 			window.removeEventListener("blur", hide);
 		};
 	}, []);
-	return link ? createPortal(<Card key={link.href} link={link} />, document.body) : null;
+	if (!shown) return null;
+	const { link, preview } = shown;
+	return (
+		<Popover open onOpenChange={open => !open && setShown(null)}>
+			<PopoverAnchor virtualRef={{ current: link }} />
+			<PopoverContent
+				key={link.href}
+				aria-hidden="true"
+				side="bottom"
+				align="start"
+				sideOffset={6}
+				collisionPadding={8}
+				onOpenAutoFocus={event => event.preventDefault()}
+				onCloseAutoFocus={event => event.preventDefault()}
+				className="pointer-events-none w-80 max-w-[calc(100vw-1rem)] origin-(--radix-popover-content-transform-origin) p-3 animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none"
+			>
+				<Body href={link.href} preview={preview} />
+			</PopoverContent>
+		</Popover>
+	);
 }
 
-/** Below the link, or above it when the card would run past the window's bottom, kept inside the window's sides. */
-function Card({ link }: { link: HTMLAnchorElement }) {
-	const href = link.href;
+/** The site, title, and description when the page was read, then the whole address, its scheme shown when it is not HTTPS. */
+function Body({ href, preview }: { href: string; preview: LinkPreview | null }) {
 	const { hostname, host, rest } = labelOf(href);
-	const [preview, setPreview] = useState<LinkPreview | null>(null);
-	const [place, setPlace] = useState<{ top: number; left: number } | null>(null);
-	const card = useRef<HTMLDivElement>(null);
-	useEffect(() => {
-		let live = true;
-		void previewOf(href).then(answer => live && setPreview(answer));
-		return () => {
-			live = false;
-		};
-	}, [href]);
-	useLayoutEffect(() => {
-		const anchor = link.getBoundingClientRect();
-		const { width, height } = card.current!.getBoundingClientRect();
-		const below = anchor.bottom + GAP + height <= window.innerHeight - MARGIN;
-		setPlace({
-			top: below ? anchor.bottom + GAP : Math.max(MARGIN, anchor.top - GAP - height),
-			left: Math.min(Math.max(MARGIN, anchor.left), window.innerWidth - width - MARGIN),
-		});
-	}, [link, preview]);
+	const scheme = href.startsWith("http:") ? "http://" : "";
+	const address = (
+		<span className="line-clamp-3 min-w-0 break-all">
+			<span className={preview ? undefined : "text-foreground"}>
+				{scheme}
+				{host}
+			</span>
+			{rest}
+		</span>
+	);
+	if (!preview) {
+		return (
+			<p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+				<SiteIcon hostname={hostname} />
+				{address}
+			</p>
+		);
+	}
 	return (
-		<div
-			ref={card}
-			aria-hidden="true"
-			style={place ?? { top: 0, left: 0, visibility: "hidden" }}
-			className={cn("pointer-events-none fixed z-[100] w-80 rounded-md border bg-popover p-3 text-popover-foreground shadow-md", place && "animate-in fade-in-0 zoom-in-95")}
-		>
-			{preview ? (
-				<>
-					<p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-						<SiteIcon hostname={hostname} />
-						<span className="truncate">{preview.site ?? host}</span>
-					</p>
-					<p className="mt-1.5 line-clamp-2 text-sm font-medium">{preview.title}</p>
-					{preview.description && <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{preview.description}</p>}
-					<p className="mt-1.5 truncate text-xs text-muted-foreground">
-						{host}
-						{rest}
-					</p>
-				</>
-			) : (
-				<p className="flex min-w-0 items-center gap-1.5 text-xs">
-					<SiteIcon hostname={hostname} />
-					<span className="min-w-0 truncate">
-						<span className="text-foreground">{host}</span>
-						{rest && <span className="text-muted-foreground">{rest}</span>}
-					</span>
-				</p>
-			)}
-		</div>
+		<>
+			<p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+				<SiteIcon hostname={hostname} />
+				<span className="truncate">{preview.site ?? host}</span>
+			</p>
+			<p className="mt-1.5 line-clamp-2 text-sm font-medium">{preview.title}</p>
+			{preview.description && <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{preview.description}</p>}
+			<p className="mt-1.5 text-xs text-muted-foreground">{address}</p>
+		</>
 	);
 }
