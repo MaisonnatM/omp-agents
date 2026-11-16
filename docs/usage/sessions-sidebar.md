@@ -130,5 +130,8 @@
 - The idle stop ends a job once its session has been idle, waiting on you or done with its turn, for the time **Stop idle processes** in [Settings](settings.md) names, 30 minutes by default, counted from when the session was last busy or from the job's start if that is later.
   A shared service stops once every live session of its project has been idle that long.
   Only the server that runs unattended work, the first one started, stops processes.
+- The idle session stop stops a session's omp once the session has been idle, with no subagent still running, for the time **Stop idle sessions** in [Settings](settings.md) names, 12 hours by default.
+  The session then shows under Past with its worktree kept, and **Resume** picks it back up; it is not **End session**.
+  It stops only sessions the dashboard started, and leaves terminal sessions, private sessions, and Bots' conversations running.
 - When a session ends or its omp exits, the server stops the services it owned and the jobs it left running.
   A session started from the dashboard also has the rest of its processes ended when it ends, as before.

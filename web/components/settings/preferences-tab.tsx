@@ -3,7 +3,7 @@ import { RadioGroup } from "@base-ui/react/radio-group";
 import { ToggleSwitch } from "../toggle-switch";
 import { IconImac, IconMoon, IconSun } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
@@ -21,7 +21,7 @@ import { hashForSettings } from "../../routing";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { putJson } from "../../api";
 import { useEditableRead } from "../../editable-read";
-import { type ProcessSettings, STOP_IDLE_CHOICES } from "../../../src/shared/processes";
+import { type ProcessSettings, STOP_IDLE_CHOICES, STOP_IDLE_SESSION_CHOICES } from "../../../src/shared/processes";
 import { NOTIFICATION_SOUNDS, type NotificationSound } from "../../../src/shared/desktop-bridge";
 
 const THEME_OPTIONS: Record<Theme, [string, IconComponent]> = {
@@ -149,36 +149,74 @@ function SessionNotifications() {
 type IdleChoice = "off" | "15" | "30" | "60" | "120";
 const IDLE_CHOICES: Record<IdleChoice, string> = { off: "Off", "15": "After 15 minutes", "30": "After 30 minutes", "60": "After 1 hour", "120": "After 2 hours" };
 
-/** When the server stops what sessions run besides omp: once every session a process serves has been idle that long. */
-function IdleProcessStop() {
+type SessionIdleChoice = "off" | "4" | "12" | "24" | "72";
+const SESSION_IDLE_CHOICES: Record<SessionIdleChoice, string> = { off: "Off", "4": "After 4 hours", "12": "After 12 hours", "24": "After 24 hours", "72": "After 3 days" };
+
+/** A select of `choices`, keyed by a setting's value as text, `off` for `null`. */
+function IdleSelect<Choice extends string>({ label, choices, value, onChoose }: { label: string; choices: Record<Choice, string>; value: number | null; onChoose: (choice: Choice) => void }) {
+	return (
+		<Select<Choice> items={choices} value={(value === null ? "off" : String(value)) as Choice} onValueChange={next => next && onChoose(next)}>
+			<SelectTrigger aria-label={label} className="w-fit">
+				<SelectValue />
+			</SelectTrigger>
+			<SelectContent>
+				{(Object.keys(choices) as Choice[]).map(choice => (
+					<SelectItem key={choice} value={choice}>
+						{choices[choice]}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
+}
+
+/**
+ * When the server stops what sessions run besides omp, once every session a process serves has been idle that long, and
+ * when it stops an idle session's omp. One read holds both, so a change to one never sends the other's stale value.
+ */
+function IdleStops() {
 	const read = useEditableRead<ProcessSettings>("/api/process-settings");
-	const minutes = read.data?.stopIdleAfterMinutes;
-	const choose = (choice: IdleChoice): void => {
-		const next: ProcessSettings = { stopIdleAfterMinutes: STOP_IDLE_CHOICES.find(each => String(each ?? "off") === choice) ?? null };
-		read.edit(next, () => putJson<ProcessSettings>("/api/process-settings", next));
+	const [edited, setEdited] = useState<keyof ProcessSettings | null>(null);
+	const settings = read.data;
+	const change = (key: keyof ProcessSettings, value: number | null): void => {
+		if (!settings) return;
+		const next: ProcessSettings = { ...settings, [key]: value };
+		setEdited(key);
+		read.edit({ [key]: value }, () => putJson<ProcessSettings>("/api/process-settings", next));
 	};
 	return (
-		<Section
-			title="Stop idle processes"
-			meta="Dev servers, watchers, and services a session starts besides omp. A process stops once every session it serves has been idle that long; hover the CPU at the foot of the left sidebar to see when. Saved on the server."
-		>
-			{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
-			{minutes !== undefined && (
-				<Select<IdleChoice> items={IDLE_CHOICES} value={minutes === null ? "off" : (String(minutes) as IdleChoice)} onValueChange={next => next && choose(next)}>
-					<SelectTrigger aria-label="Stop idle processes" className="w-fit">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						{(Object.keys(IDLE_CHOICES) as IdleChoice[]).map(choice => (
-							<SelectItem key={choice} value={choice}>
-								{IDLE_CHOICES[choice]}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			)}
-			{read.saveError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{`Not saved: ${read.saveError}`}</p>}
-		</Section>
+		<>
+			<Section
+				title="Stop idle processes"
+				meta="Dev servers, watchers, and services a session starts besides omp. A process stops once every session it serves has been idle that long; hover the CPU at the foot of the left sidebar to see when. Saved on the server."
+			>
+				{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
+				{settings && (
+					<IdleSelect<IdleChoice>
+						label="Stop idle processes"
+						choices={IDLE_CHOICES}
+						value={settings.stopIdleAfterMinutes}
+						onChoose={choice => change("stopIdleAfterMinutes", STOP_IDLE_CHOICES.find(each => String(each ?? "off") === choice) ?? null)}
+					/>
+				)}
+				{read.saveError && edited === "stopIdleAfterMinutes" && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{`Not saved: ${read.saveError}`}</p>}
+			</Section>
+			<Section
+				title="Stop idle sessions"
+				meta="Stops a session's omp once it has been idle that long with no subagent still running. It moves to Past with its worktree kept, and Resume picks it back up. Sessions started in a terminal, Bots' conversations, and private sessions keep running. Saved on the server."
+			>
+				{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
+				{settings && (
+					<IdleSelect<SessionIdleChoice>
+						label="Stop idle sessions"
+						choices={SESSION_IDLE_CHOICES}
+						value={settings.stopIdleSessionsAfterHours}
+						onChoose={choice => change("stopIdleSessionsAfterHours", STOP_IDLE_SESSION_CHOICES.find(each => String(each ?? "off") === choice) ?? null)}
+					/>
+				)}
+				{read.saveError && edited === "stopIdleSessionsAfterHours" && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{`Not saved: ${read.saveError}`}</p>}
+			</Section>
+		</>
 	);
 }
 
@@ -218,7 +256,7 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 			</Section>
 			<SidebarTabs />
 			<SessionNotifications />
-			<IdleProcessStop />
+			<IdleStops />
 			<PinnedSkill cwd={cwd} workspace={workspace} />
 		</>
 	);

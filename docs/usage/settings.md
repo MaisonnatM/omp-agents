@@ -175,7 +175,7 @@
   **Delete** asks first under the row; **Turn off and open session** turns the module off at once and opens a draft asking to remove its code, leaving its saved data on disk.
   The packaged app has no checkout, so it hides **New module**, **Edit**, and **Delete** and says why.
 - **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files.
-  The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines; **Stop idle processes** is the server's own and stays on this machine.
+  The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines.
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
@@ -185,9 +185,8 @@
   A module turned off in **Modules** says its tab shows only while it is turned on there.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.
-  **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 minutes, 30 minutes, 1 hour, or 2 hours, 30 minutes by default.
-  A process stops once every session it serves has been idle that long; see [Sessions sidebar](sessions-sidebar.md).
-  The server keeps the choice in `processes.json` beside its access token, so it applies with no page open.
+  **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 or 30 minutes, 1 hour, or 2 hours, 30 minutes by default.
+  A process stops once every session it serves has been idle that long, and **Stop idle sessions** stops the omp of a session left idle with no subagent running: **Off**, or after 4, 12, or 24 hours, or 3 days, 12 hours by default; see [Sessions sidebar](sessions-sidebar.md).
   **New sessions** pins a skill.
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, a Linear issue, or a todo, then sends its first message through that skill.
   The picker lists the skills of the sidebar's workspace, and says which, or your own skills with **All workspaces**.
