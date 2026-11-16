@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- Cmd+Shift+T reopens the last tab you closed in the header, in its old place and on the page it showed.
+- Right-click a header tab to Pin tab, Unpin tab, open a New tab, Close tab, or Close other tabs, and Ctrl+Shift+P pins or unpins the tab on screen.
+- Pinned tabs sit first and show only their icon, and stay open until you unpin them, even after a reload.
 - The Pull requests page no longer has a Board view, so it always shows the list.
 - The Pull requests page no longer shows a list at its left, so the table takes the whole page.
 - Repositories, at the top of the Pull requests page, hides or shows each repository and moves it up or down.

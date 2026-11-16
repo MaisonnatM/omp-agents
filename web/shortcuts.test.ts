@@ -56,7 +56,7 @@ test("browser-reserved chords stay the browser's, apart from the app's tab, sett
 		expect(pressOn(mac, "t", "KeyT", mod)).toEqual(["newTab"]);
 		expect(pressOn(mac, ",", "Comma", mod)).toEqual(["settings"]);
 		expect(pressOn(mac, "W", "KeyW", { ...mod, shift: true })).toEqual([]);
-		expect(pressOn(mac, "T", "KeyT", { ...mod, shift: true })).toEqual([]);
+		expect(pressOn(mac, "T", "KeyT", { ...mod, shift: true })).toEqual(["reopenClosedTab"]);
 		expect(pressOn(mac, "X", "KeyX", { ...mod, shift: true })).toEqual([]);
 		for (const [key, code] of [["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
@@ -151,8 +151,9 @@ test("↓ and ↑, or J and K, step through sessions, pull requests, todos, spor
 	expect(shortcutsFor(keyEvent("j", "KeyJ"), null, false).map(({ scope }) => scope)).not.toContain("anywhere");
 });
 
-test("Cmd+Shift+P takes no shortcut, and Cmd+Alt+P opens the directory picker", () => {
-	expect(press("P", "KeyP", { ctrl: true, shift: true })).toEqual([]);
+test("Ctrl+Shift+P pins or unpins the header tab on every platform, as in Capy, Cmd+Shift+P takes no shortcut, and Cmd+Alt+P opens the directory picker", () => {
+	expect(press("P", "KeyP", { ctrl: true, shift: true })).toEqual(["pinTab"]);
+	expect(pressOn(true, "P", "KeyP", { ctrl: true, shift: true })).toEqual(["pinTab"]);
 	expect(pressOn(true, "P", "KeyP", { meta: true, shift: true })).toEqual([]);
 	expect(press("p", "KeyP", { ctrl: true })).toEqual([]);
 	expect(press("π", "KeyP", { ctrl: true, alt: true })).toEqual(["directory"]);

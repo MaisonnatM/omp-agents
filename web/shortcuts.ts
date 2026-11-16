@@ -16,6 +16,8 @@ export type ShortcutId =
 	| "find"
 	| "closeTab"
 	| "closeOtherTabs"
+	| "reopenClosedTab"
+	| "pinTab"
 	| "newTab"
 	| "nextTab"
 	| "previousTab"
@@ -181,8 +183,22 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "find", category: "general", label: "Find text in the focused conversation, or in the pull request the page shows", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
 	{ id: "closeTab", category: "general", label: "Close the header tab on screen; its session keeps running", keys: [{ chord: CLOSE_TAB, scope: "anywhere" }] },
-	{ id: "closeOtherTabs", category: "general", label: "Close every header tab but the one on screen", command: "Close other tabs", keys: [{ chord: { key: "w", mod: true, alt: true }, scope: "anywhere" }] },
+	{
+		id: "closeOtherTabs",
+		category: "general",
+		label: "Close every header tab but the pinned ones and the one on screen",
+		command: "Close other tabs",
+		keys: [{ chord: { key: "w", mod: true, alt: true }, scope: "anywhere" }],
+	},
 	{ id: "newTab", category: "general", label: "Open a new header tab on a new session", command: "New tab", keys: [{ chord: { key: "t", mod: true }, scope: "anywhere" }] },
+	{
+		id: "reopenClosedTab",
+		category: "general",
+		label: "Reopen the last closed header tab, where it was",
+		command: "Reopen closed tab",
+		keys: [{ chord: { key: "t", mod: true, shift: true }, scope: "anywhere" }],
+	},
+	{ id: "pinTab", category: "general", label: "Pin or unpin the header tab on screen", command: "Pin or unpin tab", keys: [{ chord: { key: "p", ctrl: true, shift: true }, scope: "anywhere" }] },
 	{
 		id: "nextTab",
 		category: "general",
