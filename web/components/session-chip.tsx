@@ -1,5 +1,5 @@
 /** `SessionChip`, a small chip naming a session on a pull request or issue, and `LiveSessionsMenu`, a dropdown of the sessions on an item. */
-import { IconAiBotHead, IconChevronBottom } from "central-icons";
+import { IconAiBotHead, IconChevronDownSmall } from "central-icons";
 import type { MouseEvent } from "react";
 import type { HostStatus, RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ export function LiveSessionsMenu({ hosts, onOpen }: { hosts: RosterHost[]; onOpe
 	const count = `${hosts.length} ${hosts.length === 1 ? "session" : "sessions"}`;
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={IconAiBotHead} trailingIcon={IconChevronBottom} aria-label={`${count} working on it`} />}>
+			<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={IconAiBotHead} trailingIcon={IconChevronDownSmall} aria-label={`${count} working on it`} />}>
 				<span className="tabular-nums">{count}</span>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="max-w-80">

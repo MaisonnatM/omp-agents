@@ -2,7 +2,7 @@
  * Get started's Tools and workflows step: GitHub, every Settings › Integrations service, and pstack, what still needs
  * you above what is ready, each folded to its name, status, and summary, and opening in place on its full row.
  */
-import { IconAgentNetwork, IconCheckmark1, IconChevronBottom, IconChevronTop, IconPullRequest } from "central-icons";
+import { IconAgentNetwork, IconCheckmark1, IconChevronDownSmall, IconChevronTop, IconPullRequest } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -137,7 +137,7 @@ function Disclosure({ item, open, onToggle }: { item: Item; open: boolean; onTog
 					<span className="mt-0.5 block text-[13px] text-pretty text-muted-foreground">{item.summary}</span>
 				</span>
 				<span aria-hidden className="flex size-7 shrink-0 items-center justify-center text-muted-foreground">
-					<IconChevronBottom className="size-3.5" />
+					<IconChevronDownSmall className="size-3.5" />
 				</span>
 			</button>
 		</li>

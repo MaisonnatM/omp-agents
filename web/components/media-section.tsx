@@ -1,5 +1,5 @@
 /** The Overview tab's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
-import { IconBubbleText, IconChevronBottom, IconPaperclip1, IconPullRequest } from "central-icons";
+import { IconBubbleText, IconChevronDownSmall, IconPaperclip1, IconPullRequest } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
@@ -135,7 +135,7 @@ function TargetMenu({ label, icon, none, loading, disabled, control, children }:
 	}
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger {...activityControl(control)} render={<Button variant="secondary" size="compact" leadingIcon={icon} trailingIcon={IconChevronBottom} loading={loading} disabled={disabled} />}>{label}</DropdownMenuTrigger>
+			<DropdownMenuTrigger {...activityControl(control)} render={<Button variant="secondary" size="compact" leadingIcon={icon} trailingIcon={IconChevronDownSmall} loading={loading} disabled={disabled} />}>{label}</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">{children}</DropdownMenuContent>
 		</DropdownMenu>
 	);
