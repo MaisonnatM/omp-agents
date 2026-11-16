@@ -37,7 +37,6 @@ Leaving for Settings or a session and coming back returns to the same step on th
    Click a row, or its chevron, to open its full row from **Settings › Integrations** and connect it right there; click its header again to fold it.
    **Install GitHub CLI** opens [its download page](https://cli.github.com) if `gh` is missing, then copy `gh auth login` and run it in a terminal.
    pstack comes with the starter kit: while it is missing or its skills are not linked, **Go to Starter kit** opens step 3 to install the kit.
-   The step counts connected services, not accounts: two Gmail accounts count as one service.
 5. **First session** is required.
    Each suggested task opens the new-session draft with its prompt; **New session** opens a blank one.
    Pick a workspace and send the prompt: leaving an unsent draft does not complete this step.

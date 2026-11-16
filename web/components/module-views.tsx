@@ -60,10 +60,13 @@ const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
 	sport: { Page: SportPage, Nav: SportNav },
 };
 
+/** Any module's page as {@link ModulePageView} draws it: a stored module's gets its state, any other's none. */
+type AnyPageProps = { route: ModulePage; core: CoreData } & Partial<StoredPageProps<ModuleValues[StoredModuleId], ModuleChanges[StoredModuleId]>>;
+
 /** Module `page.kind`'s page, given the stored modules' states and the core's data. */
 export function ModulePageView({ page, states, disabled, core }: { page: ModulePage; states: ModuleStates; disabled: boolean; core: CoreData }) {
 	const { changeModule } = useDashboardActions();
-	const { Page } = MODULE_VIEWS[page.kind] as ModuleViews<WebModuleId>;
+	const Page = MODULE_VIEWS[page.kind].Page as ComponentType<AnyPageProps>;
 	const stored = page.kind in states ? { state: states[page.kind as StoredModuleId], disabled, onChange: (change: ModuleChanges[StoredModuleId]) => changeModule(page.kind as StoredModuleId, change) } : {};
 	return <Page route={page} core={core} {...stored} />;
 }

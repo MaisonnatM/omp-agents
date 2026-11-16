@@ -3,7 +3,7 @@
 A module is a feature the core runs without naming it, such as Sport.
 Its whole wiring sits behind two definitions, one for the server and one for the page.
 The core lists the modules in two registries and iterates them, so no hub file names a module.
-The core keeps the sessions, pull requests, todos, Bots and their routines, Settings, and the Google and Linear sign-ins.
+The core keeps the sessions, pull requests, todos, Bots and their routines, Settings, and the Linear and Slack sign-ins.
 
 ## The module list
 
@@ -13,14 +13,10 @@ The core keeps the sessions, pull requests, todos, Bots and their routines, Sett
 | Module | Server definition | Page definition | Page components |
 | --- | --- | --- | --- |
 | Tickets | none | `TICKETS_PAGE` in `web/components/tickets/module.ts` | `TicketsPage` |
-| Calendar | none | `CALENDAR_PAGE` in `web/components/calendar/module.ts` | `CalendarPage` and `CalendarNav` |
 | Sport | `SPORT_MODULE` in `src/sport-module.ts` | `SPORT_PAGE` in `web/components/sport/module.ts` | `SportPage` and `SportNav` |
-| Email | none | `EMAIL_PAGE` in `web/components/email/module.ts` | `EmailPage` and `EmailNav` |
 
 A module without a server definition keeps its server side in the core.
-Calendar's routes, its Google and local event stores, and its calendar choices stay in `Dashboard`, because the bell's event notices, routine event triggers, and settings sync share those same instances.
-Email's Gmail routes and accounts stay there too, because routine mail triggers read the same `GmailAccounts`.
-Tickets' Linear routes stay there as well, because ticket links, the new-ticket dialog, a session's Tickets tab, the Todo page, and the Calendar all read Linear without the Tickets page.
+Tickets' Linear routes stay there, because ticket links, the new-ticket dialog, a session's Tickets tab, and the Todo page all read Linear without the Tickets page.
 So `hashForTickets` lives in `web/tickets-model.ts` with the core's ticket helpers, and the new-ticket shortcut, C, stays a core command that Settings › Activity gates on the Tickets tab.
 
 The list is fixed when the code is built.

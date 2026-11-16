@@ -370,6 +370,21 @@ describe("SettingsSync", () => {
 		expect(b.routines.value.map(({ id }) => id)).toEqual(["r1"]);
 	});
 
+	test("a synced routine drops the triggers routines no longer watch, and is dropped once it ran only on them", () => {
+		const here = machine(scratch(), "unused");
+		const bot = { id: parseBotId("ann") as BotId, kind: "routines", name: "Ann", job: "Triage.", cwd: join(here.home, "code"), model: null, skill: null, shape: "circle", hue: 25 } as const;
+		const routine: RoutineSpec = { id: "r1", botId: bot.id, name: "Digest", schedules: [], triggers: [{ kind: "slack" }], task: { kind: "prompt", prompt: "Sum it up." }, enabled: true };
+		here.bots.apply({ op: "save", bot }, "2026-01-01T00:00:00.000Z");
+		here.routines.apply({ op: "save", routine }, 0);
+		const bots = here.places.stores.bots;
+		const [entry] = bots.read() as { routines: Record<string, unknown>[] }[];
+		const [carried] = entry!.routines;
+		const incoming = [{ ...entry, routines: [{ ...carried, triggers: [{ kind: "event" }, { kind: "slack" }] }, { ...carried, id: "r2", name: "Reminders", triggers: [{ kind: "event" }] }] }];
+		expect(bots.parse(incoming)).not.toBeNull();
+		bots.write(incoming);
+		expect(here.routines.value.map(({ id, triggers }) => ({ id, triggers }))).toEqual([{ id: "r1", triggers: [{ kind: "slack" }] }]);
+	});
+
 	test("keeps the todos two machines each added, carries the preferences, workspaces, and each todo's Workspace, and settles both on one list", async () => {
 		const { remote, a, b } = await pair();
 		const [preferences, todos, workspaces] = ["preferences", "todos", "workspaces"].map(name => `dashboard/${name}.json`);

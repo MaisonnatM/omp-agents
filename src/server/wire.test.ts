@@ -266,7 +266,7 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "pin", sessionIds: "s1" })).toBeNull();
 	});
 
-	test("preference sets a portable key to a string or null, or seeds portable strings, and refuses any other key or value", () => {
+	test("preference sets a portable key to a string or null, or seeds strings and drops a key that is not portable, and refuses any other key or value", () => {
 		const change = (value: unknown) => msg({ t: "preference", change: value });
 		expect(change({ op: "set", key: "omp-agents.theme", value: "dark", extra: 1 })).toEqual({ t: "preference", change: { op: "set", key: "omp-agents.theme", value: "dark" } });
 		expect(change({ op: "set", key: "omp-agents.theme", value: null })).toEqual({ t: "preference", change: { op: "set", key: "omp-agents.theme", value: null } });
@@ -274,7 +274,7 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "set", key: "omp-agents.split-columns", value: "0.4" })).toBeNull();
 		expect(change({ op: "set", key: "omp-agents.theme", value: 1 })).toBeNull();
 		expect(change({ op: "set", key: "omp-agents.theme" })).toBeNull();
-		expect(change({ op: "seed", values: { "omp-agents.pr-file-tree": "false" } })).toBeNull();
+		expect(change({ op: "seed", values: { "omp-agents.theme": "dark", "omp-agents.pr-file-tree": "false" } })).toEqual({ t: "preference", change: { op: "seed", values: { "omp-agents.theme": "dark" } } });
 		expect(change({ op: "reset" })).toBeNull();
 	});
 

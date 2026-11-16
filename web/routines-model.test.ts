@@ -320,9 +320,9 @@ describe("editor form", () => {
 	});
 
 	test("a form with a trigger needs no schedule, saves its triggers in one order, and one with neither says to add one", () => {
-		const draft: RoutineDraft = { ...newDraft("r4", scout), name: "Triage", prompt: "Triage it.", schedules: [], triggers: ["event", "slack"] };
-		expect(specOf(draft)).toMatchObject({ ok: { schedules: [], triggers: [{ kind: "slack" }, { kind: "event" }] } });
-		expect(draftOf(routine({ schedules: [], triggers: [{ kind: "event" }] })).triggers).toEqual(["event"]);
+		const draft: RoutineDraft = { ...newDraft("r4", scout), name: "Triage", prompt: "Triage it.", schedules: [], triggers: ["pull-request", "slack"] };
+		expect(specOf(draft)).toMatchObject({ ok: { schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] } });
+		expect(draftOf(routine({ schedules: [], triggers: [{ kind: "pull-request" }] })).triggers).toEqual(["pull-request"]);
 		expect(specOf({ ...draft, triggers: [] })).toEqual({ fix: "Add a schedule or a trigger." });
 	});
 

@@ -5,10 +5,8 @@ Each kind has its own check, and `src/server/loops.ts` runs five of them.
 The update check (`UPDATE_KINDS`) runs at startup and every six hours, whether or not a page is connected, and again after each update that succeeds.
 The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket listens, or on the owner while an enabled routine has a Slack or pull request trigger ([Triggers](routines.md#triggers)), and when a socket opens unless it ran since the last tick that found none.
 The provider check (`PROVIDER_KINDS`) runs after each `omp usage` run of the usage tick, every minute while a socket listens, and when a socket opens unless it succeeded since the last tick that found none; a continue's own run skips it ([Plan quota](plan-quota.md)).
-The event check (`EVENT_KINDS`) runs on the minute tick, whether or not a page is connected.
 The dashboard check (`DASHBOARD_KINDS`) runs at startup and every five minutes, whether or not a page is connected: `SelfUpdate.newCommits` fetches the branch the server runs from origin and counts the commits past the running one.
 The stopped check (`STOPPED_KINDS`) runs at startup once the session files are listed, on the minute tick, and each time the sessions that stopped mid-turn change ([Dashboard sessions](dashboard-sessions.md)).
-The sign-in check (`SIGN_IN_KINDS`) runs on the minute tick, whether or not a page is connected, and after each new report the sign-in inbox applies.
 
 - `latestOmp` in `src/omp/release.ts` asks `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts` for the newest release on omp's `update.channel`, unless `startup.checkUpdate` is off.
   `installedOmp` reads the version from the installed package's `package.json` on each check, so the check is right after an update, before a restart.
@@ -30,28 +28,21 @@ The sign-in check (`SIGN_IN_KINDS`) runs on the minute tick, whether or not a pa
   Cursor's plan window, whose error says its `usage limits will reset` when the monthly cycle ends, is not a billing cap, even though omp's test matches it for naming a Spend Limit; the plan notices cover it.
   The run counts each billing cap after it, and the provider's next request that worked ends it; another error, such as a per-minute throttle or a rate limit, neither starts nor ends a run.
   A provider with a run open is a notice, headed `Out of credit:` and the provider's footer name, and the footer's row for a name-only provider turns red; see [Plan quota](plan-quota.md).
-- The events come from `LocalEventsFile` and, for each signed-in Google Calendar account, `GoogleCalendars.byAccount` over the next ten minutes (`EVENT_LEAD_MS`), each timed event a notice from that lead before its start until its end, dated at that lead.
-  Google's events, one scope per account, and the local ones are separate scopes: an account whose read fails keeps its notices as they were while the other accounts' change, and the Calendar page shows why.
-  An event's notice opens the session that added it when the event names one in `sessionId`, which only a kept event added by the `user_event` tool does; otherwise it opens the event in Google Calendar, or the Calendar page for a kept event.
 - The stopped notice lists `InterruptedSessions.midTurn`, the interrupted dashboard sessions whose turn ran when they stopped, each with its listed session file's title and `cwdDisplay`, `null` without a listed file; none gives no notice.
   `presentNotice` names each as the sidebar names a past session: its title, else its folder's name, else **Untitled session**.
   Its **Continue all** sends the sidebar's `resume-all` with the notice's session ids.
-- The sign-in notices come from `GoogleAccounts.signedOut` in `src/google-accounts.ts`: the Gmail and Google Calendar accounts that a session reported signed out, each kept in `google-accounts.json` under `signedOut` by its server's name with when it was first reported.
-  The starter kit's `extensions/google-accounts.ts` reports one when a Google server answers a tool call with HTTP 401, as `{ v: 1, server, at }` in `sign-in-inbox/` beside the access token, once per server per session, and tells the agent to ask the user to sign in again in **Settings › Integrations** rather than retry.
-  `SignInInbox` in `src/server/sign-in-inbox.ts` drains that inbox on the server holding `OwnerLock`, and drops a report of a server that is no Gmail or Google Calendar account.
-  Each check lists each reported account's tools afresh, since a list cached before the 401 would read as working, and settles the report of an account that answers, whose server is gone, or that the user signs in again or signs out from Settings; the rest are notices, which open **Settings › Integrations** and never sign in.
 
 A check that fails keeps what the last one found for its kind, and the marks for it, and logs each distinct error once.
 A repository GitHub did not answer for keeps its pull requests' notices the same way.
 A notice whose update runs or ran stays after a check stops finding it, so the page shows how the update ended.
-A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `dashboard:<running commit>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, `credits:<provider>`, `stopped:<session ids>`, sorted and joined with commas, `sign-in:<account>:<first report>`, or `event:local/<id>:<start>` and `event:google/<account>/<calendar id>/<event id>:<start>`, so a moved event is news again.
+A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `dashboard:<running commit>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, `credits:<provider>`, or `stopped:<session ids>`, sorted and joined with commas.
 The dashboard notice names the running commit rather than origin's, so new commits raise its count instead of toasting again, and only a restart onto another commit makes a new one.
 A stopped notice that only lists fewer sessions than the one it replaces takes that one's seen, read, and cleared marks (`#carryStoppedMarks`), so a session that runs again does not toast the rest again, while a session that stops makes news.
 A plan notice's id leaves out the reset time, which a provider may report a little differently on each run, and a credits notice's leaves out its first failure, which moves once that failure is older than the day the check reads; the window's reset or a request that works ends the notice, and the next time it comes after its marks lapse is news.
 A Slack notice dates from its message, and a credits notice from the first failure the check reads.
 A pull request notice dates from the check that found it, since the pull request's last update on GitHub may predate the move, except on its repository's first answer since startup, which dates each from that update, so a workspace found later or a repository GitHub answers again does not bring old pull requests as news.
 The marks of a notice the checks stop finding last ten minutes, so a pull request whose checks run again, which leaves **Ready to merge** for a moment, keeps its marks, and one that comes back later is news again.
-Each notice carries its scope when its check finds it, its kind, a pull request's `owner/repo`, or `event:local` or `event:google`, and a check answers for the scopes it looked at, never by reading ids back.
+Each notice carries its scope when its check finds it, its kind or a pull request's `owner/repo`, and a check answers for the scopes it looked at, never by reading ids back.
 `notices.json` keeps each marked notice's scope under `scopes`, so a restarted server forgets the marks of a notice that is gone from an answered scope; a mark from a file without `scopes` stays until its notice is found again.
 
 A `notice` socket message carries `{ ids, op }`, with `op` one of `update`, `seen`, `read`, and `clear`.

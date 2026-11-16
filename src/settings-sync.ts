@@ -10,8 +10,8 @@ import { hostname } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { atomicWriteText, atomicWriteTextSync, JsonFile, type ReducerFile } from "./fs";
 import { ensurePrivateRepo } from "./github";
-import { canonicalJson, errorText, isNonEmpty, isObject, isSafeInteger, isTexts, type Parsed, parseAll, parseJson } from "./json";
-import { isRoutineMachine, parseRoutineSpec, type Routine, type RoutineMachine } from "./routines";
+import { canonicalJson, errorText, isNonEmpty, isObject, isSafeInteger, isTexts, type Parsed, parseJson } from "./json";
+import { isRoutineMachine, parseKeptRoutineSpec, type Routine, type RoutineMachine } from "./routines";
 import { SerialLane } from "./serial-lane";
 import type { ListKind } from "./server/list-registry";
 import type { Bot } from "./shared/bots";
@@ -342,12 +342,13 @@ function botsStore(files: SyncedFiles, home: string, changed: (list: ListKind) =
 			memory: memory(bot.id),
 			routines: routines.filter(routine => routine.botId === bot.id).map(portableRoutine),
 		}));
-	const parseRoutine = (value: unknown, botId: unknown): CarriedRoutine | null => {
+	const parseRoutine = (value: unknown, botId: unknown): CarriedRoutine | { dropped: string } | null => {
 		if (!isPlainObject(value)) return null;
 		const { runsOn = null, createdAt, ...fields } = value;
 		if (!(runsOn === null || isRoutineMachine(runsOn)) || !isSafeInteger(createdAt)) return null;
-		const spec = parseRoutineSpec({ ...fields, botId, enabled: runsOn !== null });
-		return spec && { ...spec.ok, machine: runsOn === null || runsOn.id === here.id ? null : runsOn, createdAt };
+		const spec = parseKeptRoutineSpec({ ...fields, botId, enabled: runsOn !== null });
+		if (!spec || "dropped" in spec) return spec;
+		return { ...spec.ok, machine: runsOn === null || runsOn.id === here.id ? null : runsOn, createdAt };
 	};
 	const parse = (value: unknown): { bots: Bot[]; memories: Map<string, string[]>; routines: CarriedRoutine[] } | null => {
 		if (!Array.isArray(value)) return null;
@@ -363,9 +364,17 @@ function botsStore(files: SyncedFiles, home: string, changed: (list: ListKind) =
 				// A machine on the version before routines synced sends none and may drop them from the remote, so this machine keeps its own.
 				routines.push(...kept.filter(routine => routine.botId === entry.id));
 			} else {
-				const parsed = parseAll(carried, routine => parseRoutine(routine, entry.id));
-				if (!parsed) return null;
-				routines.push(...parsed);
+				if (!Array.isArray(carried)) return null;
+				for (const item of carried) {
+					const routine = parseRoutine(item, entry.id);
+					if (routine === null) return null;
+					if ("dropped" in routine) {
+						const name = isPlainObject(item) && typeof item.name === "string" && item.name ? item.name : "unnamed";
+						console.error(`omp-agents: dropped synced routine "${name}", which ${routine.dropped}`);
+						continue;
+					}
+					routines.push(routine);
+				}
 			}
 			memories.set(entry.id, memory);
 			local.push({ ...bot, cwd: localPath(entry.cwd, home), sessionId: sessions.get(entry.id as Bot["id"]) ?? null });

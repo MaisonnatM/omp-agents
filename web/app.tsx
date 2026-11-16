@@ -88,7 +88,7 @@ export function App() {
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
 	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
 	const { absent: absentTabs, shown: tabs } = useSidebarTabs();
-	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut, the palette's tickets, a todo's ticket, and the Calendar's due days apply. */
+	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut, the palette's tickets, and a todo's ticket apply. */
 	const ticketsCallable = linear !== null && callable(linear.connection) && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
 	const botList = useMemo(() => (state.bots === null ? null : botRows(state.bots, state.hosts, state.botLasts)), [state.bots, state.hosts, state.botLasts]);

@@ -11,10 +11,9 @@ import {
 	applyRoutine,
 	MAX_ROUTINE_RUNS,
 	MAX_TRIGGER_EVENTS,
-	isRetiredTrigger,
 	isRoutineMachine,
 	parseCommandRun,
-	parseRoutineSpec,
+	parseKeptRoutineSpec,
 	parseTriggeredBy,
 	type CommandRun,
 	type Routine,
@@ -143,8 +142,8 @@ function parseRoutine(value: unknown): Routine | { dropped: string } | null {
 	const dropped = isObject(value) && isObject(value.task) && typeof value.task.kind === "string" ? DROPPED_TASKS.get(value.task.kind) : undefined;
 	if (dropped) return { dropped };
 	if (!isObject(value)) return null;
-	const spec = parseRoutineSpec({ ...value, schedules: "schedules" in value ? value.schedules : [value.schedule], triggers: "triggers" in value ? value.triggers : [] });
-	if (!spec) return Array.isArray(value.triggers) && value.triggers.some(isRetiredTrigger) ? { dropped: "ran only on triggers routines no longer watch" } : null;
+	const spec = parseKeptRoutineSpec({ ...value, schedules: "schedules" in value ? value.schedules : [value.schedule], triggers: "triggers" in value ? value.triggers : [] });
+	if (!spec || "dropped" in spec) return spec;
 	const { createdAt } = value;
 	const runs = parseAll(value.runs, parseRun);
 	// Before Settings sync carried routines, every routine ran on this computer.

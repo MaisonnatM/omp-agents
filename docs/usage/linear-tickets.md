@@ -32,7 +32,7 @@
   Each label's dot has the color Linear gives that label.
   Hover an icon to read what it means.
   Click a heading to fold it; the app keeps folded ones folded across reloads.
-- Click a row to show the issue's details on the right, beside the list, as the Email page shows a conversation.
+- Click a row to show the issue's details on the right, beside the list.
   The open issue's row is highlighted, and drag the line between them to resize the list.
   A bar above the details shows the issue's place in the list, such as `10 of 63`, with the previous and next issues the list shows, sub-issues included, and **Close**, which returns to the list alone with its folded groups preserved.
   On a page too narrow for both, the details take the list's place.
@@ -55,7 +55,7 @@
   When Linear refuses a change, the detail view undoes it, keeps the changes made after it, and says why.
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens the list with that issue's details beside it, even when the tickets list does not include it or cannot load.
-- **New ticket**, after **Search tickets** and before **Refresh** in the page header, Cmd+Shift+O (Ctrl+Shift+O off macOS) on the tickets page, where it starts no session, C outside text fields on any page but the Todo, Calendar, and Email pages, where C adds a todo, an event, or a new mail, or **Create ticket** in the command menu opens the new-issue dialog over the page you are on, laid out like Linear's.
+- **New ticket**, after **Search tickets** and before **Refresh** in the page header, Cmd+Shift+O (Ctrl+Shift+O off macOS) on the tickets page, where it starts no session, C outside text fields on any page but the Todo page, where C adds a todo, or **Create ticket** in the command menu opens the new-issue dialog over the page you are on, laid out like Linear's.
   Its header names the team by its key, such as ENG, in a pill that picks another team; the team starts as the last one an issue was created in, from here or from a todo, else Linear's first.
   Below come the title, a markdown description, and a pill for each field: the status, which starts as the team's first backlog state, the priority, the assignee, which starts as you, the project, and the labels, each a searchable list as in an issue's details, and **…** for a due date.
   The lists come from the team in Linear, and another team clears the status, labels, and project picked for the last one.
@@ -88,4 +88,4 @@
   Until omp is signed in to that server, the sidebar has no **Linear tickets** tab, and a `#tickets` address shows Linear's integration row instead of the issues.
 - To connect, open **Settings › Integrations** and choose **Connect** on Linear's row; see [Integrations](integrations.md).
   Your default browser opens Linear's sign-in page; approve omp there, and the **Linear tickets** tab appears within a few seconds.
-  When Linear later refuses the sign-in, the **Linear tickets** tab stays and its page shows Linear's row with **Reconnect**; the Todo page's **Create Linear ticket** and the Calendar's tickets hide until it works again.
+  When Linear later refuses the sign-in, the **Linear tickets** tab stays and its page shows Linear's row with **Reconnect**; the Todo page's **Create Linear ticket** hides until it works again.

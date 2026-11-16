@@ -11,7 +11,7 @@ const integrations: IntegrationsAnswer = {
 		slack: {
 			id: "slack",
 			connection: { kind: "failing", server, error: "timeout", status: null },
-			signIn: { phase: "waiting", url: "https://slack.com/oauth", account: null },
+			signIn: { phase: "waiting", url: "https://slack.com/oauth" },
 			setup: { clientId: "1.2", hasClientSecret: true, redirectUri: "https://example.com/callback", callbackPort: 3120, scope: "chat:write", configured: true },
 		},
 	},

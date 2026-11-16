@@ -118,7 +118,7 @@ test("a routine loads without its triggers, and its runs without the events, of 
 	const slack: TriggerEvent = { kind: "slack", title: "Ana mentioned you in #eng", detail: "", url: null };
 	const retired = { kind: "event", title: "Standup starts at 09:00", detail: "", url: null };
 	const routines = [
-		{ ...base, id: "r1", name: "Digest", triggers: [{ kind: "event" }, { kind: "slack" }], runs: [{ at: 2, outcome: { kind: "queued" }, errors: [], triggeredBy: [retired, slack] }] },
+		{ ...base, id: "r1", name: "Digest", triggers: [{ kind: "event" }, { kind: "slack" }], runs: [{ at: 2, outcome: { kind: "pending", queued: true }, errors: [], triggeredBy: [retired, slack] }] },
 		{ ...base, id: "r2", name: "Reminders", triggers: [{ kind: "event" }], runs: [] },
 	];
 	writeFileSync(path, JSON.stringify({ routines }));

@@ -255,7 +255,7 @@ function parseSchedules(value: unknown): Parsed<Schedule[]> {
 export const isTriggerKind = oneOf(TRIGGER_KINDS);
 
 /** Whether `entry`, a trigger or what one saw, names a kind routines no longer watch, which a saved routine or run drops. */
-export const isRetiredTrigger = (entry: unknown): boolean => isObject(entry) && typeof entry.kind === "string" && !isTriggerKind(entry.kind);
+const isRetiredTrigger = (entry: unknown): boolean => isObject(entry) && typeof entry.kind === "string" && !isTriggerKind(entry.kind);
 
 const isTriggerEvent = fields<TriggerEvent>({ kind: isTriggerKind, title: isString, detail: isString, url: nullable(isString) });
 
@@ -327,6 +327,16 @@ export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	if (!isNonEmpty(id) || !botId || !isNonEmpty(name) || typeof enabled !== "boolean" || !schedules || !triggers || !task) return null;
 	if (schedules.ok.length === 0 && triggers.ok.length === 0) return null;
 	return { ok: { id, botId, name, schedules: schedules.ok, triggers: triggers.ok, task: task.ok, enabled } };
+}
+
+/**
+ * A routine `routines.json` or Settings sync keeps, as {@link parseRoutineSpec} reads it, or why it is dropped: it ran
+ * only on triggers routines no longer watch, so it is left with neither a schedule nor a trigger.
+ */
+export function parseKeptRoutineSpec(value: Record<string, unknown>): Parsed<RoutineSpec> | { dropped: string } {
+	const spec = parseRoutineSpec(value);
+	if (spec) return spec;
+	return Array.isArray(value.triggers) && value.triggers.some(isRetiredTrigger) ? { dropped: "ran only on triggers routines no longer watch" } : null;
 }
 
 /** A request a Bot's routine tools leave for the server, with the same limits as a routine the page saves, or `null`. */

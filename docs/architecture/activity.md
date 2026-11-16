@@ -8,7 +8,7 @@ A key never holds a title, a path, a session id, or anything the user typed; the
 
 `web/activity.ts` holds the recorder, which `web/use-dashboard.ts` installs once per page load under a fresh client id from `crypto.randomUUID()`.
 
-- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, `pull-requests/files`, or `email/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
+- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, or `pull-requests/files`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
   `viewOf` returns a `ViewKey`, so a view missing from `VIEWS` is a type error, and the hook records it whenever it changes.
 - A **command** is a shortcut that took its key, recorded in `dispatch` in `web/shortcuts.ts` with `via: "keyboard"`, or a palette command, recorded in `web/components/command-palette/command-palette.tsx` with `via: "palette"`.
   Its key is the shortcut id in kebab case, `newSession` as `new-session`, so both channels share one key.
@@ -34,7 +34,6 @@ A page load resends what an earlier one left under that load's own client id and
 ## Storage
 
 `src/server/activity-store.ts` keeps the events in `activity.db` in the dashboard's data directory, a SQLite table keyed by client id and sequence, so a batch sent twice is stored once.
-Opening the store once renames the old Inbox page's `inbox` views and commands to their `email` keys, in a transaction that sets SQLite's `user_version` to 1, so it never runs again and rows a later page stores under `inbox` keep their keys.
 Only the server holding `server.lock` stores events; another server, such as a smoke server on your state, acknowledges a batch and drops it.
 That server prunes rows older than 400 days at start and once a day.
 Deleting `activity.db` while the server is stopped clears the history; settings sync never carries it.
@@ -49,7 +48,7 @@ A visit starts after 30 minutes without use or on a new local day.
 `web/activity-report.ts` builds the inventory from `VIEWS`, `SETTINGS_SECTIONS`, `SHORTCUTS`, `CONTROLS`, `ACTION_MESSAGES`, and the server's `PUT` routes.
 It splits it into used, rarely used (once or twice), never used, and not set up, and lists the 20 most used.
 A feature is not set up while its tab is one `useSidebarTabs` reports signed out, which is every integration tab until the integrations answer.
-The Tickets views, the ticket commands, and the `/api/ticket` routes go with the Tickets tab; the Email views, the Email commands, and the `/api/gmail/` routes go with the Email tab.
+The Tickets views, the ticket commands, and the `/api/ticket` routes go with the Tickets tab.
 
 ## Coverage
 
@@ -98,18 +97,15 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Pages: Pull requests | view, control | `pull-requests`; `pull-requests.view`, `pull-requests.filter`, `pull-requests.filter.section`, `pull-requests.filter.repository`, `pull-requests.filter.author`, `pull-requests.filter.created`, `pull-requests.filter.updated`, `pull-requests.filter.clear`, `pull-requests.display`, `pull-requests.display.grouping`, `pull-requests.display.empty`, `pull-requests.search`, `pull-requests.new`, `pull-requests.new.start`, `pull-requests.repositories`, `pull-requests.repository.toggle`, `pull-requests.repository.move`, `pull-requests.repositories.show-all`; Rebase N behind is a `PUT` |
 | Pages: Tickets | view, control | `tickets`, `tickets/item`; `tickets.view`, also the empty list's **Show all issues**, `tickets.filter`, `tickets.filter.status`, `tickets.filter.priority`, `tickets.filter.label`, `tickets.filter.project`, `tickets.filter.team`, `tickets.filter.created`, `tickets.filter.updated`, `tickets.filter.clear`, `tickets.display`, `tickets.display.grouping`, `tickets.search` |
 | Pages: Todo | view, control | `todo`, `todo/item`; `todo.filter`, `todo.filter.priority`, `todo.filter.assignee`, `todo.filter.link`, `todo.filter.due`, `todo.filter.created`, `todo.filter.clear`, `todo.display`, `todo.display.grouping` |
-| Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
-| Pages: Email | view | `email`, `email/new`, `email/item` |
 | Pages: Sport | view, control, action | `sport`, `sport/journal`, `sport/journal/item`, `sport/progress`; `sport.tab.week`, `sport.tab.journal`, `sport.tab.progress`, `sport.week.step`, `sport.log.open`, `sport.log.free` for the header's and a rest day's **Séance libre**, `sport.log.save`, `sport.demo.open`, `sport.demo.play`, `sport.demo.step` for the demo dialog's **Précédent** and **Suivant**, `sport.day.edit` for the day's **Modifier…**, `sport.journal.edit`, `sport.journal.remove`, `sport.weigh.open`, `sport.weigh.save`, `sport.progress.card`, `sport.progress.range`; `module-change` |
 | Pages: Sport's routine timer | control, action | `sport.timer.open` for a routine's **Lancer**, `sport.timer.pause`, `sport.timer.step` for the timer's previous and next step, `sport.timer.sound`, `sport.timer.close` for the done screen's **Fermer**; each item it ticks is a `module-change` |
 | Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.kind`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`, `bots.tab.routines`; `bot`, `routine` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |
-| Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account and Remove are `PUT`s |
 | Settings › Providers' account lines | view, action | `settings/providers`; each up or down arrow is `put /api/providers/account-order`, and Sign out is `put /api/providers/sign-out` |
 | Settings › Workflows | view, action | `settings/workflows`; saving a workflow's skill is the `PUT` that Settings › Files saves with |
 | Settings › Worktrees | view, action | `settings/worktrees`; each queued removal's preview and removal are `PUT`s |
-| Settings › Preferences | view, action | `settings/preferences`; each change to a preference that follows you, the theme, transcript, sidebar tabs, notifications, pinned skill, default merge method, diff, and calendar routine choices, is action `preference`, wherever you change it; Stop idle processes is a `PUT` |
+| Settings › Preferences | view, action | `settings/preferences`; each change to a preference that follows you, the theme, transcript, sidebar tabs, notifications, pinned skill, default merge method, and diff choices, is action `preference`, wherever you change it; Stop idle processes is a `PUT` |
 | Settings › Sync | view, action | `settings/sync`; Sync and its switches are `PUT`s |
 | ListSplit | not observed | dragging the line is not a click |
 | Shared primitives | not applicable | tags go on the component that owns a control, not on the primitive |

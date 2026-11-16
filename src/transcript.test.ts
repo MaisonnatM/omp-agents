@@ -215,7 +215,7 @@ describe("Transcript", () => {
 
 	test("omp's notices show, except Collab joins and the xd:// tools mounted as MCP servers connect", () => {
 		const t = new Transcript();
-		t.applyEvent({ type: "notice", level: "info", message: "xd://: mounted mcp__gmail_get_thread, mcp__gmail_search_threads", source: "xdev" });
+		t.applyEvent({ type: "notice", level: "info", message: "xd://: mounted mcp__chrome_devtools_click, mcp__chrome_devtools_take_screenshot", source: "xdev" });
 		t.applyEvent({ type: "notice", level: "info", message: "omp-agents joined the collab session", source: "collab" });
 		t.applyEvent({ type: "notice", level: "warning", message: "Prewalk not armed: no model.", source: "prewalk" });
 
