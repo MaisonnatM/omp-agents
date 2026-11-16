@@ -3,7 +3,7 @@
  * status labels, the Connect button and Reconnect and Sign out items, the callout that says where the connection stands,
  * the sign-out question, and the tool list.
  */
-import { IconArrowBoxLeft, IconArrowRotateClockwise, IconChevronRight, IconExclamationCircle, IconLoadingCircle, IconSquareArrowTopRight, IconWifiNoSignal } from "central-icons";
+import { IconArrowBoxLeft, IconArrowRotateClockwise, IconChevronDownSmall, IconExclamationCircle, IconLoadingCircle, IconSquareArrowTopRight, IconWifiNoSignal } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useId, useState } from "react";
 import type { McpRemoteStatus, McpTool } from "../../../src/shared/mcp-status";
@@ -238,7 +238,7 @@ export function useToolList(ready: ReadyTools | null): { toggle: ReactNode; list
 				className="-mx-1 inline-flex items-center gap-0.5 rounded px-1 hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:outline-none"
 			>
 				<span className="tabular-nums">{ready.tools.length}</span> tools
-				<IconChevronRight className={cn("size-3 transition-transform duration-150 ease-out", open && "rotate-90")} />
+				<IconChevronDownSmall className={cn("size-3 transition-transform duration-150 ease-out", !open && "-rotate-90")} />
 			</button>
 		),
 		list: open && <ToolList id={id} tools={ready.tools} server={ready.server} />,

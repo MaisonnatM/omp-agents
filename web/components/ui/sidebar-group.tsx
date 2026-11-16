@@ -207,7 +207,7 @@ const SidebarGroupLabel = forwardRef<HTMLDivElement, SidebarGroupLabelProps>(
     const sizeClasses = useSize();
     const group = useContext(SidebarGroupContext);
     const shape = useShape();
-    const ChevronRightIcon = useIcon("chevron-right");
+    const ChevronDownIcon = useIcon("chevron-down");
     const { template, content } = resolveSlotTemplate(render, asChild, children);
 
     // Truncate only the leading text; element children (count badges,
@@ -276,8 +276,8 @@ const SidebarGroupLabel = forwardRef<HTMLDivElement, SidebarGroupLabelProps>(
           {labelContent}
           {/* The chevron occupies an action-sized box, so it reads as one more
               icon in the row rather than a smaller glyph tacked on the end.
-              One chevron-right glyph for both states, sprung 90° to point
-              down while the group is open — the motion wrapper is what
+              One chevron-down glyph for both states, sprung -90° to point
+              right while the group is collapsed — the motion wrapper is what
               animates: Tailwind's rotate-* sets the standalone CSS `rotate`
               property, which transition-transform never covers. While open
               the whole box collapses to zero width at rest so the label text
@@ -296,10 +296,10 @@ const SidebarGroupLabel = forwardRef<HTMLDivElement, SidebarGroupLabelProps>(
           >
             <motion.span
               className="inline-flex"
-              animate={{ rotate: group.open ? 90 : 0 }}
+              animate={{ rotate: group.open ? 0 : -90 }}
               transition={spring.fast}
             >
-              <ChevronRightIcon
+              <ChevronDownIcon
                 size={sizeClasses.icon}
                 className="shrink-0"
               />
