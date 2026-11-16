@@ -48,7 +48,7 @@ describe("starts", () => {
 	test("a failure's reason leaves with its view, a start under way stays, and a draft's failure outlives any view", () => {
 		let starts = settleStart(beginStart(new Map(), 1, resume), 1, { ok: false, error: "no file" });
 		starts = settleStart(
-			beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", images: [], branch: null, model: null, thinking: null, skill: null, todoId: null, private: false, fromDraft: true }),
+			beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", images: [], branch: null, model: null, thinking: null, skill: null, todoId: null, private: false }),
 			2,
 			{ ok: false, error: "not a directory" },
 		);
@@ -63,6 +63,14 @@ describe("starts", () => {
 	test("a quick action asks for a new session linked to what it works on, without the action", () => {
 		expect(messageOf(quick, 4)).toMatchObject({ t: "start", kind: "new", subject: { kind: "ticket", id: "ENG-7" } });
 		expect(settleStart(beginStart(new Map(), 1, quick), 1, ok).size).toBe(0);
+	});
+
+	test("a new pull request asks for a new session on the change, and stays apart from the New session page's start", () => {
+		const op: StartOp = { kind: "pull-request-new", cwd: "/work", repo: "webapp", change: "Add dark mode", skill: null };
+		expect(messageOf(op, 5)).toMatchObject({ t: "start", kind: "new", cwd: "/work", subject: null, todoId: null, prompt: "Make this change in webapp on a new branch, then open a pull request for it.\n\nAdd dark mode" });
+		const starts = settleStart(beginStart(new Map(), 1, op), 1, { ok: false, error: "busy" });
+		expect(startOf(starts, "new")).toBeNull();
+		expect(startOf(starts, "pull-request-new")).toMatchObject({ phase: "failed", error: "busy" });
 	});
 
 	test("a Resume all leaves when every session resumed, and its failure outlives the connection and every view until dismissed", () => {

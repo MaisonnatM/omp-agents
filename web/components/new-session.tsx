@@ -50,7 +50,7 @@ interface NewSessionProps {
 	 * Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at
 	 * `thinking` when it names a level; through `skill` when it names one.
 	 */
-	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId" | "fromDraft">) => void;
+	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId">) => void;
 	/** Start the same session at `when` instead, with no page open; resolves once the server saved it. */
 	onSchedule: (op: ScheduledOp, when: ScheduleWhen) => Promise<void>;
 	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
@@ -62,7 +62,7 @@ interface NewSessionProps {
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
-export type ScheduledOp = Omit<NewOp, "kind" | "cwd" | "todoId" | "images" | "fromDraft">;
+export type ScheduledOp = Omit<NewOp, "kind" | "cwd" | "todoId" | "images">;
 
 export interface ScheduledDraft {
 	request: NewSessionRequest;

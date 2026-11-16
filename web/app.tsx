@@ -216,12 +216,13 @@ export function App() {
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
 	const quick = startOf(state.starts, "quick");
+	const pullRequestNew = startOf(state.starts, "pull-request-new");
 	const resumeAll = startOf(state.starts, "resume-all");
 	const refused = refusedStart(state.starts);
 	// The scope whose pull requests `useWorkspaceScope` polls, so the `@` menu reads the entry the page keeps current.
 	const status = useMemo(
-		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope, scope: windowScope, merges: state.merges, reviewDrafts: state.reviewDrafts }),
-		[state.connected, fork, resume, quick, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
+		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, pullRequestNew, resumeAll }, ending: state.ending, pullRequestsScope, scope: windowScope, merges: state.merges, reviewDrafts: state.reviewDrafts }),
+		[state.connected, fork, resume, quick, pullRequestNew, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 

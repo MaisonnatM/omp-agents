@@ -12,75 +12,126 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuCheckItem, 
 import { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
+	authorOptions,
+	DAY_RANGE_LABELS,
 	DAY_RANGES,
 	type DayRange,
 	EVERY_SECTION,
+	type FilterOption,
 	filters,
+	GROUPING_LABELS,
 	GROUPINGS,
 	NO_FILTER,
 	PULL_REQUEST_VIEWS,
 	type PullRequestFilter,
 	type PullRequestGrouping,
-	type PullRequestView,
+	repoOptions,
+	VIEW_PRESETS,
 	viewOf,
 	withSectionToggled,
 	withToggled,
 } from "../../pull-requests-filter";
-import { DEFAULT_ORDER, listedPullRequests, PULL_REQUEST_SORTS, type PullRequestSort, sectionTitles, withRepoStepped } from "../../pull-requests-model";
+import { DEFAULT_ORDER, PULL_REQUEST_SORTS, type PullRequestSort, SORT_LABELS, sectionTitles, withRepoStepped } from "../../pull-requests-model";
 import { activityControl } from "../../activity";
 import { useHiddenRepos, usePullRequestsDisplay, usePullRequestsFilter } from "../../pull-requests-state";
 import { ShownOrderList } from "../shown-order-list";
 import type { PullRequests } from "./pull-requests-list";
-
-const VIEWS = Object.keys(PULL_REQUEST_VIEWS) as PullRequestView[];
-const GROUPING_IDS = Object.keys(GROUPINGS) as PullRequestGrouping[];
-const SORTS = Object.keys(PULL_REQUEST_SORTS) as PullRequestSort[];
-const DAY_RANGE_IDS = Object.keys(DAY_RANGES).map(Number) as DayRange[];
 
 /** One field **Filter** filters by: its submenu's rows, and what its chip says while it leaves something out. */
 interface FilterField {
 	id: string;
 	label: string;
 	icon: ComponentType<{ className?: string }>;
-	control: ActivityControlId;
 	/** Whether it leaves something out, which shows its chip. */
 	active: boolean;
-	/** `is`, `is either of`, or `in`. */
+	/** `is`, `is any of`, or `in the`. */
 	verb: string;
-	/** What it keeps, short, such as `3 sections`, and in full for the chip's tooltip. */
+	/** What it keeps, short, such as `3 sections`. */
 	value: string;
-	full: string;
+	/** Every value it keeps, for the chip's tooltip; `null` where `value` says it all. */
+	full: string | null;
 	clear: () => void;
 	items: ReactNode;
 }
 
-/** The phrase of a set of `names`: the name of one, or how many of `noun`. */
-const setValue = (names: string[], noun: string): string => (names.length === 1 ? names[0]! : `${names.length} ${noun}`);
+/** What every field of **Filter** has before its values: its id, its name, its icon, and the activity control of its rows. */
+interface FieldBase {
+	id: string;
+	label: string;
+	icon: FilterField["icon"];
+	control: ActivityControlId;
+}
 
-/** A check per value of `values`, whose `checked` keeps them; checking one leaves the menu open, so you can check several. */
-function checkItems(values: { key: string; label: string; hint?: string }[], checked: ReadonlySet<string>, control: ActivityControlId, onToggle: (key: string) => void, disabled?: (key: string) => boolean): ReactNode {
-	return values.map(({ key, label, hint }) => (
+/** A check per option, whose `checked` keeps them, with its count where it has one; checking one leaves the menu open, so you can check several. */
+function checkItems<K extends string>(options: readonly FilterOption<K>[], checked: ReadonlySet<K>, control: ActivityControlId, onToggle: (key: K) => void, disabled?: (key: K) => boolean): ReactNode {
+	return options.map(({ key, label, count }) => (
 		<MenuCheckItem {...activityControl(control)} key={key} checked={checked.has(key)} disabled={disabled?.(key)} closeOnClick={false} onCheckedChange={() => onToggle(key)}>
 			<span className="truncate">{label}</span>
-			{hint && <span className="ml-auto pl-3 text-xs text-muted-foreground tabular-nums">{hint}</span>}
+			{count !== undefined && <span className="ml-auto pl-3 text-xs text-muted-foreground tabular-nums">{count}</span>}
 		</MenuCheckItem>
 	));
 }
 
-/** **Any time** and each {@link DayRange}, one picked. */
-function dayItems(value: DayRange | null, control: ActivityControlId, onValue: (value: DayRange | null) => void): ReactNode {
-	return (
-		<MenuRadioGroup value={value === null ? "any" : String(value)} onValueChange={(next: string) => onValue(next === "any" ? null : (Number(next) as DayRange))}>
-			<MenuRadioItem {...activityControl(control)} value="any" closeOnClick>
-				Any time
-			</MenuRadioItem>
-			{DAY_RANGE_IDS.map(days => (
-				<MenuRadioItem {...activityControl(control)} key={days} value={String(days)} closeOnClick>
-					{DAY_RANGES[days]}
+/** A field that keeps the pull requests whose value is any of `checked`, of its `options`; its chip names one, or counts several of `noun`. */
+function setField<K extends string>({
+	id,
+	label,
+	icon,
+	control,
+	noun,
+	options,
+	checked,
+	active,
+	onToggle,
+	clear,
+	disabled,
+}: FieldBase & {
+	noun: string;
+	options: readonly FilterOption<K>[];
+	checked: ReadonlySet<K>;
+	active: boolean;
+	onToggle: (key: K) => void;
+	clear: () => void;
+	disabled?: (key: K) => boolean;
+}): FilterField {
+	const names = options.filter(({ key }) => checked.has(key)).map(option => option.label);
+	return {
+		id,
+		label,
+		icon,
+		active,
+		verb: names.length === 1 ? "is" : "is any of",
+		value: names.length === 1 ? names[0]! : `${names.length} ${noun}`,
+		full: names.join(", "),
+		clear,
+		items: checkItems(options, checked, control, onToggle, disabled),
+	};
+}
+
+/** A field that keeps the pull requests of the last {@link DayRange} by one of their dates, with **Any time** first, one picked. */
+function dayField({ id, label, icon, control, value, onValue }: FieldBase & { value: DayRange | null; onValue: (value: DayRange | null) => void }): FilterField {
+	return {
+		id,
+		label,
+		icon,
+		active: value !== null,
+		verb: "in the",
+		value: value === null ? "Any time" : DAY_RANGE_LABELS[value].toLowerCase(),
+		full: null,
+		clear: () => onValue(null),
+		items: (
+			<MenuRadioGroup value={value === null ? "any" : String(value)} onValueChange={(next: string) => onValue(DAY_RANGES.find(days => String(days) === next) ?? null)}>
+				<MenuRadioItem {...activityControl(control)} value="any" closeOnClick>
+					Any time
 				</MenuRadioItem>
-			))}
-		</MenuRadioGroup>
-	);
+				{DAY_RANGES.map(days => (
+					<MenuRadioItem {...activityControl(control)} key={days} value={String(days)} closeOnClick>
+						{DAY_RANGE_LABELS[days]}
+					</MenuRadioItem>
+				))}
+			</MenuRadioGroup>
+		),
+	};
 }
 
 /** Each field of **Filter**, in menu order, from the pull requests of the repositories you did not hide. */
@@ -88,78 +139,52 @@ function useFilterFields(pulls: PullRequests): { filter: PullRequestFilter; setF
 	const [filter, setFilter] = usePullRequestsFilter();
 	const [hidden] = useHiddenRepos();
 	const { order, everyRepo } = pulls;
-	const shownRepos = everyRepo.filter(repo => !hidden.has(repoKey(repo)) || filter.repos.has(repoKey(repo)));
-	const counts = new Map<string, number>();
-	for (const pr of listedPullRequests(shownRepos)) counts.set(pr.author.login, (counts.get(pr.author.login) ?? 0) + 1);
-	for (const login of filter.authors) if (!counts.has(login)) counts.set(login, 0);
-	const authors = [...counts].toSorted(([a, aCount], [b, bCount]) => bCount - aCount || a.localeCompare(b));
-	const titles = sectionTitles(order);
-	const shownTitles = titles.filter(title => filter.sections.has(title));
-	const repoNames = shownRepos.filter(repo => filter.repos.has(repoKey(repo))).map(repoName);
+	const shownRepos = everyRepo.filter(repo => !hidden.has(repoKey(repo)));
 	const set = (change: Partial<PullRequestFilter>): void => setFilter({ ...filter, ...change });
-	const day = (id: "created" | "since", label: string, icon: FilterField["icon"], control: ActivityControlId): FilterField => {
-		const value = filter[id];
-		return { id, label, icon, control, active: value !== null, verb: "in the", value: value === null ? "Any time" : DAY_RANGES[value].toLowerCase(), full: "", clear: () => set({ [id]: null }), items: dayItems(value, control, next => set({ [id]: next })) };
-	};
 	return {
 		filter,
 		setFilter,
 		fields: [
-			{
+			setField({
 				id: "section",
 				label: "Section",
 				icon: IconLayersTwo,
 				control: "pull-requests.filter.section",
+				noun: "sections",
+				options: sectionTitles(order).map(title => ({ key: title, label: title })),
+				checked: filter.sections,
 				active: filter.sections.size < EVERY_SECTION.size,
-				verb: shownTitles.length === 1 ? "is" : "is any of",
-				value: setValue(shownTitles, "sections"),
-				full: shownTitles.join(", "),
+				onToggle: title => set({ sections: withSectionToggled(filter.sections, title) }),
 				clear: () => set({ sections: EVERY_SECTION }),
 				// The last shown section stays on, since the list always shows a section.
-				items: checkItems(
-					titles.map(title => ({ key: title, label: title })),
-					filter.sections,
-					"pull-requests.filter.section",
-					title => set({ sections: withSectionToggled(filter.sections, title as never) }),
-					title => filter.sections.size === 1 && filter.sections.has(title as never),
-				),
-			},
-			{
+				disabled: title => filter.sections.size === 1 && filter.sections.has(title),
+			}),
+			setField({
 				id: "repository",
 				label: "Repository",
 				icon: IconFolder1,
 				control: "pull-requests.filter.repository",
+				noun: "repositories",
+				options: repoOptions(shownRepos, filter.repos),
+				checked: filter.repos,
 				active: filter.repos.size > 0,
-				verb: repoNames.length === 1 ? "is" : "is any of",
-				value: setValue(repoNames, "repositories"),
-				full: repoNames.join(", "),
+				onToggle: key => set({ repos: withToggled(filter.repos, key) }),
 				clear: () => set({ repos: new Set() }),
-				items: checkItems(
-					shownRepos.map(repo => ({ key: repoKey(repo), label: repoName(repo) })),
-					filter.repos,
-					"pull-requests.filter.repository",
-					key => set({ repos: withToggled(filter.repos, key) }),
-				),
-			},
-			{
+			}),
+			setField({
 				id: "author",
 				label: "Author",
 				icon: IconUser,
 				control: "pull-requests.filter.author",
+				noun: "authors",
+				options: authorOptions(shownRepos, filter.authors),
+				checked: filter.authors,
 				active: filter.authors.size > 0,
-				verb: filter.authors.size === 1 ? "is" : "is any of",
-				value: setValue([...filter.authors], "authors"),
-				full: [...filter.authors].join(", "),
+				onToggle: login => set({ authors: withToggled(filter.authors, login) }),
 				clear: () => set({ authors: new Set() }),
-				items: checkItems(
-					authors.map(([login, count]) => ({ key: login, label: login, hint: String(count) })),
-					filter.authors,
-					"pull-requests.filter.author",
-					login => set({ authors: withToggled(filter.authors, login) }),
-				),
-			},
-			day("created", "Created", IconCalendar4, "pull-requests.filter.created"),
-			day("since", "Updated", IconCalendarClock4, "pull-requests.filter.since"),
+			}),
+			dayField({ id: "created", label: "Created", icon: IconCalendar4, control: "pull-requests.filter.created", value: filter.created, onValue: created => set({ created }) }),
+			dayField({ id: "updated", label: "Updated", icon: IconCalendarClock4, control: "pull-requests.filter.updated", value: filter.updated, onValue: updated => set({ updated }) }),
 		],
 	};
 }
@@ -178,7 +203,7 @@ function FilterChip({ field }: { field: FilterField }) {
 			</span>
 			<span className={`${cell} text-muted-foreground`}>{verb}</span>
 			<DropdownMenu open={open} onOpenChange={setOpen}>
-				<Tooltip content={full || value} forceOpen={open ? false : undefined}>
+				<Tooltip content={full ?? value} forceOpen={open ? false : undefined}>
 					<DropdownMenuTrigger render={<button type="button" className={`${cell} font-medium ${pressable}`} />}>{value}</DropdownMenuTrigger>
 				</Tooltip>
 				<DropdownMenuContent align="start" className="w-56">
@@ -269,24 +294,24 @@ function DisplayMenu({ pulls }: { pulls: PullRequests }) {
 						</Tooltip>
 						<DropdownMenuContent align="end" className="w-72">
 							<MenuSubmenu>
-								<MenuSubmenuTrigger value={GROUPINGS[display.grouping]}>Grouping</MenuSubmenuTrigger>
+								<MenuSubmenuTrigger value={GROUPING_LABELS[display.grouping]}>Grouping</MenuSubmenuTrigger>
 								<MenuSubmenuContent className="w-48">
 									<MenuRadioGroup value={display.grouping} onValueChange={(grouping: PullRequestGrouping) => setDisplay({ ...display, grouping })}>
-										{GROUPING_IDS.map(grouping => (
+										{GROUPINGS.map(grouping => (
 											<MenuRadioItem {...activityControl("pull-requests.display.grouping")} key={grouping} value={grouping} closeOnClick>
-												{GROUPINGS[grouping]}
+												{GROUPING_LABELS[grouping]}
 											</MenuRadioItem>
 										))}
 									</MenuRadioGroup>
 								</MenuSubmenuContent>
 							</MenuSubmenu>
 							<MenuSubmenu>
-								<MenuSubmenuTrigger value={PULL_REQUEST_SORTS[order.sort]}>Ordering</MenuSubmenuTrigger>
+								<MenuSubmenuTrigger value={SORT_LABELS[order.sort]}>Ordering</MenuSubmenuTrigger>
 								<MenuSubmenuContent className="w-52">
 									<MenuRadioGroup value={order.sort} onValueChange={(sort: PullRequestSort) => onSort(sort)}>
-										{SORTS.map(sort => (
+										{PULL_REQUEST_SORTS.map(sort => (
 											<MenuRadioItem key={sort} value={sort} closeOnClick>
-												{PULL_REQUEST_SORTS[sort]}
+												{SORT_LABELS[sort]}
 											</MenuRadioItem>
 										))}
 									</MenuRadioGroup>
@@ -344,7 +369,7 @@ export function PullRequestViewBar({ pulls }: { pulls: PullRequests }) {
 		<div className="space-y-2">
 			<div className="flex items-center gap-2">
 				<div role="group" aria-label="View" className="flex min-w-0 flex-wrap gap-1.5">
-					{VIEWS.map(each => (
+					{PULL_REQUEST_VIEWS.map(each => (
 						<Button
 							{...activityControl("pull-requests.view")}
 							key={each}
@@ -352,9 +377,9 @@ export function PullRequestViewBar({ pulls }: { pulls: PullRequests }) {
 							size="compact"
 							active={each === view}
 							aria-pressed={each === view}
-							onClick={() => setFilter({ ...filter, sections: PULL_REQUEST_VIEWS[each].sections })}
+							onClick={() => setFilter({ ...filter, sections: VIEW_PRESETS[each].sections })}
 						>
-							{PULL_REQUEST_VIEWS[each].label}
+							{VIEW_PRESETS[each].label}
 						</Button>
 					))}
 				</div>

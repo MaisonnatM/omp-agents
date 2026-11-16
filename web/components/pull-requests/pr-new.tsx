@@ -3,7 +3,7 @@
  * omp session there on what should change, which makes the change on a new branch and opens a pull request for it.
  */
 import { IconPlusLarge } from "central-icons";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { type Repo, repoKey, type RepoPullRequests, repoName } from "../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
@@ -22,43 +22,57 @@ type WorkspaceChoice = { value: string; label: string; repo: Repo };
 
 /** The **New pull request** button, whose popover starts a session in a workspace of `everyRepo` on the change you describe. */
 export function NewPullRequestButton({ everyRepo }: { everyRepo: RepoPullRequests[] }) {
-	const { start } = useDashboardActions();
-	const { connected } = useDashboardStatus();
+	const { start, dismissStart } = useDashboardActions();
+	const { connected, starts } = useDashboardStatus();
+	const lastStart = starts.pullRequestNew;
 	const [open, setOpen] = useState(false);
 	const [picked, setPicked] = useState<string | null>(null);
 	const [change, setChange] = useState("");
+	// This popover sent the start under way, so its success clears the text and closes it.
+	const [sent, setSent] = useState(false);
 	const titleId = useId();
+	const changeId = useId();
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const choices = everyRepo.flatMap((repo): WorkspaceChoice[] =>
 		repo.cwds.map(cwd => ({ value: cwd, label: repo.cwds.length > 1 ? `${repoName(repo)} · ${folderName(cwd) ?? cwd}` : repoName(repo), repo })),
 	);
 	// The picked workspace until it leaves the list, then the first.
 	const choice = choices.find(({ value }) => value === picked) ?? choices[0];
-	const ready = choice !== undefined && change.trim() !== "" && connected;
-	const blocked = !connected ? "Waiting for the server to reconnect" : change.trim() === "" ? "Describe the change first" : null;
-	const changeId = useId();
+	const starting = lastStart?.phase === "starting";
+	const blocked =
+		choice === undefined
+			? "Add a workspace of a repository first"
+			: !connected
+				? "Waiting for the server to reconnect"
+				: change.trim() === ""
+					? "Describe the change first"
+					: starting
+						? "Starting the session"
+						: null;
+	const ready = blocked === null;
+	const error = lastStart?.phase === "failed" ? lastStart.error : null;
 
-	const launch = (): void => {
-		if (!ready) return;
-		start({
-			kind: "new",
-			cwd: choice.value,
-			prompt: `Make this change in ${repoName(choice.repo)} on a new branch, then open a pull request for it.\n\n${change.trim()}`,
-			images: [],
-			branch: null,
-			model: null,
-			thinking: null,
-			skill: readPinnedSkill(),
-			todoId: null,
-			private: false,
-			fromDraft: false,
-		});
+	useEffect(() => {
+		if (!sent || lastStart?.phase === "starting") return;
+		setSent(false);
+		if (lastStart !== null) return;
 		setChange("");
 		setOpen(false);
+	}, [sent, lastStart]);
+
+	const launch = (): void => {
+		if (!ready || choice === undefined) return;
+		start({ kind: "pull-request-new", cwd: choice.value, repo: repoName(choice.repo), change: change.trim(), skill: readPinnedSkill() });
+		setSent(true);
+	};
+
+	const changeOpen = (next: boolean): void => {
+		setOpen(next);
+		if (!next && lastStart?.phase === "failed") dismissStart("pull-request-new");
 	};
 
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
+		<Popover open={open} onOpenChange={changeOpen}>
 			<Tooltip content="New pull request" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
 					<Button {...activityControl("pull-requests.new")} variant="ghost" size="icon-compact" aria-label="New pull request" data-state={open ? "open" : "closed"} active={open}>
@@ -117,6 +131,11 @@ export function NewPullRequestButton({ everyRepo }: { everyRepo: RepoPullRequest
 							className={`${TEXT_AREA} resize-none`}
 						/>
 					</Field>
+					{error !== null && (
+						<p role="alert" className="text-xs text-red-600 dark:text-red-400">
+							{error}
+						</p>
+					)}
 					<div className="flex justify-end">
 						<Tooltip content={blocked ?? "Start a session that opens the pull request"} shortcut={blocked ? undefined : [chordLabel({ key: "Enter", mod: true })]} side="top">
 							{/* A disabled button takes no pointer events, so the tooltip that says why sits on a wrapper. */}

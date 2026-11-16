@@ -1,6 +1,6 @@
 /**
- * The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it
- * is, with the details of the pull request it shows docked beside it.
+ * The Pull requests page: every pull request in a table, by repository or by **Display**'s grouping, in a card per
+ * section named after whose move it is, with the details of the pull request it shows docked beside it.
  */
 import { IconArrowRotateClockwise, IconCrossMedium, IconExpand } from "central-icons";
 import { type PullRequest, prKey, repoKey, type RepoPullRequests } from "../../../src/shared/github";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { filters, type ListGroup, NO_FILTER } from "../../pull-requests-filter";
+import { filters, NO_FILTER } from "../../pull-requests-filter";
 import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsFilter, usePullRequestsFolds } from "../../pull-requests-state";
 import { activityControl } from "../../activity";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
@@ -18,7 +18,6 @@ import { useRebasing } from "../../pull-request-rebases";
 import { useStoredState } from "../../stored-state";
 import { DROP_LINE } from "../../order";
 import { useInlineConfirm } from "../../use-inline-confirm";
-import type { DragItem } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { FoldButton } from "../fold";
@@ -26,11 +25,11 @@ import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
 import { SearchField } from "../search-field";
 import { Spinner } from "../spinner";
-import { type PullRequests, RepoReadError, type RepoView, UnmatchedTip, useGroupedList, usePullRequestKeys, usePullRequests, usePullRequestsList, workspacesLabel } from "./pull-requests-list";
+import { type GroupView, type PullRequests, RepoReadError, type TableView, UnmatchedTip, usePullRequestKeys, usePullRequests, usePullRequestsList, workspacesLabel } from "./pull-requests-list";
 import type { PullRequestDetailTab } from "./pr-details";
 import { NewPullRequestButton } from "./pr-new";
 import { PullRequestDetailPage, PullRequestDetails, usePullRequestCopyShortcuts } from "./pr-page";
-import { PullRequestTableRow, type RowProps } from "./pr-row";
+import { PullRequestTableRow } from "./pr-row";
 import { PullRequestViewBar } from "./pr-view-bar";
 
 const note = (text: string) => <p className="text-sm text-muted-foreground">{text}</p>;
@@ -59,35 +58,21 @@ function TableCount({ length, yours, summary }: { length: number; yours: boolean
 	return summary ? <Tooltip content={summary}>{count}</Tooltip> : count;
 }
 
-interface TableCardProps {
-	title: string;
-	/** Whether it lists **Your move**, whose count draws stronger. */
-	yours: boolean;
-	listId: string;
-	open: boolean;
-	toggle: () => void;
-	summary: string | null;
-	rows: RowProps[];
-	/** What moves it; `null` where the tables keep the list's order. */
-	drag: DragItem | null;
-	moveId: string | null;
-}
-
 /** A table of pull requests under a heading that folds it. */
-function TableCard({ title, yours, listId, open, toggle, summary, rows, drag, moveId }: TableCardProps) {
+function TableCard({ title, section, listId, open, toggle, summary, rows, drag, moveId }: Omit<TableView, "key">) {
 	const headingId = `${listId}-heading`;
 	return (
 		<section
 			aria-labelledby={headingId}
-			{...drag?.target}
-			data-move={moveId ?? undefined}
-			className={cn("relative rounded-md border border-border", drag?.dragging && "opacity-50", drag?.dropAt && DROP_LINE[drag.dropAt])}
+			{...drag.target}
+			data-move={moveId}
+			className={cn("relative rounded-md border border-border", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
 		>
-			<h3 id={headingId} {...drag?.handle} className={cn("flex items-center gap-2 bg-muted/50 px-3 py-1.5 text-sm font-medium", open && rows.length > 0 ? "rounded-t-md" : "rounded-md")}>
+			<h3 id={headingId} {...drag.handle} className={cn("flex items-center gap-2 bg-muted/50 px-3 py-1.5 text-sm font-medium", open && rows.length > 0 ? "rounded-t-md" : "rounded-md")}>
 				<FoldButton open={open} onToggle={toggle} controls={listId} className="items-center">
 					{title}
 				</FoldButton>
-				<TableCount length={rows.length} yours={yours} summary={summary} />
+				<TableCount length={rows.length} yours={section === "Your move"} summary={summary} />
 			</h3>
 			{open && rows.length > 0 && (
 				<ul id={listId} aria-label={title} className="divide-y divide-border border-t border-border">
@@ -100,31 +85,43 @@ function TableCard({ title, yours, listId, open, toggle, summary, rows, drag, mo
 	);
 }
 
-function RepoTable({ view }: { view: RepoView }) {
-	const { repo, name, bodyId, open, toggle, drag, moveId, sections } = view;
-	const workspaces = workspacesLabel(repo);
+/**
+ * A heading of the list and its tables. A repository's names its workspaces, and shows why GitHub could not read it or
+ * a note while it lists nothing; another grouping's counts its pull requests; under no grouping the one table has no
+ * heading.
+ */
+function GroupTable({ view: { title, repo, bodyId, open, toggle, drag, moveId, tables } }: { view: GroupView }) {
+	const cards = tables.map(({ key, ...table }) => <TableCard key={key} {...table} />);
+	if (title === null) return <div className="@container/pull-requests">{cards}</div>;
+	const workspaces = repo && workspacesLabel(repo);
 	return (
-		<section aria-label={name} {...drag.target} data-move={moveId} className={cn("@container/pull-requests relative space-y-3", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}>
+		<section aria-label={title} {...drag.target} data-move={moveId} className={cn("@container/pull-requests relative space-y-3", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}>
 			<h2 {...drag.handle} className="flex items-baseline gap-2 text-sm" style={{ fontVariationSettings: fontWeights.semibold }}>
 				<FoldButton open={open} onToggle={toggle} controls={bodyId}>
-					<span className="truncate" title={repo.cwds.join("\n")}>
-						{name}
+					<span className="truncate" title={repo?.cwds.join("\n")}>
+						{title}
 					</span>
-					{workspaces && (
-						<span className="truncate text-xs text-muted-foreground" style={{ fontVariationSettings: fontWeights.normal }}>
-							{workspaces}
+					{repo ? (
+						workspaces && (
+							<span className="truncate text-xs text-muted-foreground" style={{ fontVariationSettings: fontWeights.normal }}>
+								{workspaces}
+							</span>
+						)
+					) : (
+						<span className="text-xs tabular-nums text-muted-foreground" style={{ fontVariationSettings: fontWeights.normal }}>
+							{tables.reduce((sum, { rows }) => sum + rows.length, 0)}
 						</span>
 					)}
 				</FoldButton>
 			</h2>
 			{open && (
 				<div id={bodyId} className="space-y-3">
-					{"error" in repo ? (
-						<RepoReadError name={name} error={repo.error} className="text-sm" />
-					) : sections.length === 0 ? (
+					{repo && "error" in repo ? (
+						<RepoReadError name={title} error={repo.error} className="text-sm" />
+					) : repo && tables.length === 0 ? (
 						note("No open pull requests of yours and no reviews waiting on you.")
 					) : (
-						sections.map(({ section, ...card }) => <TableCard key={section.title} {...card} title={section.title} yours={section.title === "Your move"} />)
+						cards
 					)}
 				</div>
 			)}
@@ -132,49 +129,22 @@ function RepoTable({ view }: { view: RepoView }) {
 	);
 }
 
-/** The list's tables, one per repository, which you drag or move with the keys. */
-function RepoTables({ pulls }: { pulls: PullRequests }) {
+/** The list's headings, each with its tables; under the grouping by repository you drag them or move them with the keys. */
+function ListTables({ pulls }: { pulls: PullRequests }) {
 	return (
 		<div className="space-y-8">
-			{usePullRequestsList(pulls).map(each => (
-				<RepoTable key={each.key} view={each} />
+			{usePullRequestsList(pulls).map(view => (
+				<GroupTable key={view.key} view={view} />
 			))}
 		</div>
 	);
 }
 
-/** The list under a grouping other than by repository: a heading per group, each with its tables, in the list's order. */
-function GroupedTables({ pulls, groups }: { pulls: PullRequests; groups: ListGroup[] }) {
-	return (
-		<div className="space-y-8">
-			{useGroupedList(pulls, groups).map(({ key, title, bodyId, open, toggle, cards }) => {
-				const tables = cards.map(({ key, section, ...card }) => <TableCard key={key} {...card} yours={section === "Your move"} summary={null} drag={null} moveId={null} />);
-				if (title === null)
-					return (
-						<div key={key} className="@container/pull-requests">
-							{tables}
-						</div>
-					);
-				return (
-					<section key={key} aria-label={title} className="@container/pull-requests space-y-3">
-						<h2 className="flex items-baseline gap-2 text-sm" style={{ fontVariationSettings: fontWeights.semibold }}>
-							<FoldButton open={open} onToggle={toggle} controls={bodyId}>
-								<span className="truncate">{title}</span>
-								<span className="text-xs tabular-nums text-muted-foreground" style={{ fontVariationSettings: fontWeights.normal }}>
-									{cards.reduce((sum, { rows }) => sum + rows.length, 0)}
-								</span>
-							</FoldButton>
-						</h2>
-						{open && (
-							<div id={bodyId} className="space-y-3">
-								{tables}
-							</div>
-						)}
-					</section>
-				);
-			})}
-		</div>
-	);
+/** The note and the button of a list that the search, **Filter**, or both leave empty. */
+function nothingMatches(search: string, filtering: boolean): { text: string; clear: string } {
+	if (search && filtering) return { text: "No pull requests match the search and these filters.", clear: "Clear the search and filters" };
+	if (search) return { text: `No pull requests match “${search}”.`, clear: "Clear the search" };
+	return { text: "No pull requests match these filters.", clear: "Clear the filters" };
 }
 
 /** What the list shows: the tables, a note while the search or the filters keep nothing, or one while you hid every repository. */
@@ -183,29 +153,28 @@ function PullRequestsBody({ pulls, query, onQuery }: { pulls: PullRequests; quer
 	const [filter, setFilter] = usePullRequestsFilter();
 	if (pulls.everyRepo.length === 0) return note("No session ran in a GitHub repository.");
 	if (pulls.everyRepo.every(repo => hidden.has(repoKey(repo)))) return <EveryRepositoryHidden everyRepo={pulls.everyRepo} />;
-	const empty = pulls.groups ? pulls.groups.length === 0 : pulls.repos.length === 0;
-	if (empty) {
-		const searching = query.trim() !== "";
+	if (pulls.groups.length === 0) {
+		const search = query.trim();
 		const filtering = filters(filter);
-		const what = searching && filtering ? "the search and these filters" : searching ? `“${query.trim()}”` : "these filters";
+		const { text, clear } = nothingMatches(search, filtering);
 		return (
 			<div className="space-y-3">
-				{note(`No pull requests match ${what}.`)}
+				{note(text)}
 				<Button
 					{...activityControl("pull-requests.filter.clear")}
 					size="compact"
 					variant="outline"
 					onClick={() => {
-						if (searching) onQuery("");
+						if (search) onQuery("");
 						if (filtering) setFilter(NO_FILTER);
 					}}
 				>
-					{searching && filtering ? "Clear the search and filters" : searching ? "Clear the search" : "Clear the filters"}
+					{clear}
 				</Button>
 			</div>
 		);
 	}
-	return pulls.groups ? <GroupedTables pulls={pulls} groups={pulls.groups} /> : <RepoTables pulls={pulls} />;
+	return <ListTables pulls={pulls} />;
 }
 
 /** What the page shows while you hid every repository of `everyRepo`, with a button that shows them all again. */
@@ -313,7 +282,7 @@ export function PullRequestsPage(props: PullRequestsPageProps) {
 
 /** A pull request's details on a page of their own, whose keys step through the list's pull requests in its order, leaving out what its folds hide. */
 function DetailsPage({ hosts, past, route, onDock }: { hosts: RosterHost[]; past: PastSession[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onDock: () => void }) {
-	const pulls = usePullRequests({ hosts, past, route, query: "" });
+	const pulls = usePullRequests({ hosts, past, route });
 	usePullRequestKeys(pulls, usePullRequestsFolds().isFolded);
 	return <PullRequestDetailPage hosts={hosts} target={route.target} files={route.files} onDock={onDock} />;
 }

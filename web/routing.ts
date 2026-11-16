@@ -470,8 +470,8 @@ export function swapView(layout: Layout, from: View, to: View): Layout {
 
 /**
  * The layout once start `op` answers with live session `instanceId`, `null` to leave it: a resumed session takes the
- * pane of the past session it continues, a new session opens alone, a fork opens in the focused pane, and a quick
- * action's session runs in the background.
+ * pane of the past session it continues, a new session opens alone, a fork and a new pull request open in the focused
+ * pane, and a quick action's session runs in the background.
  */
 export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string): Layout | null {
 	const live: LiveView = { kind: "live", instanceId, agentId: null };
@@ -481,6 +481,7 @@ export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string
 		case "new":
 			return { panes: [live], focus: 0, maximized: false };
 		case "fork":
+		case "pull-request-new":
 			return openView(layout, live, "replace");
 		case "quick":
 		case "resume-all":

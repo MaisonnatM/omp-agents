@@ -266,13 +266,14 @@ describe("opening and closing panes", () => {
 		expect(swapView(split([a, b], 1), past, c)).toEqual(split([a, c], 1));
 	});
 
-	test("a started session opens where its start asked: a resume in its transcript's pane, a quick action nowhere", () => {
+	test("a started session opens where its start asked: a resume in its transcript's pane, a new pull request in the focused pane, a quick action nowhere", () => {
 		const past: View = { kind: "past", sessionId: "s" };
 		const layout = split([a, past, b], 2);
 		const quick: StartOp = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "ticket", id: "ENG-7", action: "work" }, skill: null };
 		expect(layoutAfterStart(layout, { kind: "resume", sessionId: "s" }, "c")).toEqual(split([a, c, b], 1));
-		expect(layoutAfterStart(layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, todoId: null, private: false, fromDraft: true }, "c")).toEqual(split([c], 0));
+		expect(layoutAfterStart(layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, todoId: null, private: false }, "c")).toEqual(split([c], 0));
 		expect(layoutAfterStart(layout, { kind: "fork", view: a, itemId: "u1", point: { entryId: "e1", prefill: true } }, "c")).toEqual(split([a, past, c], 2));
+		expect(layoutAfterStart(layout, { kind: "pull-request-new", cwd: "/work", repo: "webapp", change: "fix", skill: null }, "c")).toEqual(split([a, past, c], 2));
 		expect(layoutAfterStart(layout, quick, "c")).toBeNull();
 		expect(layoutAfterStart(layout, { kind: "resume-all", sessionIds: ["s"] }, "c")).toBeNull();
 	});

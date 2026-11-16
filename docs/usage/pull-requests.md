@@ -127,7 +127,8 @@
   The button reads **Rebasing…** beside a spinner and waits while any rebase is queued or running.
 - Tabs above the list show part of it: **Open** every section but **Recently merged**, **Your move**, **Approved**, and **Merged** that one section, and **All**, the default, every section.
   A tab reads as picked only while the sections shown are exactly its own, so sections you switch one by one leave no tab picked.
-- **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section**, **Repository**, and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.
+- **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section** lists the sections, **Repository** and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.
+  A repository or author you checked that lists nothing now, such as a repository you hid since, stays in its submenu with none, so you can uncheck it.
   Each field you set adds a chip under the tabs, such as **Author is MaisonnatM** or **Repository is any of 2 repositories**, whose tooltip names them; click the value to change it, or its × to drop the field, and **Clear all** drops every field once two chips show.
   The last section shown stays on.
   The author, date, and search filters apply before stacks join, so a stack keeps only the pull requests that match.

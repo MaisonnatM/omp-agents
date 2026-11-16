@@ -1,4 +1,5 @@
 /** What each pull request waits on next, the list's sections and stacks, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
+import { isObject, isString, oneOf, parseJson } from "../src/json";
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
 import { type LinkedPullRequest, type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, repoKey, samePullRequest, type SettableState, type StackedPullRequest, unresolvedOf } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf } from "../src/shared/moves";
@@ -187,10 +188,14 @@ export function rebaseOrder(pullRequests: readonly PullRequestSummary[]): PullRe
 	return pullRequests.filter(pr => chosen.has(pr)).map(pr => ({ pr, depth: chainBelow(pr, byHead).size })).sort((a, b) => a.depth - b.depth).map(({ pr }) => pr);
 }
 
-/** How the list orders a section's pull requests; a stack's members sit together, top first, in every sort. */
-export type PullRequestSort = "updated" | "newest" | "oldest" | "manual";
+/** How the list orders a section's pull requests, in menu order; a stack's members sit together, top first, in every sort. */
+export const PULL_REQUEST_SORTS = ["updated", "newest", "oldest", "manual"] as const;
 
-export const PULL_REQUEST_SORTS: Record<PullRequestSort, string> = { updated: "Recently updated", newest: "Newest first", oldest: "Oldest first", manual: "Manual" };
+export type PullRequestSort = (typeof PULL_REQUEST_SORTS)[number];
+
+export const SORT_LABELS: Record<PullRequestSort, string> = { updated: "Recently updated", newest: "Newest first", oldest: "Oldest first", manual: "Manual" };
+
+const isSort = oneOf(PULL_REQUEST_SORTS);
 
 /** The order you gave the pull request list, which the browser keeps. Keys you never placed follow their default order. */
 export interface PullRequestOrder {
@@ -205,19 +210,15 @@ export interface PullRequestOrder {
 
 export const DEFAULT_ORDER: PullRequestOrder = { repos: [], sections: [], sort: "updated", manual: [] };
 
-export const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter(item => typeof item === "string") : []);
+/** The strings of `value`, an array; none when it is no array. */
+const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter(isString) : []);
 
 /** The stored order, or {@link DEFAULT_ORDER} for what is missing or unreadable. */
 export function decodeOrder(raw: string | null): PullRequestOrder {
-	let stored: unknown;
-	try {
-		stored = JSON.parse(raw ?? "null");
-	} catch {
-		return DEFAULT_ORDER;
-	}
-	if (typeof stored !== "object" || stored === null) return DEFAULT_ORDER;
-	const { repos, sections, sort, manual } = stored as Record<string, unknown>;
-	return { repos: strings(repos), sections: strings(sections), sort: typeof sort === "string" && sort in PULL_REQUEST_SORTS ? (sort as PullRequestSort) : "updated", manual: strings(manual) };
+	const stored = parseJson(raw ?? "null");
+	if (!isObject(stored)) return DEFAULT_ORDER;
+	const { repos, sections, sort, manual } = stored;
+	return { repos: strings(repos), sections: strings(sections), sort: isSort(sort) ? sort : "updated", manual: strings(manual) };
 }
 
 /** `items` in `order` by `keyOf`, then the items `order` does not name, as they came. */
@@ -326,20 +327,8 @@ export function placedManual(manual: readonly string[], repo: Repo, sections: Pu
 	return [...placed, ...manual.filter(key => !key.startsWith(prefix))];
 }
 
-/** A repository's fold key, or one of its sections'; the browser keeps them in localStorage. A repository's name holds no `:`. */
-export const sectionFoldKey = (repo: string, title: string): string => `${repo}:${title}`;
-
-/** Whether the list folds the repository or section that `key` names until you unfold it. */
+/** Whether the list folds the heading or table that `key` names until you unfold it. */
 export const foldedByDefault = (key: string): boolean => GROUP_TITLES.some(title => GROUPS[title].folded && key.endsWith(`:${title}`));
-
-/** The pull requests the list shows, in its order: those of `repos` in the repositories and sections that `isFolded` leaves open, with `sectionsOf` each one's sections at the same index. */
-export function shownPullRequests(repos: readonly Repo[], sectionsOf: readonly PullRequestSection[][], isFolded: (key: string) => boolean): PullRequestSummary[] {
-	return repos.flatMap((repo, at) => {
-		const key = repoKey(repo);
-		if (isFolded(key)) return [];
-		return sectionsOf[at]!.flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
-	});
-}
 
 /** The pull request as `list` holds it, with the workspace a session on it starts in; `null` when `list` leaves it out. */
 export function listedPullRequest(list: PullRequestList, pr: PullRequest): { pr: PullRequestSummary; cwd: string } | null {

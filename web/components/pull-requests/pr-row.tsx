@@ -419,10 +419,10 @@ export interface RowBase {
 }
 
 export interface RowProps extends RowBase {
-	/** `null` where the rows keep the list's order, as under a grouping other than by repository. */
-	drag: DragItem | null;
-	/** What the move shortcuts name the row by; `null` where it does not move. */
-	moveId: string | null;
+	/** `NO_DRAG` where the rows keep the list's order, as under a grouping other than by repository. */
+	drag: DragItem;
+	/** What the move shortcuts name the row by; `undefined` where it does not move. */
+	moveId: string | undefined;
 }
 
 const sameStack = (a: StackPlace | null, b: StackPlace | null): boolean =>
@@ -450,7 +450,7 @@ const ROW_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => bo
 	actionsOpen: Object.is,
 	onActionsOpenChange: Object.is,
 	onChange: Object.is,
-	drag: (a, b) => a === b || (a !== null && b !== null && a.handle === b.handle && a.target === b.target && a.dropAt === b.dropAt && a.dragging === b.dragging),
+	drag: (a, b) => a.handle === b.handle && a.target === b.target && a.dropAt === b.dropAt && a.dragging === b.dragging,
 	moveId: Object.is,
 };
 
@@ -542,11 +542,11 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 			render={
 				<li
 					id={rowId(pr)}
-					{...drag?.handle}
-					{...drag?.target}
-					data-move={moveId ?? undefined}
+					{...drag.handle}
+					{...drag.target}
+					data-move={moveId}
 					onClick={event => openFromRow(event, pr)}
-					className={cn("group/row relative cursor-pointer px-3 py-2", targeted ? "bg-muted" : "hover:bg-muted/40", TABLE_COLUMNS, drag?.dragging && "opacity-50", drag?.dropAt && DROP_LINE[drag.dropAt])}
+					className={cn("group/row relative cursor-pointer px-3 py-2", targeted ? "bg-muted" : "hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
 				/>
 			}
 		>

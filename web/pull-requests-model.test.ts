@@ -19,9 +19,7 @@ import {
 	orderedRepos,
 	placedManual,
 	reason,
-	sectionsOfRepos,
 	sectionTitles,
-	shownPullRequests,
 	rebaseOrder,
 	threadStarters,
 	withPullRequestReviewers,
@@ -32,25 +30,7 @@ import {
 	withRepoStepped,
 	yourMoveCount,
 } from "./pull-requests-model";
-import {
-	DEFAULT_DISPLAY,
-	decodeDisplay,
-	decodeFilter,
-	encodeDisplay,
-	encodeFilter,
-	EVERY_SECTION,
-	groupedList,
-	groupedPullRequests,
-	cardFoldKey,
-	groupFoldKey,
-	keepsPullRequest,
-	type ListGroup,
-	matchesQuery,
-	NO_FILTER,
-	PULL_REQUEST_VIEWS,
-	viewOf,
-	withSectionToggled,
-} from "./pull-requests-filter";
+import { filteredList, groupedList, NO_FILTER, shownPullRequests } from "./pull-requests-filter";
 
 const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullRequestSummary => ({
 	owner: "acme",
@@ -82,10 +62,10 @@ const teammate = { login: "teammate", avatarUrl: null };
 
 const noAgent: AgentOn = () => null;
 
-/** The pull requests the page shows of `repos` in `order`, less what `isFolded` folds, as `owner#number`. */
+/** The pull requests the page shows of `repos` in `order`, grouped by repository, less what `isFolded` folds, as `owner#number`. */
 function shownOf(repos: readonly RepoPullRequests[], order: PullRequestOrder, isFolded: (key: string) => boolean = () => false): string[] {
-	const ordered = orderedRepos(repos, order);
-	return shownPullRequests(ordered, sectionsOfRepos(ordered, order, noAgent), isFolded).map(({ repo, number }) => `${repo}#${number}`);
+	const listed = filteredList(orderedRepos(repos, order), NO_FILTER, "", order, noAgent, false, 0);
+	return shownPullRequests("repository", groupedList("repository", listed, order), isFolded).map(({ repo, number }) => `${repo}#${number}`);
 }
 
 describe("next move", () => {
@@ -372,96 +352,6 @@ describe("hidden repositories", () => {
 		const shown = ["acme/a", "acme/c", "acme/d"];
 		expect(withRepoStepped(order, keys, shown, "acme/d", -1)?.repos).toEqual(["acme/a", "acme/b", "acme/d", "acme/c"]);
 		expect(withRepoStepped(order, keys, shown, "acme/c", -1)?.repos).toEqual(["acme/c", "acme/a", "acme/b", "acme/d"]);
-	});
-});
-
-describe("shown sections", () => {
-	test("a tab is active only while the shown sections are exactly its preset", () => {
-		expect(viewOf(EVERY_SECTION)).toBe("all");
-		expect(viewOf(new Set(["Approved"]))).toBe("approved");
-		expect(viewOf(withSectionToggled(EVERY_SECTION, "Recently merged"))).toBe("open");
-		expect(viewOf(new Set(["Your move", "Approved"]))).toBeNull();
-	});
-
-	test("the last shown section cannot be switched off", () => {
-		const one = PULL_REQUEST_VIEWS.merged.sections;
-		expect(withSectionToggled(one, "Recently merged")).toBe(one);
-	});
-
-	test("what is stored comes back, and a missing, unreadable, or empty value keeps everything", () => {
-		const picked = { ...NO_FILTER, sections: new Set(["Drafts", "Your move"] as const), repos: new Set(["acme/api"]), authors: new Set(["teammate"]), created: 7 as const, since: null };
-		expect(decodeFilter(encodeFilter(picked))).toEqual(picked);
-		for (const raw of [null, "{", "[]", '{"sections":["Gone"]}']) expect(decodeFilter(raw)).toEqual(NO_FILTER);
-		expect(decodeFilter('{"sections":["Gone","Drafts"],"created":5}')).toEqual({ ...NO_FILTER, sections: new Set(["Drafts"]) });
-	});
-
-	test("the stored display round-trips, and a missing or unknown grouping falls back to grouping by repository", () => {
-		const picked = { grouping: "author", empty: true } as const;
-		expect(decodeDisplay(encodeDisplay(picked))).toEqual(picked);
-		for (const raw of [null, "{", '{"grouping":"board"}']) expect(decodeDisplay(raw)).toEqual(DEFAULT_DISPLAY);
-		expect(decodeDisplay('{"grouping":"section","empty":"yes"}')).toEqual({ grouping: "section", empty: false });
-	});
-});
-
-describe("filtering and searching pull requests", () => {
-	const day = 86_400_000;
-	const now = 100 * day;
-
-	test("a date range keeps what was created or updated within it, its first moment included", () => {
-		const week = { ...NO_FILTER, created: 7 as const };
-		expect(keepsPullRequest(pr(1, { createdAt: now - 7 * day }), week, "", now)).toBe(true);
-		expect(keepsPullRequest(pr(1, { createdAt: now - 7 * day - 1 }), week, "", now)).toBe(false);
-		expect(keepsPullRequest(pr(1, { updatedAt: now - 2 * day }), { ...NO_FILTER, since: 1 }, "", now)).toBe(false);
-		expect(keepsPullRequest(pr(1, { author: teammate }), { ...NO_FILTER, authors: new Set(["me"]) }, "", now)).toBe(false);
-	});
-
-	test("every word of a search must match the title, number, branch, author, or repository, in any case", () => {
-		const one = pr(42, { title: "Fix login redirect", head: "me/oauth" });
-		expect(matchesQuery(one, "  LOGIN #42 ")).toBe(true);
-		expect(matchesQuery(one, "oauth acme/webapp")).toBe(true);
-		expect(matchesQuery(one, "login signup")).toBe(false);
-	});
-});
-
-describe("grouping", () => {
-	const repo = (name: string, pullRequests: PullRequestSummary[]): RepoPullRequests => ({ owner: "acme", repo: name, cwds: [`/code/${name}`], pullRequests });
-	const repos = [repo("webapp", [pr(1), pr(2, { review: "changes-requested" })]), repo("api", [pr(3, { repo: "api", review: "changes-requested", author: teammate, role: "reviewer" }), pr(4, { repo: "api", review: "changes-requested" })])];
-	const sectionsOf = sectionsOfRepos(repos, DEFAULT_ORDER, noAgent);
-	const shape = (groups: ListGroup[]) => groups.map(({ title, cards }) => [title, cards.map(({ title, rows }) => [title, rows.map(({ row }) => `${row.pr.repo}#${row.pr.number}`)])]);
-
-	test("by section, a heading per section in page order with a table per repository", () => {
-		const groups = groupedList("section", repos, sectionsOf, DEFAULT_ORDER);
-		expect(groups.map(({ title }) => title)).toEqual(sectionTitles(DEFAULT_ORDER).filter(title => groups.some(group => group.title === title)));
-		expect(shape(groups).find(([title]) => title === "Your move")?.[1]).toEqual([
-			["acme/webapp", ["webapp#2"]],
-			["acme/api", ["api#3", "api#4"]],
-		]);
-	});
-
-	test("by author, the author with the most pull requests first, a table per section across repositories; under no grouping, one table in the list's order", () => {
-		const byAuthor = groupedList("author", repos, sectionsOf, DEFAULT_ORDER);
-		expect(shape(byAuthor)).toEqual([
-			[
-				"me",
-				[
-					["Your move", ["webapp#2", "api#4"]],
-					["Waiting on others", ["webapp#1"]],
-				],
-			],
-			["teammate", [["Your move", ["api#3"]]]],
-		]);
-		expect(foldedByDefault(cardFoldKey(groupFoldKey("author", "me"), "Waiting on others"))).toBe(true);
-		const none = groupedList("none", repos, sectionsOf, DEFAULT_ORDER);
-		expect(none).toHaveLength(1);
-		expect(none[0]!.title).toBeNull();
-		expect(groupedPullRequests("none", none, () => false).map(({ repo, number }) => `${repo}#${number}`)).toEqual(shownOf(repos, DEFAULT_ORDER));
-	});
-
-	test("a folded heading hides its pull requests from the keys, and the merged heading starts folded", () => {
-		const groups = groupedList("section", repos, sectionsOf, DEFAULT_ORDER);
-		const folded = groupFoldKey("section", "Your move");
-		expect(groupedPullRequests("section", groups, key => key === folded).map(({ number }) => number)).not.toContain(2);
-		expect(foldedByDefault(groupFoldKey("section", "Recently merged"))).toBe(true);
 	});
 });
 

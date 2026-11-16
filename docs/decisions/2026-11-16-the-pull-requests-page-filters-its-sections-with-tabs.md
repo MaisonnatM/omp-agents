@@ -35,7 +35,7 @@ Stacks join pull requests across a section by branch, so a filter that cuts a st
 
 ## Confirmation
 
-`web/pull-requests-model.test.ts` checks that a tab reads as picked only for its exact preset, that the last shown section stays on, that a missing or unreadable stored filter shows everything, that the date, author, and search filters keep the right pull requests, and that each grouping lays out and folds its headings.
+`web/pull-requests-filter.test.ts` checks that a tab reads as picked only for its exact preset, that the last shown section stays on, that a missing or unreadable stored filter shows everything, that the date, author, and search filters keep the right pull requests, that `filteredList` drops a repository a filter empties unless **Show empty sections** is on and filters sections after stacks form, that **Filter** keeps a checked repository or author that lists nothing so you can uncheck it, and that each grouping lays out and folds its headings, with **No grouping** in section order.
 
 ## Revisit when
 
