@@ -171,7 +171,7 @@ export interface PromptEditorHandle {
 }
 
 /** Turns each reference typed or inserted into a chip, and keeps the parent's `value` and the editor's text equal. */
-function Sync({ value, onChange, disabled, autoFocus, handle }: { value: string; onChange: (text: string) => void; disabled: boolean; autoFocus: boolean; handle?: Ref<PromptEditorHandle> }) {
+function Sync({ value, onChange, disabled, handle }: { value: string; onChange: (text: string) => void; disabled: boolean; handle?: Ref<PromptEditorHandle> }) {
 	const [editor] = useLexicalComposerContext();
 	const current = useRef(value);
 	const onChangeRef = useRef(onChange);
@@ -179,10 +179,6 @@ function Sync({ value, onChange, disabled, autoFocus, handle }: { value: string;
 	/** Set while the parent's value replaces the text: none of it is being typed, so a reference at the caret is whole. */
 	const replacing = useRef(false);
 
-	// React focuses only form controls for `autoFocus`; like it, this runs on mount only.
-	useEffect(() => {
-		if (autoFocus) editor.focus();
-	}, [editor]);
 	useImperativeHandle(
 		handle,
 		() => ({
@@ -303,7 +299,7 @@ interface PromptEditorProps extends EditableProps {
 	handle?: Ref<PromptEditorHandle>;
 }
 
-export function PromptEditor({ value, onValueChange, disabled = false, autoFocus = false, handle, ...editable }: PromptEditorProps) {
+export function PromptEditor({ value, onValueChange, disabled = false, handle, ...editable }: PromptEditorProps) {
 	// Built once: the editor keeps its own text from then on, and `Sync` follows `value`.
 	const [extension] = useState(() =>
 		defineExtension({
@@ -320,7 +316,7 @@ export function PromptEditor({ value, onValueChange, disabled = false, autoFocus
 		// `null`: the editable renders as a child, since a new `contentEditable` element would build a new editor.
 		<LexicalExtensionComposer extension={extension} contentEditable={null}>
 			<ContentEditable {...editable} />
-			<Sync value={value} onChange={onValueChange} disabled={disabled} autoFocus={autoFocus} handle={handle} />
+			<Sync value={value} onChange={onValueChange} disabled={disabled} handle={handle} />
 		</LexicalExtensionComposer>
 	);
 }

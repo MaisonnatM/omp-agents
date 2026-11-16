@@ -1,5 +1,5 @@
 import { IconCrossMedium, IconLock, IconSparklesTwo, IconUnlocked } from "central-icons";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { RetroGrid } from "@/components/dithercn/retro-grid";
 import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest } from "../../src/shared/sessions";
@@ -115,6 +115,11 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			? { kind: "existing", name: pickedChoice.name }
 			: pickedChoice;
 	const starting = launch?.phase === "starting" || (scheduled?.busy ?? false);
+	const typeable = connected && !starting;
+	// The draft takes the keyboard whenever its directory is chosen, from the composer's picker or a sidebar's new session, and once it can be typed in.
+	useEffect(() => {
+		if (typeable) editorRef.current?.focus();
+	}, [cwd, typeable]);
 	const privacy = todo ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();
@@ -261,7 +266,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 								...completion.editorProps,
 								onKeyDown,
 								onPaste: scheduled ? undefined : attachments.onPaste,
-								autoFocus: true,
 							}}
 						/>
 					</div>
