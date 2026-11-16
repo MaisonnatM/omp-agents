@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-16
+
+- In poteto mode, a Babysit run's todo list now holds only the steps its mode runs, so a one-time rebase or a review-thread fix no longer ends with a turn spent ticking off polling and merge steps.
+
 ## 2026-11-13
 
 - The shortcuts now match Capy's. Cmd+1 to Cmd+9 go to your tabs at the top, and Option+1 to Option+9 open the sidebar's first nine sessions.
