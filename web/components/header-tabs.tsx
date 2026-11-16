@@ -1,14 +1,29 @@
-/** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, and a + that opens a new one. */
-import { IconBubbleText, IconCalendarClock, IconEditBig, IconHome, IconPlusLarge, IconSparklesTwo } from "central-icons";
+/** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, pinned ones first, and a + that opens a new one. */
+import { IconBubbleText, IconCalendarClock, IconCrossMedium, IconEditBig, IconHome, IconPin, IconPlusLarge, IconSparklesTwo, IconUnpin } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useRef } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { record } from "../activity";
+import { activityControl, record } from "../activity";
 import { pageTitle, viewTitle } from "../document-title";
-import { closeHeaderTab, decodeHeaderTabs, encodeHeaderTabs, type HeaderTab, HEADER_TABS_KEY, type HeaderTabTarget, headerTabTarget, NEW_TAB_HASH, reorderHeaderTabs, visitHeaderTab } from "../header-tabs";
+import {
+	closeHeaderTab,
+	closeOtherHeaderTabs,
+	decodeHeaderTabs,
+	encodeHeaderTabs,
+	type HeaderTab,
+	HEADER_TABS_KEY,
+	type HeaderTabTarget,
+	headerTabTarget,
+	NEW_TAB_HASH,
+	pinHeaderTab,
+	reopenHeaderTab,
+	reorderHeaderTabs,
+	visitHeaderTab,
+} from "../header-tabs";
 import { MODULE_LIST, type WebModuleId } from "../modules";
 import { moveBy, SIDE_DROP_LINE, stepTarget, type Where } from "../order";
 import { PAGE_ICON } from "../page-icons";
@@ -71,46 +86,83 @@ interface HeaderTabItemProps {
 	drag: DragItem;
 	onSelect: () => void;
 	onClose: () => void;
+	onTogglePin: () => void;
+	onNewTab: () => void;
+	/** `null` while no other tab would close: the row holds only pinned tabs besides this one. */
+	onCloseOthers: (() => void) | null;
 }
 
-/** One header tab, which drags from anywhere on it to reorder: its link and its ×. */
-function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClose }: HeaderTabItemProps) {
+/**
+ * One header tab, which drags from anywhere on it to reorder: its link and its ×, and the menu a right-click on it opens, in Capy's order.
+ * A pinned tab shows only its icon and draws no ×.
+ */
+function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClose, onTogglePin, onNewTab, onCloseOthers }: HeaderTabItemProps) {
+	const pinned = tab.pinned === true;
 	return (
-		<ClosableTab
-			data-tab-id={tab.id}
-			{...drag.handle}
-			{...drag.target}
-			name={label}
-			active={active}
-			onClose={onClose}
-			closeControl="header.tab.close"
-			activePadding="pr-7"
-			className={cn(
-				"max-w-60 min-w-24 border",
-				target?.kind === "view" ? "min-w-36 flex-[0_1_auto]" : "shrink-0",
-				active ? "border-border bg-background text-foreground shadow-raised" : "border-transparent",
-				drag.dragging && "opacity-50",
-				drag.dropAt && SIDE_DROP_LINE[drag.dropAt],
-			)}
-		>
-			{body => (
-				<a
-					href={tab.hash || "#"}
-					aria-current={active ? "page" : undefined}
-					title={label}
-					draggable={false}
-					className={cn(body, "flex-1")}
-					onClick={event => {
-						if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-						event.preventDefault();
-						if (!active) onSelect();
-					}}
-				>
-					{lead}
-					<span className="truncate">{label}</span>
-				</a>
-			)}
-		</ClosableTab>
+		<ContextMenu>
+			<ClosableTab
+				data-tab-id={tab.id}
+				{...drag.handle}
+				{...drag.target}
+				name={label}
+				active={active}
+				onClose={pinned ? null : onClose}
+				closeControl="header.tab.close"
+				activePadding="pr-7"
+				className={cn(
+					"border",
+					pinned ? "w-9 shrink-0" : cn("max-w-60 min-w-24", target?.kind === "view" ? "min-w-36 flex-[0_1_auto]" : "shrink-0"),
+					active ? "border-border bg-background text-foreground shadow-raised" : "border-transparent",
+					drag.dragging && "opacity-50",
+					drag.dropAt && SIDE_DROP_LINE[drag.dropAt],
+				)}
+			>
+				{body => (
+					<ContextMenuTrigger
+						render={
+							<a
+								href={tab.hash || "#"}
+								aria-current={active ? "page" : undefined}
+								title={label}
+								draggable={false}
+								className={cn(body, "flex-1", pinned && "justify-center")}
+								onClick={event => {
+									if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+									event.preventDefault();
+									if (!active) onSelect();
+								}}
+							/>
+						}
+					>
+						{lead}
+						<span className={pinned ? "sr-only" : "truncate"}>{label}</span>
+					</ContextMenuTrigger>
+				)}
+			</ClosableTab>
+			<ContextMenuContent>
+				<MenuItem {...activityControl("header.tab.pin")} onClick={onTogglePin}>
+					{pinned ? <IconUnpin /> : <IconPin />}
+					{pinned ? "Unpin tab" : "Pin tab"}
+					<MenuShortcut>{shortcutLabels("pinTab")[0]}</MenuShortcut>
+				</MenuItem>
+				<MenuItem onClick={onNewTab}>
+					<IconPlusLarge />
+					New tab
+					<MenuShortcut>{shortcutLabels("newTab")[0]}</MenuShortcut>
+				</MenuItem>
+				<MenuSeparator />
+				{!pinned && (
+					<MenuItem {...activityControl("header.tab.close")} onClick={onClose}>
+						<IconCrossMedium />
+						Close tab
+					</MenuItem>
+				)}
+				<MenuItem disabled={onCloseOthers === null} onClick={onCloseOthers ?? undefined}>
+					<IconCrossMedium />
+					Close other tabs
+				</MenuItem>
+			</ContextMenuContent>
+		</ContextMenu>
 	);
 }
 
@@ -127,7 +179,9 @@ interface HeaderTabsProps {
  * The row of header tabs, kept in this browser, working as Capy's desktop tabs do: going to a page shows it in the tab on screen,
  * a session another tab shows focuses that tab, and only + or ⌘T opens a new tab. ⌘1 to ⌘9 go to the tab of that place, and ⌃⇥
  * and ⌃⇧⇥ to the next and previous. Drag one, or press Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it,
- * closing the one on screen shows its neighbour, closing the last leaves a new one, and ⌥⌘W closes all but the one on screen.
+ * closing the one on screen shows its neighbour, closing the last leaves a new one, and ⌥⌘W closes all but the pinned ones and the one on screen.
+ * ⇧⌘T reopens the last closed tab where it was. Pin or Unpin in a tab's menu, or ⌃⇧P on the one on screen, moves it among the pinned
+ * tabs, which sit first, show only their icon, and stay open until unpinned.
  */
 export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps) {
 	const { openNewSession } = useDashboardActions();
@@ -165,7 +219,7 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 		return true;
 	};
 	const select = (index: number): void => {
-		setRow(current => ({ tabs: current.tabs, active: index }));
+		setRow(current => ({ ...current, active: index }));
 		location.hash = tabs[index]?.hash ?? "";
 	};
 	/** Opens a new tab on the new-session page, as + does. */
@@ -173,17 +227,31 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 		setRow(current => visitHeaderTab(current, NEW_TAB_HASH, true, crypto.randomUUID()));
 		openNewSession();
 	};
+	/** Applies a change that may move the screen elsewhere, as closing the tab on screen does. */
+	const apply = (change: { row: typeof row; go: string | null } | null): boolean => {
+		if (change === null) return false;
+		setRow(change.row);
+		if (change.go !== null) location.hash = change.go;
+		return true;
+	};
 	const close = (id: string): void => {
-		const { row: rest, go } = closeHeaderTab(row, id, crypto.randomUUID());
-		setRow(rest);
-		if (go !== null) location.hash = go;
+		apply(closeHeaderTab(row, id, crypto.randomUUID()));
+	};
+	const togglePin = (id: string): void => {
+		setRow(current => pinHeaderTab(current, id, current.tabs.find(tab => tab.id === id)?.pinned !== true));
 	};
 	useShortcuts({
 		moveTabLeft: () => moveFocused(-1),
 		moveTabRight: () => moveFocused(1),
+		// A pinned tab on screen takes ⌘W and stays, as it has no ×.
 		closeTab: () => {
 			if (activeId === null) return false;
 			close(activeId);
+		},
+		reopenClosedTab: () => apply(reopenHeaderTab(row)),
+		pinTab: () => {
+			if (activeId === null) return false;
+			togglePin(activeId);
 		},
 		selectTab: index => {
 			if (index >= tabs.length) return false;
@@ -192,11 +260,7 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 		nextTab: () => select((row.active + 1) % tabs.length),
 		previousTab: () => select((row.active - 1 + tabs.length) % tabs.length),
 		newTab: openTab,
-		closeOtherTabs: () => {
-			const active = tabs[row.active];
-			if (!active || tabs.length < 2) return false;
-			setRow({ tabs: [active], active: 0 });
-		},
+		closeOtherTabs: () => activeId !== null && apply(closeOtherHeaderTabs(row, activeId)),
 	});
 	return (
 		<div
@@ -232,6 +296,9 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 							drag={dragOrder("header-tabs", tab.id, (dragged, where) => move(dragged, tab.id, where))}
 							onSelect={() => select(index)}
 							onClose={() => close(tab.id)}
+							onTogglePin={() => togglePin(tab.id)}
+							onNewTab={openTab}
+							onCloseOthers={tabs.some(other => other.id !== tab.id && !other.pinned) ? () => apply(closeOtherHeaderTabs(row, tab.id)) : null}
 						/>
 					);
 				})}

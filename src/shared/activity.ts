@@ -117,6 +117,7 @@ export const CONTROLS = [
 	{ id: "header.settings", label: "Settings button", area: "Header" },
 	{ id: "header.tab.close", label: "Header tab closed", area: "Header" },
 	{ id: "header.tab.move", label: "Header tab moved to a new place", area: "Header" },
+	{ id: "header.tab.pin", label: "Header tab pinned or unpinned from its menu", area: "Header" },
 	{ id: "header.whats-new", label: "What's new button", area: "Header" },
 	{ id: "notices.open", label: "Notification bell", area: "Notifications" },
 	{ id: "notices.filter", label: "Notifications source filter", area: "Notifications" },
