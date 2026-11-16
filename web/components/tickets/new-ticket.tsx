@@ -1,4 +1,4 @@
-import { IconChevronRight, IconCrossMedium, IconExpand, IconMinimize, IconPaperclip1, IconUserGroup } from "central-icons";
+import { IconChevronRightSmall, IconCrossMedium, IconExpand, IconMinimize, IconPaperclip1, IconUserGroup } from "central-icons";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
 import { MAX_TICKET_ATTACHMENT_BYTES, type TicketChoice, type TicketDraft, type TicketLabel, type TicketOptions, type TicketPriority, type TicketStatus, type TicketTeam } from "../../../src/shared/tickets";
@@ -209,7 +209,7 @@ function NewTicketForm({ title: initialTitle, submit, onSubmit: setSubmit, onCre
 								{teams.error ? `Cannot read Linear's teams: ${teams.error}` : teams.data ? "Linear lists no team to open the issue in." : "Reading teams…"}
 							</span>
 						)}
-						<IconChevronRight className="size-3.5 text-muted-foreground" />
+						<IconChevronRightSmall className="size-3.5 text-muted-foreground" />
 					</>
 				}
 			/>

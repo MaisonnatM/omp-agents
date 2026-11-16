@@ -1,5 +1,5 @@
 /** The composer's completion popup for skills, commands, files, and other mentions, and the `useCompletion` hook that drives it. */
-import { IconChevronRight } from "central-icons";
+import { IconChevronRightSmall } from "central-icons";
 import { type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
@@ -54,7 +54,7 @@ export function CompletionPopup({ id, sections, active, onPick, error }: {
 									<Icon size={16} aria-hidden="true" />
 									<span className="min-w-0 flex-1 truncate">{option.label}</span>
 									{option.detail && <span className="max-w-[45%] truncate text-xs opacity-70">{option.detail}</span>}
-									{option.opens && <IconChevronRight size={14} aria-hidden="true" className="opacity-70" />}
+									{option.opens && <IconChevronRightSmall size={14} aria-hidden="true" className="opacity-70" />}
 								</div>
 							);
 						})}

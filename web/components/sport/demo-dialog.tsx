@@ -1,5 +1,5 @@
 /** The demo dialog: one exercise's video, its three cues and caution, and the workout's other demos to step through. */
-import { IconChevronLeft, IconChevronRight, IconExclamationTriangle, IconPlay } from "central-icons";
+import { IconChevronLeftSmall, IconChevronRightSmall, IconExclamationTriangle, IconPlay } from "central-icons";
 import { useEffect, useRef, useState } from "react";
 import type { Exercise } from "../../../src/shared/sport";
 import { Button } from "@/components/ui/button";
@@ -98,13 +98,13 @@ export function DemoDialog({ title, demos, at, onAt, onClose }: DemoDialogProps)
 			</div>
 			<div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
 				<Tooltip content="Démo précédente" shortcut={shortcutLabels("sportPreviousDemo")} side="top" disabled={at === 0}>
-					<Button variant="tertiary" size="compact" leadingIcon={IconChevronLeft} disabled={at === 0} onClick={() => onAt(at - 1)} {...activityControl("sport.demo.step")}>Précédent</Button>
+					<Button variant="tertiary" size="compact" leadingIcon={IconChevronLeftSmall} disabled={at === 0} onClick={() => onAt(at - 1)} {...activityControl("sport.demo.step")}>Précédent</Button>
 				</Tooltip>
 				{last ? (
 					<Button size="compact" onClick={onClose}>Terminé</Button>
 				) : (
 					<Tooltip content="Démo suivante" shortcut={shortcutLabels("sportNextDemo")} side="top">
-						<Button size="compact" trailingIcon={IconChevronRight} onClick={() => onAt(at + 1)} {...activityControl("sport.demo.step")}>Suivant</Button>
+						<Button size="compact" trailingIcon={IconChevronRightSmall} onClick={() => onAt(at + 1)} {...activityControl("sport.demo.step")}>Suivant</Button>
 					</Tooltip>
 				)}
 			</div>

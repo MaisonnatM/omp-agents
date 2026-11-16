@@ -1,5 +1,5 @@
 /** `FolderRows`: a folder tree's rows, each folder a button that opens and closes it, which the changes explorer and the settings file rails share; `useFolders` keeps which folders are open. */
-import { IconChevronDownSmall, IconChevronRight, IconFolder1 } from "central-icons";
+import { IconChevronDownSmall, IconChevronRightSmall, IconFolder1 } from "central-icons";
 import { Fragment, type ReactNode, useState } from "react";
 import { foldersAbove, type TreeDir } from "../changes-model";
 
@@ -58,7 +58,7 @@ export function FolderRows<T extends { path: string }>({
 		<>
 			{dir.dirs.map(child => {
 				const shut = folders.isShut(child.path);
-				const Chevron = shut ? IconChevronRight : IconChevronDownSmall;
+				const Chevron = shut ? IconChevronRightSmall : IconChevronDownSmall;
 				return (
 					<Fragment key={child.path}>
 						<li>

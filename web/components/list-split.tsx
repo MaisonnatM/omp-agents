@@ -1,5 +1,5 @@
 /** `ListSplit`, a page's list on the left and its open item on the right with a draggable divider, plus the item's top bar. */
-import { IconChevronDownSmall, IconChevronTop, IconCrossMedium } from "central-icons";
+import { IconChevronDownSmall, IconChevronTopSmall, IconCrossMedium } from "central-icons";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useLayoutEffect, useRef } from "react";
 import type { IconComponent } from "@/lib/icon-context";
@@ -67,7 +67,7 @@ export function DetailBar({ leading, previous, next, children, close }: { leadin
 }
 
 /** Chevron icons for {@link DetailBar} `previous` and `next`; the Email and Todo pages use them. */
-export const CH_PREVIOUS: BarAction["icon"] = <IconChevronTop />;
+export const CH_PREVIOUS: BarAction["icon"] = <IconChevronTopSmall />;
 export const CH_NEXT: BarAction["icon"] = <IconChevronDownSmall />;
 export const CH_CLOSE: BarAction["icon"] = <IconCrossMedium />;
 
