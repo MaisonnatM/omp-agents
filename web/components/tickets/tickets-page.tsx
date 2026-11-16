@@ -29,8 +29,8 @@ import { statusIcon, TicketRow, ticketRowId } from "./ticket-row";
 /** Folded status groups, by status name. */
 const COLLAPSED_KEY = "omp-agents.tickets-collapsed";
 
-const TICKETS_TITLE = "Tickets";
-const TICKETS_META = "Your assigned issues on Linear";
+const TICKETS_TITLE = "Linear tickets";
+const TICKETS_META = "Your assigned issues";
 
 interface GroupProps {
 	group: TicketGroup;
