@@ -10,7 +10,7 @@ const ids = (blocks: readonly Block[]): string[] => blocks.map(block => (block.k
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
-	const tool = (id: string, status: "running" | "ok"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status, agents: [] });
+	const tool = (id: string, status: "running" | "ok"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status });
 
 	const thinking = (id: string): Item => ({ id, kind: "thinking", text: "hmm", streaming: false });
 
@@ -25,8 +25,8 @@ describe("transcript rendering", () => {
 
 	test("a saved artifact leaves its tool group as its own block; a failed save stays in the group", () => {
 		const artifact: ArtifactSave = { file: "page.html", kind: "html", title: "Page", note: null, sha256: "a".repeat(64) as Sha256, bytes: 12, savedAt: 1_700_000_000_000 };
-		const saved: Item = { id: "s", kind: "tool", name: "artifact", summary: "page.html", status: "ok", agents: [], artifact };
-		const failed: Item = { id: "f", kind: "tool", name: "artifact", summary: "page.html", status: "error", agents: [] };
+		const saved: Item = { id: "s", kind: "tool", name: "artifact", summary: "page.html", status: "ok", artifact };
+		const failed: Item = { id: "f", kind: "tool", name: "artifact", summary: "page.html", status: "error" };
 		const blocks = blocksOf([tool("t1", "ok"), saved, tool("t2", "ok"), failed]);
 		expect(blocks.map(block => [block.kind, block.kind === "activity" ? block.entries.map(entry => entry.id).join("+") : block.item.id])).toEqual([
 			["activity", "t1"],
@@ -98,7 +98,7 @@ describe("resendOf", () => {
 describe("fork points", () => {
 	const prompt = (id: string, entryId: string | null): Item => ({ id, kind: "user", text: id, skill: null, from: null, entryId });
 	const reply = (id: string, streaming = false): Item => ({ id, kind: "assistant", text: id, streaming, suggestions: [] });
-	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] };
+	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok" };
 
 	test("a prompt forks at itself; a turn's last reply forks at the next prompt, keeping the whole turn", () => {
 		const items = [prompt("p1", "e1"), reply("r1a"), tool, reply("r1b"), prompt("p2", "e2"), reply("r2")];
@@ -160,7 +160,7 @@ describe("the editable prompt", () => {
 describe("turn replies", () => {
 	const prompt = (id: string): Item => ({ id, kind: "user", text: id, skill: null, from: null, entryId: id });
 	const reply = (id: string, text = id): Item => ({ id, kind: "assistant", text, streaming: false, suggestions: [] });
-	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] };
+	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok" };
 	const items = [prompt("p1"), reply("r1a"), tool, reply("r1b"), reply("r1c", " "), prompt("p2"), reply("r2a"), tool, reply("r2b")];
 
 	test("each turn's last reply with text, skipping the replies between its tool calls", () => {
@@ -175,7 +175,7 @@ describe("turn replies", () => {
 describe("outline", () => {
 	const prompt = (id: string, text: string, extra: Partial<Extract<Item, { kind: "user" }>> = {}): Item => ({ id, kind: "user", text, skill: null, from: null, entryId: id, ...extra });
 	const reply = (id: string, text: string): Item => ({ id, kind: "assistant", text, streaming: false, suggestions: [] });
-	const tool = (status: "ok" | "error"): Item => ({ id: `t-${status}`, kind: "tool", name: "bash", summary: "ls", status, agents: [] });
+	const tool = (status: "ok" | "error"): Item => ({ id: `t-${status}`, kind: "tool", name: "bash", summary: "ls", status });
 	const thinking: Item = { id: "th", kind: "thinking", text: "hmm", streaming: false };
 	const items = [prompt("p1", "Fix it"), reply("r1a", "Looking"), thinking, tool("ok"), tool("error"), reply("r1b", " Fixed. "), prompt("p2", "Ship it"), reply("r2", "Shipping")];
 	const outline = (items: Item[], working: boolean) => transcriptModel(items, working).outline;
@@ -236,7 +236,7 @@ describe("suggestions", () => {
 			streaming,
 			suggestions: streaming ? [] : ["Ship it"],
 		});
-		const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] };
+		const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok" };
 		expect(nextSuggestions([prompt, reply(false), tool], false)).toEqual(["Ship it"]);
 		expect(nextSuggestions([prompt, reply(true)], true)).toEqual([]);
 		expect(nextSuggestions([reply(false), prompt], false)).toEqual([]);
@@ -268,9 +268,9 @@ describe("viewer images", () => {
 	test("lists every prompt's and tool call's images in reading order, each captioned by its sender", () => {
 		const items: Item[] = [
 			{ id: "u", kind: "user", text: "look", skill: null, from: null, entryId: "u", images: ["/p.png"] },
-			{ id: "tool:a", kind: "tool", name: "browser", summary: "screenshot", status: "ok", agents: [], images: ["/a1.png", "/a2.png"] },
-			{ id: "tool:b", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] },
-			{ id: "tool:c", kind: "tool", name: "read", summary: "", status: "ok", agents: [], images: ["/c.png"] },
+			{ id: "tool:a", kind: "tool", name: "browser", summary: "screenshot", status: "ok", images: ["/a1.png", "/a2.png"] },
+			{ id: "tool:b", kind: "tool", name: "bash", summary: "ls", status: "ok" },
+			{ id: "tool:c", kind: "tool", name: "read", summary: "", status: "ok", images: ["/c.png"] },
 		];
 		expect(transcriptModel(items, false).images).toEqual([
 			{ id: "u", at: 0, src: "/p.png", caption: "Your message" },
@@ -284,10 +284,10 @@ describe("viewer images", () => {
 describe("a model built from the one before", () => {
 	const prompt = (id: string, text = id): Item => ({ id, kind: "user", text, skill: null, from: null, entryId: `e-${id}` });
 	const reply = (id: string, text: string, streaming: boolean): Item => ({ id, kind: "assistant", text, streaming, suggestions: [] });
-	const todo = (id: string): Item => ({ id, kind: "tool", name: "todo", summary: "", status: "ok", agents: [] });
-	const shot: Item = { id: "shot", kind: "tool", name: "browser", summary: "screenshot", status: "ok", agents: [], images: ["/s.png"] };
+	const todo = (id: string): Item => ({ id, kind: "tool", name: "todo", summary: "", status: "ok" });
+	const shot: Item = { id: "shot", kind: "tool", name: "browser", summary: "screenshot", status: "ok", images: ["/s.png"] };
 	const update: Item = { id: "d", kind: "dashboard", text: "[omp-agents] Project update.", entryId: "e-d" };
-	const tool = (id: string, status: "ok" | "error"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status, agents: [] });
+	const tool = (id: string, status: "ok" | "error"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status });
 
 	test("matches the model built from scratch at every step, keeping settled turns and rows as the same objects", () => {
 		const p1 = prompt("p1", "Fix it");
@@ -389,7 +389,6 @@ describe("a model built from the one before", () => {
 							name: pick(["bash", "todo", "browser"]),
 							summary: "ls",
 							status: pick(["ok", "error", "running"]),
-							agents: [],
 							...(random() < 0.2 ? { images: ["/s.png"] } : {}),
 						};
 					case "notice":

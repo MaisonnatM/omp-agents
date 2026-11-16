@@ -92,7 +92,7 @@ describe("Transcript", () => {
 		expect(update("po", call)).toEqual([]);
 		expect(update("pong", call)).toEqual([{ id: "m200:0", kind: "assistant", text: "pong", streaming: true, suggestions: [] }]);
 		expect(t.applyEvent({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: true })).toEqual([
-			{ id: "tool:c1", kind: "tool", name: "bash", summary: "ls", status: "error", agents: [] },
+			{ id: "tool:c1", kind: "tool", name: "bash", summary: "ls", status: "error" },
 		]);
 	});
 
@@ -269,12 +269,12 @@ describe("Transcript", () => {
 		const call = { type: "toolCall", id: "c1", name: "bash", arguments: { command: "sleep 30 && echo done" } };
 		t.applyEntry({ type: "message", id: "e1", message: assistant(400, [call], { stopReason: "toolUse" }) });
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: call.arguments });
-		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "running", agents: [] }]);
+		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "running" }]);
 
 		t.applyEntry({ type: "message", id: "e2", message: { role: "toolResult", timestamp: 401, toolCallId: "c1", toolName: "bash", isError: true } });
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: call.arguments });
 
-		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "error", agents: [] }]);
+		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "error" }]);
 	});
 
 	test("a tool result's images show on its call, and a replayed call keeps them", () => {
@@ -292,7 +292,7 @@ describe("Transcript", () => {
 		t.applyEntry({ type: "message", id: "e1", message: assistant(600, [call], { stopReason: "toolUse" }) });
 
 		expect(t.items()).toEqual([
-			{ id: "tool:s1", kind: "tool", name: "browser", summary: "screenshot", status: "ok", agents: [], images: [`/api/image?hash=${hash}&type=image%2Fwebp`, "data:image/png;base64,aGk="] },
+			{ id: "tool:s1", kind: "tool", name: "browser", summary: "screenshot", status: "ok", images: [`/api/image?hash=${hash}&type=image%2Fwebp`, "data:image/png;base64,aGk="] },
 		]);
 	});
 
@@ -300,14 +300,14 @@ describe("Transcript", () => {
 		const t = new Transcript();
 		const call = { type: "toolCall", id: "y1", name: "yield", arguments: { type: "result", data: "done banana" } };
 		t.applyEntry({ type: "message", id: "e1", message: assistant(500, [call], { stopReason: "toolUse" }) });
-		expect(t.items()).toEqual([{ id: "tool:y1", kind: "tool", name: "yield", summary: "done banana", status: "running", agents: [] }]);
+		expect(t.items()).toEqual([{ id: "tool:y1", kind: "tool", name: "yield", summary: "done banana", status: "running" }]);
 	});
 
 	test("a tool cut off by an interrupt stops showing as running when the turn ends", () => {
 		const t = new Transcript();
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c2", toolName: "bash", args: { command: "sleep 40" } });
 		t.applyEvent({ type: "agent_end" });
-		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error", agents: [] }]);
+		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error" }]);
 	});
 
 	test("thinking streams in place, a redacted block is left out, and an interrupt stops it streaming", () => {
@@ -334,33 +334,6 @@ describe("Transcript", () => {
 			{ id: "m200:0", kind: "thinking", text: "hmm", streaming: false },
 			{ id: "m200:2", kind: "assistant", text: "ok", streaming: false, suggestions: [] },
 		]);
-	});
-
-	test("a task row names its subagents by the ids omp gave them, not the task names, from progress and results alike", () => {
-		const t = new Transcript();
-		const call = { type: "toolCall", id: "k1", name: "task", arguments: { tasks: [{ name: "Fix" }, { name: "Fix" }] } };
-		t.applyEntry({ type: "message", id: "e1", message: assistant(700, [call], { stopReason: "toolUse" }) });
-		const details = { progress: [{ id: "Fix" }, { id: "Fix2" }], results: [{ id: "Fix2" }, { id: "Review" }] };
-		t.applyEntry({ type: "message", id: "e2", message: { role: "toolResult", timestamp: 701, toolCallId: "k1", toolName: "task", details } });
-
-		expect(t.items()).toEqual([{ id: "tool:k1", kind: "tool", name: "task", summary: "", status: "ok", agents: ["Fix", "Fix2", "Review"] }]);
-	});
-
-	test("a running task shows each subagent as its live updates name it, one at a time", () => {
-		const t = new Transcript();
-		const update = (id: string) => ({ type: "tool_execution_update", toolCallId: "k2", toolName: "task", partialResult: { details: { results: [], progress: [{ id }] } } });
-		t.applyEvent({ type: "tool_execution_start", toolCallId: "k2", toolName: "task", args: { i: "Spawning reviewers" } });
-		t.applyEvent(update("Alpha"));
-		t.applyEvent(update("Beta"));
-		expect(t.applyEvent(update("Alpha"))).toEqual([]);
-
-		expect(t.items()).toEqual([{ id: "tool:k2", kind: "tool", name: "task", summary: "Spawning reviewers", status: "running", agents: ["Alpha", "Beta"] }]);
-	});
-
-	test("only a task result names subagents", () => {
-		const t = new Transcript();
-		t.applyEntry({ type: "message", id: "e1", message: { role: "toolResult", timestamp: 1, toolCallId: "b1", toolName: "bash", details: { results: [{ id: "x" }] } } });
-		expect(t.items()).toEqual([{ id: "tool:b1", kind: "tool", name: "bash", summary: "", status: "ok", agents: [] }]);
 	});
 
 	test("a steer and a follow-up show where the agent took them, though omp stamps them when they were queued", () => {
@@ -404,7 +377,7 @@ describe("Transcript", () => {
 
 		expect(t.items()).toEqual([
 			{ id: "m1", kind: "user", text: "list files", skill: null, from: null, entryId: "e1" },
-			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok", agents: [] },
+			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok" },
 			{ id: "m4:0", kind: "assistant", text: "README.md", streaming: false, suggestions: [] },
 			{ id: "m4:stop", kind: "notice", level: "warning", text: "Interrupted." },
 		]);

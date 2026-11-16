@@ -202,12 +202,13 @@ export const useShowTrajectory = (view: View): void => useShownIn(shownTrajector
 export const useShownTrajectories = (): View[] => useSyncExternalStore(shownTrajectories.subscribe, shownTrajectories.snapshot, shownTrajectories.snapshot);
 
 /**
- * Asks the server to stream `view`'s conversation while the calling component is mounted and a page covers the panes, as a
- * Bot's page does for its open session. `null` asks for nothing. It marks nothing read: `useAttention` does that.
+ * Asks the server to stream `view`'s conversation while the calling component is mounted, outside the panes, as a Bot's
+ * page does for its open session and the right sidebar's Subagent tab for its subagent. `null` asks for nothing. It marks
+ * nothing read: `useAttention` does that.
  */
 export const useShowConversation = (view: View | null): void => useShownIn(shownConversations, view);
 
-/** The views whose conversation a page shows outside the panes, which the page asks the server to stream. */
+/** The views whose conversation a component shows outside the panes, which the page asks the server to stream. */
 export const useShownConversations = (): View[] => useSyncExternalStore(shownConversations.subscribe, shownConversations.snapshot, shownConversations.snapshot);
 
 /** What the server answered `view`'s composer: its last `complete` and its last `dequeue`. */

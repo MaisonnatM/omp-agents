@@ -90,12 +90,11 @@ export type Item =
 	/** The model's reasoning text. `streaming` while that reply is still arriving. A redacted block has no text and is left out. */
 	| { id: string; kind: "thinking"; text: string; streaming: boolean }
 	/**
-	 * `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool.
 	 * `images`: the addresses of the images its result returned, such as a screenshot, as a prompt's; absent when none.
 	 * `to`: the Bot a `message_bot` call messaged; absent for every other call.
 	 * `artifact`: the checked record of a successful artifact save, absent on other tools or failed saves.
 	 */
-	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[]; images?: string[]; artifact?: ArtifactSave; to?: BotId }
+	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; images?: string[]; artifact?: ArtifactSave; to?: BotId }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
 
 /** A prompt the page shows: the user's, a routine's, or another Bot's message; the dashboard's opens a turn but shows nothing. */

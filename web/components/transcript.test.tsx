@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ActivityItem } from "../transcript-view";
 import { ActivityGroup, ActivityVisibility, ToolsExpanded } from "./transcript";
 
-const tool = (id: string, status: "running" | "ok" | "error", agents: string[] = []): ActivityItem => ({ id, kind: "tool", name: "bash", summary: `summary ${id}`, status, agents });
+const tool = (id: string, status: "running" | "ok" | "error"): ActivityItem => ({ id, kind: "tool", name: "bash", summary: `summary ${id}`, status });
 const thought: ActivityItem = { id: "t", kind: "thinking", text: "weighing options", streaming: false };
 
 const render = (entries: ActivityItem[], { expanded = false, hideThinking = false } = {}) =>
@@ -22,13 +22,12 @@ test("a running group stays open and marks each line with its tool's status", ()
 	expect(html).toContain("summary a");
 });
 
-test("a finished group counts its failures and opens only when tools are expanded or it spawned subagents", () => {
+test("a finished group counts its failures and opens only when tools are expanded", () => {
 	const finished = [tool("a", "ok"), tool("b", "error")];
 	const closed = render(finished);
 	expect(closed).toContain("Ran 2 tools, 1 failed");
 	expect(closed).not.toContain("summary a");
 	expect(render(finished, { expanded: true })).toContain("summary a");
-	expect(render([tool("a", "ok", ["agent-1"])])).toContain("data-subagents");
 });
 
 test("thinking shows as its own line unless hidden", () => {

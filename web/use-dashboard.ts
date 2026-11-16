@@ -128,10 +128,14 @@ export function useDashboard(): Dashboard {
 	startsRef.current = state.starts;
 	const page = state.cover?.kind === "page" ? state.cover.page : null;
 	const openBot = useOpenBot(page, state);
-	// A page covering the panes shows none of them, so the server streams only the conversations a page shows through
-	// `useShowConversation`, such as a Bot's open session, until the panes return.
+	// The panes stream while they show, with the conversations a component shows beside them through `useShowConversation`,
+	// such as the right sidebar's Subagent tab; a page covering the panes streams only those, such as a Bot's open session.
 	const shownConversations = useShownConversations();
-	const watched = useMemo<View[]>(() => (!page ? state.layout.panes : shownConversations), [page, shownConversations, state.layout.panes]);
+	const watched = useMemo<View[]>(() => {
+		if (page) return shownConversations;
+		const panes = new Set(state.layout.panes.map(hashForView));
+		return [...state.layout.panes, ...shownConversations.filter(view => !panes.has(hashForView(view)))];
+	}, [page, shownConversations, state.layout.panes]);
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 	const shownTrajectories = useShownTrajectories();

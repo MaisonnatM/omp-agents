@@ -131,6 +131,7 @@ export const CONTROLS = [
 	{ id: "session-details.tab.browser", label: "Session details Browser tab", area: "Right sidebar" },
 	{ id: "session-details.tab.tickets", label: "Session details Tickets tab", area: "Right sidebar" },
 	{ id: "session-details.tab.artifacts", label: "Session details Artifacts tab", area: "Right sidebar" },
+	{ id: "session-details.tab.subagent", label: "Session details Subagent tab", area: "Right sidebar" },
 	{ id: "details.tab.add", label: "Details sidebar + menu, which opens a tab", area: "Right sidebar" },
 	{ id: "details.tab.close", label: "Details sidebar tab closed", area: "Right sidebar" },
 	{ id: "details.menu.subagent", label: "Details sidebar + menu subagent opened", area: "Right sidebar" },

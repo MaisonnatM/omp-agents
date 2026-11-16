@@ -118,16 +118,6 @@ function shellRun(message: Json): string {
 	return [`${fence}sh\n${run}\n${fence}`, ended].filter(Boolean).join("\n\n");
 }
 
-/**
- * The subagents a `task` result names: `progress` while they run (async spawns report only it), `results` once they
- * finished. These ids, not the call's task names, open their views: omp suffixes a name that repeats (`Name2`).
- */
-function spawnedAgents(toolName: unknown, result: unknown): string[] {
-	if (toolName !== "task" || !isObject(result) || !isObject(result.details)) return [];
-	const rows = [result.details.progress, result.details.results].flatMap(list => (Array.isArray(list) ? list : []));
-	return [...new Set(rows.flatMap(row => (isObject(row) && typeof row.id === "string" && row.id ? [row.id] : [])))];
-}
-
 /** The version an `artifact` call that did not fail saved, from its result's `details`; absent for any other call. */
 function artifactSave(toolName: unknown, isError: unknown, details: unknown): { artifact?: ArtifactSave } {
 	if (toolName !== "artifact" || isError) return {};
@@ -139,12 +129,6 @@ function artifactSave(toolName: unknown, isError: unknown, details: unknown): { 
 function recipient(toolName: unknown, args: unknown): { to?: BotId } {
 	const to = toolName === MESSAGE_BOT_TOOL && isObject(args) ? parseBotId(args.to) : null;
 	return to ? { to } : {};
-}
-
-/** `next` merged after `prev`, without repeats; `prev` itself when `next` adds nothing. */
-function union(prev: string[], next: string[]): string[] {
-	const added = next.filter(id => !prev.includes(id));
-	return added.length === 0 ? prev : [...prev, ...added];
 }
 
 /** Whether two field values are equal, primitives by value and lists or records by contents. */
@@ -301,12 +285,9 @@ export class Transcript {
 			case "message_end":
 				return this.#applyLive(message, false);
 			case "tool_execution_start":
-				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running", [], recipient(event.toolName, event.args));
-			case "tool_execution_update":
-				// A running `task` reports its subagents as they spawn, long before its result reaches the file.
-				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, undefined, spawnedAgents(event.toolName, event.partialResult));
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running", recipient(event.toolName, event.args));
 			case "tool_execution_end":
-				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", spawnedAgents(event.toolName, event.result), artifactSave(event.toolName, event.isError, isObject(event.result) ? event.result.details : undefined));
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", artifactSave(event.toolName, event.isError, isObject(event.result) ? event.result.details : undefined));
 			case "agent_end":
 				// An interrupted turn ends without tool_execution_end for the call it cut off, or message_end for thinking still streaming.
 				return [...this.#items.values()].flatMap(item => {
@@ -387,7 +368,7 @@ export class Transcript {
 			case "toolResult": {
 				const callId = str(message.toolCallId);
 				if (callId) this.#settled.add(`tool:${callId}`);
-				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message), { ...imagesOf(message.content), ...artifactSave(message.toolName, message.isError, message.details) });
+				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", { ...imagesOf(message.content), ...artifactSave(message.toolName, message.isError, message.details) });
 			}
 			case "bashExecution": {
 				// omp runs a `!` prompt's text without its `!`, so putting it back makes the text the one the routine sent:
@@ -413,7 +394,7 @@ export class Transcript {
 			} else if (block.type === "thinking" && typeof block.thinking === "string" && block.thinking) {
 				changed.push(...this.#upsert({ id: `${key}:${index}`, kind: "thinking", text: block.thinking, streaming }));
 			} else if (block.type === "toolCall") {
-				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined, [], recipient(block.name, block.arguments)));
+				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined, recipient(block.name, block.arguments)));
 			}
 		});
 		if (!streaming && (message.stopReason === "error" || message.stopReason === "aborted")) {
@@ -428,11 +409,10 @@ export class Transcript {
 		name: string | undefined,
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
-		agents: string[] = [],
 		result: { to?: BotId; artifact?: ArtifactSave } = {},
 	): Item[] {
 		if (!callId || this.#settled.has(`tool:${callId}`)) return [];
-		return this.#upsertTool(callId, name, summary, status, agents, result);
+		return this.#upsertTool(callId, name, summary, status, result);
 	}
 
 	/** Tool calls show up as content blocks, execution events, and result messages; merge them by call id. */
@@ -441,21 +421,18 @@ export class Transcript {
 		name: string | undefined,
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
-		agents: string[],
 		result: { images?: string[]; to?: BotId; artifact?: ArtifactSave } = {},
 	): Item[] {
 		if (!callId) return [];
 		const id = `tool:${callId}`;
 		const prev = this.#items.get(id);
-		const base: ToolItem = prev?.kind === "tool" ? prev : { id, kind: "tool", name: name ?? "tool", summary: "", status: "running", agents: [] };
+		const base: ToolItem = prev?.kind === "tool" ? prev : { id, kind: "tool", name: name ?? "tool", summary: "", status: "running" };
 		return this.#upsert({
 			...base,
 			name: name ?? base.name,
 			summary: summary || base.summary,
 			// A finished call stays finished when a later content-block replay reports no status.
 			status: status ?? base.status,
-			// Each report names the subagents it knows of; a workpool update names only the one that moved.
-			agents: union(base.agents, agents),
 			...result,
 		});
 	}

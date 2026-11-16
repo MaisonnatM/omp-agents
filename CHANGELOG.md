@@ -6,6 +6,8 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-16
 
 - In poteto mode, a Babysit run's todo list now holds only the steps its mode runs, so a one-time rebase or a review-thread fix no longer ends with a turn spent ticking off polling and merge steps.
+- A session's subagents now show only in the right sidebar's Overview tab. The conversation no longer lists them under the task call that started them, so that call's tool group folds like any other once it finishes.
+- Clicking a subagent in the right sidebar now opens its conversation in a sidebar tab named after it, with its composer, so the session's own conversation stays in the main pane. Cmd-click still opens it in a split.
 
 ## 2026-11-13
 

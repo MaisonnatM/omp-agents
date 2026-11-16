@@ -1,19 +1,23 @@
-/** The right sidebar for a session: its overview, its pull requests, its running app in the desktop app, and once it has any its Linear issues and its artifacts; a Bot's details share its Tickets tab. */
+/** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, and once it has any its Linear issues and its artifacts; a Bot's details share its Tickets tab. */
 import { IconAiBotHead, IconBulletList, IconPlusLarge, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
+import type { Workspace } from "../../src/shared/workspaces";
 import { MenuGroup, MenuGroupLabel, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { activityControl } from "../activity";
 import { isPhonePage } from "../api";
 import type { Artifact } from "../artifacts-model";
-import { useArtifacts } from "../pane-store";
+import { revealDetailsTab } from "../details-tabs";
+import { useArtifacts, useShowConversation } from "../pane-store";
 import { PAGE_ICON } from "../page-icons";
+import type { ModelList } from "../reads";
 import { requestNewTerminal } from "../terminal-requests";
 import { ArtifactsPanel } from "./artifacts-panel";
 import { BROWSER_AVAILABLE, BrowserPanel } from "./browser-panel";
 import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
 import type { ChangesSession } from "./overview-changes";
+import { ViewConversation } from "./pane";
 import { SessionOverview } from "./session-overview";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { SessionTicketsTab } from "./session-tickets-tab";
@@ -143,20 +147,56 @@ function SessionMenuSections({ links }: { links: SubagentLinksValue | null }) {
 	);
 }
 
+interface SubagentConversationProps {
+	view: LiveView;
+	host: RosterHost | null;
+	lastHost: RosterHost | null;
+	models: ModelList;
+	workspaces: Workspace[];
+}
+
+/** The **Subagent** tab: the picked subagent's conversation and composer, streamed while the tab is open, beside the session's own in the pane. */
+function SubagentConversation({ view, host, lastHost, models, workspaces }: SubagentConversationProps) {
+	useShowConversation(view);
+	return <ViewConversation view={view} focused={false} host={host} lastHost={lastHost} session={null} models={models} workspaces={workspaces} header={false} />;
+}
+
 interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts" | "pullRequests" | "tickets"> {
 	/** The session's directory, which relative file paths in pull requests and issues resolve against. */
 	cwd: string | null;
 	/** The live view's roster row, whose subagents the **Overview** tab lists; `null` for a past or ended one. */
 	host: RosterHost | null;
+	/** The live view's last roster row, which the **Subagent** tab's conversation reads once the session ended. */
+	lastHost: RosterHost | null;
 	/** The view's roster row, an ended session's last one, or its past entry: the pull requests, Linear issues, arenas, and directory the tabs show. */
 	row: RosterHost | PastSession | null;
+	/** The session's model list, which the **Subagent** tab's composer offers. */
+	models: ModelList;
+	/** The workspaces, which the **Subagent** tab's composer offers. */
+	workspaces: Workspace[];
 }
 
-/** The right sidebar's content for the focused view: its **Overview**, its session's pull requests, its running app, and its Linear issues and its artifacts when it has any. */
-export function SessionDetails({ view, sessionId, working, cwd, hosts, host, row }: SessionDetailsProps) {
+const SUBAGENT_TAB = "subagent";
+
+/** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, and its Linear issues and its artifacts when it has any. */
+export function SessionDetails({ view, sessionId, working, cwd, hosts, host, lastHost, row, models, workspaces }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(each => each.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const artifacts = useArtifacts(view);
-	const links = useSubagentLinks(view, host);
+	const [picked, setPicked] = useState<LiveView | null>(null);
+	const opened = useSubagentLinks(view, host);
+	// A plain click on a subagent shows it in the **Subagent** tab; a split or a new window still opens it as a pane.
+	const links = useMemo<SubagentLinksValue | null>(
+		() =>
+			opened && {
+				...opened,
+				onOpen: (target, mode) => {
+					if (mode !== "replace" || target.kind !== "live" || target.agentId === null) return opened.onOpen(target, mode);
+					setPicked(target);
+					revealDetailsTab(TAB_KEY, SUBAGENT_TAB, "overview");
+				},
+			},
+		[opened],
+	);
 	const pullRequests = row?.pullRequests ?? [];
 	const tickets = row?.tickets ?? [];
 	// The row's directory, unlike `cwd`, outlives an ended live session, whose changed files still resolve against it.
@@ -171,6 +211,19 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, row
 			count: 0,
 			content: <SessionOverview view={view} working={working} links={links} session={session} />,
 		} as const,
+		...(picked
+			? [
+					{
+						value: SUBAGENT_TAB,
+						icon: IconAiBotHead,
+						name: picked.agentId ?? "Subagent",
+						control: "session-details.tab.subagent",
+						count: 0,
+						scrollsItself: true,
+						content: <SubagentConversation key={picked.agentId} view={picked} host={host} lastHost={lastHost} models={models} workspaces={workspaces} />,
+					} as const,
+				]
+			: []),
 		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
 	];
 	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} menuSections={<SessionMenuSections links={links} />} />;
