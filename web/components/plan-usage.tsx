@@ -103,13 +103,13 @@ export function accountTags(plans: readonly PlanUsage[]): Map<PlanUsage, string>
 /** What a plan's tile opens: {@link PlanCard}, or a tooltip for a plan known by name, with its balance or why it is used up. */
 export type PlanDetail = { kind: "card" } | { kind: "tooltip"; text: string };
 
-/** A plan's tile: the share left of its tightest window, its spend, its reset credits, or its credit balance, as a ring and a figure. */
+/** A plan's tile: the share left of its tightest window, its spend, its reset credits, or its credit balance, as a bar and a figure. */
 export interface PlanGauge {
-	/** Fraction the ring fills, 0 to 1; `null` when nothing measures it. */
+	/** Fraction the bar fills, 0 to 1; `null` when nothing measures it. */
 	left: number | null;
-	/** The figure under the ring; `null` for a plan known by name only. */
+	/** The figure at the row's end; `null` for a plan known by name only. */
 	value: string | null;
-	/** The figure's and the ring's tone; red when any window is used up. */
+	/** The figure's and the bar's tone; red when any window is used up. */
 	tone: Tone;
 	/** What tells the tile apart: the account tag, else the window, else the plan's name. */
 	caption: string;
@@ -203,7 +203,7 @@ export function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 	);
 }
 
-/** A plan's tile: its logo in a ring; hovering or clicking opens {@link PlanCard}, or for a plan known by name, a tooltip. */
+/** A plan's tile: its logo beside a bar; hovering or clicking opens {@link PlanCard}, or for a plan known by name, a tooltip. */
 function PlanTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 	const popover = useHoverPopover();
 	const now = useMinute();

@@ -78,7 +78,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   A row's or card's right-click menu is `RowContextMenu` in `pr-row.tsx`, which lists the `⋯` menu's `PullRequestMenuItems` from `pr-menu.tsx`, with its **Reviewers** submenu.
 - Sidebar foot, with plan quota and the machine's CPU, memory, and disk: `SidebarStatus` in `web/components/sidebar-status.tsx`, whose CPU card lists every live session's processes with **Stop**; the terminal panel, `web/components/terminal/terminal-panel.tsx`, mounts under the panes and opens only from the details sidebar's **New terminal**.
   The disk card's **Clean up…** link opens Settings › Storage.
-  Each plan's quota, its windows and the **API credits** tile with its grant and its red `used up` once a provider refuses requests for lack of credit, is `PlanTiles` in `web/components/plan-usage.tsx`, one ring tile per plan account in a four-column grid that the machine's tiles continue, each a `GaugeTile` from `web/components/gauge-tile.tsx`.
+  Each plan's quota, its windows and the **API credits** tile with its grant and its red `used up` once a provider refuses requests for lack of credit, is `PlanTiles` in `web/components/plan-usage.tsx`, one full-width bar row per plan account in a list that the machine's rows continue, each a `GaugeTile` from `web/components/gauge-tile.tsx`.
 - The three things called Files:
   - The **Overview** tab's **Files** section, a session's changed files: `ChangedFileList` in `web/components/changed-files-section.tsx`.
   - The session changes dialog that a file or **Review** opens: `web/components/changes/session-changes-dialog.tsx`, with its explorer in `changes-explorer.tsx` and tree in `file-tree.tsx` beside it.

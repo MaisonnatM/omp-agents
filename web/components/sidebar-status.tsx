@@ -237,14 +237,14 @@ export function SidebarStatus({ usage, hosts, bots }: SidebarStatusProps) {
 	return <SidebarFoot usage={usage} load={load} titles={titles} />;
 }
 
-/** The foot's note on plan usage, then its grid of ring tiles: one per plan account, then the machine's load once read. */
+/** The foot's note on plan usage, then its list of bar rows: one per plan account, then the machine's load once read. */
 export function SidebarFoot({ usage, load, titles }: { usage: DashboardState["usage"]; load: SystemLoad | null; titles: SessionTitles }) {
 	const plans = usage?.error === null ? usage.plans : NO_PLANS;
 	return (
 		<footer data-sidebar="footer" className="mx-2 flex shrink-0 flex-col gap-2 border-t border-border pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-xs">
 			<PlanNote usage={usage} />
 			{(plans.length > 0 || load) && (
-				<ul aria-label="Plan usage and machine load" className="grid grid-cols-4 gap-1">
+				<ul aria-label="Plan usage and machine load" className="flex flex-col gap-0.5">
 					<PlanTiles plans={plans} />
 					{load && <MachineLoad load={load} titles={titles} />}
 				</ul>
