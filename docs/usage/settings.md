@@ -102,7 +102,6 @@
   Save changes only that agent's entry in your `config.yml`; **Clear user override**, confirmed and then saved, removes the entry rather than writing the definition back.
   Unknown selectors and role aliases already saved stay unchanged unless you edit them.
   A workspace override keeps winning and links to **Files**; user defaults apply in other workspaces and to later spawns, never to subagents already running.
-  Bundled seance chooses its model from the source session or invocation, so only a stale saved override can be cleared.
   **Overrides for missing agents** lists saved entries with no discovered definition and lets you clear them.
   **Execution settings** uses omp's labels and descriptions for the concurrency limit, whether tasks may request a separate checkout, whether successful changes apply back, and the apply method; zero concurrency means unlimited.
   Each execution row uses **Edit**, **Save**, and **Cancel**, with the same control and layer notes as **omp settings**.

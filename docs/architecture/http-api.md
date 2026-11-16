@@ -17,11 +17,10 @@ Each row carries omp's default and the values in your `config.yml` (`user`) and 
 A credential's value never leaves the server: its `user` and `workspace` are `true` when set, and it carries no default.
 `unlisted` names every other setting a session reads, those omp's panel gives no control to.
 `agents` is an `AgentCatalog` from `src/shared/agents.ts`, a new-session preview read by `src/omp/agents.ts` through native `discoverAgents`, read-only classification, and model selection and resolution.
-It carries the winning definitions, scope and package origin, declared tools, model layers, explicit resolved/inherited/unresolved/source-session model states, disabled markers, missing user overrides, and an explicit bundled-seance marker.
+It carries the winning definitions, scope and package origin, declared tools, model layers, explicit resolved/inherited/unresolved model states, disabled markers, and missing user overrides.
 The four execution settings come from `agentSettings`, not a second catalog projection or settings load.
 Without `cwd`, discovery runs from `/` and filters project definitions, avoiding the home directory's project agents and config; this is a user-only preview, not a running session's extension context.
 Model resolution reads the native registry's currently available models without refreshing providers or making model requests; a model-registry failure is separate from a discovery failure.
-Bundled seance never uses the stored user override in its effective preview.
 `GET /api/models` runs `omp models --json` for the pickers; `listModels` in `src/omp/models.ts` keeps its list 30 seconds, so the draft's `/api/models/connected` and `/api/models/roles`, the settings page, and every window share one run, and a model added to omp's config shows within that time.
 
 **Get started** reads `GET /api/readiness/terminal-sessions` (omp's global `collab.autoStart`) and `GET /api/readiness/starter-kit` (a genuinely read-only installer plan).

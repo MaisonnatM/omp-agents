@@ -34,7 +34,7 @@ describe("new-session agent preview", () => {
 			const { catalog, settings } = await preview(home, cwd);
 			expect(catalog.context).toBe("workspace-preview");
 			expect(catalog.agents.find(agent => agent.name === "preview-reviewer")).toMatchObject({
-				description: "Project reviewer", scope: "project", origin: "native", tools: ["read", "grep"], readOnly: true, disabled: true, seance: false,
+				description: "Project reviewer", scope: "project", origin: "native", tools: ["read", "grep"], readOnly: true, disabled: true,
 				definition: ["unavailable/definition"], user: ["unavailable/user:high", "@slow"], workspace: "unavailable/workspace", effective: ["unavailable/workspace"], model: { kind: "unresolved" },
 			});
 			expect(catalog.userOverrides["missing-reviewer"]).toBe("unavailable/missing");
@@ -56,13 +56,11 @@ describe("new-session agent preview", () => {
 		}
 	}, 30_000);
 
-	test("bundled seance cannot preview a stale override as effective, while normal agents inherit the session", async () => {
-		const home = await mkdtemp(join(tmpdir(), "agents-seance-"));
+	test("a bundled agent without a model or override inherits the session", async () => {
+		const home = await mkdtemp(join(tmpdir(), "agents-inherit-"));
 		await mkdir(join(home, ".omp", "agent"), { recursive: true });
 		try {
-			await writeFile(join(home, ".omp", "agent", "config.yml"), "task:\n  agentModelOverrides:\n    seance: unavailable/ignored\n");
 			const { catalog } = await preview(home, null);
-			expect(catalog.agents.find(agent => agent.name === "seance")).toMatchObject({ scope: "bundled", seance: true, user: "unavailable/ignored", effective: [], model: { kind: "source-session" } });
 			expect(catalog.agents.find(agent => agent.name === "task")?.model).toEqual({ kind: "inherited" });
 		} finally {
 			await rm(home, { recursive: true, force: true });
