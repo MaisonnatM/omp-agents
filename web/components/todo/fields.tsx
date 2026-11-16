@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { folderName } from "../../labels";
 import { PRIORITY_LABEL } from "../../tickets-model";
-import { dueLabel, TODO_STATUS } from "../../todo-views";
+import { ASSIGNEE_LABELS, dueLabel, TODO_STATUS } from "../../todo-views";
 import { type Choice, DuePicker, FieldPicker } from "../field-picker";
 import { PRIORITY_ICON, STATUS_ICON } from "../tickets/ticket-row";
 
@@ -25,18 +25,18 @@ export function StatusIcon({ status, className }: { status: TodoStatus; classNam
 	return <Icon aria-hidden className={cn("size-4 shrink-0", color, className)} />;
 }
 
-function PriorityIcon({ priority }: { priority: TodoPriority }) {
+export function PriorityIcon({ priority }: { priority: TodoPriority }) {
 	const [Icon, color] = PRIORITY_ICON[priority];
 	return <Icon aria-hidden className={cn("size-4 shrink-0", color)} />;
 }
 
-const ASSIGNEE: Record<TodoAssignee | "none", { label: string; icon: IconComponent }> = {
+export const ASSIGNEE: Record<TodoAssignee | "none", { label: string; icon: IconComponent }> = {
 	none: { label: "No assignee", icon: IconCircleDashed },
-	user: { label: "You", icon: IconUser },
-	agent: { label: "Agent", icon: IconAiBotHead },
+	user: { label: ASSIGNEE_LABELS.user, icon: IconUser },
+	agent: { label: ASSIGNEE_LABELS.agent, icon: IconAiBotHead },
 };
 
-function AssigneeIcon({ assignee }: { assignee: TodoAssignee | null }) {
+export function AssigneeIcon({ assignee }: { assignee: TodoAssignee | null }) {
 	const { icon: Icon } = ASSIGNEE[assignee ?? "none"];
 	return <Icon aria-hidden className={cn("size-4 shrink-0", assignee === null && "text-muted-foreground")} />;
 }

@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { PullRequestSummary, RepoPullRequests } from "../src/shared/github";
 import type { AgentOn } from "../src/shared/moves";
+import { withToggled } from "./list-filter";
 import { DEFAULT_ORDER, foldedByDefault, sectionTitles } from "./pull-requests-model";
 import {
+	atLeastOneSection,
 	authorOptions,
 	cardFoldKey,
 	DEFAULT_DISPLAY,
@@ -22,7 +24,6 @@ import {
 	shownPullRequests,
 	VIEW_PRESETS,
 	viewOf,
-	withSectionToggled,
 } from "./pull-requests-filter";
 
 const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullRequestSummary => ({
@@ -69,13 +70,13 @@ describe("shown sections", () => {
 	test("a tab is active only while the shown sections are exactly its preset", () => {
 		expect(viewOf(EVERY_SECTION)).toBe("all");
 		expect(viewOf(new Set(["Approved"]))).toBe("approved");
-		expect(viewOf(withSectionToggled(EVERY_SECTION, "Recently merged"))).toBe("open");
+		expect(viewOf(withToggled(EVERY_SECTION, "Recently merged"))).toBe("open");
 		expect(viewOf(new Set(["Your move", "Approved"]))).toBeNull();
 	});
 
 	test("the last shown section cannot be switched off", () => {
 		const one = VIEW_PRESETS.merged.sections;
-		expect(withSectionToggled(one, "Recently merged")).toBe(one);
+		expect(atLeastOneSection(withToggled(one, "Recently merged"), one)).toBe(one);
 	});
 
 	test("what is stored comes back, and a missing, unreadable, or empty value keeps everything", () => {

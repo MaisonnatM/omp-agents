@@ -130,9 +130,10 @@
 - **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section** lists the sections, **Repository** and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.
   A repository or author you checked that lists nothing now, such as a repository you hid since, stays in its submenu with none, so you can uncheck it.
   Each field you set adds a chip under the tabs, such as **Author is MaisonnatM** or **Repository is any of 2 repositories**, whose tooltip names them; click the value to change it, or its × to drop the field, and **Clear all** drops every field once two chips show.
+  After a × the focus moves to the next chip's ×, or the previous one's, or **Filter** when no chip is left, and after **Clear all** to **Filter**; the Linear tickets, Todo, and Notifications bars do the same.
   The last section shown stays on.
   The author, date, and search filters apply before stacks join, so a stack keeps only the pull requests that match.
-  While any filter or search is set, a repository with nothing left leaves the page, unless **Show empty sections** in **Display** is on; when nothing is left, a note names the search or the filters with a button that clears them.
+  While any filter or search is set, a repository with nothing left leaves the page, unless **Show empty sections** in **Display** is on; when nothing is left, a note names the search or the filters with a button that clears them and moves the focus to the list.
   The filtered pull requests leave the table and ↓ and ↑; **Rebase N behind** and the **Pull requests** tab's count still cover them.
   The browser keeps the filter across reloads.
 - The search field in the page header keeps the pull requests whose title, number, branch, author, or repository contain every word you type; Escape clears it.

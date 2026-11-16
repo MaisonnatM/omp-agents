@@ -1,6 +1,10 @@
 # Notifications
 
-- The sidebar's **Notifications** row, right under **New session**, counts the unread notices and opens the Notifications page, `#notifications`, which lists them under **New** and **Earlier**, with chips that filter them by source.
+- The sidebar's **Notifications** row, right under **New session**, counts the unread notices and opens the Notifications page, `#notifications`, which lists them under **New** and **Earlier**.
+- Above the list, the **All** and **Unread** tabs pick which notices show; **Filter** keeps the notices of the sources you check, each with how many of its notices the tab shows, or those received in the last day, 3 days, week, 2 weeks, or month, with a chip per filter under the bar; **Display › Grouping** lists them under **New and earlier**, by **Source**, or with **No grouping**, unread first in each.
+  The tab, filters, and grouping stay in this browser.
+  The header's search keeps the notices whose headline, text, or source name holds every word you type, and **Mark all as read** marks the shown unread ones.
+  When the search or the filters leave nothing, the list says so with a button that clears them, and focus moves to the list.
 - Seven sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
