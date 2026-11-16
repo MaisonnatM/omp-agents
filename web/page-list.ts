@@ -9,8 +9,8 @@ const NO_LIST = ["new", "notifications", "pull-requests"] as const satisfies rea
 /** A page whose sidebar row holds a list of its own: every other tab's page and Settings; the Sessions panes have the roster instead. */
 export type ListPage = Extract<Page, { kind: Exclude<NavRow, (typeof NO_LIST)[number]> }>;
 
-/** Whether `page` is the page of `row`, a row with a list of its own. */
-const listsOwnPage = (page: Page, row: NavRow): page is ListPage => page.kind === row && !NO_LIST.some(other => other === row);
+/** Whether `page` is the page of `row`, a row with a list of its own; a module whose page lists its items itself has none. */
+const listsOwnPage = (page: Page, row: NavRow): page is ListPage => page.kind === row && !NO_LIST.some(other => other === row) && !(isModulePage(page) && moduleOf(page).listsItself);
 
 /** Narrowest and widest the column gets, in px, and its width until the user drags it. */
 export const COLUMN_MIN = 192;

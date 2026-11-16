@@ -1,5 +1,5 @@
 /**
- * The Tickets module's page half, which `WEB_MODULES` in `web/modules.ts` lists: the Tickets page and its sidebar list.
+ * The Tickets module's page half, which `WEB_MODULES` in `web/modules.ts` lists: the Tickets page, which lists the issues itself.
  * Ticket links, the new-ticket dialog, and a session's Tickets tab are the core's, so they work with the page gone.
  */
 import { TICKET_ID } from "../../../src/shared/tickets";
@@ -35,5 +35,5 @@ export const TICKETS_PAGE: PageModule<"tickets", TicketsRoute, "ticketsNew"> = {
 		rows: [{ id: "ticketsNew", label: "Tickets page: create a Linear ticket, in place of a new session", keys: [{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" }] }],
 	},
 	controls: [],
-	split: true,
+	listsItself: true,
 };

@@ -11,14 +11,14 @@ import { pendingOf, ticketActions, ticketStart, type WorkActionId } from "../../
 import { useEditableRead } from "../../editable-read";
 import { integrationsStore, ticketsStore } from "../../reads";
 import { sessionsOn } from "../../sessions";
-import type { SectionTarget } from "../../section";
 import type { StartOf } from "../../starts";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
-import { hashForTickets, type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
+import { hashForTickets, type TicketGroup, ticketGroups } from "../../tickets-model";
+import { sectionId } from "../../section";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { DisconnectedPage } from "../integrations/disconnected-page";
 import type { CoreData } from "../module-views";
-import { FoldButton, useFolds, useReveal } from "../fold";
+import { FoldButton, useFolds } from "../fold";
 import { PolledContent, PolledPageFrame, useReturnFocus } from "../list-page";
 import { type BarAction, CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
@@ -43,11 +43,10 @@ interface GroupProps {
 }
 
 function GroupSection({ group, open, target, onToggle, quick, onQuickAction }: GroupProps) {
-	const { id } = ticketSection(group.status);
+	const id = sectionId("tickets", group.status);
 	const [Icon, color] = statusIcon(group);
 	return (
-		// Focused when its sidebar link is chosen.
-		<section id={id} tabIndex={-1} aria-labelledby={`${id}-heading`} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+		<section aria-labelledby={`${id}-heading`}>
 			<h3 id={`${id}-heading`} className="sticky top-0 z-10 flex h-10 items-center rounded-md bg-muted px-3 text-sm font-medium">
 				<FoldButton open={open} onToggle={onToggle} controls={`${id}-list`} className="items-center gap-2.5">
 					<Icon aria-hidden className={`size-4 shrink-0 ${color}`} />
@@ -79,8 +78,6 @@ function GroupSection({ group, open, target, onToggle, quick, onQuickAction }: G
 interface TicketsListProps {
 	/** The issue whose details show beside the list; `null` shows the list alone. */
 	target: string | null;
-	/** The group a sidebar link last chose, to unfold, scroll to, and focus. */
-	section: SectionTarget | null;
 	/**
 	 * Where a quick action's session starts. A Linear issue names no repository, so the caller passes the directory a
 	 * new session would start in, which the sidebar's workspace decides.
@@ -96,11 +93,11 @@ export function TicketsPage({ route: { target }, core }: { route: TicketsRoute; 
 	if (linear && !callable(linear.connection)) return <DisconnectedPage title={TICKETS_TITLE} meta={TICKETS_META} integration={linear} />;
 	// Until the sessions are listed, the workspace a quick action starts in is not known yet.
 	if (!core.listed) return <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
-	return <TicketsList target={target} section={core.section} cwd={core.cwd} hosts={core.hosts} />;
+	return <TicketsList target={target} cwd={core.cwd} hosts={core.hosts} />;
 }
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them, and beside them the issue `target` names. */
-function TicketsList({ target, section, cwd, hosts }: TicketsListProps) {
+function TicketsList({ target, cwd, hosts }: TicketsListProps) {
 	const { open, start: startSession, dismissStart, openNewTicket } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const poll = ticketsStore.usePolling();
@@ -110,7 +107,6 @@ function TicketsList({ target, section, cwd, hosts }: TicketsListProps) {
 	const start = (ticket: Ticket, action: WorkActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
 	const listRef = useRef<HTMLDivElement>(null);
 	useReturnFocus(target, id => id, id => document.getElementById(ticketRowId(id))?.querySelector<HTMLElement>("a"), poll.read, () => listRef.current);
-	useReveal(target === null ? section : null, folds, { token: section, block: "start", focus: true });
 	// On this page ⌘⇧O creates a ticket, where the App's binding of it starts a session.
 	useShortcuts({ ticketsNew: () => openNewTicket("") });
 

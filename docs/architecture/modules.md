@@ -12,7 +12,7 @@ The core keeps the sessions, pull requests, todos, Bots and their routines, Sett
 
 | Module | Server definition | Page definition | Page components |
 | --- | --- | --- | --- |
-| Tickets | none | `TICKETS_PAGE` in `web/components/tickets/module.ts` | `TicketsPage` and `TicketsNav` |
+| Tickets | none | `TICKETS_PAGE` in `web/components/tickets/module.ts` | `TicketsPage` |
 | Calendar | none | `CALENDAR_PAGE` in `web/components/calendar/module.ts` | `CalendarPage` and `CalendarNav` |
 | Sport | `SPORT_MODULE` in `src/sport-module.ts` | `SPORT_PAGE` in `web/components/sport/module.ts` | `SportPage` and `SportNav` |
 | Email | none | `EMAIL_PAGE` in `web/components/email/module.ts` | `EmailPage` and `EmailNav` |
@@ -58,6 +58,7 @@ A `PageModule` describes the module's page.
 - `shortcuts`: the Settings › Keyboard category, the go-to shortcut whose id is the module's, and the module's own rows.
 - `controls`: the page-only controls Settings › Activity counts.
 - `split`: the page splits its list from its open item, so the page column leaves it room for both.
+- `listsItself`: the page lists its items itself, so its sidebar row holds no list and the page gets no column; its views then have no `Nav`.
 - `api`: the path prefix of the module's `PUT` routes, which Settings › Activity sets apart with a gated tab.
 
 A `StoredPageModule` adds `store.apply`, which shows a change at once and returns `null` when the state refuses it.
@@ -70,7 +71,7 @@ Every module's `Page` takes its `route` and `core`, a `CoreData` that `PageSwitc
 `CoreData` holds the routines, the Bots, the todo list, whether tickets show, whether the sessions are listed, where a new session starts, the sidebar workspace's running sessions, and the page section a sidebar link last chose.
 A module reads core data through it without importing the core's stores.
 A stored module's `Page` also takes its `state`, `disabled`, and `onChange`.
-Every module's `Nav` takes its `route`, the chosen `section`, and `onSection`, which `PageList` passes so a list can scroll its page to a section.
+A module's `Nav`, which every module has but one whose page `listsItself`, takes its `route`, the chosen `section`, and `onSection`, which `PageList` passes so a list can scroll its page to a section.
 
 ## Turning a module off
 
