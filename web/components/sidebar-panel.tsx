@@ -297,7 +297,7 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, cla
 			{edgeToggle && (
 				<div
 					className={cn(
-						"absolute top-[calc((var(--page-header-height)-1.75rem)/2)] flex items-center gap-0.5",
+						"absolute top-[calc((var(--page-header-height)-1.75rem)/2)] flex items-center gap-0.5 [-webkit-app-region:no-drag]",
 						// A closed sidebar leaves no strip: its toggle floats over the header tabs' left end, past the desktop app's window buttons, which `HeaderTabs` keeps clear.
 						floatingOpen ? "z-50" : panel.floating ? "left-[9px] z-20" : panel.open ? "right-[9px] z-10" : "left-[calc(env(titlebar-area-x,0px)+9px)] z-20",
 					)}
