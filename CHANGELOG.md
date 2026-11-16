@@ -5,6 +5,10 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- The Email, Linear tickets, and Calendar pages are gone from the sidebar, along with everything that used Gmail, Google Calendar, or Linear.
+- Sessions no longer have a Tickets tab, the New ticket shortcut is gone, and todos no longer link to or create Linear tickets.
+- Routines can no longer start from a new email or a calendar event, and agents can no longer add reminders for you to see.
+- Settings › Integrations no longer offers Linear, Gmail, or Google Calendar. Your saved events and Google account list stay on disk, unused.
 - Linear tickets has the Pull requests header: a search, All, Active, Todo, and Backlog tabs, a Filter by status, priority, label, project, team, and dates, and a Display menu to group by status, priority, project, or nothing.
 - Todo has Filter and Display above its list: filter by priority, assignee, link, due date, and creation date, and group by status, priority, assignee, or nothing.
 - Notifications has a search, All and Unread tabs, a Filter by source and date in place of the source buttons, and a Display menu to group by new and earlier, source, or nothing.
