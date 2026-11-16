@@ -690,7 +690,6 @@ export class Dashboard {
 			files: { worktrees: this.#worktrees, terminals: this.terminals, fileDirsOf: files.fileDirsOf },
 			artifacts: { sessionFileOf: id => sessions.fileOf(id, files.pathOf) },
 			storage: this.#isolationSweep,
-			todos: { list: () => this.#todos.value, change: change => void this.#lists.apply("user-todos", change) },
 			pullRequests: {
 				changeMergeQueue: async change => {
 					const merged = await this.#mergeQueue.apply(change);

@@ -1,16 +1,20 @@
 /** What the Todo page's list keeps and how it groups it: **Filter**, by priority, assignee, link, due day, and creation, and **Display**'s grouping. */
 import { isObject, isTexts, oneOf, parseJson } from "../src/json";
 import { addDays } from "../src/shared/days";
-import { TODO_ASSIGNEES, type TodoAssignee, type TodoPriority, type TodoStatus, type UserTodo, type UserTodoLeaf, type UserTodoLink } from "../src/user-todos-shared";
+import { TODO_ASSIGNEES, TODO_PRIORITIES, type TodoAssignee, type TodoPriority, type TodoStatus, type UserTodo, type UserTodoLeaf, type UserTodoLink } from "../src/user-todos-shared";
 import { type DayRange, type FilterOption, type GroupingDisplay, groupingDisplay, isDayRange, withinLast } from "./list-filter";
-import { isPriorityKey, PRIORITY_LABEL, PRIORITY_ORDER, type PriorityKey } from "./tickets-model";
-import { ASSIGNEE_LABELS, earliestDue, STATUS_GROUPS } from "./todo-views";
+import { ASSIGNEE_LABELS, earliestDue, PRIORITY_LABEL, PRIORITY_ORDER, STATUS_GROUPS } from "./todo-views";
 
 export type LinkKind = UserTodoLink["kind"];
 
-const LINK_KINDS: readonly LinkKind[] = ["session", "pull-request", "ticket"];
+const LINK_KINDS: readonly LinkKind[] = ["session", "pull-request"];
 
-const LINK_LABELS: Record<LinkKind, string> = { session: "Session", "pull-request": "Pull request", ticket: "Linear issue" };
+const LINK_LABELS: Record<LinkKind, string> = { session: "Session", "pull-request": "Pull request" };
+
+/** A priority as **Filter** keys it: the number as text. */
+type PriorityKey = `${TodoPriority}`;
+
+const isPriorityKey = oneOf(TODO_PRIORITIES.map((priority): PriorityKey => `${priority}`));
 
 /** What **Filter** keeps; an empty set keeps every priority, assignee, or link, and `null` any day. */
 export interface TodoFilter {

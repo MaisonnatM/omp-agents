@@ -24,7 +24,6 @@ test("messages render GFM and refuse executable markup", () => {
 
 test("service links keep their titles and icons without displaying bare URLs", () => {
 	const destinations = [
-		["https://linear.app/team/issue/ENG-42/fix-login", "ENG-42"],
 		["https://github.com/org/repo/pull/42", "org/repo #42"],
 		["https://team.slack.com/archives/C123/p123", "Slack message"],
 	];
@@ -168,14 +167,14 @@ test("a sent prompt draws its references as chips that open here, and code stays
 				<MessageMarkdown
 					preset={PROMPT_PRESET}
 					text={
-						"/skill:ship check @web/app.tsx for [ENG-1 Fix it](https://linear.app/a/issue/ENG-1/fix) and [acme/web#7 Go](https://github.com/acme/web/pull/7), not `@web/x.ts`, then **todo \"Tidy\" (id t1)** after omp session \"Old\" (id s1)"
+						"/skill:ship check @web/app.tsx for [acme/web#7 Go](https://github.com/acme/web/pull/7), not `@web/x.ts`, then **todo \"Tidy\" (id t1)** after omp session \"Old\" (id s1)"
 					}
 				/>
 			</UserTodosContext.Provider>,
 		);
 	const html = prompt({ categories: [], todos: [todo], archive: [] });
-	expect(html.match(/data-chip="([\w-]+)"/g)).toEqual(['data-chip="skill"', 'data-chip="file"', 'data-chip="ticket"', 'data-chip="pull-request"', 'data-chip="todo"', 'data-chip="session"']);
-	expect(html.match(/href="[^"]*"/g)).toEqual(['href="#tickets/ENG-1"', 'href="#pull-requests/acme/web/7"', 'href="#todo/work?open=t1"', 'href="#session/s1"']);
+	expect(html.match(/data-chip="([\w-]+)"/g)).toEqual(['data-chip="skill"', 'data-chip="file"', 'data-chip="pull-request"', 'data-chip="todo"', 'data-chip="session"']);
+	expect(html.match(/href="[^"]*"/g)).toEqual(['href="#pull-requests/acme/web/7"', 'href="#todo/work?open=t1"', 'href="#session/s1"']);
 	expect(html).not.toContain("_blank");
 	expect(prompt({ categories: [], todos: [], archive: [todo] })).toContain('href="#todo/archive?open=t1"');
 	for (const unknown of [null, { categories: [], todos: [], archive: [] }]) expect(prompt(unknown)).not.toContain("#todo");

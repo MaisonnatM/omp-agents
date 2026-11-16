@@ -65,7 +65,7 @@ const legacySizeAliases: Partial<Record<BadgeSize, BadgeSizeCanonical>> = {
 interface BadgeProps
   extends Omit<HTMLAttributes<HTMLSpanElement>, "color">,
     Omit<VariantProps<typeof badgeVariants>, "size"> {
-  /** A palette color, or any CSS color, such as a Linear label's. */
+  /** A palette color, or any CSS color, such as a GitHub label's. */
   color?: BadgeColor | (string & {});
   /** Omitted, the badge follows the surrounding SizeProvider. Legacy
    *  sm/md/lg values still resolve. */

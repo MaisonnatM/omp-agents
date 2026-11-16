@@ -4,7 +4,7 @@
  */
 import { skillLabel } from "./labels";
 
-export type ChipKind = "skill" | "command" | "file" | "directory" | "ticket" | "pull-request" | "person" | "todo" | "session" | "annotation";
+export type ChipKind = "skill" | "command" | "file" | "directory" | "pull-request" | "person" | "todo" | "session" | "annotation";
 
 export interface PromptToken {
 	kind: ChipKind;
@@ -51,10 +51,6 @@ const PATTERNS: readonly Pattern[] = [
 	{ re: /^\/skill:(\S+)(?=\s|$)/g, leading: true, token: m => ({ kind: "skill", label: skillLabel(m[1]), target: m[1] }) },
 	{ re: /^\/([a-z][\w-]*)(?=\s|$)/g, leading: true, token: m => ({ kind: "command", label: skillLabel(m[1]), target: m[1] }) },
 	{
-		re: /\[([A-Z][A-Z\d]*-\d+ (?:[^\]\\\n]|\\.)*)\]\((https:\/\/linear\.app\/[^)\s]+)\)/g,
-		token: m => ({ kind: "ticket", label: unescapeLink(m[1]), target: m[2] }),
-	},
-	{
 		re: /\[([\w.-]+\/[\w.-]+#\d+ (?:[^\]\\\n]|\\.)*)\]\((https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+)\)/g,
 		token: m => ({ kind: "pull-request", label: unescapeLink(m[1]), target: m[2] }),
 	},
@@ -64,14 +60,13 @@ const PATTERNS: readonly Pattern[] = [
 	},
 	{ re: new RegExp(String.raw`(?<![\w-])todo (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "todo", label: quoted(m[1]), target: m[2] }) },
 	{ re: new RegExp(String.raw`(?<![\w-])omp session (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "session", label: quoted(m[1]), target: m[2] }) },
-	{ re: new RegExp(String.raw`(?<![\w-])Linear user (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "person", label: quoted(m[1]), target: m[2] }) },
 	{
 		re: new RegExp(String.raw`(?<![\w\x60])(\x60+)browser annotation (${STRING}) (${STRING})\1(?!\x60)`, "g"),
 		token: m => ({ kind: "annotation", label: quoted(m[2]), target: quoted(m[3]) }),
 	},
 	{
 		// The `@` menu's category prefixes are a query still being typed, not a path.
-		re: /(?<=^|\s)@(?!(?:file|todo|ticket|pr|person|mail|event|session):)("[^"\n]+"|[^\s"]+)(?=\s|$)/g,
+		re: /(?<=^|\s)@(?!(?:file|todo|pr|person|mail|event|session):)("[^"\n]+"|[^\s"]+)(?=\s|$)/g,
 		token: m => {
 			const path = m[1].replace(/^"(.*)"$/, "$1");
 			const directory = path.endsWith("/");
@@ -134,7 +129,7 @@ function chipTree(parent: MdNode, source: string): void {
 	parent.children = parent.children.flatMap(node => {
 		if (node.type === "text") return chipText(node);
 		if (node.type === "link" || node.type === "inlineCode") {
-			// A ticket or pull request is a markdown link, and a Browser annotation a code span, which the parser has already taken apart: match its source.
+			// A pull request or person is a markdown link, and a Browser annotation a code span, which the parser has already taken apart: match its source.
 			const written = source.slice(node.position?.start.offset, node.position?.end.offset);
 			const [token] = promptTokens(written, { leading: false });
 			return token && token.start === 0 && token.end === written.length ? [chipNode(token)] : [node];

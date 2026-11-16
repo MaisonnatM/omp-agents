@@ -24,8 +24,8 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("B", "KeyB", { ctrl: true, shift: true })).toEqual(["detailsSidebar"]);
 	expect(pressOn(true, "B", "KeyB", { meta: true, shift: true })).toEqual(["detailsSidebar"]);
 	expect(press("n", "KeyN", { ctrl: true })).toEqual([]);
-	expect(press("O", "KeyO", { ctrl: true, shift: true })).toEqual(["newSession", "ticketsNew"]);
-	expect(pressOn(true, "O", "KeyO", { meta: true, shift: true })).toEqual(["newSession", "ticketsNew"]);
+	expect(press("O", "KeyO", { ctrl: true, shift: true })).toEqual(["newSession"]);
+	expect(pressOn(true, "O", "KeyO", { meta: true, shift: true })).toEqual(["newSession"]);
 	expect(pressOn(true, "O", "KeyO", { ctrl: true, shift: true })).toEqual([]);
 	expect(press("f", "KeyF", { ctrl: true })).toEqual(["find"]);
 	expect(pressOn(true, "f", "KeyF", { meta: true })).toEqual(["find"]);
@@ -285,7 +285,7 @@ test("a registration reads its handlers when the key is pressed, and removing it
 	const stack = createShortcutStack();
 	const calls: string[] = [];
 	let handlers: ShortcutHandlers = {};
-	stack.add(1, () => ({ newTicket: () => void calls.push("app") }));
+	stack.add(1, () => ({ todoNew: () => void calls.push("app") }));
 	const remove = stack.add(2, () => handlers);
 	expect(stack.size).toBe(2);
 	stack.dispatch(pressed("c", "KeyC"), true, null);
@@ -303,7 +303,7 @@ test("scope limits who runs: text fields keep their keys, chords work anywhere, 
 	const stack = createShortcutStack();
 	const calls: string[] = [];
 	stack.add(1, () => ({
-		newTicket: () => void calls.push("ticket"),
+		todoNew: () => void calls.push("todo"),
 		switcher: () => void calls.push("switcher"),
 		interrupt: () => void calls.push("interrupt"),
 	}));
@@ -317,7 +317,7 @@ test("scope limits who runs: text fields keep their keys, chords work anywhere, 
 test("a key something nearer already handled is left alone", () => {
 	const stack = createShortcutStack();
 	const calls: string[] = [];
-	stack.add(1, () => ({ newTicket: () => void calls.push("app") }));
+	stack.add(1, () => ({ todoNew: () => void calls.push("app") }));
 	const event = pressed("c", "KeyC");
 	event.preventDefault();
 	stack.dispatch(event, true, null);

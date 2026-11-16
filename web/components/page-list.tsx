@@ -1,4 +1,4 @@
-/** `PageList`, the open page's own list, and `PageListColumn`, the column at the page's left that holds it, as Linear's inbox does. */
+/** `PageList`, the open page's own list, and `PageListColumn`, the column at the page's left that holds it. */
 import { type ReactNode, type RefObject, useLayoutEffect, useState } from "react";
 import type { BotRow } from "../bots-model";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";

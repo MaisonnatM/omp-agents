@@ -11,7 +11,6 @@ const account = (name: string, host: string) => ({ name, address: `me@${host}`, 
 
 const integrations: IntegrationsAnswer = {
 	integrations: {
-		linear: { id: "linear", connection: ready("linear", "mcp.linear.app"), signIn: null, setup: null },
 		slack: { id: "slack", connection: ready("slack", "mcp.slack.com"), signIn: null, setup: { clientId: "1.2", hasClientSecret: true, redirectUri: null, callbackPort: 3118, scope: "", configured: true } },
 		"google-calendar": { id: "google-calendar", accounts: [account("google-calendar", "calendarmcp.googleapis.com")], signIn: null, setup: googleSetup },
 		gmail: { id: "gmail", accounts: [account("gmail", "gmailmcp.googleapis.com")], signIn: null, setup: googleSetup },
@@ -26,7 +25,7 @@ const facts = (pstack: PstackStatus): ToolsFacts => ({
 const step = (pstack: PstackStatus): string => renderToStaticMarkup(<ToolsStep facts={facts(pstack)} onKitStep={() => {}} onRefresh={() => {}} refreshing={false} />);
 
 describe("ToolsStep", () => {
-	test("with everything connected and pstack loaded, it says so and lists all six as Ready", () => {
+	test("with everything connected and pstack loaded, it says so and lists every tool as Ready", () => {
 		const html = step({ installed: true, skills: 57 });
 		expect(html).toContain("Everything is set up.");
 		expect(html).toContain('aria-label="Ready"');

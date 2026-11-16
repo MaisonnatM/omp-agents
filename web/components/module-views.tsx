@@ -22,8 +22,6 @@ export interface CoreData {
 	bots: Bot[] | null;
 	/** The todo list, `null` until the server sends it. */
 	todos: UserTodoList | null;
-	/** Linear answers and the sidebar shows Tickets, so a page may show tickets. */
-	ticketsShown: boolean;
 	/** The sessions are listed, so `cwd` names the workspace a new session starts in. */
 	listed: boolean;
 	/** The directory a new session starts in, which the sidebar's workspace decides. */

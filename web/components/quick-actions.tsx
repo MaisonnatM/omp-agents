@@ -93,8 +93,6 @@ function subjectName(subject: QuickSubject): string {
 	switch (subject.kind) {
 		case "pull-request":
 			return `${subject.pr.owner}/${subject.pr.repo}#${subject.pr.number}`;
-		case "ticket":
-			return subject.id;
 		case "todo":
 			return `"${subject.text}"`;
 		default: {

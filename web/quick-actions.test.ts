@@ -1,55 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo } from "../src/user-todos-shared";
-import { pendingOf, quickOn, ticketActions, ticketStart, todoActions, todoStart } from "./quick-actions";
+import { pendingOf, quickOn, todoActions, todoStart } from "./quick-actions";
 import { messageOf } from "./starts";
-
-const ticket = (fields: Partial<Ticket>): Ticket => ({
-	id: "ENG-7",
-	title: "Show feedback",
-	url: "https://linear.app/acme/issue/ENG-7/show-feedback",
-	status: "Todo",
-	statusType: "unstarted",
-	priority: 3,
-	labels: [],
-	project: null,
-	team: "Engineering",
-	dueDate: null,
-	createdAt: "2026-09-01T00:00:00.000Z",
-	updatedAt: "2026-10-01T00:00:00.000Z",
-	branch: "eng-7-show-feedback",
-	parentId: null,
-	...fields,
-});
-
-describe("ticketActions", () => {
-	test("an issue not started yet offers work and a plan", () => {
-		for (const statusType of ["triage", "backlog", "unstarted"] as const) expect(ticketActions(ticket({ statusType }))).toEqual(["work", "plan"]);
-	});
-
-	test("a started issue offers only work, which continues it", () => {
-		expect(ticketActions(ticket({ statusType: "started", status: "In Review" }))).toEqual(["work"]);
-	});
-
-	test("a completed or canceled issue offers nothing", () => {
-		expect(ticketActions(ticket({ statusType: "completed" }))).toEqual([]);
-		expect(ticketActions(ticket({ statusType: "canceled" }))).toEqual([]);
-	});
-});
-
-describe("ticketStart", () => {
-	test("starts a new session with the issue as its subject and no todo", () => {
-		expect(messageOf(ticketStart(ticket({}), "plan", "/tmp", "poteto"), 2)).toMatchObject({
-			t: "start",
-			reqId: 2,
-			kind: "new",
-			cwd: "/tmp",
-			subject: { kind: "ticket", id: "ENG-7" },
-			todoId: null,
-			skill: "poteto",
-		});
-	});
-});
 
 describe("a pull request start", () => {
 	test("Review saves a review draft; the thermonuclear review does not", () => {
@@ -114,7 +66,7 @@ describe("quickOn", () => {
 		const failed = { op: todoStart(todo({}), "work", "/tmp", null), phase: "failed", error: "no omp" } as const;
 		expect(quickOn(failed, { kind: "todo", id: "t1" })).toBe(failed);
 		expect(quickOn(failed, { kind: "todo", id: "t2" })).toBeNull();
-		expect(quickOn(failed, { kind: "ticket", id: "t1" })).toBeNull();
+		expect(quickOn(failed, { kind: "pull-request", pr: { owner: "o", repo: "r", number: 1 } })).toBeNull();
 		expect(pendingOf(failed, { kind: "todo", id: "t1" })).toBeNull();
 		expect(pendingOf({ ...failed, phase: "starting" }, { kind: "todo", id: "t1" })).toBe("work");
 	});

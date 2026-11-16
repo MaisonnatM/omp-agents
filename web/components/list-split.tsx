@@ -85,7 +85,7 @@ interface ListSplitProps {
 }
 
 /**
- * The list on the left and the open item on the right, as in Linear, split by a line you drag to size the list.
+ * The list on the left and the open item on the right, split by a line you drag to size the list.
  * A page too narrow for both shows the list, or the open item in its place.
  */
 export function ListSplit({ widthKey, resizeLabel, detailLabel, empty, list, detail }: ListSplitProps) {

@@ -7,7 +7,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 
 ## `ui/input-message.tsx`
 
-- The text field is `PromptEditor` (`web/components/prompt-editor.tsx`), a contenteditable that shows each skill, command, file, ticket, pull request, todo, and session reference as a chip, instead of a `<textarea>`.
+- The text field is `PromptEditor` (`web/components/prompt-editor.tsx`), a contenteditable that shows each skill, command, file, pull request, todo, and session reference as a chip, instead of a `<textarea>`.
   Its height follows `minRows` and `maxRows` in CSS, so the JS autoresize is gone.
   `textareaProps` is `editorProps`, and `editorRef` exposes the caret and focus that callers read from the textarea before.
 - `editorProps.onKeyDown`: runs first, in the capture phase, and a key it prevents goes no further, not even to the editor.
@@ -109,7 +109,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/sidebar-group.tsx`: a collapsed group's body is `inert`, so its hidden rows leave the Tab order.
   `headerActions` is a prop, in place of the registry's detection of action children by type, and `SidebarGroupLabel` takes an `icon`.
 - `ui/scroll-area.tsx`: a `viewportRef` prop, which `SidebarContent` in `ui/sidebar.tsx` passes on.
-- `ui/badge.tsx`: `color` takes any CSS color beside a palette name, such as a Linear label's.
+- `ui/badge.tsx`: `color` takes any CSS color beside a palette name, such as a GitHub label's.
 - `lib/shape-context.tsx`: the rounded shape's `button` is `rounded-sm`, where the registry's is `rounded-lg`.
 - `ui/message-scroller.tsx`: the scroll button's default `variant` is `tertiary`, where the registry's is `secondary`.
 - `ui/tooltip.tsx`: `disabled` anchors hover to a non-focusable wrapper around a disabled child, `wrapperClassName` styles that wrapper, and the trigger ignores a focus that `isReturnedFocus` in `web/use-return-focus.ts` reports.

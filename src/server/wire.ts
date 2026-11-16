@@ -5,7 +5,7 @@
  * casts what it received; a parser whose refusal the page shows returns `{ error }` in place of `null`.
  * A shape the server also keeps in a file, such as a routine, a scheduled send, or an event's time, is parsed by its domain module.
  */
-import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
+import { BASE64, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
 import { parseBotChange } from "../shared/bots";
 import {
@@ -25,7 +25,6 @@ import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThink
 import { parseContextAction, parseGoalChange } from "../shared/session-controls";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import type { DevServerRequest, ProcessStop } from "../shared/processes";
-import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import {
 	GITHUB_NAME,
 	MAX_COMMENT_BODY,
@@ -62,12 +61,10 @@ import { MAX_CAPTURE_ID } from "../shared/dictation";
 import type { AckedFrame, ClientFrame, ClientMsg, ModuleChangeMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
-import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
 import type { TrustChange } from "../shared/project-trust";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { isStoredModuleId, parseModuleChange, type StoredModuleId } from "../modules";
-import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
-import { isTodoId, parseTodoChange } from "../user-todos-parse";
+import { parseTodoChange } from "../user-todos-parse";
 import { MAX_WORKTREE_BATCH, type WorktreeConfirmation, type WorktreeRemovalRequest, type WorktreeTarget } from "../worktrees-shared";
 
 /** The longest composer text the server completes. */
@@ -784,71 +781,8 @@ export function parseGoogleClient(body: unknown): Parsed<GoogleClientInput, { er
 	return { ok: clientSecret === undefined ? { clientId, callbackPort: body.callbackPort } : { clientId, clientSecret, callbackPort: body.callbackPort } };
 }
 
-const isTicketPriority = oneOf(TICKET_PRIORITIES);
-
-/** The fields a picker sets, each left out unchanged and `null` clearing it, each of its own type; `null` for any other value. */
-function parseTicketFields(body: Record<string, unknown>): Parsed<TicketFieldValues> {
-	const { state, assignee, priority, labels, project, dueDate } = body;
-	const fields: TicketFieldValues = {};
-	if (state !== undefined) {
-		if (!isNonEmpty(state)) return null;
-		fields.state = state;
-	}
-	if (assignee !== undefined) {
-		if (assignee !== null && !isNonEmpty(assignee)) return null;
-		fields.assignee = assignee;
-	}
-	if (priority !== undefined) {
-		if (!isTicketPriority(priority)) return null;
-		fields.priority = priority;
-	}
-	if (labels !== undefined) {
-		if (!Array.isArray(labels) || !labels.every(isNonEmpty)) return null;
-		fields.labels = [...new Set(labels)];
-	}
-	if (project !== undefined) {
-		if (project !== null && !isNonEmpty(project)) return null;
-		fields.project = project;
-	}
-	if (dueDate !== undefined) {
-		if (dueDate !== null && !isDay(dueDate)) return null;
-		fields.dueDate = dueDate;
-	}
-	return { ok: fields };
-}
-
-/** The body of `PUT /api/ticket/new`: a title and a description, each within its limit, a team by id, and any picker's fields. */
-export function parseTicketDraft(body: unknown): Parsed<TicketDraft> {
-	if (!isObject(body)) return null;
-	const { title, description, team } = body;
-	if (!isNonEmpty(title) || title.length > MAX_TICKET_TITLE || typeof description !== "string" || description.length > MAX_TICKET_DESCRIPTION || !isNonEmpty(team)) return null;
-	const fields = parseTicketFields(body);
-	return fields && { ok: { ...fields.ok, title: title.trim(), description, team } };
-}
-
-/** The body of `PUT /api/todo/ticket`: a todo by id, and a Linear team by id. */
-export function parseTodoTicket(body: unknown): Parsed<TodoTicketRequest> {
-	if (!isObject(body) || !isTodoId(body.todoId) || !isNonEmpty(body.team)) return null;
-	return { ok: { todoId: body.todoId, team: body.team } };
-}
-
-/** The body of `PUT /api/ticket`: an issue identifier and at least one field to change, each of its own type. */
-export function parseTicketEdit(body: unknown): Parsed<TicketEdit> {
-	if (!isObject(body) || typeof body.id !== "string" || !TICKET_ID.test(body.id)) return null;
-	const fields = parseTicketFields(body);
-	return fields && Object.keys(fields.ok).length > 0 ? { ok: { id: body.id, ...fields.ok } } : null;
-}
-
 /** Whether `data` is a file's bytes in standard base64, the empty file too, of at most `maxBytes`. */
 const isBase64File = (data: unknown, maxBytes: number): data is string => typeof data === "string" && data.length <= Math.ceil(maxBytes / 3) * 4 && (data === "" || BASE64.test(data));
-
-/** The body of `PUT /api/ticket/attachment`: an issue identifier, a file name and MIME type, and its bytes in base64 within the size limit. */
-export function parseTicketAttachment(body: unknown): Parsed<TicketAttachmentUpload> {
-	if (!isObject(body)) return null;
-	const { issue, name, type, data } = body;
-	if (typeof issue !== "string" || !TICKET_ID.test(issue) || !isNonEmpty(name) || !isNonEmpty(type) || !isBase64File(data, MAX_TICKET_ATTACHMENT_BYTES)) return null;
-	return { ok: { issue, name, type, data } };
-}
 
 const isPullRequestImageType = oneOf(PULL_REQUEST_IMAGE_TYPES);
 

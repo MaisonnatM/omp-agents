@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import type { MailThread } from "../src/shared/gmail";
 import type { Person, PullRequestSummary, Reviewer } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
-import type { Ticket } from "../src/shared/tickets";
 import type { ChangedFile, FileChange } from "../src/shared/transcript";
 import type { UserTodo, UserTodoLeaf } from "../src/user-todos-shared";
 import { completionTrigger, type MentionToken } from "./completion-trigger";
@@ -39,7 +38,6 @@ const data: MentionData = {
 		todo("t3", 'Ask about "SSO" login'),
 		todo("t4", "Login page copy"),
 	],
-	tickets: [{ id: "ENG-12", title: "Login [beta] flag", url: "https://linear.app/acme/issue/ENG-12" } as Ticket],
 	pullRequestRepos: [
 		{
 			owner: "acme",
@@ -52,7 +50,6 @@ const data: MentionData = {
 		},
 		{ owner: "acme", repo: "api", cwds: ["/code/api"], error: "GitHub is down" },
 	],
-	linearUsers: [{ id: "u-1", name: "Cleo Dent" }],
 	hosts: [host("s-self", "Login work"), host("s-live", null)],
 	past: [{ sessionId: "s-old", title: "Login bug hunt", cwdDisplay: "~/code/api" } as PastSession],
 	threads: [{ id: "t1", from: "Ana", subject: "Login [alert]", url: "https://mail.google.com/t1" } as MailThread],
@@ -82,10 +79,9 @@ describe("mentionQuery", () => {
 		expect(at("Read @login")).toEqual({ kind: "search", words: "login" });
 		expect(at("@file:src/")).toEqual({ kind: "source", category: "file", words: "src/" });
 		expect(at("@todo:")).toEqual({ kind: "source", category: "todo", words: "" });
-		expect(at("@ticket:login")).toEqual({ kind: "source", category: "ticket", words: "login" });
 		expect(at("@pr:7")).toEqual({ kind: "source", category: "pull-request", words: "7" });
 		expect(at("@session:bug")).toEqual({ kind: "source", category: "session", words: "bug" });
-		expect(at('@ticket:"login page')).toEqual({ kind: "source", category: "ticket", words: "login page" });
+		expect(at('@todo:"login page')).toEqual({ kind: "source", category: "todo", words: "login page" });
 		expect(at('@"login page')).toEqual({ kind: "search", words: "login page" });
 	});
 
@@ -104,7 +100,7 @@ describe("fileSearch", () => {
 
 	test("asks nothing on home or another category", () => {
 		expect(fileSearch("See @", tokenAt("See @"))).toBeNull();
-		expect(fileSearch("See @ticket:login", tokenAt("See @ticket:login"))).toBeNull();
+		expect(fileSearch("See @todo:login", tokenAt("See @todo:login"))).toBeNull();
 		expect(fileSearch("See @file:", tokenAt("See @file:"))).toEqual({ text: "See @", cursor: 5 });
 	});
 });
@@ -119,7 +115,7 @@ describe("mentionMenu", () => {
 		{ path: "my notes.md", changes: [change(20)] },
 		{ path: "src/c.ts", changes: [change(10)] },
 	];
-	const categories = ["Files & Folders", "Todos", "Tickets", "Pull requests", "People", "Email", "Calendar", "Sessions"];
+	const categories = ["Files & Folders", "Todos", "Pull requests", "People", "Email", "Calendar", "Sessions"];
 
 	test("home offers the last three files the agent changed inside its directory, then every category", () => {
 		expect(labels(menu("Read @", { changed }))).toEqual([
@@ -140,14 +136,13 @@ describe("mentionMenu", () => {
 		expect(home.map(option => [option.edit.text, option.opens])).toEqual([
 			["Ask @file:", true],
 			["Ask @todo:", true],
-			["Ask @ticket:", true],
 			["Ask @pr:", true],
 			["Ask @person:", true],
 			["Ask @mail:", true],
 			["Ask @event:", true],
 			["Ask @session:", true],
 		]);
-		expect(home[2].edit.cursor).toBe(12);
+		expect(home[2].edit.cursor).toBe(8);
 	});
 
 	test("a search lists five files, then three matches per source, leaving out done todos and this session", () => {
@@ -155,7 +150,6 @@ describe("mentionMenu", () => {
 		expect(labels(menu("@login", { files }))).toEqual([
 			["Files & Folders", ["src/login-a.ts", "src/login-b.ts", "src/login-c.ts", "src/login-d.ts", "src/login-e.ts"]],
 			["Todos", ["Fix login redirect", "Write the login test", 'Ask about "SSO" login']],
-			["Tickets", ["Login [beta] flag"]],
 			["Pull requests", ["Fix login"]],
 			["Email", ["Login [alert]"]],
 			["Calendar", ["Login review", "Login retro"]],
@@ -163,7 +157,6 @@ describe("mentionMenu", () => {
 		]);
 		expect(labels(menu("@login"))).toEqual([
 			["Todos", ["Fix login redirect", "Write the login test", 'Ask about "SSO" login']],
-			["Tickets", ["Login [beta] flag"]],
 			["Pull requests", ["Fix login"]],
 			["Email", ["Login [alert]"]],
 			["Calendar", ["Login review", "Login retro"]],
@@ -178,7 +171,6 @@ describe("mentionMenu", () => {
 			["Pull requests", ["Fix login"]],
 		]);
 		expect(labels(menu('@todo:"test redirect'))).toEqual([["Todos", ["Write the login test"]]]);
-		expect(labels(menu("@ticket:eng-12"))).toEqual([["Tickets", ["Login [beta] flag"]]]);
 		expect(labels(menu("@wiki:login"))).toEqual([]);
 	});
 
@@ -188,13 +180,12 @@ describe("mentionMenu", () => {
 		expect(pick("See @event:retro", "Login retro")?.text).toMatch(/^See calendar event "Login retro", .+ · This computer $/);
 	});
 
-	test("People lists the listed pull requests' authors, reviewers, and teams once each, without you or bots, then the Linear members", () => {
-		expect(labels(menu("@person:"))).toEqual([["People", ["@ana", "@bo", "@acme/design", "Cleo Dent"]]]);
-		expect(menu("@person:")[0].options.map(option => option.detail)).toEqual(["acme/webapp#7, acme/webapp#9", "acme/webapp#9", "acme/webapp#9", "Linear"]);
+	test("People lists the listed pull requests' authors, reviewers, and teams once each, without you or bots", () => {
+		expect(labels(menu("@person:"))).toEqual([["People", ["@ana", "@bo", "@acme/design"]]]);
+		expect(menu("@person:")[0].options.map(option => option.detail)).toEqual(["acme/webapp#7, acme/webapp#9", "acme/webapp#9", "acme/webapp#9"]);
 		expect(labels(menu("@person:#7"))).toEqual([["People", ["@ana"]]]);
 		expect(pick("Ask @person:bo", "@bo")).toEqual({ text: "Ask [@bo](https://github.com/bo) ", cursor: 33 });
 		expect(pick("Ask @person:design", "@acme/design")?.text).toBe("Ask [@acme/design](https://github.com/orgs/acme/teams/design) ");
-		expect(pick("Ask @person:cleo", "Cleo Dent")?.text).toBe('Ask Linear user "Cleo Dent" (id u-1) ');
 	});
 
 	test("a prefix shows only its source, up to fifty", () => {
@@ -212,10 +203,6 @@ describe("mentionMenu", () => {
 
 	test("an item replaces the whole token with its reference and a space, the caret after it", () => {
 		expect(pick("Look at @todo:sso", 'Ask about "SSO" login')).toEqual({ text: 'Look at todo "Ask about \\"SSO\\" login" (id t3) ', cursor: 47 });
-		expect(pick("@ticket:login", "Login [beta] flag")).toEqual({
-			text: "[ENG-12 Login \\[beta\\] flag](https://linear.app/acme/issue/ENG-12) ",
-			cursor: 67,
-		});
 		expect(pick("@pr:fix then merge", "Fix login", 7)).toEqual({ text: "[acme/webapp#7 Fix login](https://github.com/acme/webapp/pull/7)  then merge", cursor: 65 });
 		expect(pick("@session:", "webapp")).toEqual({ text: 'omp session "webapp" (id s-live) ', cursor: 33 });
 		expect(pick("@session:", "Login bug hunt")).toEqual({ text: 'omp session "Login bug hunt" (id s-old) ', cursor: 40 });

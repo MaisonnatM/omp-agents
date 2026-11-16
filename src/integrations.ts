@@ -1,6 +1,6 @@
 /**
  * The services whose MCP server the integrations page signs omp in to: where omp stands with each, checked by listing
- * the server's tools, and the sign-ins and removals the page starts. Linear and Slack sign in to the first server on
+ * the server's tools, and the sign-ins and removals the page starts. Slack signs in to the first server on
  * their host, and a sign-in adds it to omp's user-level MCP config when omp has none. Gmail and Google Calendar hold an
  * account per server on their host, as `src/google-accounts.ts` keeps them.
  */
@@ -23,7 +23,6 @@ import {
 } from "./omp/mcp";
 import {
 	type AccountId,
-	type ClientService,
 	type GoogleAccount,
 	type GoogleClientInput,
 	type GoogleService,
@@ -90,7 +89,7 @@ function singleServer(id: SingleService): IntegrationKind<{ connection: McpConne
 	};
 }
 
-const SETUP_ERROR: Record<Exclude<McpClient, "none">, string> = {
+const SETUP_ERROR: Record<McpClient, string> = {
 	"slack-app": "Set up the Slack app before connecting. Save a client ID, client secret, HTTPS redirect, callback port, and at least one supported scope.",
 	"google-oauth": "Set up the Google OAuth client before connecting. Save its client ID, client secret, and callback port.",
 };
@@ -131,7 +130,7 @@ export function createIntegrations(googleAccounts: GoogleAccounts): Integrations
 	 * Saves `id`'s OAuth client, as `plan` makes it from the user MCP config, and answers the integration.
 	 * A waiting sign-in is cancelled. A new client ID or secret also drops the sign-ins made with the old one.
 	 */
-	const saveClient = async (id: ClientService, plan: (path: string) => Promise<ClientSave>): Promise<McpIntegration> => {
+	const saveClient = async (id: McpIntegrationId, plan: (path: string) => Promise<ClientSave>): Promise<McpIntegration> => {
 		const path = userMcpConfigPath();
 		const planned = await plan(path);
 		signIns[id].cancel();
@@ -153,7 +152,7 @@ export function createIntegrations(googleAccounts: GoogleAccounts): Integrations
 			await signIns[id].start(account, async (signal, waiting) => {
 				const turnedOn = await enableMcpServersOn(service.host);
 				if (turnedOn && (await mcpSignedInIds((await serversOf(id)).map(server => server.credentialId))).size > 0) return;
-				if (service.client !== "none" && !(await clientSetup(id))?.configured) throw new Error(SETUP_ERROR[service.client]);
+				if (!(await clientSetup(id)).configured) throw new Error(SETUP_ERROR[service.client]);
 				await kindOf(id).signIn(account, signal, waiting);
 			});
 			return load(id, false);

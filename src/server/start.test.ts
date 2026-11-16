@@ -62,7 +62,7 @@ test("a private session does not fork, before any omp starts, since its copy wou
 		}),
 		pathFor: () => join(root, "i1", "--work--", "2026-11-03T10-00-00-000Z_s1.jsonl"),
 		savedFile: () => null,
-		factsFor: () => ({ tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }),
+		factsFor: () => ({ pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }),
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
@@ -131,7 +131,7 @@ test("a reattached session whose turn ended while no server listened is listed w
 		});
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")), unreadPath);
 		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => false, () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
-		const facts: SessionFacts = { tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false };
+		const facts: SessionFacts = { pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false };
 		expect(sessions.rows(() => facts).map(row => [row.instanceId, row.unread])).toEqual([
 			["i-ended", { at: Date.parse("2026-11-02T10:00:12.000Z"), reply: "done" }],
 			["i-prompted", { at: Date.parse("2026-11-02T10:00:20.000Z"), reply: null }],
@@ -206,7 +206,7 @@ test("a keeper that never greets is stopped with its job within the bound, then 
 function claimedStarter(
 	sessions: LiveSessions,
 	savedFile: string | null = null,
-	factsFor: () => SessionFacts = () => ({ tickets: [], pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }),
+	factsFor: () => SessionFacts = () => ({ pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }),
 	admit: (cwd: string) => Promise<void> = async () => {},
 	restoreWorktree: (sessionIds: readonly string[]) => Promise<void> = async () => {},
 ) {
@@ -245,7 +245,7 @@ test("simultaneous task launches across registries allow one writer before check
 		const checkout = spyOn(git, "checkoutDir").mockResolvedValue(dir);
 		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
 		const spawn = spyOn(DashboardSession, "start").mockImplementation(async (id, cwd) => sessionForStart(id, cwd));
-		const request = newSessionRequest(dir, "Implement the ticket", { subject: { kind: "ticket", id: "ENG-2650" }, branch: { kind: "existing", name: "work" } });
+		const request = newSessionRequest(dir, "Implement the change", { subject: { kind: "pull-request", pr: { owner: "acme", repo: "app", number: 7 } }, branch: { kind: "existing", name: "work" } });
 		const results = await Promise.all([first(request), second(request)]);
 		expect(results.filter(result => result.ok)).toHaveLength(1);
 		expect(results.filter(result => !result.ok)).toHaveLength(1);
@@ -270,11 +270,11 @@ test("a failed spawn releases its claim, while distinct explicit tasks may inten
 		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
 		const spawn = spyOn(DashboardSession, "start").mockRejectedValueOnce(new Error("failed to spawn"));
 		spawn.mockImplementation(async (id, cwd) => sessionForStart(id, cwd));
-		const request = newSessionRequest(dir, "/ship ENG2650");
+		const request = newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7");
 		expect(await start(request)).toMatchObject({ ok: false, error: expect.stringContaining("failed to spawn") });
 		expect((await start(request)).ok).toBe(true);
-		expect((await start(newSessionRequest(dir, "/ship ENG2650", { taskId: "ENG-2650:tests-only" }))).ok).toBe(true);
-		expect((await start(newSessionRequest(dir, "/ship ENG2650", { taskId: "ENG-2650:server-only" }))).ok).toBe(true);
+		expect((await start(newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7", { taskId: "app#7:tests-only" }))).ok).toBe(true);
+		expect((await start(newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7", { taskId: "app#7:server-only" }))).ok).toBe(true);
 		expect((await start(newSessionRequest(dir, "Explain the unrelated architecture"))).ok).toBe(true);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
@@ -293,7 +293,7 @@ test("a start in a project with untrusted code spawns no omp, asks with the piec
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
 		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
 		const keeper = spyOn(keeperLink, "startKeeper").mockRejectedValue(new Error("no omp should start"));
-		const request = newSessionRequest(dir, "/ship ENG2650");
+		const request = newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7");
 		expect(await start(request)).toEqual({ ok: false, error: untrustedText(ask), trust: ask });
 		expect(admit).toHaveBeenCalledWith(dir);
 		expect(keeper).not.toHaveBeenCalled();
@@ -319,19 +319,19 @@ test("a start whose admission fails spawns no omp and says why", async () => {
 	}
 });
 
-test("resuming a saved ticket claims the same task and refuses another session's claim before spawning", async () => {
+test("resuming a saved session on a pull request claims the same task and refuses another session's claim before spawning", async () => {
 	const dir = mkdtempSync("/tmp/omp-start-resume-");
 	try {
 		const file = join(dir, "saved.jsonl");
 		writeFileSync(file, `${JSON.stringify({ type: "session", cwd: dir })}\n`);
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")));
-		const start = claimedStarter(sessions, file, () => ({ tickets: ["ENG-2650"], pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }));
+		const start = claimedStarter(sessions, file, () => ({ pullRequests: [{ owner: "acme", repo: "app", number: 7, link: "worked" }], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }));
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
-		expect(await sessions.reserveTask("ticket:ENG-2650", "already-working", dir, () => { throw new Error("no running sessions"); })).toBeNull();
+		expect(await sessions.reserveTask("pr:acme/app#7", "already-working", dir, () => { throw new Error("no running sessions"); })).toBeNull();
 		const resume = spyOn(DashboardSession, "resume").mockImplementation(async (id) => sessionForStart(id, dir));
 		expect(await start({ kind: "resume", sessionId: "saved" })).toMatchObject({
 			ok: false,
-			error: expect.stringContaining("ticket:ENG-2650 is already claimed by"),
+			error: expect.stringContaining("pr:acme/app#7 is already claimed by"),
 			owner: { here: true, instanceId: "already-working", sessionName: null, cwdDisplay: dir },
 		});
 		expect(resume).not.toHaveBeenCalled();
@@ -428,10 +428,10 @@ test("a terminal or pre-claim session already in the registry owns its explicit 
 	const dir = mkdtempSync("/tmp/omp-start-existing-");
 	try {
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")));
-		sessions.add(fromPartial({ instanceId: "terminal-owner", sessionId: "s-terminal", cwd: dir, finished: () => false }), { kind: "ticket", id: "ENG-2650" });
+		sessions.add(fromPartial({ instanceId: "terminal-owner", sessionId: "s-terminal", cwd: dir, finished: () => false }), { kind: "pull-request", pr: { owner: "acme", repo: "app", number: 7 } });
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
 		const spawn = spyOn(DashboardSession, "start");
-		const result = await claimedStarter(sessions)(newSessionRequest(dir, "/ship ENG2650"));
+		const result = await claimedStarter(sessions)(newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7"));
 		expect(result).toMatchObject({ ok: false, error: expect.stringContaining("#session/s-terminal") });
 		expect(spawn).not.toHaveBeenCalled();
 	} finally {
@@ -459,30 +459,30 @@ test("an explicit read-only PR review coexists with implementation, but duplicat
 	}
 });
 
-test("an explicit independent task survives reattachment and ended-session resume ahead of inferred ticket subjects", async () => {
+test("an explicit independent task survives reattachment and ended-session resume ahead of inferred pull request subjects", async () => {
 	const dir = mkdtempSync("/tmp/omp-start-independent-resume-");
 	try {
 		const path = join(dir, "claims.json");
 		const file = join(dir, "saved.jsonl");
 		writeFileSync(file, `${JSON.stringify({ type: "session", cwd: dir })}\n`);
 		const claims = new TaskClaims(path);
-		claims.claim("/repo/.git", "task:ENG-2650:tests-only", "original", dir);
+		claims.claim("/repo/.git", "task:app#7:tests-only", "original", dir);
 		claims.bind("original", process.pid, "s-original", dir);
 		const restarted = new LiveSessions(() => {}, new TaskClaims(path));
-		restarted.add(sessionForStart("original", dir), { kind: "ticket", id: "ENG-2650" });
+		restarted.add(sessionForStart("original", dir), { kind: "pull-request", pr: { owner: "acme", repo: "app", number: 7 } });
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
 		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
 		spyOn(DashboardSession, "start").mockImplementation(async (id, cwd) => sessionForStart(id, cwd));
 		const afterRestart = claimedStarter(restarted);
-		expect((await afterRestart(newSessionRequest(dir, "/ship ENG2650"))).ok).toBe(true);
-		expect((await afterRestart(newSessionRequest(dir, "/ship ENG2650", { taskId: "ENG-2650:tests-only" }))).ok).toBe(false);
+		expect((await afterRestart(newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7"))).ok).toBe(true);
+		expect((await afterRestart(newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7", { taskId: "app#7:tests-only" }))).ok).toBe(false);
 		restarted.remove("original");
 		const resumedRegistry = new LiveSessions(() => {}, new TaskClaims(path));
-		const resume = claimedStarter(resumedRegistry, file, () => ({ tickets: ["ENG-2650"], pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }));
+		const resume = claimedStarter(resumedRegistry, file, () => ({ pullRequests: [{ owner: "acme", repo: "app", number: 7, link: "worked" }], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }));
 		spyOn(DashboardSession, "resume").mockImplementation(async id => sessionForStart(id, dir));
-		// The implementation ticket still has its own live claim, but this saved session owns the independent test slice.
+		// The pull request's implementation still has its own live claim, but this saved session owns the independent test slice.
 		expect((await resume({ kind: "resume", sessionId: "s-original" })).ok).toBe(true);
-		expect((await resume(newSessionRequest(dir, "/ship ENG2650", { taskId: "ENG-2650:tests-only" }))).ok).toBe(false);
+		expect((await resume(newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7", { taskId: "app#7:tests-only" }))).ok).toBe(false);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

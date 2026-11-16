@@ -19,11 +19,11 @@ const context = (change: Partial<SessionActionContext> = {}): SessionActionConte
 });
 const live = (control: ControlPhase): SessionEntry => ({
 	kind: "live",
-	host: { instanceId: "i1", sessionId: "s1", cwd: "/w", pullRequests: [], tickets: [], control } as unknown as RosterHost,
+	host: { instanceId: "i1", sessionId: "s1", cwd: "/w", pullRequests: [], control } as unknown as RosterHost,
 });
 const past = (change: Partial<PastSession> = {}): SessionEntry => ({
 	kind: "past",
-	session: { sessionId: "s2", cwd: "/w", source: "omp", pullRequests: [], tickets: [], interrupted: false, ...change } as PastSession,
+	session: { sessionId: "s2", cwd: "/w", source: "omp", pullRequests: [], interrupted: false, ...change } as PastSession,
 });
 const ids = (entry: SessionEntry, change?: Partial<SessionActionContext>) => sessionActions(entry, context(change)).map(group => group.map(({ id }) => id));
 
@@ -58,12 +58,11 @@ describe("sessionActions", () => {
 		expect([resume("other")?.title, resume("other")?.disabled]).toEqual(["Resume", true]);
 	});
 
-	test("each pull request and ticket gets its own link, before the workspace settings", () => {
-		const entry = past({ pullRequests: [{ owner: "o", repo: "r", number: 4 } as LinkedPullRequest], tickets: ["ENG-1", "ENG-2"] });
+	test("each pull request gets its own link, before the workspace settings", () => {
+		const entry = past({ pullRequests: [{ owner: "o", repo: "r", number: 4 } as LinkedPullRequest, { owner: "o", repo: "r", number: 5 } as LinkedPullRequest] });
 		expect(sessionActions(entry, context({ workspaceSettings: noop }))[1].map(({ title, run }) => [title, run])).toEqual([
 			["Open r#4", { kind: "link", href: "https://github.com/o/r/pull/4", external: true }],
-			["Open ENG-1", { kind: "link", href: "#tickets/ENG-1" }],
-			["Open ENG-2", { kind: "link", href: "#tickets/ENG-2" }],
+			["Open r#5", { kind: "link", href: "https://github.com/o/r/pull/5", external: true }],
 			["Workspace settings", { kind: "do", fn: noop }],
 		]);
 	});

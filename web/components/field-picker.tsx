@@ -1,5 +1,5 @@
-/** Linear's field pickers: a button that opens a searchable list of a field's choices, and the due date's. The issue detail, the new-issue dialog, the Todo page, and a pull request's details share them. */
-import { IconCalendar1, IconCheckmark1, IconDotGrid1x3Horizontal } from "central-icons";
+/** Field pickers: a button that opens a searchable list of a field's choices, and the due date's. The Todo page and a pull request's details share them. */
+import { IconCalendar1, IconCheckmark1 } from "central-icons";
 import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -10,20 +10,15 @@ import { dateLabel } from "../labels";
 
 /** A field's button in a side column: the row's width, its value in the text's color, and room for wrapped labels. */
 const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
-/** A field's button laid in a property row of a pull request's or issue's details: its text lines up with the row's, and it spans the row. */
+/** A field's button laid in a property row of a pull request's details: its text lines up with the row's, and it spans the row. */
 export const ROW_BUTTON = "-mx-2 -my-1 h-auto min-h-6 w-[calc(100%+1rem)] justify-start px-2 py-1 text-xs font-normal text-foreground";
-/** A field's pill in the new-issue dialog, as Linear's own dialog draws them. */
-const CHIP_BUTTON = "max-w-56 rounded-full px-2.5 font-normal text-foreground";
 
-/** Where a picker sits: a row of a side column, a property row of the details, or a pill in the new-issue dialog. */
-export type PickerLook = "field" | "row" | "chip";
+/** Where a picker sits: a row of a side column, or a property row of the details. */
+export type PickerLook = "field" | "row";
 
-const LOOK_BUTTON: Record<PickerLook, string> = { field: FIELD_BUTTON, row: ROW_BUTTON, chip: CHIP_BUTTON };
+const LOOK_BUTTON: Record<PickerLook, string> = { field: FIELD_BUTTON, row: ROW_BUTTON };
 
-const pickerButton = (look: PickerLook, className: string | undefined): { variant: "ghost" | "tertiary"; className: string } => ({
-	variant: look === "chip" ? "tertiary" : "ghost",
-	className: className ?? LOOK_BUTTON[look],
-});
+const pickerButton = (look: PickerLook, className: string | undefined): { variant: "ghost"; className: string } => ({ variant: "ghost", className: className ?? LOOK_BUTTON[look] });
 
 export interface Choice {
 	value: string;
@@ -67,14 +62,14 @@ interface FieldPickerProps extends OpenState {
 	multi?: boolean;
 	/** The field cannot change yet, as before the item's details arrive. */
 	disabled?: boolean;
-	/** The digit that picks the first choice while the list is open, the next digit the next one, as Linear's status (1) and priority (0) menus do. */
+	/** The digit that picks the first choice while the list is open, the next digit the next one, as the status (1) and priority (0) menus do. */
 	firstKey?: number;
 	/** A click opened the list: the fields ask for the choices then. */
 	onOpen?: () => void;
 	onPick: (value: string) => void;
 }
 
-/** A field as a button that opens a searchable list of its choices, as Linear's issue fields do. */
+/** A field as a button that opens a searchable list of its choices. */
 export function FieldPicker({ field, current, trigger, look = "field", className, choices, error = null, selected, multi = false, disabled = false, firstKey, onOpen, onPick, ...openState }: FieldPickerProps) {
 	const [open, setOpen] = useOpenState(openState);
 	const pick = (value: string): void => {
@@ -147,29 +142,23 @@ interface DuePickerProps extends OpenState {
 	onChange: (dueDate: string | null) => void;
 }
 
-/** The due date: a date field to set it, and a button to clear it. As a pill without a date, it waits behind a more button, as in Linear. */
+/** The due date: a date field to set it, and a button to clear it. */
 export function DuePicker({ dueDate, disabled, trigger, look = "field", className, onChange, ...openState }: DuePickerProps) {
 	const [open, setOpen] = useOpenState(openState);
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<Tooltip content={dueDate ? `Change the due date: ${dateLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
-					{look === "chip" && !dueDate && trigger === undefined ? (
-						<Button variant="tertiary" size="icon-compact" className="rounded-full" aria-label="More fields: set a due date" data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-							<IconDotGrid1x3Horizontal />
-						</Button>
-					) : (
-						<Button size="compact" {...pickerButton(look, className)} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-							<span className="flex min-w-0 items-center gap-2">
-								{trigger ?? (
-									<>
-										{look !== "row" && <IconCalendar1 className="size-4 text-muted-foreground" />}
-										{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
-									</>
-								)}
-							</span>
-						</Button>
-					)}
+					<Button size="compact" {...pickerButton(look, className)} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
+						<span className="flex min-w-0 items-center gap-2">
+							{trigger ?? (
+								<>
+									{look !== "row" && <IconCalendar1 className="size-4 text-muted-foreground" />}
+									{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
+								</>
+							)}
+						</span>
+					</Button>
 				</PopoverTrigger>
 			</Tooltip>
 			<PopoverContent align="start" className="w-auto p-2">

@@ -37,9 +37,9 @@ describe("keepsTodo", () => {
 	});
 
 	test("keeps a todo carrying a link of any checked kind", () => {
-		const linked = todo("a", { links: [{ kind: "ticket", identifier: "ENG-1" }] });
-		expect(keeps(linked, { links: new Set(["ticket", "session"]) })).toBe(true);
-		expect(keeps(linked, { links: new Set(["pull-request"]) })).toBe(false);
+		const linked = todo("a", { links: [{ kind: "pull-request", owner: "o", repo: "r", number: 1 }] });
+		expect(keeps(linked, { links: new Set(["pull-request", "session"]) })).toBe(true);
+		expect(keeps(linked, { links: new Set(["session"]) })).toBe(false);
 	});
 
 	test("keeps a todo due within the next days, overdue included, by its earliest open due day", () => {
@@ -67,7 +67,7 @@ describe("stored filter and display", () => {
 	test("falls back part by part on unreadable values", () => {
 		expect(decodeFilter(null)).toEqual(NO_FILTER);
 		expect(decodeFilter("not json")).toEqual(NO_FILTER);
-		expect(decodeFilter(JSON.stringify({ priorities: ["9", "2"], assignees: "user", links: ["email"], due: 5, created: 14 }))).toEqual({
+		expect(decodeFilter(JSON.stringify({ priorities: ["9", "2"], assignees: "user", links: ["ticket"], due: 5, created: 14 }))).toEqual({
 			...NO_FILTER,
 			priorities: new Set(["2"]),
 			created: 14,
@@ -80,9 +80,9 @@ describe("stored filter and display", () => {
 describe("linkOptions", () => {
 	test("offers the kinds the todos carry, with counts, and a checked kind none carries", () => {
 		const todos = [todo("a", { links: [{ kind: "session", sessionId: "s" }] }), todo("b", { links: [{ kind: "session", sessionId: "t" }] })];
-		expect(linkOptions(todos, new Set(["ticket"]))).toEqual([
+		expect(linkOptions(todos, new Set(["pull-request"]))).toEqual([
 			{ key: "session", label: "Session", count: 2 },
-			{ key: "ticket", label: "Linear issue", count: 0 },
+			{ key: "pull-request", label: "Pull request", count: 0 },
 		]);
 	});
 });

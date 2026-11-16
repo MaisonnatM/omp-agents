@@ -1,5 +1,5 @@
 /** A todo's status, priority, assignee, due day, and Workspace as pickers, as an icon on its row or a labeled button in its details. */
-import { IconAiBotHead, IconCalendarClock, IconCircleDashed, IconFolder1, IconUser } from "central-icons";
+import { IconAiBotHead, IconCalendarClock, IconCircleDashed, IconDotGrid1x3Horizontal, IconExclamationCircle, IconFolder1, IconSpeedHigh, IconSpeedLow, IconSpeedMiddle, IconUser } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { Workspace } from "../../../src/shared/workspaces";
 import {
@@ -15,13 +15,19 @@ import {
 } from "../../../src/user-todos-shared";
 import { cn } from "@/lib/utils";
 import { folderName } from "../../labels";
-import { PRIORITY_LABEL } from "../../tickets-model";
-import { ASSIGNEE_LABELS, dueLabel, TODO_STATUS } from "../../todo-views";
+import { ASSIGNEE_LABELS, dueLabel, PRIORITY_LABEL, TODO_STATUS } from "../../todo-views";
 import { type Choice, DuePicker, FieldPicker } from "../field-picker";
-import { PRIORITY_ICON, STATUS_ICON } from "../tickets/ticket-row";
+
+export const PRIORITY_ICON: Record<TodoPriority, [IconComponent, string]> = {
+	0: [IconDotGrid1x3Horizontal, "text-muted-foreground"],
+	1: [IconExclamationCircle, "text-orange-500 dark:text-orange-400"],
+	2: [IconSpeedHigh, "text-foreground"],
+	3: [IconSpeedMiddle, "text-foreground"],
+	4: [IconSpeedLow, "text-foreground"],
+};
 
 export function StatusIcon({ status, className }: { status: TodoStatus; className?: string }) {
-	const [Icon, color] = STATUS_ICON[TODO_STATUS[status].kind];
+	const [Icon, color] = TODO_STATUS[status].icon;
 	return <Icon aria-hidden className={cn("size-4 shrink-0", color, className)} />;
 }
 
