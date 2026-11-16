@@ -13,7 +13,6 @@
   ⇧⌘L opens **Browser**, and opens the sidebar too when it is closed; the **+** menu lists both keys.
   The sidebar remembers the tabs you opened and the one you chose, for every view; a tab the view cannot show, such as **Browser** for a past session, stays open but hidden until it can.
   **Review visuals** opens and shows the **Browser** tab, and saving an artifact the **Artifacts** tab.
-  What a live session runs besides omp shows in the sidebar's CPU card; see [Sessions sidebar](sessions-sidebar.md).
 - **Overview** lists the view's **Subagents**, then the **Files**, **Images**, and **Sources** of [Changed files and images](changed-files-and-images.md), each under a filled header with its count that folds on a click; see [Conversations](conversations.md) for the **Subagents** section.
   A section shows once it has something to list, and the tab says **Nothing yet** once the session's lists have loaded and none has.
   A past session's view shows its files, images, and sources but no subagents.

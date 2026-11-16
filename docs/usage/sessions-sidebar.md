@@ -1,6 +1,6 @@
 # Sessions sidebar
 
-- The sidebar's foot shows how much quota is left on each plan account, as a grid of rings, and the Mac's CPU, free memory, and free disk: hover or click the CPU for each session's processes with **Stop**, or the disk for **Clean up…**.
+- The sidebar's foot shows how much quota is left on each plan account, one full-width row with a bar per account.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the button that hides the sidebar; under it a row holds the omp mark and the command menu button.
 - Under it the page list shows **New session**, then **Notifications** with its unread count, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, and **Settings**.
@@ -103,8 +103,8 @@
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.
   Each sidebar's width, and whether it is hidden, is saved in the app.
 - The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
-- The sidebar's foot, under the roster and a dividing line, shows how much quota is left on each plan account that `omp usage` reports, as a grid of four tiles per row: each tile is the provider's logo, from [svgl](https://svgl.app), inside a ring that empties as the plan is used, then the percent left of its tightest open window, then the account's email when the provider has several, on up to two lines, else the window, such as `7d`.
-  A provider without a logo shows the first letters of the plan's name in the ring.
+- The sidebar's foot, under the roster and a dividing line, shows how much quota is left on each plan account that `omp usage` reports, one full-width row per account: the provider's logo, from [svgl](https://svgl.app), then the account's email when the provider has several, else the window, such as `7d`, then the percent left of its tightest open window, over a bar that empties as the plan is used.
+  A provider without a logo shows the first letters of the plan's name in its place.
   Amber means less than 20% is left, and red means a window of the plan is used up, as omp reports it.
   Hover or click a tile to see every window of the plan with its bar and when it resets, the extra usage, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
   A plan with extra usage and no windows, the pay-as-you-go spend past its plan such as Claude's, shows the amount spent and the cap, as `$12.40 / $50.00`.
@@ -122,25 +122,8 @@
   A sign-in that exists only in Chrome stays a name, because that browser's cookies are encrypted.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.
-- The same grid continues after the plans with the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory, each as a ring that fills with the share in use, amber past 80% and red past 95%.
-  On a phone paired through Phone access the foot leaves these three out, since they describe the Mac, and the plan tiles show only while the floating sidebar is open.
-  The foot reads them again every five seconds while the page is visible.
-  Hover or focus the memory for its full reading.
-  Hover or click the disk space for that volume's percent used, a bar of it, and the space used, free, and in total.
-  Click it or press Enter to move focus into the popover, then follow **Clean up…** to [Settings › Storage](settings.md).
-- Hover or click the CPU for a popover that lists what every live session runs besides omp, read again every 5 seconds while it is open.
-  Clicking the CPU while hover opened it, or pressing Enter on it, moves focus into the popover, so Tab reaches each **Stop**.
-  The busiest session comes first, by the CPU of omp and its processes together, each named by its session name or else its folder; a Bot's conversation reads its Bot's name and **Bot**.
-  The CPU of a process is the share of one core it uses, so one process can show more than 100%; macOS reads it as an average that decays over the last minute.
-  Each session starts with the CPU, memory, and process count of omp and its MCP servers, which end with the session and have no **Stop**.
-  Below it come its jobs and services, biggest memory first.
-  A job is a process group the session started, such as a dev server or a watcher, named by its command line; a service is a daemon that omp's project broker runs for the session, named by the daemon's name and command.
-  Each row shows its CPU, its memory, how many processes it holds when more than one, **Shared with this project's sessions** for a broker daemon no session owns, such as omp's browser, and **Stops in N min** once the idle stop has a time for it.
-  A shared service shows under each session of its project, and counts toward each one's CPU.
-  **Stop** ends it at once: a job gets SIGTERM, then SIGKILL after 3 seconds, and a service is stopped through its broker.
-  A process the session ran in a Docker container does not show, since Docker runs it outside the session's processes.
 - The idle stop ends a job once its session has been idle, waiting on you or done with its turn, for the time **Stop idle processes** in [Settings](settings.md) names, 30 minutes by default, counted from when the session was last busy or from the job's start if that is later.
   A shared service stops once every live session of its project has been idle that long.
-  Only the server that runs unattended work, the first one started, stops processes, so another server shows no **Stops in** time.
+  Only the server that runs unattended work, the first one started, stops processes.
 - When a session ends or its omp exits, the server stops the services it owned and the jobs it left running.
   A session started from the dashboard also has the rest of its processes ended when it ends, as before.

@@ -1,41 +1,28 @@
-/** The ring tiles of the sidebar's foot, which show plan quota and the machine's load alike. */
+/** The bar rows of the sidebar's foot, which show plan quota and the machine's load alike. */
 import type { HTMLAttributes, ReactNode, Ref } from "react";
 import { cn } from "@/lib/utils";
 
 /** How a figure reads: `out` is used up, `low` is running low. */
 export type Tone = "out" | "low" | "ok";
 
-export const TONE_CLASS: Record<Tone, { text: string; bar: string; ring: string }> = {
-	out: { text: "text-red-600 dark:text-red-400", bar: "bg-red-500", ring: "stroke-red-500" },
-	low: { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500", ring: "stroke-amber-500" },
-	ok: { text: "text-foreground", bar: "bg-foreground/60", ring: "stroke-foreground/60" },
+export const TONE_CLASS: Record<Tone, { text: string; bar: string }> = {
+	out: { text: "text-red-600 dark:text-red-400", bar: "bg-red-500" },
+	low: { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" },
+	ok: { text: "text-foreground", bar: "bg-foreground/60" },
 };
 
-const RING_RADIUS = 13;
-const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
-const TILE = "flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1 tabular-nums outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring";
+const TILE = "flex w-full min-w-0 flex-col gap-1 rounded-md px-1.5 py-1 text-left tabular-nums outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring";
 
-/** An icon inside a ring filled to `fill`, 0 to 1, or left empty for `null`. */
-function GaugeRing({ fill, tone, children }: { fill: number | null; tone: Tone; children: ReactNode }) {
+/** A full-width bar filled to `fill`, 0 to 1, or left empty for `null`. */
+function GaugeBar({ fill, tone }: { fill: number | null; tone: Tone }) {
 	return (
-		<span aria-hidden className="relative grid size-8 place-items-center">
-			<svg viewBox="0 0 32 32" className="absolute inset-0 -rotate-90">
-				<circle cx="16" cy="16" r={RING_RADIUS} fill="none" strokeWidth="2.5" className="stroke-foreground/10" />
-				{fill !== null && (
-					<circle
-						cx="16"
-						cy="16"
-						r={RING_RADIUS}
-						fill="none"
-						strokeWidth="2.5"
-						strokeLinecap="round"
-						strokeDasharray={RING_LENGTH}
-						strokeDashoffset={(1 - Math.max(0.02, fill)) * RING_LENGTH}
-						className={cn("transition-[stroke-dashoffset] duration-300 ease-out motion-reduce:transition-none", TONE_CLASS[tone].ring)}
-					/>
-				)}
-			</svg>
-			{children}
+		<span aria-hidden className="block h-1 w-full overflow-hidden rounded-full bg-foreground/10">
+			{fill !== null && (
+				<span
+					className={cn("block h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none", TONE_CLASS[tone].bar)}
+					style={{ width: `${Math.max(0.02, Math.min(1, fill)) * 100}%` }}
+				/>
+			)}
 		</span>
 	);
 }
@@ -45,27 +32,28 @@ interface GaugeTileProps extends Omit<HTMLAttributes<HTMLElement>, "className"> 
 	as: "button" | "img";
 	/** What a screen reader says for the tile. */
 	label: string;
-	/** Fraction the ring fills, 0 to 1; `null` leaves it empty. */
+	/** Fraction the bar fills, 0 to 1; `null` leaves it empty. */
 	fill: number | null;
 	tone: Tone;
-	/** What sits in the ring, such as a provider's logo. */
+	/** What leads the row, such as a provider's logo. */
 	icon: ReactNode;
-	/** The figure under the ring, in the tile's tone; `null` shows a dash. */
+	/** The figure at the row's end, in the tile's tone; `null` shows a dash. */
 	value: string | null;
-	/** The muted line under the figure, which wraps to a second line, as a long email does. */
+	/** The muted name beside the icon, truncated when long, as an email is. */
 	caption: string;
 	ref?: Ref<HTMLElement>;
 }
 
-/** One tile of the foot's grid: a ring, its figure, and its caption, stacked; it takes a popover's or a tooltip's trigger props. */
+/** One row of the foot's list: icon, caption, and figure over a full-width bar; it takes a popover's or a tooltip's trigger props. */
 export function GaugeTile({ as, label, fill, tone, icon, value, caption, ref, ...props }: GaugeTileProps) {
 	const body = (
 		<>
-			<GaugeRing fill={fill} tone={tone}>
-				{icon}
-			</GaugeRing>
-			<span className={cn("max-w-full truncate font-medium", TONE_CLASS[tone].text)}>{value ?? "—"}</span>
-			<span className="line-clamp-2 max-w-full text-center text-3xs text-muted-foreground [overflow-wrap:anywhere]">{caption}</span>
+			<span className="flex min-w-0 items-center gap-1.5">
+				<span aria-hidden className="grid size-3.5 shrink-0 place-items-center">{icon}</span>
+				<span className="min-w-0 flex-1 truncate text-muted-foreground">{caption}</span>
+				<span className={cn("shrink-0 font-medium", TONE_CLASS[tone].text)}>{value ?? "—"}</span>
+			</span>
+			<GaugeBar fill={fill} tone={tone} />
 		</>
 	);
 	if (as === "button") {
@@ -82,7 +70,7 @@ export function GaugeTile({ as, label, fill, tone, icon, value, caption, ref, ..
 	);
 }
 
-/** One cell of the foot's grid, holding a {@link GaugeTile} and stretching it to the row's height. */
+/** One row of the foot's list, holding a {@link GaugeTile}. */
 export function GaugeCell({ children }: { children: ReactNode }) {
-	return <li className="flex min-w-0 flex-col">{children}</li>;
+	return <li className="flex min-w-0">{children}</li>;
 }

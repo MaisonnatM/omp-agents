@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- The sidebar's foot now shows plan usage as full-width rows with a bar, instead of a grid of rings, so long account emails read in full.
+- The Mac's CPU, free memory, and free disk no longer show in the sidebar; Settings › Storage still shows the free disk space.
 - A workspace's new-session button in the sidebar now sits level with the workspace name and its chevron, instead of a few pixels lower.
 - In the desktop app, the sidebar toggle and the back and forward buttons above the sidebar respond to clicks again, instead of dragging the window.
 - In poteto mode, a Babysit run's todo list now holds only the steps its mode runs, so a one-time rebase or a review-thread fix no longer ends with a turn spent ticking off polling and merge steps.

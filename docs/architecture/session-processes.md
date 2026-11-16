@@ -1,15 +1,15 @@
 # Session processes
 
-The sidebar's CPU card lists what every live session runs besides omp, and the server stops those processes on request, once their sessions have been idle long enough, and once their session leaves the roster.
+The server lists what every live session runs besides omp, for the Browser's dev servers, and stops those processes on request, once their sessions have been idle long enough, and once their session leaves the roster.
 `SessionProcessWatch` in `src/server/session-processes.ts` does all three, so there is one path that stops a session's processes.
 
 ## What counts as a session's process
 
 omp's bash tool runs in omp's own process: each command it runs, foreground or async, is a child of omp that leads its own process group, and so do omp's Python kernels and private browsers.
 Each such group is a job, listed by its top process, the group's leader, and stopped as a whole.
-omp's stdio MCP servers are children of omp in omp's own process group: they are omp's helpers, not something the session started, so the card only shows their memory and CPU with omp's, and they end with the session.
+omp's stdio MCP servers are children of omp in omp's own process group: they are omp's helpers, not something the session started, so the list only counts their memory and CPU with omp's, and they end with the session.
 omp starts its shared workers, whose commands begin with `__omp_worker_`, such as a project's daemon broker, the blob broker, or the LSP multiplexer, as children of whichever omp first needs them, and they serve every omp of the project or the machine.
-`descendants` in `src/process-census.ts` skips them and everything under them, for the card, the keeper's census, and `stopTree` alike; `OMP_WORKER_PREFIX` names the prefix omp's `cli/worker-selectors.ts` gives every worker.
+`descendants` in `src/process-census.ts` skips them and everything under them, for the list, the keeper's census, and `stopTree` alike; `OMP_WORKER_PREFIX` names the prefix omp's `cli/worker-selectors.ts` gives every worker.
 A service is a daemon the project's broker runs: a dev server the bash tool or the Browser's **Start dev server** started with a `name`, or omp's shared headless browser.
 It runs under the broker, not under omp, and outlives the session that started it while any omp stays in the project, which with sessions the dashboard keeps running is forever.
 `ompDaemons` in `src/omp/daemons.ts` lists them with omp's own `collectReports` from `cli/ps-data.ts`, which never starts a broker, keeps the ones a live broker supervises that have not ended, and stops one generation through the broker's `stop` with its id and a 3-second timeout.
