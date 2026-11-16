@@ -5,13 +5,10 @@
  * casts what it received; a parser whose refusal the page shows returns `{ error }` in place of `null`.
  * A shape the server also keeps in a file, such as a routine, a scheduled send, or an event's time, is parsed by its domain module.
  */
-import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
+import { BASE64, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
 import { parseBotChange } from "../shared/bots";
 import {
-	GOOGLE_CLIENT_ID,
-	type GoogleClientInput,
-	holdsAccounts,
 	type IntegrationTarget,
 	MCP_INTEGRATIONS,
 	normalizeSlackScope,
@@ -19,13 +16,10 @@ import {
 	slackRedirectError,
 } from "../shared/accounts";
 import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
-import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
-import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { parseImages, parseModel, parseNewSessionRequest, parseSkill, parseThinking } from "../shared/sessions";
 import { parseContextAction, parseGoalChange } from "../shared/session-controls";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import type { DevServerRequest, ProcessStop } from "../shared/processes";
-import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import {
 	GITHUB_NAME,
 	MAX_COMMENT_BODY,
@@ -62,12 +56,10 @@ import { MAX_CAPTURE_ID } from "../shared/dictation";
 import type { AckedFrame, ClientFrame, ClientMsg, ModuleChangeMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
-import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
 import type { TrustChange } from "../shared/project-trust";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { isStoredModuleId, parseModuleChange, type StoredModuleId } from "../modules";
-import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
-import { isTodoId, parseTodoChange } from "../user-todos-parse";
+import { parseTodoChange } from "../user-todos-parse";
 import { MAX_WORKTREE_BATCH, type WorktreeConfirmation, type WorktreeRemovalRequest, type WorktreeTarget } from "../worktrees-shared";
 
 /** The longest composer text the server completes. */
@@ -434,7 +426,7 @@ export function parseClientMsg(raw: string | Buffer): Parsed<ClientFrame> {
 }
 
 /** A UUID as `crypto.randomUUID()` writes it, lowercase. */
-export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** The `page` of a `/ws` address: the id a page load picks once, `crypto.randomUUID()`; `null` when absent or not one. */
 export const parsePageId = (value: string | null): string | null => (value !== null && UUID.test(value) ? value : null);
@@ -607,16 +599,8 @@ export function parseRepoQuery(params: URLSearchParams): Parsed<Repo> {
 
 const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
-/**
- * The body of `PUT /api/integrations/sign-in` and `/remove`: `{ id, account }`, an MCP integration and, for one of
- * many accounts, the account's server name, or `null` to add one; a service of one server takes no account.
- */
-export function parseIntegrationTarget(body: unknown): Parsed<IntegrationTarget> {
-	if (!isObject(body) || !isMcpIntegration(body.id)) return null;
-	const account = body.account ?? null;
-	if (account === null) return { ok: { id: body.id, account } };
-	return holdsAccounts(body.id) && isNonEmpty(account) ? { ok: { id: body.id, account } } : null;
-}
+/** The body of `PUT /api/integrations/sign-in` and `/remove`: `{ id }`, an MCP integration. */
+export const parseIntegrationTarget = (body: unknown): Parsed<IntegrationTarget> => (isObject(body) && isMcpIntegration(body.id) ? { ok: { id: body.id } } : null);
 
 /** The body of `PUT /api/mcp-servers/sign-in`, `/sign-out`, and `/remove`: `{ name }` naming a server omp loads. */
 export const parseMcpServerName = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.name) ? { ok: body.name } : null);
@@ -674,78 +658,6 @@ export const parseProviderSignOut = (body: unknown): Parsed<{ provider: string; 
 export const parseAccountOrder = (body: unknown): Parsed<AccountOrderEdit> =>
 	isObject(body) && isNonEmpty(body.provider) && isTexts(body.emails) && body.emails.every(isNonEmpty) ? { ok: { provider: body.provider, emails: body.emails } } : null;
 
-/** The body of `PUT /api/google/calendars`: `{ account, id, shown }`, a Google calendar's account and id and whether the Calendar page shows it. */
-export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
-	isObject(body) && isNonEmpty(body.account) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { ok: { account: body.account, id: body.id, shown: body.shown } } : null;
-
-function parseNewEventCalendar(value: unknown): Parsed<NewEventCalendar> {
-	if (!isObject(value)) return null;
-	if (value.kind === "local") return { ok: { kind: "local" } };
-	return value.kind === "google" && isNonEmpty(value.account) && isNonEmpty(value.calendarId) ? { ok: { kind: "google", account: value.account, calendarId: value.calendarId } } : null;
-}
-
-/** The body of `PUT /api/calendar/events/new`: a trimmed title of at most {@link MAX_EVENT_TITLE} characters, when it happens, and the calendar it goes in. */
-export function parseNewEvent(body: unknown): Parsed<NewEvent> {
-	if (!isObject(body) || !isNonEmpty(body.title)) return null;
-	const title = body.title.trim();
-	const when = parseEventWhen(body.when);
-	const calendar = parseNewEventCalendar(body.calendar);
-	return title.length <= MAX_EVENT_TITLE && when && calendar ? { ok: { title, when: when.ok, calendar: calendar.ok } } : null;
-}
-
-/** The body of `PUT /api/calendar/events/delete`: an event kept on this computer by its id, or a Google event by its account, its calendar's id, and its own. */
-export function parseEventRef(body: unknown): Parsed<EventRef> {
-	if (!isObject(body)) return null;
-	if (body.kind === "local") return isNonEmpty(body.id) ? { ok: { kind: "local", id: body.id } } : null;
-	if (body.kind === "google") {
-		return isNonEmpty(body.account) && isNonEmpty(body.calendarId) && isNonEmpty(body.eventId)
-			? { ok: { kind: "google", account: body.account, calendarId: body.calendarId, eventId: body.eventId } }
-			: null;
-	}
-	return null;
-}
-
-/** The most people one field of a sent mail names. */
-const MAX_RECIPIENTS = 100;
-
-/** A body's `key` as people to write to: each `{ name, address }` with an address holding an `@`, else `null`. */
-function peopleIn(body: Record<string, unknown>, key: string): MailPerson[] | null {
-	const list = body[key];
-	if (!Array.isArray(list) || list.length > MAX_RECIPIENTS) return null;
-	const people = list.flatMap(item =>
-		isObject(item) && typeof item.name === "string" && typeof item.address === "string" && /^[^\s@<>,]+@[^\s@<>,]+$/.test(item.address)
-			? [{ name: item.name.replace(/[\r\n]/g, " "), address: item.address }]
-			: [],
-	);
-	return people.length === list.length ? people : null;
-}
-
-/** A body's draft without its subject, `null` when a field is missing or too long, or it names no one to write to. */
-function draftIn(body: Record<string, unknown>): Omit<MailDraft, "subject"> | null {
-	if (typeof body.html !== "string" || !isNonEmpty(body.text) || body.text.length > MAX_MAIL_BODY || body.html.length > MAX_MAIL_BODY) return null;
-	const [to, cc, bcc] = [peopleIn(body, "to"), peopleIn(body, "cc"), peopleIn(body, "bcc")];
-	if (!to || !cc || !bcc || to.length + cc.length + bcc.length === 0) return null;
-	return { to, cc, bcc, html: body.html, text: body.text };
-}
-
-/** The body of `PUT /api/gmail/reply`: the account and conversation to answer, and the reply. */
-export function parseMailReply(body: unknown): Parsed<MailReply> {
-	if (!isObject(body) || !isNonEmpty(body.account) || !isNonEmpty(body.thread)) return null;
-	const draft = draftIn(body);
-	return draft && { ok: { ...draft, account: body.account, thread: body.thread } };
-}
-
-/** The body of `PUT /api/gmail/send`: a new mail from an account, its subject on one line. */
-export function parseMailSend(body: unknown): Parsed<MailSend> {
-	if (!isObject(body) || !isNonEmpty(body.account) || typeof body.subject !== "string" || body.subject.length > 1000) return null;
-	const draft = draftIn(body);
-	return draft && { ok: { ...draft, account: body.account, subject: body.subject.replace(/[\r\n]/g, " ") } };
-}
-
-/** The body of `PUT /api/gmail/trash`: the account and conversation to move to Trash. */
-export const parseMailTrash = (body: unknown): Parsed<MailTrash> =>
-	isObject(body) && isNonEmpty(body.account) && isNonEmpty(body.thread) ? { ok: { account: body.account, thread: body.thread } } : null;
-
 const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 
 /** A body's `clientSecret`: trimmed, `undefined` when left out or empty so the saved secret can stay, `null` when it is not a string. */
@@ -773,82 +685,8 @@ export function parseSlackClient(body: unknown): Parsed<SlackClientInput, { erro
 	return { ok: clientSecret === undefined ? { clientId, redirectUri, callbackPort: body.callbackPort, scope } : { clientId, clientSecret, redirectUri, callbackPort: body.callbackPort, scope } };
 }
 
-/** The body of `PUT /api/integrations/<google-calendar|gmail>/client`. An empty secret is omitted so the saved secret can stay. */
-export function parseGoogleClient(body: unknown): Parsed<GoogleClientInput, { error: string }> {
-	if (!isObject(body)) return { error: "Expected { clientId, callbackPort } for the Google OAuth client." };
-	const clientId = typeof body.clientId === "string" ? body.clientId.trim() : "";
-	if (!GOOGLE_CLIENT_ID.test(clientId)) return { error: "Enter the OAuth client's ID, which ends in .apps.googleusercontent.com." };
-	const clientSecret = secretOf(body);
-	if (clientSecret === null) return { error: "Expected clientSecret to be a string." };
-	if (!validPort(body.callbackPort)) return { error: "Enter a local callback port from 1 to 65535." };
-	return { ok: clientSecret === undefined ? { clientId, callbackPort: body.callbackPort } : { clientId, clientSecret, callbackPort: body.callbackPort } };
-}
-
-const isTicketPriority = oneOf(TICKET_PRIORITIES);
-
-/** The fields a picker sets, each left out unchanged and `null` clearing it, each of its own type; `null` for any other value. */
-function parseTicketFields(body: Record<string, unknown>): Parsed<TicketFieldValues> {
-	const { state, assignee, priority, labels, project, dueDate } = body;
-	const fields: TicketFieldValues = {};
-	if (state !== undefined) {
-		if (!isNonEmpty(state)) return null;
-		fields.state = state;
-	}
-	if (assignee !== undefined) {
-		if (assignee !== null && !isNonEmpty(assignee)) return null;
-		fields.assignee = assignee;
-	}
-	if (priority !== undefined) {
-		if (!isTicketPriority(priority)) return null;
-		fields.priority = priority;
-	}
-	if (labels !== undefined) {
-		if (!Array.isArray(labels) || !labels.every(isNonEmpty)) return null;
-		fields.labels = [...new Set(labels)];
-	}
-	if (project !== undefined) {
-		if (project !== null && !isNonEmpty(project)) return null;
-		fields.project = project;
-	}
-	if (dueDate !== undefined) {
-		if (dueDate !== null && !isDay(dueDate)) return null;
-		fields.dueDate = dueDate;
-	}
-	return { ok: fields };
-}
-
-/** The body of `PUT /api/ticket/new`: a title and a description, each within its limit, a team by id, and any picker's fields. */
-export function parseTicketDraft(body: unknown): Parsed<TicketDraft> {
-	if (!isObject(body)) return null;
-	const { title, description, team } = body;
-	if (!isNonEmpty(title) || title.length > MAX_TICKET_TITLE || typeof description !== "string" || description.length > MAX_TICKET_DESCRIPTION || !isNonEmpty(team)) return null;
-	const fields = parseTicketFields(body);
-	return fields && { ok: { ...fields.ok, title: title.trim(), description, team } };
-}
-
-/** The body of `PUT /api/todo/ticket`: a todo by id, and a Linear team by id. */
-export function parseTodoTicket(body: unknown): Parsed<TodoTicketRequest> {
-	if (!isObject(body) || !isTodoId(body.todoId) || !isNonEmpty(body.team)) return null;
-	return { ok: { todoId: body.todoId, team: body.team } };
-}
-
-/** The body of `PUT /api/ticket`: an issue identifier and at least one field to change, each of its own type. */
-export function parseTicketEdit(body: unknown): Parsed<TicketEdit> {
-	if (!isObject(body) || typeof body.id !== "string" || !TICKET_ID.test(body.id)) return null;
-	const fields = parseTicketFields(body);
-	return fields && Object.keys(fields.ok).length > 0 ? { ok: { id: body.id, ...fields.ok } } : null;
-}
-
 /** Whether `data` is a file's bytes in standard base64, the empty file too, of at most `maxBytes`. */
 const isBase64File = (data: unknown, maxBytes: number): data is string => typeof data === "string" && data.length <= Math.ceil(maxBytes / 3) * 4 && (data === "" || BASE64.test(data));
-
-/** The body of `PUT /api/ticket/attachment`: an issue identifier, a file name and MIME type, and its bytes in base64 within the size limit. */
-export function parseTicketAttachment(body: unknown): Parsed<TicketAttachmentUpload> {
-	if (!isObject(body)) return null;
-	const { issue, name, type, data } = body;
-	if (typeof issue !== "string" || !TICKET_ID.test(issue) || !isNonEmpty(name) || !isNonEmpty(type) || !isBase64File(data, MAX_TICKET_ATTACHMENT_BYTES)) return null;
-	return { ok: { issue, name, type, data } };
-}
 
 const isPullRequestImageType = oneOf(PULL_REQUEST_IMAGE_TYPES);
 

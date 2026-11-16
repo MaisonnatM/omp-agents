@@ -3,24 +3,14 @@
  * read, or cleared, which `notices.json` keeps across restarts. Each kind has its own check.
  */
 import { JsonFile } from "../fs";
-import type { SignedOutAccount } from "../google-accounts";
 import { errorText, isObject } from "../json";
 import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, yourMoves } from "../shared/moves";
 import type { DashboardNews, DashboardUpdateOutcome } from "../shared/dashboard-update";
 import type { PlanUsage } from "../shared/models";
-import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
-import { EVENT_LEAD_MS, usesClause } from "../shared/notices";
+import type { CreditsSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
+import { usesClause } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
-
-/** A timed calendar event; `ref` names it among the events: `local/<id>`, or `google/<account>/<calendar id>/<event id>`. */
-export type FoundEvent = Omit<EventSubject, "kind"> & { ref: string };
-
-/** One Google Calendar account's timed events, `null` when the account did not answer. */
-export interface AccountFoundEvents {
-	account: string;
-	events: FoundEvent[] | null;
-}
 
 export interface NoticeSources {
 	/** The newest omp release, or `null` when omp's settings turn the check off. */
@@ -46,14 +36,8 @@ export interface NoticeSources {
 	plans(): Promise<PlanUsage[]>;
 	/** Each provider whose prepaid credits ran out, as its latest requests failed. */
 	creditRuns(): Promise<Omit<CreditsSubject, "kind">[]>;
-	/** The timed events kept on this computer. */
-	localEvents(): FoundEvent[];
-	/** The timed events of each signed-in Google Calendar account's shown calendars that overlap `from` to `to`, epoch ms. */
-	googleEvents(from: number, to: number): Promise<AccountFoundEvents[]>;
 	/** The interrupted dashboard sessions that stopped while their turn ran. */
 	stoppedSessions(): StoppedSession[];
-	/** The Google accounts sessions reported signed out that still do not work. */
-	signedOut(): Promise<SignedOutAccount[]>;
 	now(): number;
 }
 
@@ -65,12 +49,8 @@ export const DASHBOARD_KINDS = ["dashboard"] as const satisfies readonly NoticeK
 export const ACTIVITY_KINDS = ["pull-request", "slack"] as const satisfies readonly NoticeKind[];
 /** The kinds the provider check looks for. */
 export const PROVIDER_KINDS = ["plan", "credits"] as const satisfies readonly NoticeKind[];
-/** The kinds the event check looks for. */
-export const EVENT_KINDS = ["event"] as const satisfies readonly NoticeKind[];
 /** The kinds the stopped-sessions check looks for. */
 export const STOPPED_KINDS = ["stopped"] as const satisfies readonly NoticeKind[];
-/** The kinds the sign-in check looks for, which lists each reported account's tools. */
-export const SIGN_IN_KINDS = ["sign-in"] as const satisfies readonly NoticeKind[];
 
 const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
@@ -89,10 +69,7 @@ interface Marked {
 /** How long a mark outlives its notice: a pull request whose state flickers, as GitHub works out its conflicts again, does not toast twice. */
 const MARK_GRACE_MS = 10 * 60_000;
 
-/**
- * A notice a check found. Its `scope` is what one answer covers: its kind, a pull request's repository, or Google's or the
- * local calendar events.
- */
+/** A notice a check found. Its `scope` is what one answer covers: its kind, or a pull request's repository. */
 type Found = Unscoped & { scope: string };
 type Unscoped = { id: string; at: number } & NoticeSubject;
 
@@ -119,9 +96,7 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	slack: "Slack messages",
 	plan: "used-up plans",
 	credits: "providers out of credits",
-	event: "calendar events",
 	stopped: "sessions that stopped mid-turn",
-	"sign-in": "signed-out Google accounts",
 };
 
 /**
@@ -173,25 +148,6 @@ function planNotices(plans: PlanUsage[], at: number): Unscoped[] {
 				resetCredits: resetCredits?.count ?? 0,
 			})),
 	);
-}
-
-/**
- * A notice for each event of `local` and `google` that starts within {@link EVENT_LEAD_MS} of `now` or runs then, dated
- * that lead before its start. Each Google Calendar account is a scope of its own: an account that did not answer, or
- * all of them when `google` is `null`, keeps its events' notices as they were, as the Calendar page shows why. The scope
- * every Google event had before accounts counts as answered, so notices kept from then clear.
- */
-function eventNotices(local: FoundEvent[], google: AccountFoundEvents[] | null, now: number): Checked {
-	const scoped = (events: FoundEvent[], scope: string): Found[] =>
-		events
-			.filter(({ start, end }) => start - EVENT_LEAD_MS <= now && now < end)
-			.map(({ ref, ...event }) => ({ id: `event:${ref}:${event.start}`, at: event.start - EVENT_LEAD_MS, scope, kind: "event" as const, ...event }));
-	const answered = (google ?? []).flatMap(({ account, events }) => (events === null ? [] : [{ scope: `event:google/${account}`, events }]));
-	return {
-		found: [...scoped(local, "event:local"), ...answered.flatMap(({ scope, events }) => scoped(events, scope))],
-		scopes: new Set(["event:local", ...(google === null ? [] : ["event:google"]), ...answered.map(({ scope }) => scope)]),
-		dated: true,
-	};
 }
 
 /**
@@ -345,18 +301,8 @@ export class Notices {
 					(await this.#sources.creditRuns()).map(run => ({ id: `credits:${run.provider}`, at: run.since, kind: "credits", ...run })),
 					true,
 				);
-			case "event": {
-				const now = this.#sources.now();
-				const google = await this.#sources.googleEvents(now, now + EVENT_LEAD_MS).catch(() => null);
-				return eventNotices(this.#sources.localEvents(), google, now);
-			}
 			case "stopped":
 				return all(stoppedNotices(this.#sources.stoppedSessions(), this.#sources.now()), false);
-			case "sign-in":
-				return all(
-					(await this.#sources.signedOut()).map(({ since, ...account }) => ({ id: `sign-in:${account.account}:${since}`, at: since, kind: "sign-in", ...account })),
-					true,
-				);
 		}
 	}
 

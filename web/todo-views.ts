@@ -1,14 +1,13 @@
 /** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
-import { IconAiBotHead, IconArchive, IconBubbleQuestion, IconCalendarClock, IconTodos } from "central-icons";
+import { IconAiBotHead, IconArchive, IconBubbleQuestion, IconCalendarClock, IconCircleCheck, IconCircleDashed, IconCircleX, IconContrast, IconFormCircle, IconTodos } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import type { TodoAssignee, TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
+import type { TodoAssignee, TodoPriority, TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
 import { everyWord } from "../src/shared/every-word";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "../src/shared/days";
 import { DAY_FORMAT } from "./labels";
 import type { WindowScope } from "./sessions";
 import type { TodoListView } from "./routing";
-import type { StatusKind } from "./tickets-model";
 import { workStateOf, type TodoSessions } from "./todo-work-state";
 
 /** What a list shows and lets you do. A category's title is its own name. */
@@ -43,19 +42,24 @@ export const SIDEBAR_LISTS: { view: Exclude<TodoListView, { kind: "category" }>;
 	{ view: { kind: "archive" }, name: "Archive", icon: IconArchive },
 ];
 
-/** Each status as the page names it and draws it, with the Linear state type whose glyph it takes. */
-export const TODO_STATUS: Record<TodoStatus, { label: string; kind: StatusKind }> = {
-	backlog: { label: "Backlog", kind: "backlog" },
-	todo: { label: "Todo", kind: "unstarted" },
-	"in-progress": { label: "In Progress", kind: "started" },
-	done: { label: "Done", kind: "completed" },
-	canceled: { label: "Canceled", kind: "canceled" },
+/** Each status as the page names it and draws it: its glyph and the glyph's color. */
+export const TODO_STATUS: Record<TodoStatus, { label: string; icon: [IconComponent, string] }> = {
+	backlog: { label: "Backlog", icon: [IconCircleDashed, "text-muted-foreground"] },
+	todo: { label: "Todo", icon: [IconFormCircle, "text-muted-foreground"] },
+	"in-progress": { label: "In Progress", icon: [IconContrast, "text-amber-500 dark:text-amber-400"] },
+	done: { label: "Done", icon: [IconCircleCheck, "text-indigo-500 dark:text-indigo-400"] },
+	canceled: { label: "Canceled", icon: [IconCircleX, "text-muted-foreground"] },
 };
+
+export const PRIORITY_LABEL: Record<TodoPriority, string> = { 0: "No priority", 1: "Urgent", 2: "High", 3: "Medium", 4: "Low" };
+
+/** Urgent first, then high, medium, and low, and no priority last: the order a priority filter and the priority headings list them in. */
+export const PRIORITY_ORDER: readonly TodoPriority[] = [1, 2, 3, 4, 0];
 
 /** Who a todo is assigned to, as its assignee picker and **Filter** name them. */
 export const ASSIGNEE_LABELS: Record<TodoAssignee, string> = { user: "You", agent: "Agent" };
 
-/** The statuses in the order a list groups its todos, as Linear's lists do: started work first, closed work last. */
+/** The statuses in the order a list groups its todos: started work first, closed work last. */
 export const STATUS_GROUPS: readonly TodoStatus[] = ["in-progress", "todo", "backlog", "done", "canceled"];
 
 export const titleOf = (list: UserTodoList, view: TodoListView): string =>

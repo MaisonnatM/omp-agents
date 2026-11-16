@@ -1,5 +1,5 @@
 /** The Overview tab's Images section: a strip of the view's images, their viewer, and the bar that sends the selected ones on. */
-import { IconBubbleText, IconChevronDownSmall, IconPaperclip1, IconPullRequest } from "central-icons";
+import { IconBubbleText, IconChevronDownSmall, IconPullRequest } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
@@ -9,7 +9,6 @@ import { type AgentMedia, mediaExtension, mediaUrl } from "../../src/shared/tran
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import { errorText } from "../../src/json";
 import { activityControl } from "../activity";
 import { apiFetch, mediaSrc, putJson } from "../api";
 import { age } from "../labels";
@@ -104,9 +103,7 @@ interface MediaActionsProps {
 	/** The selected images, in the order they were selected. */
 	picked: AgentMedia[];
 	pullRequests: LinkedPullRequest[];
-	tickets: string[];
-	/** The images to keep selected after a send: none when every one went, else the ones that did not. */
-	onSent: (left: AgentMedia[]) => void;
+	/** Unselects every image, after a send too. */
 	onClear: () => void;
 }
 
@@ -141,35 +138,15 @@ function TargetMenu({ label, icon, none, loading, disabled, control, children }:
 	);
 }
 
-/** What the selected images can go to: a pull request's description, through `gh pr edit --attach`, or a Linear issue's attachments. */
-function MediaActions({ picked, pullRequests, tickets, onSent, onClear }: MediaActionsProps) {
+/** What the selected images can go to: a pull request's description, through `gh pr edit --attach`. */
+function MediaActions({ picked, pullRequests, onClear }: MediaActionsProps) {
 	const toPullRequest = useAction(async (pr: LinkedPullRequest) => {
 		const files = await Promise.all(picked.map((media, index) => imageFile(media, index + 1)));
 		await putJson<object>("/api/pull-request/attachment", { owner: pr.owner, repo: pr.repo, number: pr.number, files });
 		toasts.add({ title: `Added ${images(picked.length)} to ${pullRequestName(pr)}` });
-		onSent([]);
+		onClear();
 	}, "Could not add the images to the pull request");
-	const toTicket = useAction(async (issue: string) => {
-		const refused: { media: AgentMedia; reason: string }[] = [];
-		for (const [index, media] of picked.entries()) {
-			try {
-				const { name, type, data } = await imageFile(media, index + 1);
-				await putJson<object>("/api/ticket/attachment", { issue, name, type: type || "application/octet-stream", data });
-			} catch (err) {
-				refused.push({ media, reason: `${media.path ? fileName(media.path) : `image ${index + 1}`} (${errorText(err)})` });
-			}
-		}
-		const reasons = refused.map(({ reason }) => reason).join(", ");
-		if (refused.length === picked.length) throw new Error(reasons);
-		onSent(refused.map(({ media }) => media));
-		const sent = picked.length - refused.length;
-		toasts.add(
-			refused.length === 0
-				? { title: `Attached ${images(sent)} to ${issue}` }
-				: { title: `Attached ${sent} of ${images(picked.length)} to ${issue}`, description: `Linear did not take ${reasons}. Those stay selected.` },
-		);
-	}, "Could not attach the images to the Linear issue");
-	const pending = toPullRequest.pending || toTicket.pending;
+	const pending = toPullRequest.pending;
 	return (
 		<div className="flex flex-wrap items-center gap-1 px-2 pt-1">
 			<span className="mr-auto text-xs text-muted-foreground tabular-nums" aria-live="polite">
@@ -178,13 +155,6 @@ function MediaActions({ picked, pullRequests, tickets, onSent, onClear }: MediaA
 			<TargetMenu label="Add to PR description" icon={IconPullRequest} none={pullRequests.length === 0 ? "This session has no pull request yet" : null} loading={toPullRequest.pending} disabled={pending} control="changes-card.image.to-pull-request">
 				{pullRequests.map(pr => (
 					<PullRequestItem key={pullRequestName(pr)} pr={pr} onPick={() => toPullRequest.run(pr)} />
-				))}
-			</TargetMenu>
-			<TargetMenu label="Attach to Linear issue" icon={IconPaperclip1} none={tickets.length === 0 ? "This session has no Linear issue yet" : null} loading={toTicket.pending} disabled={pending} control="changes-card.image.to-ticket">
-				{tickets.map(issue => (
-					<MenuItem key={issue} onClick={() => toTicket.run(issue)}>
-						{issue}
-					</MenuItem>
 				))}
 			</TargetMenu>
 			<Button {...activityControl("changes-card.image.clear")} variant="ghost" size="compact" disabled={pending} onClick={onClear}>
@@ -199,16 +169,14 @@ interface MediaStripProps {
 	view: View;
 	/** What the session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
-	/** The Linear issues the session and its subagents worked on, by identifier, the session's own first. */
-	tickets: string[];
 }
 
 /**
  * The images the view's agent and its subagents' tools returned or wrote, newest first, as a row of thumbnails that open
- * large. Selected ones go to one of the session's pull requests' descriptions or to one of its Linear issues; while any
+ * large. Selected ones go to one of the session's pull requests' descriptions; while any
  * is selected, a click selects instead of opening.
  */
-export function MediaStrip({ media, view, pullRequests, tickets }: MediaStripProps) {
+export function MediaStrip({ media, view, pullRequests }: MediaStripProps) {
 	const [shown, setShown] = useState<string | null>(null);
 	const [selected, setSelected] = useState<string[]>([]);
 	const index = shown === null ? -1 : media.findIndex(item => mediaKey(item) === shown);
@@ -218,7 +186,7 @@ export function MediaStrip({ media, view, pullRequests, tickets }: MediaStripPro
 	return (
 		<>
 			{picked.length > 0 && (
-				<MediaActions picked={picked} pullRequests={pullRequests} tickets={tickets} onSent={left => setSelected(left.map(mediaKey))} onClear={() => setSelected([])} />
+				<MediaActions picked={picked} pullRequests={pullRequests} onClear={() => setSelected([])} />
 			)}
 			<ul className="flex gap-1.5 overflow-x-auto px-2 py-1.5" aria-label="Images, newest first">
 				{media.map(item => {

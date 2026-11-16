@@ -13,13 +13,13 @@ Object.assign(globalThis, { window: globalThis, document, HTMLIFrameElement: cla
 // Imported only after the stubs above, since a static import would load React DOM before the document exists.
 const { createRoot } = await import("react-dom/client");
 const { useOpenLatest } = await import("./use-open-latest.ts");
-const { hashForPage } = await import("./routing.ts");
-const hashForEmail = target => hashForPage({ kind: "email", target });
+const { hashForTodo } = await import("./routing.ts");
+const hashForAll = id => hashForTodo({ kind: "all" }, id);
 
-const older = { account: "gmail", thread: "a1" };
-const newer = { account: "gmail", thread: "q1" };
+const older = "a1";
+const newer = "q1";
 function Probe({ open, first, ready }) {
-	useOpenLatest(hashForEmail, open, first, ready);
+	useOpenLatest(hashForAll, open, first, ready);
 	return null;
 }
 const root = createRoot(container);
@@ -32,21 +32,21 @@ const step = async (name, props) => {
 await step("before the lists", { open: null, first: null, ready: false });
 await step("the lists arrive", { open: null, first: older, ready: true });
 await step("the address names it", { open: older, first: older, ready: true });
-await step("a newer conversation arrives above it", { open: older, first: newer, ready: true });
+await step("a newer todo arrives above it", { open: older, first: newer, ready: true });
 await step("Close", { open: null, first: newer, ready: true });
 await act(async () => root.unmount());
 console.log(JSON.stringify(steps));
 `;
 
-test("a bare Email page names its newest conversation in the address once the lists arrive, and neither a later arrival nor Close opens another", async () => {
+test("a bare todo list names its newest todo in the address once the lists arrive, and neither a later arrival nor Close opens another", async () => {
 	const child = Bun.spawn([process.execPath, "--eval", scenario], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" });
 	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
 	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
 	expect(JSON.parse(stdout)).toEqual({
 		"before the lists": [],
-		"the lists arrive": ["#email/gmail/a1"],
+		"the lists arrive": ["#todo?open=a1"],
 		"the address names it": [],
-		"a newer conversation arrives above it": [],
+		"a newer todo arrives above it": [],
 		Close: [],
 	});
 });

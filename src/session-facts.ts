@@ -7,12 +7,6 @@
  * worktree, or in a main checkout one other than the default branch. A PR a session only read, quoted, listed, or
  * was handed is not linked to it; nor is the main checkout's default branch, which every session started there shares.
  *
- * The same scan collects the Linear issues a session worked on: the ones omp's Linear MCP tools changed or opened
- * (`save_issue`) or commented on (`save_comment`), the issue a /ship run records, and the one a Linear link in the
- * session's own prompt names. Weaker evidence links an issue only once two kinds of it agree: a read (`get_issue`,
- * `list_comments`), its identifier in the session's own prompt, and the session's branch (`eng-123-fix`, `me/eng-123`).
- * An issue a search only listed is not linked. A subagent's prompt is its assignment, so it names nothing.
- *
  * The session's own bash calls and file changes tell which linked worktree it works in: a session started in a
  * repository's main checkout often adds a worktree, then edits its files and runs its commands there with bash's `cwd`.
  *
@@ -32,7 +26,6 @@ import { headKey, type LinkedPullRequest, parseRemote, type PullRequest, type Pu
 import { located, within } from "../templates/omp/agent/extensions/shell/commands";
 import { taskText } from "./shared/routine-message";
 import { type ArenaRecord, SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
-import { TICKET_ID } from "./shared/tickets";
 import { messageItemsOf } from "./transcript";
 import { WorkspacePlacement } from "./workspace-placement";
 import { changedPaths } from "./work";
@@ -52,33 +45,17 @@ const URI_SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
 const PR_URL = /https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/g;
 /** A PR number as a prompt writes it, `#7049`, `PR 7049`, or `PR#7049`; not `acme/webapp#7049` or `&#39;`. */
 const PR_NUMBER = /\bPR[ \t]*#?[ \t]*(\d+)\b|(?<![\w&/])#(\d+)\b/gi;
-/** A Linear issue's address, `https://linear.app/acme/issue/ENG-123/its-title`. */
-const LINEAR_URL = /https:\/\/linear\.app\/[\w.-]+\/issue\/([A-Za-z][A-Za-z0-9_]*-\d+)/gi;
-/** A Linear issue identifier in a prompt's prose. */
-const TICKET_TOKEN = /\b[A-Z][A-Z0-9_]*-\d+\b/g;
-/** A branch name's `/`-separated segment that starts with a Linear issue identifier, `eng-123` or `eng-123-fix`. */
-const BRANCH_TICKET = /^([A-Za-z][A-Za-z0-9_]*-\d+)(?=-|$)/;
 /** `To github.com:acme/webapp.git`: git names the remote before the refs a push updated. */
 const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "omp-arena.state", "omp-agents.headless", "mcp__linear_", '"cwd"', '"toolName":"edit"', '"toolName":"write"', '"name":"read"', "cd ", "-C "];
+const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "omp-arena.state", "omp-agents.headless", '"cwd"', '"toolName":"edit"', '"toolName":"write"', '"name":"read"', "cd ", "-C "];
 /**
  * Where `located` starts a bash call that names no absolute `cwd`, so a relative `cd` keeps its path relative to the
  * session's directory, which the scan does not know: no real directory starts with a NUL.
  */
 const SESSION_DIR = "/\0";
-/** A Linear MCP tool called directly (`mcp__linear_get_issue`, or `xd_mcp__linear_get_issue`), or written to as an omp device. */
-const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
-const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
-/** The Linear tools that act on one issue, the argument that names it, and whether the call reads the issue or works on it. */
-const LINEAR_ISSUE_ARG = new Map<string, [arg: string, evidence: TicketEvidence]>([
-	["get_issue", ["id", "read"]],
-	["save_issue", ["id", "worked"]],
-	["list_comments", ["issueId", "read"]],
-	["save_comment", ["issueId", "worked"]],
-]);
 const isShipStage = oneOf(SHIP_STAGES);
 const isShipWork = oneOf(SHIP_WORK);
 
@@ -100,13 +77,6 @@ interface ReadRef {
 }
 
 type FoundRef = PullRequestRef | ReadRef;
-
-/**
- * What names a Linear issue in a transcript: work on it, a `save_issue`, a `save_comment`, a /ship run's issue, or a Linear link
- * in the session's own prompt; a read of it; or its identifier in the session's own prompt.
- */
-export type TicketEvidence = "worked" | "read" | "named";
-
 /** What a bash call's output can prove: the URL `gh pr create` prints, and the branches `git push` updated. */
 interface Expected {
 	created: boolean;
@@ -151,20 +121,6 @@ function* pushedBranches(text: string): Generator<PullRequestRef> {
 	}
 }
 
-/** A Linear MCP call's tool, without the server prefix, and its arguments; `null` for any other call. */
-function linearCall(name: string, args: Record<string, unknown>): { tool: string; args: Record<string, unknown> } | null {
-	const direct = LINEAR_TOOL.exec(name)?.[1];
-	if (direct) return { tool: direct, args };
-	const device = name === "write" && typeof args.path === "string" ? LINEAR_DEVICE.exec(args.path)?.[1] : undefined;
-	if (!device || typeof args.content !== "string") return null;
-	try {
-		const content: unknown = JSON.parse(args.content);
-		return isObject(content) ? { tool: device, args: content } : null;
-	} catch {
-		return null;
-	}
-}
-
 /** A /ship run's progress as its `omp-ship.state` entry records it, or `null` when the entry names no known stage. */
 export function parseShipProgress(data: unknown): ShipProgress | null {
 	if (!isObject(data)) return null;
@@ -202,17 +158,13 @@ function withArena(arenas: readonly ArenaRecord[], arena: ArenaRecord): ArenaRec
 	return at < 0 ? [...arenas, arena] : arenas.with(at, arena);
 }
 
-/** Folds one transcript's lines, in order, into the pull requests and Linear issues it names, each once. */
+/** Folds one transcript's lines, in order, into the pull requests it names, each once. */
 export class SessionFactsScan {
 	/** Bash calls, then their background jobs, whose output has not been read yet, and what it can prove. */
 	readonly #pending = new Map<string, Expected>();
-	/** `save_issue` calls that open an issue, whose result names it. */
-	readonly #opening = new Set<string>();
 	/** Whether the transcript's user prompts are the session's own: a subagent's is its assignment, which names what its parent worked on. */
 	readonly #prompts: boolean;
 	readonly found = new Map<string, FoundRef>();
-	/** Linear issue identifiers, `ENG-123`, in the order the transcript first named them, with what named each. */
-	readonly tickets = new Map<string, Set<TicketEvidence>>();
 	/** The PR numbers the session's own prompts name, `#7049` or `PR 7049`. */
 	readonly named = new Set<number>();
 	ship: ShipProgress | null = null;
@@ -243,8 +195,7 @@ export class SessionFactsScan {
 
 	applyLine(line: string): void {
 		const backgrounding = this.#pending.size > 0 && line.includes('"jobId"');
-		// A call's result can matter even when it holds none of the markers: a `save_issue` names the issue it opened.
-		const answering = (this.#pending.size > 0 || this.#opening.size > 0) && line.includes('"toolResult"');
+		const answering = this.#pending.size > 0 && line.includes('"toolResult"');
 		if (!backgrounding && !answering && !MARKERS.some(marker => line.includes(marker)) && !line.includes('"role":"user"') && !line.includes("skill-prompt")) return;
 		let entry: unknown;
 		try {
@@ -264,10 +215,7 @@ export class SessionFactsScan {
 				// `ship_stage({stop: true})` writes `{stopped: true}` when the user says "no ship", which ends the run.
 				if (isObject(entry.data) && entry.data.stopped === true) this.ship = null;
 				const ship = parseShipProgress(entry.data);
-				if (ship) {
-					this.ship = ship;
-					if (ship.issue) this.#ticket(ship.issue, "worked");
-				}
+				if (ship) this.ship = ship;
 			} else if (entry.customType === "omp-arena.state") {
 				const arena = parseArenaRecord(entry.data);
 				if (arena) this.arenas = withArena(this.arenas, arena);
@@ -307,18 +255,15 @@ export class SessionFactsScan {
 			}
 			if (cwd) this.#workedIn(cwd);
 			if (call.name === "read" && typeof call.args.path === "string") this.#read(call.args.path);
-			const linear = linearCall(call.name, call.args);
-			if (linear) this.#linear(call.id, linear.tool, linear.args);
 		}
 		this.#toolResult(entry.message);
 	}
 
-	/** A tool result: it closes a `save_issue` that opened an issue, and a bash call or `wait` hands over what the command printed. */
+	/** A tool result: a bash call or `wait` hands over what the command printed. */
 	#toolResult(message: Record<string, unknown>): void {
 		const result = toolResultOf(message);
 		if (!result) return;
 		const { callId, details } = result;
-		if (callId !== undefined && this.#opening.delete(callId) && !result.isError) this.#opened(textOf(result.content));
 		if (!result.isError) {
 			for (const path of changedPaths(result.toolName, details)) {
 				this.#changed.add(path);
@@ -377,38 +322,10 @@ export class SessionFactsScan {
 		this.#add({ kind: "read", repository: owner && repo ? { owner, repo } : null, number: Number(number) });
 	}
 
-	/** The session's own prompt: a PR or Linear issue it links is work on it, and a PR number or issue identifier it writes names one. */
+	/** The session's own prompt: a PR it links is work on it, and a PR number it writes names one. */
 	#prompt(text: string): void {
 		for (const [, owner, repo, number] of text.matchAll(PR_URL)) this.#add({ kind: "pr", link: "worked", named: true, owner: owner!, repo: repo!, number: Number(number) });
 		for (const [, written, hashed] of text.matchAll(PR_NUMBER)) this.named.add(Number(written ?? hashed));
-		for (const [, id] of text.matchAll(LINEAR_URL)) this.#ticket(id!, "worked");
-		for (const [id] of text.matchAll(TICKET_TOKEN)) this.#ticket(id, "named");
-	}
-
-	#linear(callId: string, tool: string, args: Record<string, unknown>): void {
-		const issueArg = LINEAR_ISSUE_ARG.get(tool);
-		if (!issueArg) return;
-		const [arg, evidence] = issueArg;
-		const named = args[arg];
-		if (typeof named === "string") this.#ticket(named, evidence);
-		else if (tool === "save_issue") this.#opening.add(callId);
-	}
-
-	/** `save_issue` answers the issue it opened as JSON, with its identifier as `id`. */
-	#opened(text: string): void {
-		try {
-			const issue: unknown = JSON.parse(text);
-			if (isObject(issue) && typeof issue.id === "string") this.#ticket(issue.id, "worked");
-		} catch {}
-	}
-
-	/** Linear takes `eng-123` too; a UUID is left out, since the page opens an issue by its identifier. */
-	#ticket(named: string, evidence: TicketEvidence): void {
-		const id = named.toUpperCase();
-		if (!TICKET_ID.test(id)) return;
-		const known = this.tickets.get(id);
-		if (known) known.add(evidence);
-		else this.tickets.set(id, new Set([evidence]));
 	}
 
 	/** What a bash command printed, and what its command said the output can prove. */
@@ -494,10 +411,6 @@ interface SessionScan {
 	/** The PR numbers the session's own prompts name, which link a `pr://` read of one. */
 	named: ReadonlySet<number>;
 	pullRequests: LinkedPullRequest[];
-	/** Every transcript's Linear issues, each once, the session's own first, with what named each. */
-	evidence: Map<string, Set<TicketEvidence>>;
-	/** The Linear issues of `evidence` that link to the session, with its branch's. */
-	tickets: string[];
 	/** The `cwd` arguments of the session's own bash calls and the directories of the files its `edit` and `write` calls changed, absolute, the most recently used first. */
 	workDirs: string[];
 	/** The linked worktree it works in, when that is not the checkout `cwd` is in. */
@@ -512,12 +425,6 @@ interface SessionScan {
 
 /** What git says of the branch a session works on. */
 type GitBranch = Pick<SessionBranch, "name" | "linked">;
-
-/** The Linear issues a branch name names: each `/`-separated segment that starts with one, as `me/eng-123` or `eng-123-fix`. */
-const branchTickets = (branch: string): string[] => branch.split("/").flatMap(segment => BRANCH_TICKET.exec(segment)?.[1]?.toUpperCase() ?? []);
-
-/** An issue links on work alone, or once two kinds of weaker evidence agree: a read, the session's own prompt, and its branch. */
-const linksTicket = (evidence: ReadonlySet<TicketEvidence>, onBranch: boolean): boolean => evidence.has("worked") || evidence.size + Number(onBranch) >= 2;
 
 /** The directory whose checkout a session works on: its linked worktree, else `cwd`. */
 const workDirOf = (session: SessionScan): string => session.worktree ?? session.cwd;
@@ -596,7 +503,7 @@ const SCAN_PARALLEL = PROBE_PARALLEL;
 const ASK_AGAIN_MS = 60_000;
 
 /** The facts of a session before its first scan: one value, so that a caller can tell by identity that they did not change. */
-const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, arenas: NO_ARENAS, worktree: null, branch: null, workspace: null, gone: false };
+const NO_FACTS: SessionFacts = { pullRequests: [], ship: null, arenas: NO_ARENAS, worktree: null, branch: null, workspace: null, gone: false };
 
 export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
@@ -653,7 +560,7 @@ export class SessionFactsIndex {
 		const gone = dir !== undefined && this.placement.gone(dir);
 		if (!session || sessionPath === null) return workspace || gone ? { ...NO_FACTS, workspace, gone } : NO_FACTS;
 		const own = this.#ownFile(sessionPath)?.fold;
-		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: own?.scan.ship ?? null, arenas: session.arenas, worktree: session.worktree, branch: session.branch, workspace, gone };
+		return { pullRequests: session.pullRequests, ship: own?.scan.ship ?? null, arenas: session.arenas, worktree: session.worktree, branch: session.branch, workspace, gone };
 	}
 
 	/** Whether omp last started session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
@@ -696,7 +603,7 @@ export class SessionFactsIndex {
 
 	/**
 	 * Read what the listed session files gained since the last refresh and forget unlisted ones.
-	 * Resolves whether any session's pull requests, Linear issues, /ship stage, headless mark, worktree, branch, or workspace changed.
+	 * Resolves whether any session's pull requests, /ship stage, headless mark, worktree, branch, or workspace changed.
 	 * Refreshes run one at a time, and the calls made while one runs share a single next refresh of the newest list.
 	 */
 	refresh(sessions: readonly ListedSession[]): Promise<boolean> {
@@ -734,7 +641,7 @@ export class SessionFactsIndex {
 	}
 
 	/**
-	 * Recompute a session's pull requests, from its transcripts' refs and then its branch, its Linear issues, and its `branch` whole
+	 * Recompute a session's pull requests, from its transcripts' refs and then its branch, and its `branch` whole
 	 * from `git`, what git last said of it, with its default branch and the PR it heads; returns whether any changed.
 	 */
 	#resolve(session: SessionScan, git: GitBranch | null = session.branch): boolean {
@@ -745,10 +652,6 @@ export class SessionFactsIndex {
 		const branch: SessionBranch | null = git && { name: git.name, linked: git.linked, defaultBranch, pullRequest: headed };
 		const branchChanged = JSON.stringify(branch) !== JSON.stringify(session.branch);
 		if (branchChanged) session.branch = branch;
-		const onBranch = new Set(git ? branchTickets(git.name) : []);
-		const tickets = [...session.evidence].flatMap(([id, evidence]) => (linksTicket(evidence, onBranch.has(id)) ? [id] : []));
-		const ticketsChanged = tickets.length !== session.tickets.length || tickets.some((id, i) => id !== session.tickets[i]);
-		if (ticketsChanged) session.tickets = tickets;
 		const refs = session.refs.flatMap((ref): PullRequestRef[] => {
 			if (ref.kind !== "read") return [ref];
 			if (!session.named.has(ref.number)) return [];
@@ -759,22 +662,13 @@ export class SessionFactsIndex {
 		const before = session.pullRequests;
 		const same = pullRequests.length === before.length && pullRequests.every((pr, i) => prKey(pr) === prKey(before[i]!) && pr.link === before[i]!.link);
 		if (!same) session.pullRequests = pullRequests;
-		return branchChanged || ticketsChanged || !same;
+		return branchChanged || !same;
 	}
 
-	/** Collect every transcript's refs and Linear issues into the session. */
+	/** Collect every transcript's refs into the session. */
 	#gather(session: SessionScan, own: SessionFactsScan): void {
-		const scans = transcriptsOf(session).map(transcript => transcript.fold.scan);
-		session.refs = scans.flatMap(scan => [...scan.found.values()]);
+		session.refs = transcriptsOf(session).flatMap(transcript => [...transcript.fold.scan.found.values()]);
 		session.named = own.named;
-		session.evidence = new Map();
-		for (const scan of scans) {
-			for (const [id, evidence] of scan.tickets) {
-				const known = session.evidence.get(id);
-				if (known) for (const kind of evidence) known.add(kind);
-				else session.evidence.set(id, new Set(evidence));
-			}
-		}
 	}
 
 	async #refresh(sessions: readonly ListedSession[]): Promise<boolean> {
@@ -879,7 +773,7 @@ export class SessionFactsIndex {
 		let session = this.#sessions.get(path);
 		session ??= {
 			modifiedAt: Number.NaN, cwd, own: new FoldedFile(path, () => new TranscriptFold(new SessionFactsScan(true), this.#ownFileFolds.map(folds => folds.start(path)))), subagents: new Map(),
-			refs: [], repo: null, named: new Set(), pullRequests: [], evidence: new Map(), tickets: [], workDirs: [], worktree: null, branch: null,
+			refs: [], repo: null, named: new Set(), pullRequests: [], workDirs: [], worktree: null, branch: null,
 			ship: null, arenas: NO_ARENAS, headless: false,
 		};
 		this.#sessions.set(path, session);

@@ -8,7 +8,7 @@ import type { ForkPoint } from "./transcript-view";
 
 /**
  * What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A
- * quick action keeps its subject, the pull request, Linear issue, or todo with the action, which its page shows progress
+ * quick action keeps its subject, the pull request or todo with the action, which its page shows progress
  * and failure for; the server links its session to that subject. A new pull request from the Pull requests page keeps
  * the change it describes, which its popover shows the failure for. A **Resume all** resumes each of the sidebar's
  * interrupted sessions.

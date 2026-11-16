@@ -1,24 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { decodeIntegrationsAnswer, type IntegrationsAnswer } from "./accounts";
 import { type Analytics, decodeAnalytics, type Usage } from "./analytics";
-import { type CalendarEventsAnswer, decodeCalendarEventsAnswer, decodeGoogleStatus, decodeLocalEventsAnswer, type GoogleStatus, type LocalEventsAnswer } from "./calendar";
 import { decodePullRequestList, type PullRequestList, type PullRequestSummary } from "./github";
-import { decodeEmailAnswer, type EmailAnswer } from "./gmail";
-import { decodeTicketsAnswer, type TicketsAnswer } from "./tickets";
 
-const server = { name: "linear", url: "https://mcp.linear.app/mcp", host: "mcp.linear.app" };
-const googleSetup = { clientId: null, hasClientSecret: false, callbackPort: 3119, configured: false };
+const server = { name: "slack", url: "https://mcp.slack.com/mcp", host: "mcp.slack.com" };
 const integrations: IntegrationsAnswer = {
 	integrations: {
-		linear: { id: "linear", connection: { kind: "ready", server, tools: [{ name: "list_issues", description: null }] }, signIn: null, setup: null },
 		slack: {
 			id: "slack",
 			connection: { kind: "failing", server, error: "timeout", status: null },
-			signIn: { phase: "waiting", url: "https://slack.com/oauth", account: null },
+			signIn: { phase: "waiting", url: "https://slack.com/oauth" },
 			setup: { clientId: "1.2", hasClientSecret: true, redirectUri: "https://example.com/callback", callbackPort: 3120, scope: "chat:write", configured: true },
 		},
-		"google-calendar": { id: "google-calendar", accounts: [], signIn: { phase: "failed", error: "denied", account: null }, setup: googleSetup },
-		gmail: { id: "gmail", accounts: [{ name: "gmail-2", address: "me@example.com", addressError: null, connection: { kind: "signed-out", server } }], signIn: null, setup: googleSetup },
 	},
 };
 
@@ -34,43 +27,6 @@ const analytics: Analytics = {
 	agents: { main: 3, subagent: 0, advisor: 0 },
 	tools: [{ name: "read", calls: 1, errors: 0, tokenShare: 3 }],
 	sessions: [{ sessionId: "s", title: null, listed: true, workspace: "/tmp", usage, subagentTokens: 0, models: ["anthropic/claude"], lastAt: 1 }],
-};
-
-const google: GoogleStatus = { failed: [{ account: "google-calendar-2", error: "refused" }], calendars: [{ account: "google-calendar", id: "me@example.com", name: "Me", color: "#123456", group: "mine", writable: true, shown: true, error: null }] };
-
-const events: CalendarEventsAnswer = {
-	events: [
-		{ account: "google-calendar", calendarId: "me@example.com", eventId: "e1", writable: true, title: "Standup", calendar: "Me", color: "#123456", url: "https://calendar.google.com/e1", when: { allDay: false, start: 1, end: 2 } },
-		{ account: "google-calendar", calendarId: "me@example.com", eventId: "e2", writable: false, title: "Holiday", calendar: "Me", color: "#123456", url: "https://calendar.google.com/e2", when: { allDay: true, firstDay: "2026-10-13", lastDay: "2026-10-13" } },
-	],
-};
-
-const local: LocalEventsAnswer = { events: [{ id: "l1", title: "Dentist", when: { allDay: false, start: 1, end: 2 }, sessionId: null }] };
-
-const email: EmailAnswer = {
-	accounts: [{ account: "gmail", error: null }],
-	threads: [{ account: "gmail", id: "t1", from: "Ada", subject: "Hi", snippet: "Hello", at: 1, unread: true, count: 2, url: "https://mail.google.com/t1" }],
-};
-
-const tickets: TicketsAnswer = {
-	tickets: [
-		{
-			id: "ENG-1",
-			title: "Ticket",
-			url: "https://linear.app/team/issue/ENG-1",
-			status: "Todo",
-			statusType: "unstarted",
-			priority: 3,
-			labels: [{ name: "bug", color: "#f00" }],
-			project: null,
-			team: "ENG",
-			dueDate: null,
-			createdAt: "2026-09-01T12:00:00.000Z",
-			updatedAt: "2026-10-01T12:00:00.000Z",
-			branch: "eng-1-ticket",
-			parentId: null,
-		},
-	],
 };
 
 const person = { login: "ada", avatarUrl: null };
@@ -110,14 +66,13 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 		decode: decodeIntegrationsAnswer,
 		whole: integrations,
 		partial: {
-			"every integration an empty record": { integrations: { linear: {}, slack: {}, "google-calendar": {}, gmail: {} } },
-			"an integration without its connection": { integrations: { ...integration, linear: { ...integration.linear, connection: undefined } } },
+			"every integration an empty record": { integrations: { slack: {} } },
+			"an integration without its connection": { integrations: { ...integration, slack: { ...integration.slack, connection: undefined } } },
 			"a connection of an unknown kind": { integrations: { ...integration, slack: { ...integration.slack, connection: { kind: "maybe", server } } } },
-			"an account's connection that is absent": { integrations: { ...integration, gmail: { ...integration.gmail, accounts: [{ name: "gmail", address: null, addressError: null, connection: { kind: "absent" } }] } } },
-			"a ready connection without its server": { integrations: { ...integration, linear: { ...integration.linear, connection: { kind: "ready", tools: [] } } } },
-			"a ready connection that lists tool names": { integrations: { ...integration, linear: { ...integration.linear, connection: { kind: "ready", server, tools: ["list_issues"] } } } },
-			"a Google setup without its callback port": { integrations: { ...integration, gmail: { ...integration.gmail, setup: { ...googleSetup, callbackPort: undefined } } } },
-			"an integration under another id": { integrations: { ...integration, gmail: { ...integration.gmail, id: "slack" } } },
+			"a ready connection without its server": { integrations: { ...integration, slack: { ...integration.slack, connection: { kind: "ready", tools: [] } } } },
+			"a ready connection that lists tool names": { integrations: { ...integration, slack: { ...integration.slack, connection: { kind: "ready", server, tools: ["send_message"] } } } },
+			"a Slack setup without its callback port": { integrations: { ...integration, slack: { ...integration.slack, setup: { ...integration.slack.setup, callbackPort: undefined } } } },
+			"an integration under another id": { integrations: { ...integration, slack: { ...integration.slack, id: "jira" } } },
 		},
 	},
 	{
@@ -128,48 +83,6 @@ const cases: { name: string; decode: (raw: unknown) => unknown; whole: unknown; 
 			"a damaged token summary": { ...analytics, totals: { tokens: null } },
 			"a chart without provider buckets": { ...analytics, series: [{ start: 1 }] },
 			"a model without its usage": { ...analytics, models: [{ selector: "anthropic/claude", tokensPerSecond: null }] },
-		},
-	},
-	{
-		name: "Google calendars",
-		decode: decodeGoogleStatus,
-		whole: google,
-		partial: {
-			"a calendar from before shown and writable": { calendars: [{ id: "me@example.com", name: "Me", color: "#123456", group: "mine", error: null }] },
-			"a calendar without its name": { calendars: [{ ...google.calendars[0], name: undefined }] },
-		},
-	},
-	{
-		name: "calendar events",
-		decode: decodeCalendarEventsAnswer,
-		whole: events,
-		partial: {
-			"an event from before calendarId": { events: [{ ...events.events[0], calendarId: undefined }] },
-			"an event without its times": { events: [{ ...events.events[0], when: { allDay: false } }] },
-		},
-	},
-	{
-		name: "local events",
-		decode: decodeLocalEventsAnswer,
-		whole: local,
-		partial: {
-			"an event without its days": { events: [{ id: "l1", title: "Dentist", when: { allDay: true }, sessionId: null }] },
-		},
-	},
-	{
-		name: "Gmail inbox",
-		decode: decodeEmailAnswer,
-		whole: email,
-		partial: { "a conversation without its unread flag": { ...email, threads: [{ ...email.threads[0], unread: undefined }] } },
-	},
-	{
-		name: "tickets",
-		decode: decodeTicketsAnswer,
-		whole: tickets,
-		partial: {
-			"a ticket from before its opening date": { tickets: [{ ...tickets.tickets[0], createdAt: undefined }] },
-			"a ticket from before its parent": { tickets: [{ ...tickets.tickets[0], parentId: undefined }] },
-			"a ticket of an unknown status type": { tickets: [{ ...tickets.tickets[0], statusType: "doing" }] },
 		},
 	},
 	{

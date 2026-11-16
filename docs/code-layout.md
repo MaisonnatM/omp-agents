@@ -55,11 +55,11 @@ Start a UI change here, then read that file's entry under [Page](#page).
   The open page's own list, such as the Bots or the Settings sections, is `PageList` in `web/components/page-list.tsx`, which `web/app.tsx` draws in `PageListColumn` at the page's left, or hands `SidebarNav` to nest under its row while the sidebar floats.
   Its foot is `SidebarFoot` in `web/components/sidebar-status.tsx`, which `web/app.tsx` mounts under `AppSidebar` in the same `DashboardSidebar`, and which shows plan quota.
 - Right sidebar, the session details: `SessionDetails` in `web/components/session-details.tsx`, inside `DashboardSidebar` from `web/components/sidebar-panel.tsx`, which `web/app.tsx` mounts.
-  Its tabs are **Overview**, `SessionOverview` in `session-overview.tsx`, then **Diffs** in `session-diffs-tab.tsx`, **PRs** in `session-pull-requests-tab.tsx`, **Browser** in `browser-panel.tsx`, **Tickets** in `session-tickets-tab.tsx`, and **Artifacts** in `artifacts-panel.tsx`, all in `web/components/`.
+  Its tabs are **Overview**, `SessionOverview` in `session-overview.tsx`, then **Diffs** in `session-diffs-tab.tsx`, **PRs** in `session-pull-requests-tab.tsx`, **Browser** in `browser-panel.tsx`, and **Artifacts** in `artifacts-panel.tsx`, all in `web/components/`.
   `DetailsSidebarFrame` in `web/components/details-sidebar-frame.tsx` draws the open tabs and the **+** menu for it and a Bot's details, over the open tabs that `web/details-tabs.ts` keeps in localStorage.
   **Overview** stacks the view's subagents and what its agents changed, each section shown once it has something to list.
   Its **Subagents** section is `SubagentsSection` in `web/components/overview-subagents.tsx`, over `subagentTree` and `arenaGroups` in `web/overview-subagents-model.ts`, from the `SubagentLinksValue` that `useSubagentLinks` in `web/components/subagent-links.tsx` builds for the view, with its `CancelAgentButton` for a running subagent; it is the only place that lists a session's subagents, since the transcript's `task` rows no longer link them; an arena's runner cards come from `SessionFacts.arenas`, which the `arena` tool of `templates/omp/agent/extensions/arena.ts` records.
-  Its **Files**, **Images**, and **Sources** sections are `ChangesSections` in `web/components/overview-changes.tsx`: **Files** is `ChangedFileList` in `changed-files-section.tsx`, **Images** is `MediaStrip` in `media-section.tsx`, with the selection bar that sends images to a pull request or Linear issue, and **Sources** is `SourceList` in `sources-section.tsx`.
+  Its **Files**, **Images**, and **Sources** sections are `ChangesSections` in `web/components/overview-changes.tsx`: **Files** is `ChangedFileList` in `changed-files-section.tsx`, **Images** is `MediaStrip` in `media-section.tsx`, with the selection bar that sends images to a pull request, and **Sources** is `SourceList` in `sources-section.tsx`.
   Every section folds under `OverviewSection`'s filled header from `web/components/overview-section.tsx`, with closed sections kept by `useStoredKeys`.
   The **Images** section, the transcript, and a pull request's Markdown share `ImageViewer` from `web/components/media-viewer.tsx`, with the image, its caption, `N of M`, previous and next buttons and arrow keys, zoom, open in the default browser, and Close.
   Zoom is `ZoomPane` and `ZoomControls` from `web/components/zoom-pane.tsx`, which the expanded chart or diagram and the file dialog's image use too: −, the level, which fits again, and +, the same on the − + 0 keys, a pinch or ⌘/Ctrl+wheel around the pointer, and a drag to pan; the desktop menu keeps ⌘+ and ⌘− for the whole window.
@@ -97,10 +97,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - The empty home, with **New session** and **Get started**: `EmptyHome` in `web/components/empty-home.tsx`, which `PageSwitch` draws.
   - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, which docks the composer at the page's bottom with a new session's directory and branch pickers above it, draws `RetroGrid` from `web/components/dithercn/retro-grid.tsx` behind a new session, and shows a private draft's `PrivateFacts` from `web/components/new-session-modes.tsx` under the composer.
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button and the **Repositories** popover at its top, and one pull request in `pr-page.tsx` beside it.
-  - Tickets: `web/components/tickets/tickets-page.tsx`, with the bar of tabs, **Filter**, and **Display** above its list in `ticket-view-bar.tsx`.
   - Todo: `web/components/todo/page.tsx`.
-  - Calendar: `web/components/calendar/calendar-page.tsx`, with **Show routines** in `web/components/calendar/calendar-nav.tsx`, both reading the saved display preference in `web/use-calendar-display.ts`.
-  - Email: `web/components/email/email-page.tsx`.
   - Sport: `web/components/sport/page.tsx`, with its sidebar tab in `web/components/sport/nav.tsx`, the week in `week.tsx` and `day-detail.tsx`, the demos in `demo-dialog.tsx`, the Fait dialog in `log-form.tsx`, the journal in `journal.tsx`, and the progress in `progress.tsx`, all in `web/components/sport/`.
   - Bots: the gallery of every Bot at `#bots` in `web/components/bots/bots-gallery.tsx`, a Bot's page and the New Bot form with its job templates in `web/components/bots/bot-page.tsx`, the Bot's details in the right sidebar in `web/components/bots/bot-details.tsx`, the card of its routines from `web/components/routines/routines-card.tsx` in place of the conversation, with each row in `web/components/routines/routine-row.tsx` and an open row's rest in `web/components/routines/routine-open.tsx`, the sidebar's **Bots** tab in `web/components/bots/bots-nav.tsx`, each Bot's face in `web/components/bots/bot-avatar.tsx`, and its shape and color choice in `web/components/bots/bot-look-picker.tsx`.
     The New Bot form's type picker starts on Bot designer and fills each type's starting name and job from `BOT_KIND_START` in `web/bots-model.ts`.
@@ -113,7 +110,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
     Settings › omp settings, omp's own settings by its tabs with search, a control per row, **Reset**, and the workspace lock: `OmpSettingsTab` in `web/components/settings/omp-settings-tab.tsx`, with the `SettingRow` and controls shared with Agents in `editor.tsx`, over `shownTabs` and `OWNED_SETTINGS` in `web/omp-settings.ts`, and `readAgentSettings` in `src/omp/agent-settings.ts`.
     Settings › omp memory, the backend bar with **Auto-learn**, what a new session gets, and the store with its edit and forget actions: `OmpMemoryTab` in `web/components/settings/omp-memory-tab.tsx`, over `loadOmpMemory` in `src/memory.ts` and the omp access in `src/omp/memory.ts`.
     Settings › Activity, with its never-used, most-used, navigation, and active-time reports: `ActivityTab` in `web/components/settings/activity-tab.tsx`.
-    Settings › Integrations' Google account lines, with **Add account** and **Remove**: `GoogleAccountsRow` in `web/components/integrations/google-accounts.tsx`.
+    Settings › Integrations' rows, with **Connect**, **Reconnect**, and **Sign out**: `McpIntegrationRow` in `web/components/integrations/mcp-integration.tsx`, whose sign-in waits on the one `SignIn` per service that `createSignIn` in `src/sign-in.ts` makes.
     Settings › Providers' account lines, with each account's place, its up and down arrows, and **Sign out**: `AccountLine` and `ProviderRow` in `web/components/settings/providers-tab.tsx`, over `orderableAccounts` in `src/shared/providers.ts` and `src/omp/account-order.ts`.
     Settings › Worktrees, with its totals, filters, **Merged** and blocker badges, selection bar, and **Remove N merged**: `WorktreesTab` in `web/components/settings/worktrees-tab.tsx`, with the removal queue and its toasts in `web/worktree-removals.ts`.
     Settings › Sync, with its remote, **Sync** button, last outcome, conflict choices, and item switches: `SyncTab` in `web/components/settings/sync-tab.tsx`.
@@ -132,7 +129,7 @@ The server lives in `src/`; its files, listed by area:
 - [Shared types, omp facades, analytics, and subprocesses](code-layout/server-shared-and-omp.md)
 - [Sessions and transcripts](code-layout/server-sessions.md)
 - [Git, worktrees, pull requests, merges, and sync](code-layout/server-git-and-pull-requests.md)
-- [Linear, Google, todos, shared lists, and inboxes](code-layout/server-integrations-and-inboxes.md)
+- [Integrations, todos, shared lists, and inboxes](code-layout/server-integrations-and-inboxes.md)
 - [Routines, scheduled sends, usage, settings, and tests](code-layout/server-routines-and-settings.md)
 
 ## Page
@@ -144,6 +141,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Sidebar status, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Bots, Routines, Calendar, Email, and Sport](code-layout/page-pages.md)
+- [Sidebar, Todo, Bots, Routines, and Sport](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
-- [Pull requests, tickets, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)
+- [Pull requests, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

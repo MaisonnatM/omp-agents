@@ -4,7 +4,7 @@ import { beginStart, dismissSettled, dropHidden, failStart, messageOf, refusedSt
 const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
 const resume = { kind: "resume", sessionId: "s1" } as const;
-const quick = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "ticket", id: "ENG-7", action: "work" }, skill: null } as const;
+const quick = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "todo", id: "t7", text: "fix", action: "work" }, skill: null } as const;
 const ok = { ok: true, instanceId: "i1", workspace: "/tmp", prompt: null } as const;
 
 describe("starts", () => {
@@ -17,13 +17,13 @@ describe("starts", () => {
 	});
 
 	test("two quick actions in a row both wait for their answer, and each answer settles its own start", () => {
-		const other = { ...quick, subject: { kind: "ticket", id: "ENG-8", action: "work" } } as const;
+		const other = { ...quick, subject: { kind: "todo", id: "t8", text: "fix", action: "work" } } as const;
 		let starts = beginStart(beginStart(new Map(), 1, quick), 2, other);
-		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { id: "ENG-8" } } });
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { id: "t8" } } });
 		starts = settleStart(starts, 2, ok);
-		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { id: "ENG-7" } } });
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { id: "t7" } } });
 		starts = settleStart(starts, 1, { ok: false, error: "busy" });
-		expect(startOf(starts, "quick")).toMatchObject({ phase: "failed", error: "busy", op: { subject: { id: "ENG-7" } } });
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "failed", error: "busy", op: { subject: { id: "t7" } } });
 	});
 
 	test("an answer settles only a start still waiting: success removes it, failure keeps the reason", () => {
@@ -61,7 +61,7 @@ describe("starts", () => {
 	});
 
 	test("a quick action asks for a new session linked to what it works on, without the action", () => {
-		expect(messageOf(quick, 4)).toMatchObject({ t: "start", kind: "new", subject: { kind: "ticket", id: "ENG-7" } });
+		expect(messageOf(quick, 4)).toMatchObject({ t: "start", kind: "new", subject: null, todoId: "t7" });
 		expect(settleStart(beginStart(new Map(), 1, quick), 1, ok).size).toBe(0);
 	});
 

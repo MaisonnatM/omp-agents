@@ -35,7 +35,7 @@ interface ListPageProps<Data> {
 	title: string;
 	/** What the page lists, under its title; the time of the last read follows it once there is one. */
 	meta: string;
-	/** What the page's load and refresh errors call it: "the tickets". */
+	/** What the page's load and refresh errors call it: "the pull requests". */
 	noun: string;
 	/** What shows while the first read loads. */
 	loading: string;
@@ -61,7 +61,7 @@ function RefreshButton({ refreshing, onRefresh }: { refreshing: boolean; onRefre
 }
 
 interface PolledContentProps<Data> {
-	/** What the load and refresh errors call the data: "the tickets". */
+	/** What the load and refresh errors call the data: "the pull requests". */
 	noun: string;
 	/** What shows while the first read loads. */
 	loading: string;
@@ -109,7 +109,7 @@ export function PolledPageFrame<Data>({ title, meta, poll, onRefresh, actions, c
 	);
 }
 
-/** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
+/** A page of lists read from GitHub with a Refresh button, `notice`, and the lists once the first read loads. */
 export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, actions, children }: ListPageProps<Data>) {
 	return (
 		<PolledPageFrame title={title} meta={meta} poll={poll} onRefresh={onRefresh} actions={actions}>

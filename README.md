@@ -46,22 +46,12 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   A live session's dev servers, watchers, and omp broker services, biggest memory first, each with a Stop button; the server stops them once their sessions have been idle for 30 minutes, or a time you pick, and when their session ends.
 - **Pull requests.**
   A list of your GitHub pull requests, sorted by whose move it is and linked to the sessions that submitted or worked on them.
-- **Linear tickets.**
-  The Linear issues assigned to you, grouped by workflow state like Linear's My issues, read through omp's Linear MCP sign-in.
-  Click one to read it in full, and start a session that works on it or plans it.
 - **Slack.**
   Search, history, and sending in Slack from every omp session, through Slack's MCP server at `https://mcp.slack.com/mcp`.
   Save a dedicated internal Slack app in **Settings › Integrations**, then connect it.
-- **Calendar.**
-  A month of routine runs, due todos and Linear tickets, and your Google Calendar's events, read with omp's sign-in to Google Calendar's MCP server.
-- **Email.**
-  Your Gmail inbox's latest conversations, with a rich-text editor to reply and write new mail, and Delete to Trash, each opening in Gmail, read with omp's sign-in to Gmail's MCP server.
-- **Several Google accounts.**
-  Connect more than one Gmail and Google Calendar account; the Email page and the Calendar merge them, tagged by address.
-  omp sessions are told, through the starter kit's `google-accounts` extension, which account each MCP server signs in as.
 - **Your own todo list.**
   Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
-  A todo links to the sessions, pull requests, and Linear issues it is about, starts a session or opens a Linear issue from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool, check off a todo once they finish its work, and edit or delete one when you ask.
+  A todo links to the sessions and pull requests it is about, starts a session from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool, check off a todo once they finish its work, and edit or delete one when you ask.
   The desktop app captures a todo from any app.
 - **Settings editor.**
   Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place, edit your workflows, the skills tagged `workflow` such as `/ship`'s, and pin a skill that every new session starts through.
@@ -86,10 +76,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   ```
 
 - Optional, for the pull request list: the [GitHub CLI](https://cli.github.com) (`gh`), signed in with `gh auth login`.
-- Optional, for the Linear tickets: Linear's MCP server added to omp (`/mcp add` with `https://mcp.linear.app/mcp`) and signed in.
 - Optional, for Slack in omp sessions: a dedicated internal Slack app, with the MCP server and token rotation turned on, an HTTPS redirect, and the user scopes you choose, saved from **Settings › Integrations**.
-- Optional, for Google Calendar: a Google OAuth client of type Web application, with the Google Calendar API turned on, saved from **Settings › Integrations**.
-- Optional, for the Email page: a Google OAuth client of type Web application, with the Gmail API turned on, saved from **Settings › Integrations**; the Google Calendar client works too.
 
 ## Quick start
 
@@ -126,7 +113,7 @@ The window signs itself in, so it needs no token from you.
   Cmd+Q quits.
 - In the packaged app on macOS, **Open at Login** in the app menu starts the app, and with it your routines, when you log in.
   **Install omp Starter Kit…** in the same menu installs the starter kit.
-- Links to GitHub, Linear, and every other site open in your default browser.
+- Links to GitHub and every other site open in your default browser.
 - `PORT` sets the port for `bun run desktop` and `bun start` alike.
 
 ## Configuration
@@ -181,7 +168,7 @@ See the [kit's README](templates/omp/README.md) for what it contains.
 Select a session in the left sidebar to read its conversation and message it.
 Cmd-click (Ctrl-click on Linux and Windows) opens it in a split pane.
 Click **+** to start a session, **Resume** to continue a past one, and **Fork from here** under a prompt or a reply to branch a conversation.
-The **Pull requests** tab shows your pull requests, the **Linear tickets** tab your Linear issues, and the gear button in the header opens Settings.
+The **Pull requests** tab shows your pull requests, and the gear button in the header opens Settings.
 
 While a turn runs, Enter queues a follow-up and Cmd+Enter (Ctrl+Enter on Linux and Windows) steers the turn.
 Cmd+. (Ctrl+. on Linux and Windows) interrupts it.

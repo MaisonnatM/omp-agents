@@ -1,7 +1,6 @@
 import { IconPencil, IconPlusLarge, IconTrashCan } from "central-icons";
 import { useId, useState } from "react";
 import type { ServedBuild } from "../../../src/served-build";
-import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { appendToComposer, newDraftKey } from "../../composer-drafts";
@@ -9,16 +8,14 @@ import { deleteModulePrompt, editModulePrompt, newModulePrompt } from "../../mod
 import { MODULE_LIST, type WebModuleId } from "../../modules";
 import { useModulesOff } from "../../modules-off";
 import { useRead } from "../../reads";
-import { hashForSettings } from "../../routing";
-import { useSignedOutTabs } from "../../sidebar-tabs";
 import { useDashboardActions } from "../dashboard-context";
 import { FIELD, Field, TEXT_AREA } from "../form-field";
 import { FormDialog, FormDialogHeader, isSubmitChord } from "../form-dialog";
-import { IntegrationList, IntegrationRow, MarkTile, MetaDot } from "../integrations/integration-row";
+import { IntegrationList, IntegrationRow, MarkTile } from "../integrations/integration-row";
 import { Confirm } from "../integrations/mcp-connection-controls";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { ToggleSwitch } from "../toggle-switch";
-import { LINK, Section } from "./editor";
+import { Section } from "./editor";
 
 type Module = (typeof MODULE_LIST)[number];
 
@@ -78,7 +75,6 @@ function PromptDialog({ title, named, question, onClose, onSubmit }: {
 /** Settings › Modules: every module the page is built with, a switch that turns each on or off on every machine, and New, Edit, and Delete, which open an agent session that writes the code. */
 export function ModulesTab() {
 	const [off, setOn] = useModulesOff();
-	const signedOut = useSignedOutTabs();
 	const { openNewSession } = useDashboardActions();
 	const build = useRead<ServedBuild>("/api/dashboard/build");
 	// A packaged app serves a prebuilt page, so there is no checkout to change; until the answer comes, the actions wait.
@@ -104,7 +100,6 @@ export function ModulesTab() {
 				{MODULE_LIST.map(module => {
 					const { id, tab, about } = module;
 					const offNote = "offNote" in module ? module.offNote : undefined;
-					const service = tab.integration !== undefined && signedOut.has(id) ? MCP_SERVICES[tab.integration] : null;
 					return (
 						<IntegrationRow
 							key={id}
@@ -112,22 +107,7 @@ export function ModulesTab() {
 							mark={<MarkTile icon={tab.icon} name={tab.label} />}
 							status={null}
 							summary={about}
-							meta={
-								(offNote !== undefined || service !== null) && (
-									<>
-										{offNote !== undefined && <span>{offNote}</span>}
-										{offNote !== undefined && service !== null && <MetaDot />}
-										{service !== null && (
-											<span>
-												Shows only while {service.label} is connected.{" "}
-												<a href={hashForSettings("integrations")} className={LINK}>
-													Connect it in Integrations
-												</a>
-											</span>
-										)}
-									</>
-								)
-							}
+							meta={offNote !== undefined && <span>{offNote}</span>}
 							actions={
 								<>
 									<ToggleSwitch aria-label={`Turn on ${tab.label}`} checked={!off.has(id)} onCheckedChange={on => setOn(id, on)} />

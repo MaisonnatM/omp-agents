@@ -1,10 +1,10 @@
-/** The `@` token that ends at the caret: `@src/`, `@ticket:login`, or a quoted `@"file with space` or `@ticket:"login page`. */
+/** The `@` token that ends at the caret: `@src/`, `@todo:login`, or a quoted `@"file with space` or `@todo:"login page`. */
 export interface MentionToken {
 	/** Where the `@` is. */
 	start: number;
 	/** The caret, where the token ends. */
 	end: number;
-	/** The word before a colon, `ticket` in `@ticket:login`; `null` without one. */
+	/** The word before a colon, `todo` in `@todo:login`; `null` without one. */
 	prefix: string | null;
 	/** What follows the `@` and any prefix, quote kept. */
 	body: string;

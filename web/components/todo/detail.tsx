@@ -1,8 +1,6 @@
-import { IconChevronRightSmall, IconPlay, IconPlusLarge, IconTicket } from "central-icons";
+import { IconChevronRightSmall, IconPlay, IconPlusLarge } from "central-icons";
 import { useState } from "react";
-import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
-import type { TicketChoice, TodoTicketAnswer, TodoTicketRequest } from "../../../src/shared/tickets";
 import { addTodo } from "../../../src/user-todos";
 
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -11,7 +9,6 @@ import { badgeColors } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { getJson, putJson } from "../../api";
 import { dayLabel } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type QuickItem, quickOn, todoActions, todoStart, type WorkActionId } from "../../quick-actions";
@@ -23,109 +20,10 @@ import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Choice, FieldPicker } from "../field-picker";
 import { NotesEditor } from "../notes-editor";
 import { QuickActionButton, QuickStartNotice } from "../quick-actions";
-import { preferredTeam, rememberTeam, TeamSelect } from "../tickets/team-select";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar } from "../list-split";
 import { PROPERTY_BUTTON, StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker, TodoWorkspacePicker } from "./fields";
 import { TodoInput } from "./input";
 import { AddedByChip, type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
-
-/**
- * Opening a Linear issue from a todo: pick its team, then the server creates it and links it to the todo. An issue the
- * server opened but could not link stays `unlinked`, which offers to link it rather than to open another.
- */
-type TicketStep =
-	| { kind: "idle" }
-	| { kind: "loading" }
-	| { kind: "picking"; teams: TicketChoice[]; team: string }
-	| { kind: "creating"; teams: TicketChoice[]; team: string }
-	| { kind: "failed"; error: string }
-	| { kind: "linked"; identifier: string }
-	| { kind: "unlinked"; identifier: string; error: string };
-
-function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: UserTodoChange) => void }) {
-	const [step, setStep] = useState<TicketStep>({ kind: "idle" });
-	const start = async (): Promise<void> => {
-		setStep({ kind: "loading" });
-		try {
-			const teams = await getJson<TicketChoice[]>("/api/linear/teams");
-			if (teams.length === 0) return setStep({ kind: "failed", error: "Linear lists no team to open the issue in." });
-			setStep({ kind: "picking", teams, team: preferredTeam(teams) });
-		} catch (err) {
-			setStep({ kind: "failed", error: errorText(err) });
-		}
-	};
-	const create = async (teams: TicketChoice[], team: string): Promise<void> => {
-		setStep({ kind: "creating", teams, team });
-		let created: TodoTicketAnswer;
-		try {
-			created = await putJson<TodoTicketAnswer>("/api/todo/ticket", { todoId: todo.id, team } satisfies TodoTicketRequest);
-		} catch (err) {
-			return setStep({ kind: "failed", error: errorText(err) });
-		}
-		rememberTeam(team);
-		setStep(created.linked ? { kind: "linked", identifier: created.identifier } : { kind: "unlinked", identifier: created.identifier, error: created.error });
-	};
-	// The todo list arrives over the socket, so the link may show a moment after the answer; this one hides then.
-	if (step.kind === "linked") return <p className="text-xs text-muted-foreground">Opened {step.identifier} and linked it.</p>;
-	if (step.kind === "unlinked") {
-		const { identifier, error } = step;
-		return (
-			<div className="flex flex-wrap items-center gap-2">
-				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-					Opened {identifier} in Linear, but this todo does not link it: {error}
-				</p>
-				<Tooltip content={`Link ${identifier} to this todo, without opening another issue`}>
-					<Button variant="tertiary" size="compact" leadingIcon={IconTicket} onClick={() => onChange({ op: "link", id: todo.id, link: { kind: "ticket", identifier } })}>
-						Link {identifier}
-					</Button>
-				</Tooltip>
-			</div>
-		);
-	}
-	if (step.kind === "idle" || step.kind === "loading" || step.kind === "failed") {
-		const loading = step.kind === "loading";
-		const createButton = (
-			<Button variant="tertiary" size="compact" leadingIcon={IconTicket} disabled={loading} onClick={() => void start()}>
-				{loading ? "Reading teams…" : "Create Linear ticket"}
-			</Button>
-		);
-		return (
-			<div className="flex flex-wrap items-center gap-2">
-				<Tooltip content="Create a Linear issue from this todo" disabled={loading}>
-					{createButton}
-				</Tooltip>
-				{step.kind === "failed" && (
-					<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-						{step.error}
-					</p>
-				)}
-			</div>
-		);
-	}
-	const { teams, team } = step;
-	const creating = step.kind === "creating";
-	const createButton = (
-		<Button size="compact" disabled={creating} onClick={() => void create(teams, team)}>
-			{creating ? "Creating…" : "Create, assigned to you"}
-		</Button>
-	);
-	const cancelButton = (
-		<Button variant="ghost" size="compact" disabled={creating} onClick={() => setStep({ kind: "idle" })}>
-			Cancel
-		</Button>
-	);
-	return (
-		<div className="flex flex-wrap items-center gap-2">
-			<TeamSelect teams={teams} value={team} disabled={creating} onChange={next => setStep({ kind: "picking", teams, team: next })} />
-			<Tooltip content="Create the issue in this team, assigned to you" disabled={creating}>
-				{createButton}
-			</Tooltip>
-			<Tooltip content="Don't create the issue" disabled={creating}>
-				{cancelButton}
-			</Tooltip>
-		</div>
-	);
-}
 
 interface TodoDetailProps {
 	list: UserTodoList;
@@ -150,7 +48,6 @@ interface TodoDetailProps {
 	newSessionCwd: string;
 	/** The Workspaces the Workspace picker offers. */
 	workspaces: Workspace[];
-	linearConnected: boolean;
 }
 
 function CategoryDot({ categoryId }: { categoryId: string | null }) {
@@ -293,7 +190,7 @@ function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo
  * The open todo: a bar with where it sits and the way to its neighbours, then its title, its properties as pickers, its
  * notes, and for a top-level todo its sub-todos, agent, links, and when it was added.
  */
-export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChange, onOpen, onClose, onPrevious, onNext, sessions, newSessionCwd, workspaces, linearConnected }: TodoDetailProps) {
+export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChange, onOpen, onClose, onPrevious, onNext, sessions, newSessionCwd, workspaces }: TodoDetailProps) {
 	const { todo } = open;
 	const top = open.parent === null ? open.todo : null;
 	const categoryId = (open.parent ?? open.todo).categoryId;
@@ -377,7 +274,7 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 				<NotesEditor key={todo.id} value={todo.body} label={`Notes of ${todo.text}`} readOnly={readOnly} onSave={body => onChange({ op: "edit-body", id: todo.id, body })} />
 				{top && <SubTodos todo={top} readOnly={readOnly} onChange={onChange} onOpen={onOpen} />}
 				{top && <AgentCard todo={top} readOnly={readOnly} sessions={sessions} newSessionCwd={newSessionCwd} />}
-				{top && (links.length > 0 || (!readOnly && linearConnected && !links.some(link => link.kind === "ticket"))) && (
+				{top && links.length > 0 && (
 					<div className="flex flex-col gap-1.5">
 						<h3 className="text-xs font-medium text-muted-foreground">Links</h3>
 						<div className="flex flex-wrap items-center gap-1.5" aria-label="Links">
@@ -385,7 +282,6 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 								<TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} onRemove={readOnly ? undefined : () => onChange({ op: "unlink", id: top.id, link })} />
 							))}
 						</div>
-						{!readOnly && linearConnected && !links.some(link => link.kind === "ticket") && <CreateTicket todo={top} onChange={onChange} />}
 					</div>
 				)}
 				{(todo.createdAt || top?.addedBy) && (

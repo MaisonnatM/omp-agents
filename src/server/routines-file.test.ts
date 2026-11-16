@@ -109,6 +109,24 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 	expect(saved.routines[0]?.schedule).toBeUndefined();
 });
 
+test("a routine loads without its triggers, and its runs without the events, of kinds routines no longer watch, and one that ran only on those is dropped", () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
+	dirs.push(dir);
+	const path = join(dir, "omp-agents", "routines.json");
+	mkdirSync(join(dir, "omp-agents"));
+	const base = { botId: "scout", schedules: [], task: { kind: "prompt", prompt: "Sum it up." }, enabled: true, createdAt: 1, scheduledAt: null };
+	const slack: TriggerEvent = { kind: "slack", title: "Ana mentioned you in #eng", detail: "", url: null };
+	const retired = { kind: "event", title: "Standup starts at 09:00", detail: "", url: null };
+	const routines = [
+		{ ...base, id: "r1", name: "Digest", triggers: [{ kind: "event" }, { kind: "slack" }], runs: [{ at: 2, outcome: { kind: "pending", queued: true }, errors: [], triggeredBy: [retired, slack] }] },
+		{ ...base, id: "r2", name: "Reminders", triggers: [{ kind: "event" }], runs: [] },
+	];
+	writeFileSync(path, JSON.stringify({ routines }));
+	const file = new RoutinesFile(path);
+	expect(file.value.map(({ id, triggers, runs }) => ({ id, triggers, triggeredBy: runs.map(run => run.triggeredBy) }))).toEqual([{ id: "r1", triggers: [{ kind: "slack" }], triggeredBy: [[slack]] }]);
+	expect(existsSync(`${path}.invalid`)).toBe(false);
+});
+
 test("a file from before Bots moves every routine to one Routines Bot in the first one's workspace, each still doing what it did", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);

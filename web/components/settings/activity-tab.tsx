@@ -5,8 +5,6 @@ import { cn } from "@/lib/utils";
 import { inventory, report, type UsedFeature } from "../../activity-report";
 import { readTime } from "../../labels";
 import { activityStore } from "../../reads";
-import type { SidebarTab } from "../../routing";
-import { useSignedOutTabs } from "../../sidebar-tabs";
 import { LoadNote } from "../sheet-details";
 import { full } from "./analytics-format";
 import { RangePicker, useRangedRead } from "./range";
@@ -38,8 +36,8 @@ function FeatureRows({ features }: { features: UsedFeature[] }) {
 	));
 }
 
-function ActivityBody({ data, signedOut }: { data: ActivityRead; signedOut: ReadonlySet<SidebarTab> }) {
-	const result = useMemo(() => report(inventory(data.serverActions), data, signedOut), [data, signedOut]);
+function ActivityBody({ data }: { data: ActivityRead }) {
+	const result = useMemo(() => report(inventory(data.serverActions), data), [data]);
 	return (
 		<div className="space-y-7">
 			<Section id="activity-never" title="Not used">
@@ -59,7 +57,6 @@ function ActivityBody({ data, signedOut }: { data: ActivityRead; signedOut: Read
 						<FeatureRows features={result.rarely} />
 					</Table>
 				)}
-				{result.notSetUp.length > 0 && <p className="text-xs text-muted-foreground">Not set up, so not counted: {result.notSetUp.map(({ label }) => label).join(", ")}.</p>}
 			</Section>
 			<Section id="activity-most-used" title="Most used">
 				<Table label="The 20 most used features" columns={["Feature", "Kind", "Uses", "Days", "Keyboard / palette"]} textColumns={2}>
@@ -109,13 +106,12 @@ function ActivityBody({ data, signedOut }: { data: ActivityRead; signedOut: Read
 /** Activity over the chosen range, read while the tab shows. */
 export function ActivityTab({ active }: { active: boolean }) {
 	const { range, setRange, data, error, switching } = useRangedRead(activityStore, "30d", active);
-	const signedOut = useSignedOutTabs();
 	return (
 		<div className="space-y-7">
 			<RangePicker range={range} onChange={setRange} />
 			{error && data && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot refresh activity: {error}</p>}
 			<div aria-busy={switching || undefined} className={cn("transition-opacity duration-150", switching && "opacity-50")}>
-				{!data ? <LoadNote loading="Reading activity…" error={error} /> : <ActivityBody data={data} signedOut={signedOut} />}
+				{!data ? <LoadNote loading="Reading activity…" error={error} /> : <ActivityBody data={data} />}
 			</div>
 		</div>
 	);

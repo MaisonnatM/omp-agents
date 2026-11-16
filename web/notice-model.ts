@@ -1,5 +1,4 @@
 /** How the bell words, pictures, links, acts on, and toasts each notice: {@link presentNotice}, the one place that tells notice kinds apart. */
-import { type AccountsService, MCP_SERVICES } from "../src/shared/accounts";
 import { didNotStart, shortCommit } from "../src/shared/dashboard-update";
 import type { PullRequestSummary } from "../src/shared/github";
 import type { YourMove } from "../src/shared/moves";
@@ -8,26 +7,18 @@ import { hashForSession } from "../src/shared/sessions";
 import { folderName, providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
-import { hashForPage, hashForPullRequests, hashForSettings } from "./routing";
+import { hashForPullRequests, hashForSettings } from "./routing";
 
 /** The bell's filters, each a source of notices. */
-export type NoticeSource = "github" | "slack" | "providers" | "integrations" | "calendar" | "sessions" | "updates";
+export type NoticeSource = "github" | "slack" | "providers" | "sessions" | "updates";
 
 /** Where a notice leads: a dashboard hash, or a page outside the dashboard that opens in a new tab. */
 export type NoticeLink = { href: string; external: boolean };
 
-/** Where an event opens: the session that added it, its page in Google Calendar, or `null` for one you kept on this computer. */
-export function eventLink(sessionId: string | null, url: string | null): NoticeLink | null {
-	if (sessionId !== null) return { href: hashForSession(sessionId), external: false };
-	return url === null ? null : { href: url, external: true };
-}
-
 /** Who a notice's picture shows. */
 export type NoticeFace =
 	| { kind: "update" }
-	| { kind: "event"; color: string | null }
 	| { kind: "stopped" }
-	| { kind: "sign-in"; service: AccountsService }
 	| { kind: "provider"; provider: string; window: "plan" | "credits" }
 	| { kind: "move"; move: YourMove; person: { name: string; avatarUrl: string | null } | null }
 	| { kind: "slack"; person: { name: string; avatarUrl: string | null } };
@@ -67,7 +58,7 @@ export interface NoticePresentation {
 	toast: NoticeToast;
 }
 
-/** How long a news toast stays; an event's stays until dismissed or the event ends. */
+/** How long a news toast stays. */
 export const TOAST_MS = 6_000;
 
 /** Each of your moves as the bell words it. */
@@ -149,16 +140,6 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				link: { href: hashForSettings("providers"), external: false },
 				face: { kind: "provider", provider: notice.provider, window: "credits" },
 			};
-		case "event":
-			return {
-				...NEWS,
-				source: "calendar",
-				headline: `${notice.title} ${notice.start > now ? "starts" : "started"} at ${SAME_DAY.format(notice.start)}`,
-				preview: `${SAME_DAY.format(notice.start)} – ${SAME_DAY.format(notice.end)} · ${notice.calendar ?? "This computer"}`,
-				link: eventLink(notice.sessionId, notice.url) ?? { href: hashForPage({ kind: "calendar" }), external: false },
-				face: { kind: "event", color: notice.color },
-				toast: { kind: "news", timeout: 0 },
-			};
 		case "stopped": {
 			const count = notice.sessions.length;
 			const [first] = notice.sessions;
@@ -176,17 +157,6 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				toast: { kind: "news", timeout: 0 },
 			};
 		}
-		case "sign-in":
-			return {
-				...NEWS,
-				source: "integrations",
-				headline: `${MCP_SERVICES[notice.service].label} is signed out`,
-				preview: `${notice.address ?? `Account ${notice.account}`}: sign in again in Settings › Integrations. Sessions cannot use it until then.`,
-				link: { href: hashForSettings("integrations"), external: false },
-				face: { kind: "sign-in", service: notice.service },
-				// Every session that needs the account fails until you sign in again.
-				toast: { kind: "news", timeout: 0 },
-			};
 		case "dashboard-failed":
 			// No Update: origin still holds the commit that did not start, which it would only refuse.
 			return {

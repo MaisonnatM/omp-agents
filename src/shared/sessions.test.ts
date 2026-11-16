@@ -15,3 +15,8 @@ test("a private start parses alone and is refused with a todo, a task, or a revi
 	expect(parseNewSessionRequest(review)?.ok.reviewDraft).toBe(true);
 	expect(parseNewSessionRequest({ ...review, private: true })).toBeNull();
 });
+
+test("a start saved on a Linear issue before the dashboard dropped Linear reads as one on nothing in particular", () => {
+	const start = { kind: "new", cwd: "/work", prompt: "Work on ENG-7", subject: { kind: "ticket", id: "ENG-7" } };
+	expect(parseNewSessionRequest(start)?.ok.subject).toBeNull();
+});

@@ -1,7 +1,7 @@
 /**
  * The routines, kept in a file so that the next server knows which slots ran.
  * Every change saves at once: a queued run is on disk before the runner starts anything from it.
- * A routine whose task was pull requests or a project's prompt is dropped on load. The rest of the file stays.
+ * A routine whose task was pull requests or a project's prompt, or that ran only on triggers routines no longer watch, is dropped on load. The rest of the file stays.
  * A file from before `schedules`, before a run's `outcome`, before every routine had a Bot, or before triggers migrates here, so everything else sees the current shape.
  */
 import { ReducerFile } from "../fs";
@@ -13,8 +13,8 @@ import {
 	MAX_TRIGGER_EVENTS,
 	isRoutineMachine,
 	parseCommandRun,
-	parseRoutineSpec,
-	parseTriggerEvent,
+	parseKeptRoutineSpec,
+	parseTriggeredBy,
 	type CommandRun,
 	type Routine,
 	type RoutineChange,
@@ -60,7 +60,7 @@ const unstarted = (queued: boolean, errors: readonly string[]): RoutineOutcome =
 function parseRun(value: unknown): RoutineRun | null {
 	if (!isObject(value) || !isSafeInteger(value.at) || !isTexts(value.errors)) return null;
 	// A run from before triggers was started by a schedule or Run now.
-	const triggeredBy = "triggeredBy" in value ? parseAll(value.triggeredBy, parseTriggerEvent) : [];
+	const triggeredBy = "triggeredBy" in value ? parseTriggeredBy(value.triggeredBy) : [];
 	if (!triggeredBy) return null;
 	const { errors } = value;
 	if (isObject(value.outcome)) {
@@ -142,8 +142,8 @@ function parseRoutine(value: unknown): Routine | { dropped: string } | null {
 	const dropped = isObject(value) && isObject(value.task) && typeof value.task.kind === "string" ? DROPPED_TASKS.get(value.task.kind) : undefined;
 	if (dropped) return { dropped };
 	if (!isObject(value)) return null;
-	const spec = parseRoutineSpec({ ...value, schedules: "schedules" in value ? value.schedules : [value.schedule], triggers: "triggers" in value ? value.triggers : [] });
-	if (!spec) return null;
+	const spec = parseKeptRoutineSpec({ ...value, schedules: "schedules" in value ? value.schedules : [value.schedule], triggers: "triggers" in value ? value.triggers : [] });
+	if (!spec || "dropped" in spec) return spec;
 	const { createdAt } = value;
 	const runs = parseAll(value.runs, parseRun);
 	// Before Settings sync carried routines, every routine ran on this computer.

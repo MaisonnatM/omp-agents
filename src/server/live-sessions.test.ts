@@ -9,7 +9,7 @@ import type { HostSnapshot } from "../omp/collab";
 import type { SessionFacts } from "../shared/sessions";
 import { LiveSessions, withSubject } from "./live-sessions";
 
-const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], tickets: ["ENG-1"], ship: null, arenas: [], worktree: null, branch: null, workspace: null, gone: false };
+const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], ship: null, arenas: [], worktree: null, branch: null, workspace: null, gone: false };
 
 const dirs: string[] = [];
 /** The servers whose guests joined terminal sessions, which a test leaves. */
@@ -76,17 +76,15 @@ function sessionFile(entries: Array<[string, string, string]>): string {
 }
 
 describe("withSubject", () => {
-	test("puts a quick action's pull request or issue first among the session's links", () => {
+	test("puts a quick action's pull request first among the session's links", () => {
 		expect(withSubject(facts, { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 12 } }).pullRequests).toEqual([
 			{ owner: "acme", repo: "webapp", number: 12, link: "worked" },
 			{ owner: "acme", repo: "webapp", number: 7, link: "submitted" },
 		]);
-		expect(withSubject(facts, { kind: "ticket", id: "ENG-2" }).tickets).toEqual(["ENG-2", "ENG-1"]);
 	});
 
 	test("keeps the links as the tool calls found them once they name the subject", () => {
 		expect(withSubject(facts, { kind: "pull-request", pr: { owner: "ACME", repo: "webapp", number: 7 } })).toEqual(facts);
-		expect(withSubject(facts, { kind: "ticket", id: "ENG-1" })).toEqual(facts);
 		expect(withSubject(facts, undefined)).toEqual(facts);
 	});
 });

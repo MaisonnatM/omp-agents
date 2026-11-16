@@ -17,7 +17,7 @@ describe("splitSystemPrompt", () => {
 		"- pydantic-config-evolution (yampa/actions/**/*.py): Changing configs.",
 		"</domain-rules>",
 		"# xd:// Tool Devices",
-		"- xd://mcp__google_calendar_create_event — Creates an event.",
+		"- xd://mcp__chrome_devtools_take_screenshot — Takes a screenshot.",
 		"- xd://mcp__slack_send_message — Sends a message.",
 	].join("\n");
 	const context = [
@@ -28,11 +28,11 @@ describe("splitSystemPrompt", () => {
 		"</file>",
 		"</project-context>",
 		"## MCP Tool Routes",
-		"- \"create_event\" → `xd://mcp__google_calendar_create_event` — Creates an event.",
+		"- \"take_screenshot\" → `xd://mcp__chrome_devtools_take_screenshot` — Takes a screenshot.",
 		"## MCP Server Instructions",
 		"### datadog",
 		"Load a skill first.",
-		"### linear",
+		"### sentry",
 		"Send real newlines.",
 	].join("\n");
 	const parts = splitSystemPrompt([role, context]);
@@ -40,9 +40,9 @@ describe("splitSystemPrompt", () => {
 	test("names each instruction file, skill, rule, MCP server, and section by what it is", () => {
 		expect([...parts.keys()].sort()).toEqual([
 			"file:/repo/AGENTS.md",
+			"mcp:chrome_devtools",
 			"mcp:datadog",
-			"mcp:google_calendar",
-			"mcp:linear",
+			"mcp:sentry",
 			"mcp:slack",
 			"prompt:MCP Server Instructions",
 			"prompt:MCP Tool Routes",
@@ -54,7 +54,7 @@ describe("splitSystemPrompt", () => {
 			"skill:writing-tests",
 		]);
 		expect(parts.get("file:/repo/AGENTS.md")).toBe("<file path=\"/repo/AGENTS.md\">\n# Guide\nRead the standards.\n</file>");
-		expect(parts.get("mcp:google_calendar")!.split("\n")).toHaveLength(2);
+		expect(parts.get("mcp:chrome_devtools")!.split("\n")).toHaveLength(2);
 		expect(parts.get("mcp:datadog")).toBe("### datadog\nLoad a skill first.");
 	});
 

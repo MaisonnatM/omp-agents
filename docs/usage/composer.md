@@ -89,18 +89,17 @@
   Type `$` to complete `/skill:<name>` skills: the list shows each skill by its name, and picking one puts its `/skill:` text in the draft, such as `/skill:poteto-mode`, so omp runs it as if you had typed it.
   A skill whose name has a space is left out, since omp cannot invoke it.
   `$` opens the list at the start of a line or after a space, and not before a digit, so a price such as `$5` stays text.
-  Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, People, Email, Calendar, and Sessions.
-  Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@ticket:`, `@pr:`, `@person:`, `@mail:`, `@event:`, or `@session:`.
-  People lists the authors, reviewers, and review teams of the pull requests the Pull requests page lists, without you or bots, each with the pull requests they are on, so `@person:#12` finds the people on pull request 12, then your Linear workspace's active members while Linear is connected.
-  Email lists your Gmail inbox's latest conversations while Gmail is connected; Calendar lists the events from today through the next 14 days, from your Google calendars while Google Calendar is connected and from this computer.
+  Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Pull requests, People, and Sessions.
+  Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@pr:`, `@person:`, or `@session:`.
+  People lists the authors, reviewers, and review teams of the pull requests the Pull requests page lists, without you or bots, each with the pull requests they are on, so `@person:#12` finds the people on pull request 12.
   Type `@` and a word to search everything at once: up to five files from the selected session's working directory, then up to three matches from each category.
-  Every word must appear in a row's name or the detail beside it, such as a ticket's ID, in any order; quote several words, as in `@"login page` or `@ticket:"login page`.
+  Every word must appear in a row's name or the detail beside it, such as a pull request's repository, in any order; quote several words, as in `@"login page` or `@pr:"login page`.
   A file inserts its path, as in omp's terminal.
-  A todo inserts its text and ID, a ticket, pull request, or email a Markdown link, a GitHub person or team their handle linked to their GitHub page, a Linear member their name and ID, an event its title, time, and calendar, linked when it is a Google event, and a session its title and ID.
+  A todo inserts its text and ID, a pull request a Markdown link, a GitHub person or team their handle linked to their GitHub page, and a session its title and ID.
   Done todos and the session you are typing in stay out of the list.
   Use arrow keys, Tab or Enter to insert a suggestion, and Esc to close the list.
   File suggestions follow Git ignore rules in Git repositories.
-- In the composer, a skill or command at the start of the prompt, an `@` file or folder, an inserted todo, ticket, pull request, person, or session, and an annotation attached from the [Browser](browser.md) show as a chip, a single unit with an icon and a short name, such as the file's name or the ticket's ID and title.
+- In the composer, a skill or command at the start of the prompt, an `@` file or folder, an inserted todo, pull request, person, or session, and an annotation attached from the [Browser](browser.md) show as a chip, a single unit with an icon and a short name, such as the file's name or the pull request's title.
   A picked suggestion is a chip at once; a reference you type becomes one once you type past it or move the caret away, so `/mo` stays text while you type `/move`.
   Typing right against a chip turns it back into text, so `/move` followed by `X` reads `/moveX`.
   The arrow keys step over a chip as over one character, Backspace removes a chip whole, undo brings it back, and the prompt you send is still the text behind each chip.

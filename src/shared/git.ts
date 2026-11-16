@@ -32,7 +32,7 @@ export const worktreeDir = (mainWorktree: string, branch: string): string => `${
 export type BranchChoice =
 	| { kind: "existing"; name: string }
 	| { kind: "new"; name: string; base: string }
-	/** The branch a pull request or ticket names: the local one, else origin's, else a new one from the default branch. */
+	/** The branch a pull request names: the local one, else origin's, else a new one from the default branch. */
 	| { kind: "work"; name: string };
 
 /**

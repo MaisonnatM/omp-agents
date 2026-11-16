@@ -128,12 +128,11 @@ describe("paletteSections", () => {
 		]);
 	});
 
-	test("todos, tickets, and pull requests list for a search or under Suggestions, each under its own heading, and only when they hold every word", () => {
+	test("todos and pull requests list for a search or under Suggestions, each under its own heading, and only when they hold every word", () => {
 		const items = [
 			item("session:r", "running", "Large old gardens in north"),
 			item("todo:t", "todos", "Fix login"),
 			item("todo:loose", "todos", "Large old gardens in north"),
-			item("ticket:ENG-1", "tickets", "Login page"),
 			item("pr:o/r#4", "pullRequests", "Ship login"),
 		];
 		expect(listed(paletteSections(items, "", {}, NOW))).toEqual([["running", ["session:r"]]]);
@@ -143,7 +142,6 @@ describe("paletteSections", () => {
 		]);
 		const found = paletteSections(items, "login", {}, NOW);
 		expect(found.map(section => [section.heading, section.items.map(entry => entry.id)]).toSorted()).toEqual([
-			["Linear tickets", ["ticket:ENG-1"]],
 			["Pull requests", ["pr:o/r#4"]],
 			["Running", ["session:r"]],
 			["Todos", ["todo:t"]],
@@ -176,9 +174,9 @@ describe("paletteSections", () => {
 
 describe("paletteCommands", () => {
 	test("lists the shortcuts with a command title and a handler, less those unavailable now", () => {
-		const handlers: ShortcutHandlers = { tickets: noop, "pull-requests": noop, restore: noop, closeTab: noop, help: noop };
-		expect(paletteCommands(handlers, new Set()).map(({ id }) => id)).toEqual(["help", "pull-requests", "tickets"]);
-		expect(paletteCommands(handlers, new Set(["tickets"])).map(({ id }) => id)).toEqual(["help", "pull-requests"]);
+		const handlers: ShortcutHandlers = { todo: noop, "pull-requests": noop, restore: noop, closeTab: noop, help: noop };
+		expect(paletteCommands(handlers, new Set()).map(({ id }) => id)).toEqual(["help", "pull-requests", "todo"]);
+		expect(paletteCommands(handlers, new Set(["todo"])).map(({ id }) => id)).toEqual(["help", "pull-requests"]);
 	});
 
 	test("the focused-session goal command uses the normal availability filter", () => {

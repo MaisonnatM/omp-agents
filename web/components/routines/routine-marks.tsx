@@ -1,11 +1,11 @@
 /** What a Bot's details and its routines card mark a routine with: its task's icon, its triggers' logos, its runs' dots, icons, and ticks, and how an opened routine or run unfolds. */
-import { IconBubbleText, IconCalendarClock, IconCircleCheck, IconCircleDashed, IconCircleX, IconConsole, IconLoadingCircle } from "central-icons";
+import { IconBubbleText, IconCircleCheck, IconCircleDashed, IconCircleX, IconConsole, IconLoadingCircle } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
 import type { RoutineRun, RoutineTask, TriggerKind } from "../../../src/routines";
 import { cn } from "@/lib/utils";
 import { type RunHealth, runHealth, runWords } from "../../routines-model";
-import { BrandMark, GMAIL_LOGO, SLACK_LOGO } from "../integrations/brand-logos";
+import { BrandMark, SLACK_LOGO } from "../integrations/brand-logos";
 import { OrgIcon } from "../org-icon";
 
 /** How an open routine row's or run card's details unfold, and how they do under reduced motion. */
@@ -65,6 +65,4 @@ const MARK = "size-3.5 shrink-0";
 export const TRIGGER_MARKS: Record<TriggerKind, { name: string; logo: ReactNode }> = {
 	slack: { name: "Slack", logo: <BrandMark logo={SLACK_LOGO} className={MARK} /> },
 	"pull-request": { name: "GitHub pull requests", logo: <OrgIcon org="github" className={MARK} /> },
-	event: { name: "calendar events", logo: <IconCalendarClock className={MARK} /> },
-	gmail: { name: "Gmail", logo: <BrandMark logo={GMAIL_LOGO} className={MARK} /> },
 };

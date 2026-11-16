@@ -29,11 +29,11 @@ describe("PreferencesFile", () => {
 		expect(new PreferencesFile(path).value).toEqual({ "omp-agents.theme": "dark", "omp-agents.hide-tool-calls": "true" });
 	});
 
-	test("a file that holds a key this version does not carry moves aside, so the next page seeds again", () => {
+	test("a key this version does not carry drops on load, and the rest of the file stays", () => {
 		const path = preferencesPath();
 		mkdirSync(dirname(path), { recursive: true });
-		writeFileSync(path, JSON.stringify({ values: { "omp-agents.split-columns": "0.4" } }));
-		expect(new PreferencesFile(path).value).toBeNull();
-		expect(existsSync(`${path}.invalid`)).toBe(true);
+		writeFileSync(path, JSON.stringify({ values: { "omp-agents.theme": "dark", "omp-agents.split-columns": "0.4" } }));
+		expect(new PreferencesFile(path).value).toEqual({ "omp-agents.theme": "dark" });
+		expect(existsSync(`${path}.invalid`)).toBe(false);
 	});
 });

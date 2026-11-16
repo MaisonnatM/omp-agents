@@ -76,7 +76,7 @@ export interface Guards {
 	 * the `Authorization: Bearer` header (401). A token in the query is no credential.
 	 */
 	admit(req: Request): Response | null;
-	/** `admit` that also takes the media key as `?key=`, for the routes that an image, a video, or a mail frame loads. */
+	/** `admit` that also takes the media key as `?key=`, for the routes that an image or a video loads. */
 	admitMedia(req: Request): Response | null;
 	/**
 	 * The capability of one resource, named by `purpose`: its `key`, signed with the token without disclosing it, and `admit`,

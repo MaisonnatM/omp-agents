@@ -1,27 +1,25 @@
-/** `McpIntegrationRow`: one MCP-backed service in Settings › Integrations, with its status, sign-in, and tool list, or its accounts. */
+/** `McpIntegrationRow`: one MCP-backed service in Settings › Integrations, with its status, sign-in, and tool list. */
 import { IconKey1 } from "central-icons";
 import { type ReactNode, useState } from "react";
-import { type GoogleAccount, hasAccounts, MCP_SERVICES, type McpIntegration, type SignInState, type SingleService, signedIn } from "../../../src/shared/accounts";
+import { MCP_SERVICES, type McpIntegration, type SignInState, signedIn } from "../../../src/shared/accounts";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
-import { GoogleAccountsRow } from "./google-accounts";
 import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
 import { ConnectButton, ConnectionCallout, Reconnecting, ReconnectItem, SignOutConfirm, SignOutItem, StatusBadge, useToolList } from "./mcp-connection-controls";
 import { integrationStatus, SERVICES } from "./services";
 import { SlackAppForm } from "./slack-app-form";
 
-/** A service that signs in to one server: where omp stands with it, and the buttons that sign in and out. */
-function ServerIntegrationRow({ integration }: { integration: McpIntegration<SingleService> }) {
+/** One service whose MCP server omp signs in to: where omp stands with it, and the buttons that sign in and out. */
+export function McpIntegrationRow({ integration }: { integration: McpIntegration }) {
 	const { id, connection, setup } = integration;
 	const { label } = MCP_SERVICES[id];
 	const service = SERVICES[id];
-	const needsSetup = setup !== null && !setup.configured;
-	const settingsLabel = id === "slack" ? "app settings" : "OAuth client";
-	const start = async (): Promise<SignInState> => (await putJson<McpIntegration>("/api/integrations/sign-in", { id, account: null })).signIn;
+	const needsSetup = !setup.configured;
+	const start = async (): Promise<SignInState> => (await putJson<McpIntegration>("/api/integrations/sign-in", { id })).signIn;
 	const signIn = useSignIn(integration.signIn, integrationsStore.refresh, start);
 	const { refreshing } = integrationsStore.use();
 	const [confirming, setConfirming] = useState(false);
@@ -44,12 +42,10 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 					<Reconnecting signIn={signIn} />
 					<MoreActionsMenu name={label} disabled={signIn.starting}>
 						{!needsSetup && <ReconnectItem signIn={signIn} />}
-						{setup !== null && (
-							<MenuItem onClick={() => setFormOpen(true)}>
-								<IconKey1 />
-								{setup.configured ? `Replace ${settingsLabel}` : "Set up"}
-							</MenuItem>
-						)}
+						<MenuItem onClick={() => setFormOpen(true)}>
+							<IconKey1 />
+							{setup.configured ? "Replace app settings" : "Set up"}
+						</MenuItem>
 						<MenuSeparator />
 						<SignOutItem destructive onClick={() => setConfirming(true)} />
 					</MoreActionsMenu>
@@ -59,14 +55,12 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 			actions = (
 				<>
 					<ConnectButton signIn={signIn} />
-					{setup !== null && (
-						<MoreActionsMenu name={label} disabled={signIn.starting}>
-							<MenuItem onClick={() => setFormOpen(true)}>
-								<IconKey1 />
-								Replace {settingsLabel}
-							</MenuItem>
-						</MoreActionsMenu>
-					)}
+					<MoreActionsMenu name={label} disabled={signIn.starting}>
+						<MenuItem onClick={() => setFormOpen(true)}>
+							<IconKey1 />
+							Replace app settings
+						</MenuItem>
+					</MoreActionsMenu>
 				</>
 			);
 		}
@@ -81,7 +75,7 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 					<SignOutConfirm
 						name={label}
 						signOut={async () => {
-							await putJson<McpIntegration>("/api/integrations/remove", { id, account: null });
+							await putJson<McpIntegration>("/api/integrations/remove", { id });
 							await integrationsStore.refresh();
 						}}
 						onDone={() => setConfirming(false)}
@@ -93,7 +87,7 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 					? null
 					: needsSetup
 						? {
-								message: `Complete the ${label} ${settingsLabel} before you reconnect.`,
+								message: `Complete the ${label} app settings before you reconnect.`,
 								fix: (
 									<Button variant="secondary" size="compact" leadingIcon={IconKey1} onClick={() => setFormOpen(true)}>
 										Set up
@@ -125,15 +119,15 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 					) : (
 						<span className="font-mono">{connection.server.host}</span>
 					)}
-					{integration.id === "slack" && integration.setup.configured && integration.setup.redirectUri && (
+					{setup.configured && setup.redirectUri && (
 						<>
 							<MetaDot />
-							<span className="max-w-56 truncate font-mono" title={integration.setup.redirectUri}>
-								{integration.setup.redirectUri}
+							<span className="max-w-56 truncate font-mono" title={setup.redirectUri}>
+								{setup.redirectUri}
 							</span>
 						</>
 					)}
-					{setup?.configured && (
+					{setup.configured && (
 						<>
 							<MetaDot />
 							<span>
@@ -152,25 +146,8 @@ function ServerIntegrationRow({ integration }: { integration: McpIntegration<Sin
 			actions={actions}
 		>
 			{callout}
-			{formOpen && integration.id === "slack" && <SlackAppForm setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
+			{formOpen && <SlackAppForm setup={setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
 			{tools.list}
 		</IntegrationRow>
-	);
-}
-
-interface McpIntegrationRowProps {
-	integration: McpIntegration;
-	/** What shows once above a Google service's accounts, such as why none of their calendars could be listed. */
-	notice?: ReactNode;
-	/** What shows under each Google account, such as its calendars. */
-	details?: (account: GoogleAccount) => ReactNode;
-}
-
-/** One service whose MCP server omp signs in to, or whose accounts it signs in to, one server each. */
-export function McpIntegrationRow({ integration, notice, details }: McpIntegrationRowProps) {
-	return hasAccounts(integration) ? (
-		<GoogleAccountsRow integration={integration} notice={notice} details={details} />
-	) : (
-		<ServerIntegrationRow integration={integration} />
 	);
 }

@@ -1,6 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
 import { COMMAND_TIME_LIMIT, type RoutineSpec, TRIGGER_KINDS, type TriggerKind, type Weekday } from "../../../src/routines";
-import { EVENT_LEAD_MS } from "../../../src/shared/notices";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -14,8 +13,6 @@ const UNITS: EveryUnit[] = ["minutes", "hours", "days"];
 const TRIGGER_HINTS: Record<TriggerKind, string> = {
 	slack: "A mention or direct message you have not answered. Needs Slack signed in under Settings › Integrations.",
 	"pull-request": "One of yours, or one waiting on your review, comes to need you: a review, failing checks, a conflict, comments to address, or ready to merge.",
-	event: `${EVENT_LEAD_MS / 60_000} minutes before a timed event on your calendars.`,
-	gmail: "A new message, unread, in one of your Gmail inboxes. Needs Gmail signed in under Settings › Integrations.",
 };
 
 /** One choice of a radio group, with the controls it enables under it. */

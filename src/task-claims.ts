@@ -42,26 +42,16 @@ const isClaimsFile = fields<ClaimsFile>({
 	saved: recordOf(isString),
 });
 
-/** The claim identity of Linear issue `id`. */
-export const ticketTask = (id: string): string => `ticket:${id.toUpperCase()}`;
-
 /** The claim identity of pull request `pr`; a review draft is a separate task from the implementation. */
 export const pullRequestTask = (pr: PullRequest, review = false): string => `${review ? "review:" : ""}pr:${pr.owner.toLowerCase()}/${pr.repo.toLowerCase()}#${pr.number}`;
 
-/**
- * Only explicit launch subjects, a Linear or pull request URL leading the prompt, or a `/ship`, `/ticket`, `/review`, or
- * `/fix-pr` argument count; never a ticket-like word in prose, such as `S3` or `EC2`.
- */
+/** Only explicit launch subjects, a pull request URL leading the prompt, or a `/ship`, `/review`, or `/fix-pr` argument count. */
 export function taskIdentity(request: NewSessionRequest): string | null {
 	if (request.taskId) return `task:${request.taskId}`;
-	if (request.subject?.kind === "ticket") return ticketTask(request.subject.id);
-	if (request.subject?.kind === "pull-request") return pullRequestTask(request.subject.pr, request.reviewDraft);
+	if (request.subject) return pullRequestTask(request.subject.pr, request.reviewDraft);
 	if (request.todoId) return `todo:${request.todoId}`;
 	const prompt = request.prompt.trim();
-	const command = /^\/(?:ship|ticket|review|fix-pr)\s+(\S+)/i.exec(prompt);
-	const argument = command?.[1] ?? prompt.split(/\s/, 1)[0] ?? "";
-	const ticket = (command ? /^(?:https:\/\/linear\.app\/[^/]+\/issue\/)?([A-Z][A-Z0-9]*?)-?(\d+)(?:\/\S*)?$/i : /^https:\/\/linear\.app\/[^/]+\/issue\/([A-Z][A-Z0-9]*)-(\d+)(?:\/\S*)?$/i).exec(argument);
-	if (ticket) return ticketTask(`${ticket[1]}-${ticket[2]}`);
+	const argument = /^\/(?:ship|review|fix-pr)\s+(\S+)/i.exec(prompt)?.[1] ?? prompt.split(/\s/, 1)[0] ?? "";
 	const pr = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:[/?#].*)?$/i.exec(argument);
 	return pr ? pullRequestTask({ owner: pr[1]!, repo: pr[2]!, number: Number(pr[3]) }) : null;
 }

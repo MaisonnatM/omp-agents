@@ -4,7 +4,6 @@ import { ToggleSwitch } from "../toggle-switch";
 import { IconImac, IconMoon, IconSun } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { useContext, useState } from "react";
-import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
 import { hideTab, moveTab, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
@@ -42,7 +41,7 @@ function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string;
 
 /** The sidebar's tabs in the order they show, each with a switch to hide it and buttons to move it. */
 function SidebarTabs() {
-	const { layout, setLayout, signedOut } = useSidebarTabs();
+	const { layout, setLayout } = useSidebarTabs();
 	const [off] = useModulesOff();
 	return (
 		<Section
@@ -66,8 +65,6 @@ function SidebarTabs() {
 									</a>
 									.
 								</>
-							) : row.integration !== undefined && signedOut.has(tab) ? (
-								`Shows only while ${MCP_SERVICES[row.integration].label} is connected.`
 							) : undefined,
 					};
 				})}

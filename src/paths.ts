@@ -42,12 +42,8 @@ export const userTodosFile = join(configDir, "todos.json");
  * The server applies and deletes them, so it stays the only writer of {@link userTodosFile}.
  */
 export const userTodoInboxDir = join(configDir, "todo-inbox");
-/** Where omp's `user_event` tool leaves the reminders it adds and removes, one JSON file each, so the server stays the only writer of {@link localEventsFile}. */
-export const eventInboxDir = join(configDir, "event-inbox");
 /** Where omp's `end_session` tool asks the server to end a session, one `<session id>.json` each, beside {@link tokenFile}. */
 export const sessionEndInboxDir = join(configDir, "end-inbox");
-/** Where the starter kit's `google-accounts` extension reports a Gmail or Google Calendar account that answered a session with HTTP 401, one JSON file each. */
-export const signInInboxDir = join(configDir, "sign-in-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
 /** Where a Bot's `save_routine` and `delete_routine` tools leave their changes to its routines, one JSON file each, so the server stays the only writer of {@link routinesFile}. */
@@ -85,12 +81,6 @@ export const processesFile = join(configDir, "processes.json");
 export const modelProfilesFile = join(configDir, "model-profiles.json");
 /** The fallback lists the composer's Extra usage switch parked, beside {@link tokenFile}. */
 export const extraUsageFile = join(configDir, "extra-usage.json");
-/** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
-export const calendarsFile = join(configDir, "calendars.json");
-/** The address each Google account signs in as and when a session found each signed out, beside {@link tokenFile}. */
-export const googleAccountsFile = join(configDir, "google-accounts.json");
-/** The events the Calendar page keeps on this computer, beside {@link tokenFile}. */
-export const localEventsFile = join(configDir, "events.json");
 /** The notices the bell's user saw or cleared, beside {@link tokenFile}. */
 export const noticesFile = join(configDir, "notices.json");
 /** The source control settings: automatic pulls of the workspaces' default branches, and the cleanup after a merge, beside {@link tokenFile}. */
@@ -105,8 +95,6 @@ export const settingsSyncFile = join(configDir, "settings-sync.json");
 export const settingsSyncRepo = join(dataDir, "settings-sync.git");
 /** The page's activity events, which Settings › Activity reports, in the dashboard's data directory; a machine file settings sync never carries. */
 export const activityDb = join(dataDir, "activity.db");
-/** The Google calendars' secret addresses an older version kept, beside {@link tokenFile}; the server deletes it at startup. */
-export const oldGoogleFile = join(configDir, "google.json");
 /** Names the server that runs routines and applies the todo inbox, which servers side by side share, beside {@link tokenFile}. */
 export const serverLockFile = join(configDir, "server.lock");
 

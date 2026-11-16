@@ -50,7 +50,6 @@ import type {
 	McpCredentialsModule,
 	McpOAuthDiscoveryModule,
 	McpOAuthFlowModule,
-	McpRpcModule,
 } from "./module-types/mcp";
 import type {
 	HindsightBankModule,
@@ -373,7 +372,6 @@ export const agentPluginRoots = await load<AgentPluginRootsModule>(join(srcDir, 
 export const configFiles = await load<ConfigFilesModule>(join(srcDir, "config.ts"), { findConfigFile: "function", getConfigDirPaths: "function" });
 export const configSources = await load<ConfigFileSourcesModule>(join(srcDir, "utils", "config-file-sources.ts"), { configFileSources: "function" });
 export const markit = await load<MarkitModule>(join(srcDir, "utils", "markit.ts"), { convertBufferWithMarkit: "function" });
-export const mcpRpc = await load<McpRpcModule>(join(srcDir, "mcp", "json-rpc.ts"), { callMCP: "function" });
 export const mcpConfig = await load<McpConfigModule>(join(srcDir, "mcp", "config.ts"), { loadAllMCPConfigs: "function" });
 export const mcpClient = await load<McpClientModule>(join(srcDir, "mcp", "client.ts"), {
 	connectToServer: "function",

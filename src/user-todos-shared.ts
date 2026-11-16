@@ -3,20 +3,17 @@
  * The omp extension `templates/omp/agent/extensions/todos.ts`, with its section shape in `todos/sections.ts`, reads and writes the same file but cannot import `src/`, so it keeps its own copy of the file's shape: change it with this one.
  */
 
-/** What a todo points to: a session it started or came from, a pull request, or a Linear issue. */
-export type UserTodoLink =
-	| { kind: "session"; sessionId: string }
-	| { kind: "pull-request"; owner: string; repo: string; number: number }
-	| { kind: "ticket"; identifier: string };
+/** What a todo points to: a session it started or came from, or a pull request. */
+export type UserTodoLink = { kind: "session"; sessionId: string } | { kind: "pull-request"; owner: string; repo: string; number: number };
 
-/** Where a todo stands, as Linear's workflow states go: not planned yet, planned, being worked on, then closed as done or canceled. */
+/** Where a todo stands: not planned yet, planned, being worked on, then closed as done or canceled. */
 export const TODO_STATUSES = ["backlog", "todo", "in-progress", "done", "canceled"] as const;
 export type TodoStatus = (typeof TODO_STATUSES)[number];
 
 /** Whether a todo with `status` is closed, which gives it a `doneAt`. */
 export const isClosed = (status: TodoStatus): boolean => status === "done" || status === "canceled";
 
-/** 0 none, 1 urgent, 2 high, 3 medium, 4 low: Linear's scale, the same as `TicketPriority`. */
+/** 0 none, 1 urgent, 2 high, 3 medium, 4 low. */
 export type TodoPriority = 0 | 1 | 2 | 3 | 4;
 
 export const TODO_PRIORITIES: readonly TodoPriority[] = [0, 1, 2, 3, 4];

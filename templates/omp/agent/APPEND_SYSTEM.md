@@ -122,7 +122,7 @@ Cursor models carry Cursor's tool habits, which omp's tools reject or misread.
 # Starting /ship yourself
 
 When a request will end in a pull request, ship it with `skill://ship` even when the user did not type `/ship`: read the skill and call `ship_stage` before your first edit.
-This includes a ticket or todo "Work on it" session that forbids pushing: run ship's steps up to, not including, the Draft PR step.
+This includes a todo's "Work on it" session that forbids pushing: run ship's steps up to, not including, the Draft PR step.
 When a pull request is requested later, such as through a suggested prompt, and no ship workflow exists yet, start ship then; it grills the choices the code made and resumes at the right stage, instead of following `# Before any pull request` on its own.
 Say so in the first reply, in one line such as "Shipping this with /ship; say 'no ship' to work without it."
 When the user says "no ship", call `ship_stage({stop: true})` and finish the work without the workflow.

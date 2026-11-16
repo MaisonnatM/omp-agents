@@ -133,14 +133,14 @@ const CLOCK_FORMAT = new Intl.DateTimeFormat(undefined, { hour: "numeric", minut
 /** A `2026-10-05` date as `Oct 5`, read as a local date so it does not shift a day west of UTC. */
 export const dateLabel = (date: string): string => DAY_FORMAT.format(new Date(`${date}T00:00`));
 
-/** A time as Linear's lists date it: `Oct 6` in `now`'s year, `Mar 2025` in an earlier one. */
+/** A time as a list dates it: `Oct 6` in `now`'s year, `Mar 2025` in an earlier one. */
 export function dayLabel(at: string, now = new Date()): string {
 	const date = new Date(at);
 	return (date.getFullYear() === now.getFullYear() ? DAY_FORMAT : MONTH_FORMAT).format(date);
 }
 
-/** When mail arrived, as Gmail's list dates it: `2:05 PM` on `now`'s day, `Oct 9` earlier in its year, `Oct 9, 2025` before. */
-export function mailTime(at: number, now = new Date()): string {
+/** When something happened, as a list dates it: `2:05 PM` on `now`'s day, `Oct 9` earlier in its year, `Oct 9, 2025` before. */
+export function listTime(at: number, now = new Date()): string {
 	const date = new Date(at);
 	if (date.toDateString() === now.toDateString()) return CLOCK_FORMAT.format(date);
 	return (date.getFullYear() === now.getFullYear() ? DAY_FORMAT : FULL_DAY_FORMAT).format(date);

@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
@@ -34,14 +33,13 @@ import { firstSessionFact } from "./get-started-model";
 import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
 import { SidebarFoot } from "./components/sidebar-status";
 import { subjectOf } from "./components/subject";
-import { NewTicketDialog } from "./components/tickets/new-ticket";
 import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
 import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
-import { integrationsStore, UNREAD } from "./reads";
+import { UNREAD } from "./reads";
 import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { revealDetailsTab } from "./details-tabs";
@@ -56,7 +54,7 @@ import { useFocusedSession } from "./use-focused-session";
 import { useOverlays } from "./use-overlays";
 import { usePageShortcuts } from "./use-page-shortcuts";
 import { useSessionLists } from "./use-session-lists";
-import { useLatestTicket, useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
+import { useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
 
@@ -86,15 +84,11 @@ export function App() {
 	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
 	const goalHost = goalEditor ? state.hosts.find(host => host.instanceId === goalEditor.instanceId) : null;
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
-	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
 	const { absent: absentTabs, shown: tabs } = useSidebarTabs();
-	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut, the palette's tickets, a todo's ticket, and the Calendar's due days apply. */
-	const ticketsCallable = linear !== null && callable(linear.connection) && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
 	const botList = useMemo(() => (state.bots === null ? null : botRows(state.bots, state.hosts, state.botLasts)), [state.bots, state.hosts, state.botLasts]);
 	const latestBot = botList?.[0]?.bot.id ?? null;
-	const latestTicket = useLatestTicket(page);
-	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, latestTicket, navigate, show });
+	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
 	const maximized = layout.maximized && !page;
 	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
@@ -152,7 +146,7 @@ export function App() {
 	const switchWorkspace = useCallback(
 		(cwd: string | null): void => {
 			pickWorkspace(cwd);
-			// A page such as the tickets stays; only the panes follow the sidebar into the workspace.
+			// A page such as the pull requests stays; only the panes follow the sidebar into the workspace.
 			const { page, hosts, shownWorkspace } = latest.current;
 			const next = page ? null : workspaceSession(cwd, hosts, shownWorkspace);
 			if (next) open(next, "replace");
@@ -179,7 +173,7 @@ export function App() {
 		[workspaces, pickWorkspace, navigate],
 	);
 
-	const { setOpenedFile, setNewTicket, dispatchPalette } = overlays;
+	const { setOpenedFile, dispatchPalette } = overlays;
 	// The command menu's **Open pull request** acts on the focused pane's session while the panes show and that session's branch can take a pull request, as `offeredPrompt` says.
 	const openPullRequest = useOpenPullRequest(page ? null : focused.view, focused.host, request);
 	const focusedGoal = page === null && focused.view?.kind === "live" && focused.view.agentId === null && focused.host?.source === "dashboard" && focused.host.goal.kind !== "off" && focused.host.control.phase === "live" && !focused.host.control.readOnly ? focused.host : null;
@@ -191,13 +185,11 @@ export function App() {
 		listed: sessions.listed,
 		view: focused.view,
 		absentTabs,
-		ticketsCallable,
 		hasDetails: detailsView !== null || openBot !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
 		setGoal: focusedGoal ? () => editGoal(focusedGoal.instanceId, "objective") : null,
 		palette: overlays.palette,
 		dispatchPalette,
-		setNewTicket,
 		openNewSession,
 		open,
 		show,
@@ -211,8 +203,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, end: endHost, openFile: setOpenedFile, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, endHost, setOpenedFile, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -324,7 +316,6 @@ export function App() {
 																	defaultWorkspace={defaultWorkspace}
 																	sectionTarget={sectionTarget}
 																	todoView={todoView}
-																	ticketsCallable={ticketsCallable}
 																	maximized={maximized}
 																	hasDetails={detailsView !== null}
 																	rightOpen={sidebars.panels.right.open}
@@ -389,7 +380,6 @@ export function App() {
 									onClose={() => show(layout)}
 								/>
 								{overlays.openedFile !== null && <FileDialog key={textFileUrl(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
-								{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
 								{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
 									<GoalDialog
 										key={goalEditor.instanceId}
@@ -414,8 +404,6 @@ export function App() {
 									unavailable={unavailable}
 									todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 									todos={mentionLists.todos}
-									ticketsCallable={ticketsCallable}
-									onCreateTicket={setNewTicket}
 								/>
 							</SidebarProvider>
 							<LinkPreviewCard />

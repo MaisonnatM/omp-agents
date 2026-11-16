@@ -42,13 +42,13 @@
   While its session runs, the conversation and its composer work as in a pane.
   Otherwise the composer writes to the Bot: the first message starts its conversation in its workspace, and a later one resumes the same session.
   What you type there stays when you leave the page, one draft per Bot, until you send it.
-  Its `/`, `$`, and `@` menus work as in any composer, resolved in the Bot's workspace, so you can mention a file, todo, ticket, pull request, person, email, event, or session.
+  Its `/`, `$`, and `@` menus work as in any composer, resolved in the Bot's workspace, so you can mention a file, todo, pull request, person, or session.
   Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name, and where it messaged another Bot, **Messaged** and that Bot's name.
   A routine run card shows the routine's name, task icon, trigger logos, time, and status, with a command's duration when available.
   Open the card to read its prompt or command, any output, what started it, and the **Open routine** link.
 - The right sidebar shows the Bot's details, as it shows a session's on the panes.
   Click the Bot's name in the header, the button at the header's end, or press Cmd+Shift+B to show or hide it; it keeps the width and open state of the session details sidebar.
-  It shows its tabs as a session's does, with **Details** always open and **+** listing **Routines**, which counts the Bot's routines, and, once the Bot's conversation worked on a Linear issue, **Tickets**, which shows those issues as a session's does; it remembers the tabs you opened, apart from a session's.
+  It shows its tabs as a session's does, with **Details** always open and **+** listing **Routines**, which counts the Bot's routines; it remembers the tabs you opened, apart from a session's.
   **Details** starts with the avatar, the name, the Bot's type and whether its session runs, and its workspace.
   Click the avatar to change its shape and color; the avatar follows each pick, and closing the popover saves the last one.
   Click the name to rename it: Enter or leaving the field saves, and Escape puts the name back.
@@ -68,7 +68,7 @@
   A conversation with no turn running whose file nothing wrote for a day ends by itself, so an idle Bot holds no omp process; your next message resumes it.
 - **Delete**, in red, asks first, and says that the Bot's routines go with it.
   Deleting a Bot forgets it and deletes its routines, but its conversation stays one of your sessions, and its memory file stays.
-- Every routine belongs to a Bot: on a schedule, or when a Slack message, a pull request, a calendar event, or unread mail triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
+- Every routine belongs to a Bot: on a schedule, or when a Slack message or a pull request triggers it, it messages the Bot, or runs a command in the Bot's workspace and posts the output into its conversation; see [Routines](routines.md).
   You can also ask a Bot in its conversation to add, change, or delete its routines, such as "check the build every morning at 9"; it sees a short line for each of its own routines on every turn, with the start of its prompt or command, and what it saves shows in its **Routines** tab once the dashboard applies it.
   A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
   A Bot can change only its own routines, never another Bot's.

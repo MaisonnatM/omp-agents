@@ -66,7 +66,7 @@ export function DetailBar({ leading, previous, next, children, close }: { leadin
 	);
 }
 
-/** Chevron icons for {@link DetailBar} `previous` and `next`; the Email and Todo pages use them. */
+/** Chevron icons for {@link DetailBar} `previous` and `next`; the Todo page, Settings › Extensions, and the Sport journal use them. */
 export const CH_PREVIOUS: BarAction["icon"] = <IconChevronTopSmall />;
 export const CH_NEXT: BarAction["icon"] = <IconChevronDownSmall />;
 export const CH_CLOSE: BarAction["icon"] = <IconCrossMedium />;
@@ -85,7 +85,7 @@ interface ListSplitProps {
 }
 
 /**
- * The list on the left and the open item on the right, as in Linear, split by a line you drag to size the list.
+ * The list on the left and the open item on the right, split by a line you drag to size the list.
  * A page too narrow for both shows the list, or the open item in its place.
  */
 export function ListSplit({ widthKey, resizeLabel, detailLabel, empty, list, detail }: ListSplitProps) {

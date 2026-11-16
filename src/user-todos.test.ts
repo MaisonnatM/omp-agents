@@ -85,7 +85,7 @@ describe("applyUserTodo", () => {
 	});
 
 	test("indent refuses a todo with links, which a todo under another cannot hold", () => {
-		const list = after(listOf([], todo("a"), todo("b")), { op: "link", id: "b", link: { kind: "ticket", identifier: "ENG-1" } });
+		const list = after(listOf([], todo("a"), todo("b")), { op: "link", id: "b", link: { kind: "session", sessionId: "s1" } });
 		expect(shape(after(list, { op: "indent", id: "b" }))).toBe("a b");
 	});
 
@@ -273,12 +273,12 @@ describe("applyUserTodo", () => {
 	});
 
 	test("links stay once each on a top-level todo, and unlink takes one off", () => {
-		const ticket = { kind: "ticket", identifier: "ENG-1" } as const;
+		const pr = { kind: "pull-request", owner: "acme", repo: "app", number: 1 } as const;
 		const session = { kind: "session", sessionId: "s1" } as const;
-		const list = after(listOf([], todo("a", ["a1"])), { op: "link", id: "a", link: ticket }, { op: "link", id: "a", link: session }, { op: "link", id: "a", link: ticket });
-		expect(list.todos[0]!.links).toEqual([ticket, session]);
-		expect(after(list, { op: "unlink", id: "a", link: ticket }).todos[0]!.links).toEqual([session]);
-		expect(after(list, { op: "link", id: "a1", link: ticket })).toBe(list);
+		const list = after(listOf([], todo("a", ["a1"])), { op: "link", id: "a", link: pr }, { op: "link", id: "a", link: session }, { op: "link", id: "a", link: pr });
+		expect(list.todos[0]!.links).toEqual([pr, session]);
+		expect(after(list, { op: "unlink", id: "a", link: pr }).todos[0]!.links).toEqual([session]);
+		expect(after(list, { op: "link", id: "a1", link: pr })).toBe(list);
 	});
 
 	test("categorize moves a top-level todo, with its todos, to the end of the category it joins", () => {
@@ -324,7 +324,7 @@ describe("applyUserTodo", () => {
 			{ op: "move", id: "a", afterId: "gone", categoryId: "work" },
 			{ op: "move", id: "a", afterId: null, categoryId: "gone" },
 			{ op: "move", id: "a1", afterId: null, categoryId: null },
-			{ op: "unlink", id: "a", link: { kind: "ticket", identifier: "ENG-1" } },
+			{ op: "unlink", id: "a", link: { kind: "session", sessionId: "s1" } },
 			{ op: "unarchive", id: "a" },
 			{ op: "empty-archive" },
 			addTodo({ id: "a1", text: "again" }),

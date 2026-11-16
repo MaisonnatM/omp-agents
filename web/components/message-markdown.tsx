@@ -2,7 +2,6 @@ import type { Element, ElementContent } from "hast";
 import { type ComponentProps, memo, useContext, useRef, useState } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform, type ExtraProps, type Options, type UrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockHeader, CodeBlockLine, CodeBlockTitle } from "@/components/ui/code-block";
 import { mediaSrc } from "../api";
@@ -16,12 +15,11 @@ import { remarkPromptChips } from "../prompt-tokens";
 import { useRead } from "../reads";
 import { parseReviewPages } from "../review-pages";
 import { hashForPullRequests, hashForTodoId } from "../routing";
-import { hashForTickets } from "../tickets-model";
 import { UserTodosContext } from "./dashboard-context";
 import { FileLink } from "./file-link";
 import { LocalMedia, MediaStrip } from "./local-media";
 import { Openable, OpenMarkdownImage, useMarkdownImages } from "./markdown-images";
-import { BrandMark, LINEAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
+import { BrandMark, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { type ChipProps, isChipKind, PromptChip } from "./prompt-chip";
 import { isVisualLanguage, SessionVisual } from "./session-visual";
@@ -32,9 +30,7 @@ const GITHUB_AVATARS = "https://avatars.githubusercontent.com/";
 const INLINE_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,/i;
 
 const inlineImage = (src: string): boolean => INLINE_IMAGE.test(src);
-/** A file of a Linear issue, which this server fetches from Linear: the issue's markdown names it so. */
-const ticketMedia = (src: string): boolean => src.startsWith(`${TICKET_MEDIA_PATH}?`);
-const githubImage = (src: string): boolean => inlineImage(src) || ticketMedia(src) || src.startsWith(GITHUB_AVATARS);
+const githubImage = (src: string): boolean => inlineImage(src) || src.startsWith(GITHUB_AVATARS);
 
 /**
  * An image that loads only from where `allowed` says. Any other would be fetched the moment the text renders, so a
@@ -103,7 +99,7 @@ const mediaFigure: Components["figure"] = ({ node }) => {
 };
 
 function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
-	let service: "linear" | "github" | "slack" | null = null;
+	let service: "github" | "slack" | null = null;
 	let label = "";
 	let web = false;
 	let titleUrl: string | null = null;
@@ -113,10 +109,7 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 		if (url.protocol === "https:" || url.protocol === "http:") {
 			const host = url.hostname;
 			web = true;
-			if (host === "linear.app") {
-				service = "linear";
-				label = url.pathname.match(/\/issue\/([^/]+)/)?.[1] ?? "Linear";
-			} else if (host === "github.com" || host === "www.github.com") {
+			if (host === "github.com" || host === "www.github.com") {
 				service = "github";
 				const pr = url.pathname.match(/^\/([^/]+)\/([^/]+)\/(?:pull|issues)\/(\d+)/);
 				label = pr ? `${pr[1]}/${pr[2]} #${pr[3]}` : url.pathname.split("/").filter(Boolean).slice(0, 2).join("/") || "GitHub";
@@ -135,8 +128,8 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 		<a {...props} href={href} target="_blank" rel="noopener noreferrer">
 			{web ? (
 				<>
-					{service === "linear" || service === "slack" ? (
-						<BrandMark logo={service === "linear" ? LINEAR_LOGO : SLACK_LOGO} className="mr-1 inline-flex size-3 align-middle" />
+					{service === "slack" ? (
+						<BrandMark logo={SLACK_LOGO} className="mr-1 inline-flex size-3 align-middle" />
 					) : service ? (
 						<OrgIcon org={service} className="mr-1 inline-block align-middle" />
 					) : null}
@@ -149,12 +142,12 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 
 const link: Components["a"] = ({ node: _node, ...props }) => <ExternalLink {...props} />;
 
-/** A video, from its `src` or its first `<source>`, that plays only a Linear issue's file or one uploaded to GitHub; any other shows as a link to it. */
+/** A video, from its `src` or its first `<source>`, that plays only one uploaded to GitHub; any other shows as a link to it. */
 const video: Components["video"] = ({ node, src: own }) => {
 	const source = node?.children.find((child): child is Element => child.type === "element" && child.tagName === "source");
 	const src = own ?? source?.properties.src;
 	if (typeof src !== "string" || src === "") return null;
-	const playable = ticketMedia(src) ? src : githubMediaPath(src);
+	const playable = githubMediaPath(src);
 	if (!playable) {
 		return (
 			<a href={src} target="_blank" rel="noopener noreferrer">
@@ -182,14 +175,12 @@ const agentLink: Components["a"] = ({ href, children, node: _node, ...props }) =
 };
 
 /** Where a chip opens in the dashboard; `null` for a skill, command, file, folder, person, or Browser annotation, which have no page of their own, and for a todo not found. */
-function chipHref({ kind, label, target }: ChipProps, todos: UserTodoList | null): string | null {
+function chipHref({ kind, target }: ChipProps, todos: UserTodoList | null): string | null {
 	switch (kind) {
 		case "todo":
 			return todos && hashForTodoId(todos, target);
 		case "session":
 			return hashForSession(target);
-		case "ticket":
-			return hashForTickets(label.slice(0, label.indexOf(" ")));
 		case "pull-request": {
 			const pr = pullRequestOfUrl(target);
 			return pr ? hashForPullRequests(pr) : null;
@@ -209,7 +200,7 @@ function chipHref({ kind, label, target }: ChipProps, todos: UserTodoList | null
 }
 
 /**
- * A reference in a sent prompt, which `remarkPromptChips` marks; a todo, session, ticket, or pull request opens in the
+ * A reference in a sent prompt, which `remarkPromptChips` marks; a todo, session, or pull request opens in the
  * dashboard. Any other `span` stays one.
  */
 function PromptChipSpan({ node, ...props }: ComponentProps<"span"> & ExtraProps) {
@@ -330,7 +321,7 @@ export const loadRawHtml = (): Promise<unknown> => rawHtmlPlugins.load();
  */
 export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rawHtml: false, rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform, openImages: true, linkPages: false };
 
-/** A user's prompt, read as agent text with its skill, command, file, ticket, pull request, todo, and session references as chips. */
+/** A user's prompt, read as agent text with its skill, command, file, pull request, todo, and session references as chips. */
 export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS };
 
 /** A settled message in a session's conversation: agent text whose `mermaid` and `chart` fences draw as visuals. */
@@ -362,9 +353,8 @@ const remarkLineBreaks = () => (root: BreakNode) => {
 export const BOT_MESSAGE_PRESET: MarkdownPreset = { ...SESSION_AGENT_PRESET, remark: [...AGENT_PRESET.remark, remarkLineBreaks] };
 
 /**
- * Text written on GitHub or Linear, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which
- * follows GitHub's; HTML comments drop out, as GitHub hides them. Images load from GitHub's hosts and from this
- * server's route for a Linear issue's files, which also plays its videos.
+ * Text written on GitHub, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which follows
+ * GitHub's; HTML comments drop out, as GitHub hides them. Images load from GitHub's hosts.
  */
 export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rawHtml: true, rehype: [], components: GITHUB_COMPONENTS, urlTransform, openImages: false, linkPages: true };
 

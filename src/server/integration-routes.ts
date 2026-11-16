@@ -1,4 +1,3 @@
-import { errorText } from "../json";
 import type { Integrations } from "../integrations";
 import {
 	addMcpServerFrom,
@@ -9,66 +8,31 @@ import {
 	signOutMcpServer,
 	startMcpServerSignIn,
 } from "../mcp-servers";
-import {
-	attachToTicket,
-	createTicket,
-	loadLinearUsers,
-	loadTeams,
-	loadTicketDetail,
-	loadTicketMedia,
-	loadTicketOptions,
-	loadTickets,
-	saveTicket,
-} from "../tickets";
-import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
-import { GOOGLE_SERVICES, type GoogleService, type IntegrationTarget, type McpIntegration } from "../shared/accounts";
+import type { IntegrationTarget, McpIntegration } from "../shared/accounts";
 import { answer, checked, fail } from "./http";
-import {
-	parseGoogleClient,
-	parseIntegrationTarget,
-	parseMcpServerAdd,
-	parseMcpServerEnabled,
-	parseMcpServerName,
-	parseSlackClient,
-	parseTicketAttachment,
-	parseTicketDraft,
-	parseTicketEdit,
-	UUID,
-} from "./wire";
-import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID } from "../shared/tickets";
+import { parseIntegrationTarget, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseSlackClient } from "./wire";
 import type { Handler, RouteKit, Routes } from "./route-kit";
 
-/** The MCP integrations, the other MCP servers omp loads, and Linear tickets. */
-export function integrationRoutes({ get, media, write }: RouteKit, integrations: Integrations): Routes {
-	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server or accounts, and the sign-in the page last started. */
+/** The MCP integrations and the other MCP servers omp loads. */
+export function integrationRoutes({ get, write }: RouteKit, integrations: Integrations): Routes {
+	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server, and the sign-in the page last started. */
 	const loaded = get((params) => answer(() => integrations.load(params.has("fresh"))));
 
-	/** A write of `{ id, account }` naming an MCP integration and one of its accounts, answered with that integration as `act` leaves it. */
+	/** A write of `{ id }` naming an MCP integration, answered with that integration as `act` leaves it. */
 	const integrationWrite = (act: (target: IntegrationTarget) => Promise<McpIntegration>): Handler =>
-		write(
-			(body) => checked(parseIntegrationTarget(body), "Expected { id, account } naming an integration and, for Gmail or Google Calendar, an account or null"),
-			act,
-		);
+		write((body) => checked(parseIntegrationTarget(body), "Expected { id } naming an integration"), act);
 
-	/** `PUT /api/integrations/sign-in`: starts a sign-in to an account, or adds one, and answers with its authorization address to open. */
+	/** `PUT /api/integrations/sign-in`: starts a sign-in, and answers with its authorization address to open. */
 	const integrationSignIn = integrationWrite(integrations.startSignIn);
 
-	/** `PUT /api/integrations/remove`: signs out of the integration's server, as `/mcp unauth` does, and removes an account's server unless it is the last. */
+	/** `PUT /api/integrations/remove`: signs out of the integration's server, as `/mcp unauth` does. */
 	const integrationRemove = integrationWrite(integrations.remove);
 
 	const refuseClient = (err: unknown): Response | null => (err instanceof ClientConfigError ? fail(400, err.message) : null);
 
 	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */
 	const slackClient = write((body) => checked(parseSlackClient(body)), integrations.saveSlackClient, refuseClient);
-
-	/** `PUT /api/integrations/<google-calendar|gmail>/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client for that service. */
-	const googleClient = (id: GoogleService): Handler =>
-		write(
-			(body) => checked(parseGoogleClient(body)),
-			(input) => integrations.saveGoogleClient(id, input),
-			refuseClient,
-		);
 
 	/** `GET /api/mcp-servers[?fresh]`: every user-level MCP server omp loads, where omp stands with each, and its sign-in under way. */
 	const mcpServers = get((params) => answer(() => loadMcpServers(params.has("fresh"))));
@@ -95,61 +59,6 @@ export function integrationRoutes({ get, media, write }: RouteKit, integrations:
 		return {};
 	});
 
-	/** `GET /api/tickets[?fresh]`: the viewer's assigned Linear issues, or why they could not be read. */
-	const tickets = get((params) => answer(() => loadTickets(params.has("fresh"))));
-
-	/** `GET /api/ticket?id=<identifier>`: that Linear issue in full, for the tickets page's main content. */
-	const ticket = get((params) => {
-		const id = params.get("id") ?? "";
-		return TICKET_ID.test(id) ? answer(() => loadTicketDetail(id)) : fail(400, "Expected ?id= naming a Linear issue, such as ENG-123");
-	});
-
-	/** `PUT /api/ticket`: `TicketEdit`, applied in Linear; answers the issue in full as it is after it. */
-	const ticketWrite = write((body) => checked(parseTicketEdit(body), "Expected { id } naming a Linear issue and at least one field to change"), saveTicket);
-
-	/** `PUT /api/ticket/new`: `TicketDraft`, opened in Linear; answers `{ identifier }`. */
-	const ticketCreate = write(
-		(body) => checked(parseTicketDraft(body), "Expected { title, description, team } naming a Linear team by id, and fields of their own types"),
-		createTicket,
-	);
-
-	/** `PUT /api/ticket/attachment`: `TicketAttachmentUpload`, attached to the issue in Linear; answers `{}`. */
-	const ticketAttach = write(
-		(body) =>
-			checked(
-				parseTicketAttachment(body),
-				`Expected { issue, name, type, data } naming a Linear issue, with a file of at most ${MAX_TICKET_ATTACHMENT_BYTES / 1024 / 1024} MB in base64`,
-			),
-		async (upload) => {
-			await attachToTicket(upload);
-			return {};
-		},
-	);
-
-	/** `GET /api/linear/teams`: the workspace's Linear teams, `{ id, name, key }`, for the team a new issue goes in. */
-	const teams = get(() => answer(loadTeams));
-
-	/** `GET /api/linear/users`: the workspace's active Linear members, `{ id, name }`, for the composer's People. */
-	const linearUsers = get(() => answer(loadLinearUsers));
-
-	/** `GET /api/ticket/options?team=<id>`: what the field pickers offer for an issue of that Linear team. */
-	const ticketOptions = get((params) => {
-		const team = params.get("team") ?? "";
-		return UUID.test(team) ? answer(() => loadTicketOptions(team)) : fail(400, "Expected ?team= naming a Linear team by id");
-	});
-
-	/** `GET /api/ticket/media?issue=<identifier>&path=<upload path>`: a file that the issue or its comments embed, from Linear. */
-	const ticketMedia = media(async (params, req) => {
-		const issue = params.get("issue") ?? "";
-		const path = params.get("path") ?? "";
-		if (!TICKET_ID.test(issue) || !isUploadPath(path)) return fail(400, "Expected ?issue= naming a Linear issue and ?path= naming one of its files");
-		try {
-			return (await loadTicketMedia(issue, path, req.headers.get("range"), req.signal)) ?? fail(404, `${issue} embeds no file ${path}`);
-		} catch (err) {
-			return fail(502, errorText(err));
-		}
-	});
-
 	return {
 		"/api/integrations": { GET: loaded },
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
@@ -161,14 +70,5 @@ export function integrationRoutes({ get, media, write }: RouteKit, integrations:
 		"/api/mcp-servers/enabled": { PUT: mcpServerEnabled },
 		"/api/mcp-servers/remove": { PUT: mcpServerRemove },
 		"/api/integrations/slack/client": { PUT: slackClient },
-		...Object.fromEntries(GOOGLE_SERVICES.map((id) => [`/api/integrations/${id}/client`, { PUT: googleClient(id) }])),
-		"/api/tickets": { GET: tickets },
-		"/api/linear/teams": { GET: teams },
-		"/api/linear/users": { GET: linearUsers },
-		"/api/ticket": { GET: ticket, PUT: ticketWrite },
-		"/api/ticket/new": { PUT: ticketCreate },
-		"/api/ticket/attachment": { PUT: ticketAttach },
-		"/api/ticket/options": { GET: ticketOptions },
-		"/api/ticket/media": { GET: ticketMedia },
 	};
 }

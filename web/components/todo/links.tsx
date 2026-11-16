@@ -5,7 +5,6 @@ import type { UserTodoLink } from "../../../src/user-todos-shared";
 import { hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import { hashForPullRequests } from "../../routing";
-import { hashForTickets } from "../../tickets-model";
 import type { TodoWorkState } from "../../todo-work-state";
 import { Tooltip } from "@/components/ui/tooltip";
 import { StatusDot } from "../status-dot";
@@ -31,8 +30,6 @@ function linkTarget(link: UserTodoLink, sessions: KnownSessions) {
 		}
 		case "pull-request":
 			return { href: hashForPullRequests(link), label: `${link.repo}#${link.number}`, title: `Pull request ${link.owner}/${link.repo}#${link.number}`, host: null };
-		case "ticket":
-			return { href: hashForTickets(link.identifier), label: link.identifier, title: `Linear issue ${link.identifier}`, host: null };
 		default: {
 			const never: never = link;
 			return never;
@@ -41,7 +38,7 @@ function linkTarget(link: UserTodoLink, sessions: KnownSessions) {
 }
 
 /** Each link shows the icon of the page it opens. */
-const ICONS = { session: PAGE_ICON.sessions, "pull-request": PAGE_ICON["pull-requests"], ticket: PAGE_ICON.tickets } as const;
+const ICONS = { session: PAGE_ICON.sessions, "pull-request": PAGE_ICON["pull-requests"] } as const;
 
 interface TodoLinkChipProps {
 	link: UserTodoLink;
