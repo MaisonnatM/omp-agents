@@ -6,7 +6,6 @@ import type { PastSession, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { needsYou } from "../attention";
 import { ALL_WORKSPACES, folderName, sessionsWaiting } from "../labels";
 import { type RosterFolder, rosterFolders, rowPlacement, type SidebarSessions, type WorkspaceGroup } from "../sessions";
@@ -90,7 +89,7 @@ interface WorkspaceFolderProps {
 function WorkspaceFolder({ folder: { group, rows }, name, open, onOpenChange, onNewSession, children }: WorkspaceFolderProps) {
 	const waiting = group.hosts.filter(needsYou).length;
 	const newHere = (
-		<SidebarGroupActions className={cn("opacity-0 transition-opacity group-hover/workspace:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100", rows === 0 ? "top-0" : "top-0.5")}>
+		<SidebarGroupActions className="top-0 h-7 opacity-0 transition-opacity group-hover/workspace:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
 			<Tooltip content={`New session in ${name}`} side="right">
 				<SidebarGroupAction aria-label={`New session in ${name}`} onClick={onNewSession}>
 					<IconPlusLarge />
