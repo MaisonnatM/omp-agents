@@ -65,6 +65,14 @@ describe("starts", () => {
 		expect(settleStart(beginStart(new Map(), 1, quick), 1, ok).size).toBe(0);
 	});
 
+	test("a new pull request asks for a new session on the change, and stays apart from the New session page's start", () => {
+		const op: StartOp = { kind: "pull-request-new", cwd: "/work", repo: "webapp", change: "Add dark mode", skill: null };
+		expect(messageOf(op, 5)).toMatchObject({ t: "start", kind: "new", cwd: "/work", subject: null, todoId: null, prompt: "Make this change in webapp on a new branch, then open a pull request for it.\n\nAdd dark mode" });
+		const starts = settleStart(beginStart(new Map(), 1, op), 1, { ok: false, error: "busy" });
+		expect(startOf(starts, "new")).toBeNull();
+		expect(startOf(starts, "pull-request-new")).toMatchObject({ phase: "failed", error: "busy" });
+	});
+
 	test("a Resume all leaves when every session resumed, and its failure outlives the connection and every view until dismissed", () => {
 		const resumeAll: StartOp = { kind: "resume-all", sessionIds: ["s1", "s2"] };
 		const waiting = beginStart(new Map(), 1, resumeAll);

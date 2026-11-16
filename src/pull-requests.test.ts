@@ -31,6 +31,7 @@ const node = (number: number, fields: Record<string, unknown>) => ({
 	mergeable: "MERGEABLE",
 	headRefName: `me/branch-${number}`,
 	baseRefName: "main",
+	createdAt: "2026-09-29T10:00:00Z",
 	updatedAt: "2026-10-01T10:00:00Z",
 	mergedAt: null,
 	author: me,
@@ -152,6 +153,7 @@ describe("parseListAnswer", () => {
 				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
 				viewerApproved: false,
+				createdAt: Date.parse("2026-09-29T10:00:00Z"),
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -174,6 +176,7 @@ describe("parseListAnswer", () => {
 				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
 				viewerApproved: false,
+				createdAt: Date.parse("2026-09-29T10:00:00Z"),
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -196,6 +199,7 @@ describe("parseListAnswer", () => {
 				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
 				viewerApproved: false,
+				createdAt: Date.parse("2026-09-29T10:00:00Z"),
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -218,6 +222,7 @@ describe("parseListAnswer", () => {
 				unresolved: { count: 0, exact: true, bots: 0 },
 				conversations: 0,
 				viewerApproved: false,
+				createdAt: Date.parse("2026-09-29T10:00:00Z"),
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
 			},
 		]);

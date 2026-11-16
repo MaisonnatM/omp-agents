@@ -19,9 +19,7 @@ import {
 	orderedRepos,
 	placedManual,
 	reason,
-	sectionsOfRepos,
 	sectionTitles,
-	shownPullRequests,
 	rebaseOrder,
 	threadStarters,
 	withPullRequestReviewers,
@@ -32,6 +30,7 @@ import {
 	withRepoStepped,
 	yourMoveCount,
 } from "./pull-requests-model";
+import { filteredList, groupedList, NO_FILTER, shownPullRequests } from "./pull-requests-filter";
 
 const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullRequestSummary => ({
 	owner: "acme",
@@ -54,6 +53,7 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
 	viewerApproved: false,
+	createdAt: 0,
 	updatedAt: number,
 	...fields,
 });
@@ -62,10 +62,10 @@ const teammate = { login: "teammate", avatarUrl: null };
 
 const noAgent: AgentOn = () => null;
 
-/** The pull requests the page shows of `repos` in `order`, less what `isFolded` folds, as `owner#number`. */
+/** The pull requests the page shows of `repos` in `order`, grouped by repository, less what `isFolded` folds, as `owner#number`. */
 function shownOf(repos: readonly RepoPullRequests[], order: PullRequestOrder, isFolded: (key: string) => boolean = () => false): string[] {
-	const ordered = orderedRepos(repos, order);
-	return shownPullRequests(ordered, sectionsOfRepos(ordered, order, noAgent), isFolded).map(({ repo, number }) => `${repo}#${number}`);
+	const listed = filteredList(orderedRepos(repos, order), NO_FILTER, "", order, noAgent, false, 0);
+	return shownPullRequests("repository", groupedList("repository", listed, order), isFolded).map(({ repo, number }) => `${repo}#${number}`);
 }
 
 describe("next move", () => {

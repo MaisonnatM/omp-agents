@@ -189,6 +189,8 @@ export interface PullRequestSummary extends PullRequest {
 	conversations: number;
 	/** Whether your latest review of it approves it. */
 	viewerApproved: boolean;
+	/** When it was opened, in ms since the epoch. */
+	createdAt: number;
 	/** Last update, or the merge for a merged PR, in ms since the epoch. */
 	updatedAt: number;
 }
@@ -226,6 +228,7 @@ const isSummary = fields<PullRequestSummary>({
 	unresolved: fields<PullRequestSummary["unresolved"]>({ count: isNumber, exact: isBoolean, bots: isNumber }),
 	conversations: isNumber,
 	viewerApproved: isBoolean,
+	createdAt: isNumber,
 	updatedAt: isNumber,
 });
 

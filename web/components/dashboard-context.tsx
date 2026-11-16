@@ -55,6 +55,7 @@ export interface DashboardStatus {
 		fork: StartOf<"fork"> | null;
 		resume: StartOf<"resume"> | null;
 		quick: StartOf<"quick"> | null;
+		pullRequestNew: StartOf<"pull-request-new"> | null;
 		resumeAll: StartOf<"resume-all"> | null;
 	};
 	/** The live sessions the page asked the server to end, by instance id, with the session each ran, until it answers. */

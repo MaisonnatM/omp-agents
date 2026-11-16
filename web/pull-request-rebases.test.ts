@@ -25,6 +25,7 @@ const pr = (number: number, stackedOn: number | null = null): PullRequestSummary
 	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
 	viewerApproved: false,
+	createdAt: 0,
 	updatedAt: number,
 });
 

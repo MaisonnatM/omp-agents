@@ -125,21 +125,38 @@
   One toast with a spinner and a running clock counts the run, such as `Rebasing 2 of 5 pull requests`, and names the branch rebasing now with its step, such as `me/fix: Pushing through the pre-push checks`; when the last one ends, it sums up the run, such as `Rebased 3 of 5 pull requests`, with how many already had their base, stopped at a conflict, failed, or were skipped.
   A conflict or a failure also toasts on its own as it happens.
   The button reads **Rebasing…** beside a spinner and waits while any rebase is queued or running.
-- The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
-  Any sort but **Manual** keeps your moves in their order and sorts within each move.
-  Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.
+- Tabs above the list show part of it: **Open** every section but **Recently merged**, **Your move**, **Approved**, and **Merged** that one section, and **All**, the default, every section.
+  A tab reads as picked only while the sections shown are exactly its own, so sections you switch one by one leave no tab picked.
+- **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section** lists the sections, **Repository** and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.
+  A repository or author you checked that lists nothing now, such as a repository you hid since, stays in its submenu with none, so you can uncheck it.
+  Each field you set adds a chip under the tabs, such as **Author is MaisonnatM** or **Repository is any of 2 repositories**, whose tooltip names them; click the value to change it, or its × to drop the field, and **Clear all** drops every field once two chips show.
+  The last section shown stays on.
+  The author, date, and search filters apply before stacks join, so a stack keeps only the pull requests that match.
+  While any filter or search is set, a repository with nothing left leaves the page, unless **Show empty sections** in **Display** is on; when nothing is left, a note names the search or the filters with a button that clears them.
+  The filtered pull requests leave the table and ↓ and ↑; **Rebase N behind** and the **Pull requests** tab's count still cover them.
+  The browser keeps the filter across reloads.
+- The search field in the page header keeps the pull requests whose title, number, branch, author, or repository contain every word you type; Escape clears it.
+  The page forgets the search when you leave it.
+- **Display**, the sliders button beside **Filter**, holds **Grouping**, **Ordering**, **Show empty sections**, and **Repositories…**; it stays highlighted while you hide a repository.
+  **Grouping** lays the list out by **Repository**, the default, by **Section** with a table per repository under each section, by **Author**, most pull requests first, with a table per section under each author, or with **No grouping**, one table of every pull request, in section order.
+  Every grouping but **Repository** folds its own headings and keeps no drag; **Waiting on others** and **Recently merged** start folded there too.
+  **Ordering** orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
+  Any order but **Manual** keeps your moves in their order and sorts within each move.
+  Drag a pull request within its section to place it by hand, which switches the order to **Manual** and keeps the order the section showed until then.
   In **Manual**, a pull request you never placed comes first, most recently updated first.
   A stack moves as one, and its pull requests keep their order from the top of the stack.
   Drag a repository's name on the page to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
-  The app keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
-- **Repositories** at the top of the Pull requests page, beside the sort button, lists every repository the page covers, each with a switch that shows or hides it and buttons that move it up or down.
+  The app keeps the order across reloads, and **Reset the order** under **Ordering** restores the default.
+- **Repositories…** in **Display** lists every repository the page covers, each with a switch that shows or hides it and buttons that move it up or down.
   Its line under the title says that a hidden repository also leaves the tab's count, and that the browser keeps the choice.
-  While you hide any, the button reads **N hidden** and its tooltip **Repositories: N hidden**.
+  While you hide any, the **Display** button's tooltip reads **Display: N repositories hidden**.
   A hidden repository leaves the table, **Rebase N behind**, ↓ and ↑, and the **Pull requests** tab's count, and keeps its place in the order, so it comes back where it was.
   E still works on the details of a hidden repository's pull request.
   **Reset the order** leaves the hidden repositories hidden, and the browser keeps the choice across reloads.
-  When every repository is hidden, the page says "Every repository is hidden. Show them from Repositories." above a **Show all repositories** button.
+  When every repository is hidden, the page says "Every repository is hidden. Show them from Display, then Repositories." above a **Show all repositories** button.
+- **+** in the page header opens **New pull request**: pick a workspace, named by its repository and by its folder when the repository has several, say what should change, and **Start** opens a new session there that makes the change on a new branch and opens a pull request for it.
+  The session opens in the focused pane, and the New session page keeps its own draft.
 
 - The Pull requests page works from the keyboard, outside text fields, while its tab shows.
   ↓ and ↑ move to the next and previous row, and Enter shows the focused row's details.

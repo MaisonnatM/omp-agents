@@ -8,25 +8,34 @@ interface Drag {
 	over: { key: string; where: Where } | null;
 }
 
-/** One draggable item: the element you grab, the element that takes a drop, where a drop would land, and whether it is the one dragged. */
+/** The element you grab, which starts a drag. */
+interface DragHandle {
+	draggable: true;
+	onDragStart: (event: DragEvent<HTMLElement>) => void;
+	onDragEnd: () => void;
+}
+
+/** The element that takes a drop. */
+interface DropTarget {
+	onDragOver: (event: DragEvent<HTMLElement>) => void;
+	onDrop: (event: DragEvent<HTMLElement>) => void;
+}
+
+/** One draggable item: the props of the element you grab and of the element that takes a drop, where a drop would land, and whether it is the one dragged. */
 export interface DragItem {
-	handle: {
-		draggable: true;
-		onDragStart: (event: DragEvent<HTMLElement>) => void;
-		onDragEnd: () => void;
-	};
-	target: {
-		onDragOver: (event: DragEvent<HTMLElement>) => void;
-		onDrop: (event: DragEvent<HTMLElement>) => void;
-	};
+	handle: Partial<DragHandle>;
+	target: Partial<DropTarget>;
 	dropAt: Where | null;
 	dragging: boolean;
 }
 
+/** An item that neither drags nor takes a drop, such as a row of a list that keeps its own order; its props spread to nothing. */
+export const NO_DRAG: DragItem = { handle: {}, target: {}, dropAt: null, dragging: false };
+
 /** What an item keeps across renders: the same handlers, which call the `onDrop` of the latest render. */
 interface Held {
-	handle: DragItem["handle"];
-	target: DragItem["target"];
+	handle: DragHandle;
+	target: DropTarget;
 	onDrop: (dragged: string, where: Where) => void;
 }
 

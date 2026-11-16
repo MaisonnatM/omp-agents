@@ -9,8 +9,9 @@ import type { ForkPoint } from "./transcript-view";
 /**
  * What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A
  * quick action keeps its subject, the pull request, Linear issue, or todo with the action, which its page shows progress
- * and failure for; the server links its session to that subject. A **Resume all** resumes each of the
- * sidebar's interrupted sessions.
+ * and failure for; the server links its session to that subject. A new pull request from the Pull requests page keeps
+ * the change it describes, which its popover shows the failure for. A **Resume all** resumes each of the sidebar's
+ * interrupted sessions.
  */
 export type StartOp =
 	| {
@@ -32,6 +33,8 @@ export type StartOp =
 	| { kind: "resume"; sessionId: string }
 	/** `skill`: the skill pinned in the settings, `null` for none. `branch`: the branch whose worktree it starts in, `null` to start in `cwd`. */
 	| QuickOp
+	/** `repo`: the repository's name, which the prompt names. `change`: what should change. `skill`: the skill pinned in the settings, `null` for none. */
+	| { kind: "pull-request-new"; cwd: string; repo: string; change: string; skill: string | null }
 	| { kind: "resume-all"; sessionIds: string[] };
 
 export type NewOp = Extract<StartOp, { kind: "new" }>;
@@ -62,6 +65,25 @@ export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId, taskId: null, reviewDraft: false, bot: null, private: op.private };
 		case "quick":
 			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: op.branch, model: null, thinking: null, skill: op.skill, taskId: null, bot: null, private: false, ...startTarget(op.subject) };
+		case "pull-request-new":
+			return {
+				t: "start",
+				reqId,
+				kind: "new",
+				cwd: op.cwd,
+				prompt: `Make this change in ${op.repo} on a new branch, then open a pull request for it.\n\n${op.change}`,
+				images: [],
+				branch: null,
+				model: null,
+				thinking: null,
+				skill: op.skill,
+				subject: null,
+				todoId: null,
+				taskId: null,
+				reviewDraft: false,
+				bot: null,
+				private: false,
+			};
 		case "fork":
 			return { t: "start", reqId, kind: "fork", view: op.view, entryId: op.point.entryId };
 		case "resume":
