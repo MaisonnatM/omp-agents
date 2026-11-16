@@ -1,4 +1,4 @@
-import { IconChevronBottom, IconChevronGrabberVertical, IconChevronGrabberVerticalToward, IconCodeTree, IconLayoutColumn, IconLayoutTopBottom, IconParagraph, IconSettingsSliderHor, IconLinebreak } from "central-icons";
+import { IconChevronDownSmall, IconChevronGrabberVertical, IconChevronGrabberVerticalToward, IconCodeTree, IconLayoutColumn, IconLayoutTopBottom, IconParagraph, IconSettingsSliderHor, IconLinebreak } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { useState } from "react";
 import type { PullRequestCommit } from "../../../../src/shared/github";
@@ -89,7 +89,7 @@ function CommitScope({ commits, commit, onCommit }: Pick<CodeToolbarProps, "comm
 					<Button
 						size="xs"
 						variant="secondary"
-						trailingIcon={IconChevronBottom}
+						trailingIcon={IconChevronDownSmall}
 						className="min-w-0 max-w-64 [&>span.relative]:min-w-0 [&>span.relative>span]:min-w-0 [&_svg]:shrink-0"
 						aria-label={`Diff scope: ${label}`}
 					/>

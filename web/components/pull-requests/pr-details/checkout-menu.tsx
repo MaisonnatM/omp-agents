@@ -1,4 +1,4 @@
-import { IconBranch, IconChevronBottom, IconFolder2 } from "central-icons";
+import { IconBranch, IconChevronDownSmall, IconFolder2 } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { CheckedOutPullRequest, CheckoutPlace, PullRequest, PullRequestCheckout } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ export function CheckoutMenu({ pr, cwd, onOpen }: { pr: PullRequest; cwd: string
 			<Tooltip content="Check out this pull request">
 				<DropdownMenuTrigger
 					{...activityControl("pr-details.checkout")}
-					render={<Button size="xs" variant="outline" className="shrink-0 @max-[35rem]/pr-header:gap-0.5 [&_svg:last-child]:text-muted-foreground" leadingIcon={IconBranch} trailingIcon={IconChevronBottom} disabled={checkOut.pending} aria-label={label} />}
+					render={<Button size="xs" variant="outline" className="shrink-0 @max-[35rem]/pr-header:gap-0.5 [&_svg:last-child]:text-muted-foreground" leadingIcon={IconBranch} trailingIcon={IconChevronDownSmall} disabled={checkOut.pending} aria-label={label} />}
 				>
 					<span className="@max-[35rem]/pr-header:hidden">{label}</span>
 				</DropdownMenuTrigger>

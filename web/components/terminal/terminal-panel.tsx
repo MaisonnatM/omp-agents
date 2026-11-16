@@ -1,5 +1,5 @@
 /** `TerminalPanel`: the resizable panel under the panes holding the terminal tabs, and its shown/height state. */
-import { IconChevronBottom, IconCrossMedium, IconLoader, IconPlusLarge } from "central-icons";
+import { IconChevronDownSmall, IconCrossMedium, IconLoader, IconPlusLarge } from "central-icons";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TerminalInfo } from "../../../src/shared/terminals";
 import { Button } from "@/components/ui/button";
@@ -188,7 +188,7 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 				)}
 				<Tooltip content="Hide the terminal">
 					<Button variant="ghost" size="icon-compact" aria-label="Hide the terminal" className="ml-auto" onClick={() => setOpen(false)}>
-						<IconChevronBottom />
+						<IconChevronDownSmall />
 					</Button>
 				</Tooltip>
 			</div>
