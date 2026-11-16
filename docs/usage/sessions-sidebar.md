@@ -17,7 +17,9 @@
   Cmd+1 through Cmd+9 go to the first through ninth tab, and Ctrl+Tab and Ctrl+Shift+Tab, or Cmd+Alt+→ and Cmd+Alt+←, to the next and previous one.
   The × on a tab, a middle-click, or Cmd+W closes it, closing the one on screen shows its neighbor, and closing the last one leaves a new tab on New session; Cmd+Alt+W closes every tab but the pinned ones and the one on screen.
   Cmd+Shift+T reopens the last closed tab where it was, on the page it showed, and pressed again brings back the one closed before; a closed session that another tab shows by then switches to that tab instead.
-  Right-click a tab for **Pin tab** or **Unpin tab**, **New tab**, **Close tab**, and **Close other tabs**, as in Capy; Ctrl+Shift+P pins or unpins the tab on screen.
+  Right-click a tab for **Pin tab** or **Unpin tab**, **New tab**, **Duplicate tab**, **Copy URL**, **Close tab**, **Close other tabs**, and **Close tabs to the right**, as in Capy; Ctrl+Shift+P pins or unpins the tab on screen, and Cmd+L copies its URL.
+  **Duplicate tab** opens what the tab shows in a new tab right after it, or right after the pinned tabs for a pinned one; a duplicated session shows in both tabs, and opening it from another tab goes to the first of them.
+  **Close tabs to the right** keeps the pinned tabs, and when it closes the tab on screen it shows the one you right-clicked.
   Pinned tabs sit first and show only their icon, and the ×, a middle-click, and Cmd+W leave them open until you unpin them.
   Drag a tab from anywhere on it to move it among the pinned or the other tabs, or focus it and press Alt+Shift+← or →; this browser keeps the tabs, their order, which are pinned, and the last 20 closed across reloads.
   In the desktop app on macOS the row is the window's title bar: it starts after the window's buttons and drags the window.

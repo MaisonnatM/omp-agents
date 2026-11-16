@@ -57,8 +57,9 @@ test("browser-reserved chords stay the browser's, apart from the app's tab, sett
 		expect(pressOn(mac, ",", "Comma", mod)).toEqual(["settings"]);
 		expect(pressOn(mac, "W", "KeyW", { ...mod, shift: true })).toEqual([]);
 		expect(pressOn(mac, "T", "KeyT", { ...mod, shift: true })).toEqual(["reopenClosedTab"]);
+		expect(pressOn(mac, "l", "KeyL", mod)).toEqual(["copyTabUrl"]);
 		expect(pressOn(mac, "X", "KeyX", { ...mod, shift: true })).toEqual([]);
-		for (const [key, code] of [["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["n", "KeyN"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
 		expect(pressOn(mac, "K", "KeyK", { ...mod, shift: true })).toEqual(["copyPullRequestNumber"]);

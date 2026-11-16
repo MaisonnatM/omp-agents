@@ -70,12 +70,13 @@ const remember = (closed: readonly ClosedHeaderTab[], entries: readonly ClosedHe
 /**
  * The row once the dashboard went to `to`: a session another tab shows focuses that tab, `newTab` or an empty row adds a tab `newId` at the end,
  * and anything else shows in the tab on screen. The same object when nothing changes, so a render stores only a change.
+ * A session the tab on screen shows stays in it, since a duplicated tab shows it twice.
  */
 export function visitHeaderTab(row: HeaderTabs, to: string, newTab: boolean, newId: string): HeaderTabs {
 	if (headerTabTarget(to) === null) return row;
 	const session = sessionOf(to);
-	const showing = session === null ? -1 : row.tabs.findIndex(tab => sessionOf(tab.hash) === session);
 	const current = row.tabs[row.active];
+	const showing = session === null ? -1 : current && sessionOf(current.hash) === session ? row.active : row.tabs.findIndex(tab => sessionOf(tab.hash) === session);
 	if (showing !== -1 && (newTab || showing !== row.active)) return { ...row, tabs: row.tabs.map((tab, index) => (index === showing ? { ...tab, hash: to } : tab)), active: showing };
 	if (newTab || !current) return { ...row, tabs: [...row.tabs, { id: newId, hash: to }], active: row.tabs.length };
 	if (current.hash === to) return row;
@@ -98,17 +99,38 @@ export function closeHeaderTab(row: HeaderTabs, id: string, newId: string): { ro
 	return { row: { tabs, active, closed }, go: tabs[active]?.hash ?? null };
 }
 
-/**
- * The row with only the pinned tabs and tab `id`, which goes on screen, and where to go when it was not; `null` when that closes nothing.
- * Reopen closed tab brings the others back from the left.
- */
-export function closeOtherHeaderTabs(row: HeaderTabs, id: string): { row: HeaderTabs; go: string | null } | null {
-	const keep = (tab: HeaderTab): boolean => tab.pinned === true || tab.id === id;
-	const gone = row.tabs.flatMap((tab, index) => (keep(tab) ? [] : [{ tab, index }]));
+/** The row with only the tabs `keep` holds and tab `focus` on screen, and where to go when it was not; `null` when that closes nothing. Reopen closed tab brings the others back from the left. */
+function closeAllBut(row: HeaderTabs, keep: (tab: HeaderTab, index: number) => boolean, focus: string): { row: HeaderTabs; go: string | null } | null {
+	const gone = row.tabs.flatMap((tab, index) => (keep(tab, index) ? [] : [{ tab, index }]));
 	const tabs = row.tabs.filter(keep);
-	const active = tabs.findIndex(tab => tab.id === id);
+	const active = tabs.findIndex(tab => tab.id === focus);
 	if (gone.length === 0 || active === -1) return null;
-	return { row: { tabs, active, closed: remember(row.closed, gone.toReversed()) }, go: row.tabs[row.active]?.id === id ? null : (tabs[active]?.hash ?? null) };
+	return { row: { tabs, active, closed: remember(row.closed, gone.toReversed()) }, go: row.tabs[row.active]?.id === focus ? null : (tabs[active]?.hash ?? null) };
+}
+
+/** The row with only the pinned tabs and tab `id`, which goes on screen. */
+export const closeOtherHeaderTabs = (row: HeaderTabs, id: string): { row: HeaderTabs; go: string | null } | null =>
+	closeAllBut(row, tab => tab.pinned === true || tab.id === id, id);
+
+/** The row without the unpinned tabs after tab `id`; when the one on screen goes, tab `id` takes its place on screen. */
+export function closeRightHeaderTabs(row: HeaderTabs, id: string): { row: HeaderTabs; go: string | null } | null {
+	const at = row.tabs.findIndex(tab => tab.id === id);
+	const keep = (tab: HeaderTab, index: number): boolean => tab.pinned === true || index <= at;
+	const current = row.tabs[row.active];
+	return at === -1 ? null : closeAllBut(row, keep, current && keep(current, row.active) ? current.id : id);
+}
+
+/**
+ * The row with a copy `newId` of tab `id` on screen, right after it, or first of the unpinned tabs when it is pinned, as Capy's Duplicate tab does; `go` is what it shows.
+ * The copy is never pinned, and a session then shows in both tabs.
+ */
+export function duplicateHeaderTab(row: HeaderTabs, id: string, newId: string): { row: HeaderTabs; go: string } | null {
+	const index = row.tabs.findIndex(tab => tab.id === id);
+	const tab = row.tabs[index];
+	if (!tab) return null;
+	const { pinned, ...rest } = tab;
+	const at = pinned ? row.tabs.filter(each => each.pinned).length : index + 1;
+	return { row: { ...row, tabs: [...row.tabs.slice(0, at), { ...rest, id: newId }, ...row.tabs.slice(at)], active: at }, go: tab.hash };
 }
 
 /**
