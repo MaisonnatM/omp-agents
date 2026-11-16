@@ -23,7 +23,7 @@ describe("starts", () => {
 		starts = settleStart(starts, 2, ok);
 		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { id: "t7" } } });
 		starts = settleStart(starts, 1, { ok: false, error: "busy" });
-		expect(startOf(starts, "quick")).toMatchObject({ phase: "failed", error: "busy", op: { subject: { id: "ENG-7" } } });
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "failed", error: "busy", op: { subject: { id: "t7" } } });
 	});
 
 	test("an answer settles only a start still waiting: success removes it, failure keeps the reason", () => {
