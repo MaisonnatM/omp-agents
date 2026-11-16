@@ -1,10 +1,8 @@
 /** The sidebar's page list as the user arranged it in Settings › Preferences: the tabs' order, and which ones it leaves out. */
 import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
-import { type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
 import { useModulesOff } from "./modules-off";
-import { integrationsStore } from "./reads";
 import { type Page, SIDEBAR_TABS, type SidebarTab } from "./routing";
 import type { ShortcutId } from "./shortcuts";
 import { useStoredState } from "./stored-state";
@@ -22,7 +20,7 @@ export type TabLayout = readonly { tab: SidebarTab; hidden: boolean }[];
 
 export const DEFAULT_TAB_LAYOUT: TabLayout = SIDEBAR_TABS.map(({ value }) => ({ tab: value, hidden: false }));
 
-/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, and the integration it waits on. */
+/** Each tab's row of {@link SIDEBAR_TABS}: its label and icon. */
 export const TAB_ROWS = Object.fromEntries(SIDEBAR_TABS.map(row => [row.value, row])) as Record<SidebarTab, (typeof SIDEBAR_TABS)[number]>;
 
 /** Whether a page kind is a sidebar tab's, with a row in {@link TAB_ROWS}. */
@@ -33,7 +31,7 @@ export type NavRow = SidebarTab | "notifications" | "settings" | "new";
 
 /**
  * The row of the page list that `page` selects: the panes, the empty home, a page with no row, and a page whose tab is
- * absent, signed out or turned off, select none.
+ * absent, its module turned off, select none.
  * A page whose tab the user hid in Preferences still selects it, so while its list nests in the sidebar it shows after the last row.
  */
 export function navRowOf(page: Page | null, absentTabs: ReadonlySet<SidebarTab>): NavRow | null {
@@ -97,35 +95,19 @@ export function moveTab(layout: TabLayout, tab: SidebarTab, by: -1 | 1): TabLayo
 /** `layout` with `tab` hidden or shown. */
 export const hideTab = (layout: TabLayout, tab: SidebarTab, hidden: boolean): TabLayout => layout.map(entry => (entry.tab === tab ? { tab, hidden } : entry));
 
-/** The tabs shown, in order: those the user did not hide, less the `absent` ones, signed out or turned off. */
+/** The tabs shown, in order: those the user did not hide, less the `absent` ones, whose module is turned off. */
 export const shownTabs = (layout: TabLayout, absent: ReadonlySet<SidebarTab>): SidebarTab[] =>
 	layout.filter(({ tab, hidden }) => !hidden && !absent.has(tab)).map(({ tab }) => tab);
 
-/** The tabs whose service omp holds no sign-in to, which then neither show nor take their shortcuts; all of them until the integrations answer. */
-export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
-	SIDEBAR_TABS.flatMap(row => (row.integration !== undefined && !(integrations && signedIn(integrations[row.integration].connection)) ? [row.value] : []));
-
-/** The tabs whose service omp holds no sign-in to, as {@link tabsSignedOut} names them; the same set until one signs in or out, whatever the integrations' polls answer. */
-export function useSignedOutTabs(): ReadonlySet<SidebarTab> {
-	const names = tabsSignedOut(integrationsStore.usePolling().read?.data.integrations);
-	const namesKey = names.join();
-	return useMemo((): ReadonlySet<SidebarTab> => new Set(names), [namesKey]);
-}
-
-/** The tabs that neither show nor take their shortcuts: those whose service omp holds no sign-in to, and the modules' turned `off`. */
-export const mergeAbsent = (signedOut: ReadonlySet<SidebarTab>, off: ReadonlySet<SidebarTab>): ReadonlySet<SidebarTab> => new Set([...signedOut, ...off]);
-
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
- * `signedOut`, the {@link useSignedOutTabs}, stays the same set until one signs in or out, `absent` until that or a module turns on or off, and `shown` with it until the layout changes.
+ * `absent` stays the same set until a module turns on or off, and `shown` with it until the layout changes.
  * A stored layout that differs from how it decodes, such as one naming a tab that left or {@link LEGACY_NOTES_TAB}, is stored again, so old ids leave this browser and Settings › Sync.
  */
 export function useSidebarTabs(): {
 	layout: TabLayout;
 	setLayout: (next: TabLayout | ((prev: TabLayout) => TabLayout)) => void;
-	/** The tabs whose service omp holds no sign-in to. */
-	signedOut: ReadonlySet<SidebarTab>;
-	/** The tabs that neither show nor take their shortcuts: signed out or turned off. */
+	/** The tabs that neither show nor take their shortcuts: those of the modules turned off. */
 	absent: ReadonlySet<SidebarTab>;
 	shown: readonly SidebarTab[];
 } {
@@ -134,9 +116,7 @@ export function useSidebarTabs(): {
 		const raw = localStorage.getItem(KEY);
 		if (raw !== null && raw !== encodeTabLayout(layout)) setLayout(layout);
 	}, [layout, setLayout]);
-	const signedOut = useSignedOutTabs();
-	const [off] = useModulesOff();
-	const absent = useMemo(() => mergeAbsent(signedOut, off), [signedOut, off]);
+	const [absent] = useModulesOff();
 	const shown = useMemo(() => shownTabs(layout, absent), [layout, absent]);
-	return { layout, setLayout, signedOut, absent, shown };
+	return { layout, setLayout, absent, shown };
 }

@@ -33,7 +33,6 @@ Config writes invalidate that name, and sign-in, sign-out, and discovery or serv
 While a service's sign-in waits on the browser, `hold` on its `SignIn` answers the connection read during that sign-in, without listing the tools again, and a new sign-in starts holding nothing.
 The page keeps the last read in localStorage.
 `integrationsStore` in `web/reads.ts` drops a cached answer in which an integration has no connection, or a `ready` one lists its tools as anything but objects, as answers did before tools carried descriptions.
-Each gated tab names its service as the `integration` of its row in `SIDEBAR_TABS` in `web/routing.ts`, and `tabsSignedOut` in `web/sidebar-tabs.ts` turns those rows into the tabs omp holds no sign-in for. `useSidebarTabs` keeps the layout, the signed-out set, and the tabs shown; the bar draws those of the header's group, and a group with none shown disables its side of the switch.
 
 `PUT /api/integrations/slack/client` takes `{ clientId, clientSecret?, redirectUri, callbackPort, scope }`.
 `parseSlackClient` accepts a nonempty subset of `SLACK_USER_SCOPES`, with commas or whitespace as separators, and an HTTPS redirect.

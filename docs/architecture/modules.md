@@ -42,7 +42,6 @@ Settings › Activity counts every such change as action `module-change`.
 A `PageModule` describes the module's page.
 
 - `tab`: the sidebar tab's label, icon, and `place`, which orders it among the core's tabs.
-  A tab with an `integration` shows only while omp holds a sign-in to that service.
 - `about`: one plain line on what the module is for, which its row of Settings › Modules shows.
 - `home`: the route the tab opens.
 - `address`: how `#<id>/<rest>?<query>` reads into a route and back.
@@ -52,7 +51,6 @@ A `PageModule` describes the module's page.
 - `controls`: the page-only controls Settings › Activity counts.
 - `split`: the page splits its list from its open item, so the page column leaves it room for both.
 - `listsItself`: the page lists its items itself, so its sidebar row holds no list and the page gets no column; its views then have no `Nav`.
-- `api`: the path prefix of the module's `PUT` routes, which Settings › Activity sets apart with a gated tab.
 
 A `StoredPageModule` adds `store.apply`, which shows a change at once and returns `null` when the state refuses it.
 The page keeps each stored module's state in `DashboardState.modules`, `null` until the server first sends it.
@@ -70,8 +68,8 @@ A module's `Nav`, which every module has but one whose page `listsItself`, takes
 
 Settings › Modules lists every module, a row each in `MODULE_LIST` order, with a switch that turns the module on or off.
 The modules turned off are kept as a JSON array of ids under the portable preference `omp-agents.modules-off`, which `parseModulesOff` in `src/shared/modules-off.ts` reads on both sides, ignoring unknown ids.
-On the page, `useModulesOff` in `web/modules-off.ts` reads it, and `useSidebarTabs` merges it into its `absent` set with the signed-out tabs.
-So a module turned off loses its tab, its go-to shortcut, its palette commands, and its nav row, as a signed-out tab does.
+On the page, `useModulesOff` in `web/modules-off.ts` reads it, and `useSidebarTabs` returns it as its `absent` set.
+So a module turned off loses its tab, its go-to shortcut, its palette commands, and its nav row.
 Its address shows `ModuleOffPage` in place of its `Page`, so its own shortcut rows, which its page binds, never fire.
 On the server, `moduleJoins` gives what a new session joins with, less the joins of the modules the server's preferences turn off.
 `Dashboard.#joinFor` calls it for every session it starts, so a session already running keeps the tool it joined with.

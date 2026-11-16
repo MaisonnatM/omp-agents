@@ -1,7 +1,6 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
 import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage, IconWidgets } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
@@ -10,13 +9,12 @@ import { decodeSegment } from "./hash-segment";
 import { PAGE_ICON } from "./page-icons";
 import { isModulePage, isWebModuleId, MODULE_LIST, type ModulePage, moduleOf, modulePage, type WebModuleId } from "./modules";
 
-/** A sidebar tab's row: its label, its icon, its `place` among the tabs, lowest first, and the integration it waits on. */
+/** A sidebar tab's row: its label, its icon, and its `place` among the tabs, lowest first. */
 export interface SidebarTabRow {
 	value: SidebarTab;
 	label: string;
 	icon: IconComponent;
 	place: number;
-	integration?: McpIntegrationId;
 }
 
 /** The core's tabs, which the modules' tabs join by `place`. */
@@ -24,12 +22,11 @@ const CORE_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: 10 },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: 30 },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: 50 },
-] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number; integration?: McpIntegrationId }[];
+] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number }[];
 
 /**
- * The sidebar's tabs, in order, each a row of its page list. A tab with an `integration` shows, and its
- * shortcut applies, only while omp holds a sign-in to that service, even one the service refuses, which the page then
- * offers to reconnect. Settings is no tab: the row after them and the header's button open it.
+ * The sidebar's tabs, in order, each a row of its page list. Settings is no tab: the row after them and the header's
+ * button open it.
  */
 export const SIDEBAR_TABS: readonly SidebarTabRow[] = [...CORE_TABS, ...MODULE_LIST.map(({ id, tab }) => ({ value: id, ...tab }))].sort((a, b) => a.place - b.place);
 

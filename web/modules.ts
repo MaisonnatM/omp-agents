@@ -6,7 +6,6 @@
  */
 import type { IconComponent } from "@/lib/icon-context";
 import type { ModuleChanges, ModuleValues, StoredModuleId } from "../src/modules";
-import type { McpIntegrationId } from "../src/shared/accounts";
 import { SPORT_PAGE } from "./components/sport/module";
 import type { Binding } from "./shortcuts";
 
@@ -31,11 +30,8 @@ export interface PageStore<Value, Change> {
 
 export interface PageModule<Id extends string, Route, Shortcut extends string = never, Control extends string = never> {
 	readonly id: Id;
-	/**
-	 * The module's sidebar tab, whose id is the module's. `place` orders it among every tab, the core's too, lowest first.
-	 * A tab with an `integration` shows, and its shortcut applies, only while omp holds a sign-in to that service.
-	 */
-	readonly tab: { label: string; icon: IconComponent; place: number; integration?: McpIntegrationId };
+	/** The module's sidebar tab, whose id is the module's. `place` orders it among every tab, the core's too, lowest first. */
+	readonly tab: { label: string; icon: IconComponent; place: number };
 	/** One plain line on what the module is for, which its row of Settings › Modules shows. */
 	readonly about: string;
 	/** What else turning the module off changes, beyond its page, tab, shortcuts, and commands, which its row of Settings › Modules shows. */
@@ -61,8 +57,6 @@ export interface PageModule<Id extends string, Route, Shortcut extends string = 
 	readonly split?: true;
 	/** The page lists its items itself, so its sidebar row holds no list and the page gets no column at its left. */
 	readonly listsItself?: true;
-	/** The path prefix of the module's `PUT` routes, which Settings › Activity sets apart with the tab while it is signed out. */
-	readonly api?: string;
 }
 
 /** A module whose state the server keeps, `ModuleValues[Id]` changed by `ModuleChanges[Id]`. */

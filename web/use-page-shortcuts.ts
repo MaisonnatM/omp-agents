@@ -16,7 +16,7 @@ export interface PageShortcutInput {
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through, and ⌥1 to ⌥9 count. */
 	listed: View[];
 	view: View | null;
-	/** The sidebar tabs signed out or turned off; their shortcuts and commands do not apply. */
+	/** The sidebar tabs of the modules turned off; their shortcuts and commands do not apply. */
 	absentTabs: ReadonlySet<SidebarTab>;
 	/** The right sidebar has a session to show. */
 	hasDetails: boolean;

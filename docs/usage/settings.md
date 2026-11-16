@@ -43,7 +43,6 @@
 - **Activity** shows how you use the dashboard over the last 30 days; choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
   It counts the pages and settings sections you open, the shortcuts and command menu commands you run, the changes you send, and clicks on a few controls that change nothing else, by name only, never what they show or what you typed.
   **Not used** lists every feature with no use in the range and when you last used it, or **Never**; features used once or twice follow.
-  The pages, commands, and changes of a service omp is not signed in to are listed apart and not counted.
   **Most used** lists the top 20 features, with how many days you used each and, for a command, how often you ran it by its keys and from the command menu.
   **Navigation** lists the 15 most common moves from one view to another and the time spent on each view.
   **Active time** charts the minutes you used the dashboard each day, up to five minutes between two uses, with a table of each day's active time, visits, and changes sent.

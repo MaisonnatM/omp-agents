@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
-import { type Page, routeFromHash, type SidebarTab } from "./routing";
+import { type Page, routeFromHash } from "./routing";
 import {
-	mergeAbsent,
 	DEFAULT_TAB_LAYOUT,
 	decodeTabLayout,
 	encodeTabLayout,
@@ -9,7 +8,6 @@ import {
 	moveTab,
 	navRowOf,
 	shownTabs,
-	tabsSignedOut,
 	type TabLayout,
 } from "./sidebar-tabs";
 
@@ -108,10 +106,6 @@ test("a layout stored in the old order, Todo in the bar before Notes, puts Todo 
 	expect(decodeTabLayout(JSON.stringify(before))).toEqual(hideTab(DEFAULT, "todo", true));
 });
 
-test("no tab waits on an integration, so none is signed out, even before the integrations answer", () => {
-	expect(tabsSignedOut(undefined)).toEqual([]);
-});
-
 const pageAt = (hash: string): Page => {
 	const route = routeFromHash(hash);
 	if (route.kind !== "page") throw new Error(`${hash} names no page`);
@@ -126,11 +120,4 @@ test("the page list's current row is the page's tab, and none for the panes or a
 	expect(navRowOf(pageAt("#new"), none)).toBe("new");
 	expect(navRowOf(pageAt("#todo"), new Set(["todo"] as const))).toBeNull();
 	expect(navRowOf(pageAt("#get-started"), none)).toBeNull();
-});
-
-test("the absent tabs are the signed-out ones and the modules turned off, each once", () => {
-	const signedOut: ReadonlySet<SidebarTab> = new Set(["todo", "bots"]);
-	expect([...mergeAbsent(signedOut, new Set())]).toEqual(["todo", "bots"]);
-	expect([...mergeAbsent(signedOut, new Set(["sport", "bots"]))]).toEqual(["todo", "bots", "sport"]);
-	expect(shownTabs(DEFAULT, mergeAbsent(new Set(), new Set(["sport"])))).not.toContain("sport");
 });

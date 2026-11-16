@@ -46,8 +46,7 @@ Each page load's time between two events counts toward the view it showed, up to
 A visit starts after 30 minutes without use or on a new local day.
 `lastUsed` is each feature's latest row whatever the range, which the store's `lastUsed()` answers in SQL, so a feature unused in the range still shows when it was last used.
 `web/activity-report.ts` builds the inventory from `VIEWS`, `SETTINGS_SECTIONS`, `SHORTCUTS`, `CONTROLS`, `ACTION_MESSAGES`, and the server's `PUT` routes.
-It splits it into used, rarely used (once or twice), never used, and not set up, and lists the 20 most used.
-A feature is not set up while its tab is one `useSidebarTabs` reports signed out, which is every integration tab until the integrations answer.
+It splits it into used, rarely used (once or twice), and never used, and lists the 20 most used.
 
 ## Coverage
 
