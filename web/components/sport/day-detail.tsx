@@ -1,5 +1,5 @@
 /** The open day of the week: each workout with its demos, blocks, exercises, and loads, then the daily habits with their routines' checklists. */
-import { IconCheckmark1, IconPlay, IconPlusLarge, IconStopwatch } from "central-icons";
+import { IconCheckmark1, IconPlay, IconPlusSmall, IconStopwatch } from "central-icons";
 import type { Exercise, Plan, Routine, RoutineCheck } from "../../../src/shared/sport";
 import type { PlannedDay, PlannedExercise, PlannedWorkout } from "../../../src/sport-week";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +45,7 @@ export function DayDetail({ plan, day, today, disabled, checks, onDemo, onTimer,
 					<p className="text-xs text-muted-foreground first-letter:uppercase">{kicker}</p>
 					<h2 className="text-xl font-semibold">Repos</h2>
 					<p className="mt-1 text-sm text-muted-foreground">Rien de prévu ce jour.</p>
-					<Button variant="tertiary" size="compact" leadingIcon={IconPlusLarge} className="mt-3" disabled={disabled} onClick={() => onLog(null)} {...activityControl("sport.log.free")}>Séance libre</Button>
+					<Button variant="tertiary" size="compact" leadingIcon={IconPlusSmall} className="mt-3" disabled={disabled} onClick={() => onLog(null)} {...activityControl("sport.log.free")}>Séance libre</Button>
 				</section>
 			) : (
 				day.workouts.map(workout => <WorkoutCard key={workout.id} plan={plan} kicker={kicker} workout={workout} disabled={disabled} onDemo={onDemo} onTimer={onTimer} onLog={onLog} />)

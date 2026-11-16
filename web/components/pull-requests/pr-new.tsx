@@ -2,7 +2,7 @@
  * The Pull requests page's **New pull request** button: a popover that picks a workspace of a repository and starts an
  * omp session there on what should change, which makes the change on a new branch and opens a pull request for it.
  */
-import { IconPlusLarge } from "central-icons";
+import { IconPlusSmall } from "central-icons";
 import { useEffect, useId, useRef, useState } from "react";
 import { type Repo, repoKey, type RepoPullRequests, repoName } from "../../../src/shared/github";
 import { Button } from "@/components/ui/button";
@@ -76,7 +76,7 @@ export function NewPullRequestButton({ everyRepo }: { everyRepo: RepoPullRequest
 			<Tooltip content="New pull request" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
 					<Button {...activityControl("pull-requests.new")} variant="ghost" size="icon-compact" aria-label="New pull request" data-state={open ? "open" : "closed"} active={open}>
-						<IconPlusLarge />
+						<IconPlusSmall />
 					</Button>
 				</PopoverTrigger>
 			</Tooltip>

@@ -1,5 +1,5 @@
 /** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Restart conversation and Delete; and its Routines tab. */
-import { IconArrowRotateCounterClockwise, IconPlusLarge, IconRepeat, IconTrashCan } from "central-icons";
+import { IconArrowRotateCounterClockwise, IconPlusSmall, IconRepeat, IconTrashCan } from "central-icons";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { type Routine, runsHere } from "../../../src/routines";
 import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
@@ -204,13 +204,13 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 					All routines
 				</a>
 				{connected ? (
-					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={IconPlusLarge}>
+					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={IconPlusSmall}>
 						<a href={hashForBotRoutine(bot.id, { kind: "new" })} aria-current={open.kind === "new" ? "page" : undefined}>
 							New routine
 						</a>
 					</Button>
 				) : (
-					<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} disabled>
+					<Button variant="ghost" size="compact" leadingIcon={IconPlusSmall} disabled>
 						New routine
 					</Button>
 				)}

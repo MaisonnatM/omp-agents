@@ -1,5 +1,5 @@
 /** The sidebar's Todo tab: the todo views and categories, with counts left to do (`TodoCategories`). */
-import { IconCheckmark1, IconDotGrid1x3Horizontal, IconPencil, IconPlusLarge, IconTrashCan } from "central-icons";
+import { IconCheckmark1, IconDotGrid1x3Horizontal, IconPencil, IconPlusSmall, IconTrashCan } from "central-icons";
 import { type ReactNode, useRef, useState } from "react";
 import type { UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { badgeColors } from "@/components/ui/badge";
@@ -151,7 +151,7 @@ export function TodoCategories({ list, view, disabled, onChange, sessions }: Tod
 				{!disabled && (
 					<Tooltip content="New category">
 						<SidebarGroupAction aria-label="New category" onClick={() => setNaming({ kind: "add" })}>
-							<IconPlusLarge />
+							<IconPlusSmall />
 						</SidebarGroupAction>
 					</Tooltip>
 				)}

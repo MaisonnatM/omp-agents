@@ -1,5 +1,5 @@
 /** `TerminalPanel`: the resizable panel under the panes holding the terminal tabs, and its shown/height state. */
-import { IconChevronDownSmall, IconCrossMedium, IconLoader, IconPlusLarge } from "central-icons";
+import { IconChevronDownSmall, IconCrossMedium, IconLoader, IconPlusSmall } from "central-icons";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TerminalInfo } from "../../../src/shared/terminals";
 import { Button } from "@/components/ui/button";
@@ -182,7 +182,7 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 				{inventory.state === "ready" && (
 					<Tooltip content="New terminal">
 						<Button variant="ghost" size="icon-compact" aria-label="New terminal" onClick={add}>
-							<IconPlusLarge />
+							<IconPlusSmall />
 						</Button>
 					</Tooltip>
 				)}

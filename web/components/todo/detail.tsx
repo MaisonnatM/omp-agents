@@ -1,4 +1,4 @@
-import { IconChevronRightSmall, IconPlay, IconPlusLarge } from "central-icons";
+import { IconChevronRightSmall, IconPlay, IconPlusSmall } from "central-icons";
 import { useState } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import { addTodo } from "../../../src/user-todos";
@@ -67,7 +67,7 @@ function SubTodos({ todo, readOnly, onChange, onOpen }: { todo: UserTodo; readOn
 	};
 	if (children.length === 0 && (readOnly || adding === null)) {
 		return readOnly ? null : (
-			<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} className="self-start text-muted-foreground" onClick={() => setAdding(0)}>
+			<Button variant="ghost" size="compact" leadingIcon={IconPlusSmall} className="self-start text-muted-foreground" onClick={() => setAdding(0)}>
 				Add sub-todos
 			</Button>
 		);
@@ -85,7 +85,7 @@ function SubTodos({ todo, readOnly, onChange, onOpen }: { todo: UserTodo; readOn
 				{!readOnly && (
 					<Tooltip content="Add a sub-todo">
 						<Button variant="ghost" size="icon-compact" aria-label="Add a sub-todo" className="ml-auto" onClick={() => setAdding(adding ?? 0)}>
-							<IconPlusLarge />
+							<IconPlusSmall />
 						</Button>
 					</Tooltip>
 				)}

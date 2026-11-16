@@ -1,5 +1,5 @@
 /** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, and once it has any its artifacts. */
-import { IconAiBotHead, IconBranch, IconBulletList, IconPlusLarge, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
+import { IconAiBotHead, IconBranch, IconBulletList, IconPlusSmall, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
@@ -144,7 +144,7 @@ function sessionMenuSections(links: SubagentLinksValue | null, query: string): R
 					<MenuGroup>
 						<MenuGroupLabel>Terminals</MenuGroupLabel>
 						<MenuItem {...activityControl("details.menu.new-terminal")} onClick={requestNewTerminal}>
-							<IconPlusLarge aria-hidden="true" />
+							<IconPlusSmall aria-hidden="true" />
 							New terminal
 						</MenuItem>
 					</MenuGroup>

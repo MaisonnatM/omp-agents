@@ -1,4 +1,4 @@
-import { IconPlusLarge, IconSquareX, IconTodos, IconTrashCan } from "central-icons";
+import { IconPlusSmall, IconSquareX, IconTodos, IconTrashCan } from "central-icons";
 import { Fragment, type ReactNode, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -113,7 +113,7 @@ function TodoGroupSection({ group: { key, heading, todos, status }, open, listTi
 				{status !== null && onAdd && (
 					<Tooltip content={`Add a todo to ${label}`}>
 						<Button variant="ghost" size="icon-compact" aria-label={`Add a todo to ${label}`} className={isClosed(status) ? undefined : "ml-auto"} onClick={() => onAdd(status)}>
-							<IconPlusLarge />
+							<IconPlusSmall />
 						</Button>
 					</Tooltip>
 				)}
@@ -273,7 +273,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 					onClick={() => startDraft("todo")}
 					className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground [&>svg]:size-4"
 				>
-					<IconPlusLarge />
+					<IconPlusSmall />
 					{kind.add.label}
 				</button>
 			</Tooltip>

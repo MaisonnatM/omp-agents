@@ -1,4 +1,4 @@
-import { IconCheckmark1, IconPlusLarge, IconSquareArrowTopRight } from "central-icons";
+import { IconCheckmark1, IconPlusSmall, IconSquareArrowTopRight } from "central-icons";
 import { useId, useState } from "react";
 import { MCP_CATALOG, MCP_CATEGORIES, type McpCatalogEntry, type McpCategory } from "../../../src/shared/mcp-catalog";
 import type { McpServerRow } from "../../../src/shared/mcp-servers";
@@ -60,7 +60,7 @@ function CatalogCard({ entry, added }: { entry: McpCatalogEntry; added: McpServe
 					<Button
 						variant="secondary"
 						size="compact"
-						leadingIcon={IconPlusLarge}
+						leadingIcon={IconPlusSmall}
 						loading={starting || addOpen.pending}
 						aria-label={`Add ${entry.label}`}
 						onClick={() => (entry.auth === "oauth" ? void connect() : addOpen.run())}

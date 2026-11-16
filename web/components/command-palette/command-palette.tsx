@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Command as CommandPrimitive } from "cmdk";
-import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowRotateCounterClockwise, IconArrowUp, IconCmd, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPin, IconPlusLarge, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
+import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowRotateCounterClockwise, IconArrowUp, IconCmd, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPin, IconPlusSmall, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DashboardUpdateStatus, didNotStart, shortCommit } from "../../../src/shared/dashboard-update";
@@ -49,10 +49,10 @@ import { PaletteFooter } from "./palette-footer";
 import { commandKey, record } from "../../activity";
 
 const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
-	newSession: IconPlusLarge,
+	newSession: IconPlusSmall,
 	previousSession: IconArrowUp,
 	nextSession: IconArrowDown,
-	newTab: IconPlusLarge,
+	newTab: IconPlusSmall,
 	previousTab: IconArrowLeft,
 	nextTab: IconArrowRight,
 	closeOtherTabs: IconCrossMedium,
