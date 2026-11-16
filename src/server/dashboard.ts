@@ -30,7 +30,7 @@ import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, endedWorktreesFile, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
-import { MODULE_JOINS, moduleInboxes, openModules } from "../modules";
+import { moduleInboxes, moduleJoins, openModules } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -892,9 +892,9 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads what the modules join with, and any but a Bot's can wait on another session and move itself. */
+	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads what the modules the user left on join with, and any but a Bot's can wait on another session and move itself. */
 	#joinFor(request: StartRequest, instanceId: string): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), ...MODULE_JOINS];
+		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), ...moduleJoins(this.#preferences.value)];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {

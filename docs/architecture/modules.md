@@ -39,7 +39,7 @@ A `ServerModule` has an `id` and four optional parts.
 - `routes`: the module's own `/api/*` routes, built from the core's `RouteKit`.
 - `shipped`: the files `scripts/build-desktop-artifact.ts` bundles into a packaged app.
 
-The core reads these through `openModules`, `parseModuleChange`, `moduleInboxes`, `MODULE_JOINS`, `moduleRoutes`, and `SHIPPED_FILES`.
+The core reads these through `openModules`, `parseModuleChange`, `moduleInboxes`, `moduleJoins`, `moduleRoutes`, and `SHIPPED_FILES`.
 `ListRegistry` sends each stored module's state as `{ t: "module", id, value }` on the roster topic, after the core's lists.
 A page changes it with `{ t: "module-change", id, change }`, which `src/server/wire.ts` checks through the module's `parse`.
 Settings › Activity counts every such change as action `module-change`.
@@ -50,6 +50,7 @@ A `PageModule` describes the module's page.
 
 - `tab`: the sidebar tab's label, icon, and `place`, which orders it among the core's tabs.
   A tab with an `integration` shows only while omp holds a sign-in to that service.
+- `about`: one plain line on what the module is for, which its section of Settings › Modules shows.
 - `home`: the route the tab opens.
 - `address`: how `#<id>/<rest>?<query>` reads into a route and back.
 - `title`: what the window and a header tab call the page.
@@ -70,6 +71,16 @@ Every module's `Page` takes its `route` and `core`, a `CoreData` that `PageSwitc
 A module reads core data through it without importing the core's stores.
 A stored module's `Page` also takes its `state`, `disabled`, and `onChange`.
 Every module's `Nav` takes its `route`, the chosen `section`, and `onSection`, which `PageList` passes so a list can scroll its page to a section.
+
+## Turning a module off
+
+Settings › Modules has a section per module, built from `MODULE_LIST`, with a switch that turns the module on or off.
+The modules turned off are kept as a JSON array of ids under the portable preference `omp-agents.modules-off`, which `parseModulesOff` in `src/shared/modules-off.ts` reads on both sides, ignoring unknown ids.
+On the page, `useModulesOff` in `web/modules-off.ts` reads it, and `useSidebarTabs` merges it into its `absent` set with the signed-out tabs.
+So a module turned off loses its tab, its go-to shortcut, its palette commands, and its nav row, as a signed-out tab does.
+Its address shows `ModuleOffPage` in place of its `Page`, so its own shortcut rows, which its page binds, never fire.
+On the server, `moduleJoins` gives what a new session joins with, less the joins of the modules the server's preferences turn off.
+`Dashboard.#joinFor` calls it for every session it starts, so a session already running keeps the tool it joined with.
 
 ## Adding a module
 

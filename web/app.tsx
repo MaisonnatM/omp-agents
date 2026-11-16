@@ -87,7 +87,7 @@ export function App() {
 	const goalHost = goalEditor ? state.hosts.find(host => host.instanceId === goalEditor.instanceId) : null;
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
 	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
-	const { signedOut: absentTabs, shown: tabs } = useSidebarTabs();
+	const { absent: absentTabs, shown: tabs } = useSidebarTabs();
 	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut, the palette's tickets, a todo's ticket, and the Calendar's due days apply. */
 	const ticketsCallable = linear !== null && callable(linear.connection) && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);

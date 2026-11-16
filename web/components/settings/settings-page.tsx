@@ -7,6 +7,7 @@ import { isPhonePage, settingsUrl } from "../../api";
 import { useEditableRead } from "../../editable-read";
 import { type ReadState, useRead } from "../../reads";
 import { ompSettingsFiles } from "../../omp-settings";
+import { MODULE_LIST, type WebModuleId } from "../../modules";
 import { hashForSettings, SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
 import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
@@ -19,6 +20,7 @@ import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { KeyboardTab } from "./keyboard-tab";
 import { McpServersTab } from "./mcp-servers-tab";
+import { ModuleTab } from "./module-tab";
 import { OmpMemoryTab } from "./omp-memory-tab";
 import { OmpSettingsTab } from "./omp-settings-tab";
 import { ExtensionsTab } from "./extensions-tab";
@@ -201,6 +203,7 @@ export function SettingsPage({
 		"whats-new": <WhatsNewTab />,
 		decisions: <DecisionsTab cwd={cwd} workspaces={workspaces} active={section === "decisions"} />,
 		extensions: <ExtensionsTab cwd={cwd} active={section === "extensions"} onSaved={settings.reload} />,
+		...(Object.fromEntries(MODULE_LIST.map(module => [module.id, <ModuleTab key={module.id} module={module} />])) as Record<WebModuleId, ReactNode>),
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
 	const body = SETTINGS_SECTIONS.filter(({ value }) => value !== "extensions" && !(isPhonePage() && value === "phone")).map(({ value, label }) => (

@@ -39,6 +39,8 @@ export interface PageModule<Id extends string, Route, Shortcut extends string = 
 	 * A tab with an `integration` shows, and its shortcut applies, only while omp holds a sign-in to that service.
 	 */
 	readonly tab: { label: string; icon: IconComponent; place: number; integration?: McpIntegrationId };
+	/** One plain line on what the module is for, which its section of Settings › Modules shows. */
+	readonly about: string;
 	/** The route the tab opens. */
 	readonly home: Route;
 	readonly address: PageAddress<Route>;

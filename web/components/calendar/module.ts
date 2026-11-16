@@ -8,6 +8,7 @@ export type CalendarRoute = Record<never, never>;
 export const CALENDAR_PAGE: PageModule<"calendar", CalendarRoute, "calendarNewEvent", "calendar.routines.toggle"> = {
 	id: "calendar",
 	tab: { label: "Calendar", icon: IconCalendarClock, place: 40 },
+	about: "Your month of events, routine runs, and due todos and tickets in one calendar.",
 	home: {},
 	/** `#calendar` is a month of routine runs, due todos, and due tickets; nothing follows it. */
 	address: { parse: () => ({}), rest: () => null, query: () => null },
