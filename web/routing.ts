@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage } from "central-icons";
+import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage, IconWidgets } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
@@ -70,6 +70,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "activity", label: "Activity", icon: IconCursorClick, group: "usage", keywords: ["features", "used", "time"] },
 	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
 	{ value: "keyboard", label: "Keyboard", icon: IconKeyboard, group: "general", keywords: ["shortcuts", "keys", "hotkeys", "keybindings"] },
+	{ value: "modules", label: "Modules", icon: IconWidgets, group: "general", keywords: [...MODULE_LIST.map(({ tab }) => tab.label.toLowerCase()), "turn off", "enable", "disable", "add", "new"] },
 	{ value: "workspaces", label: "Workspaces", icon: IconFolders, group: "general", keywords: ["directories", "folders", "hide"] },
 	{ value: "sync", label: "Sync", icon: IconArrowRotateCounterClockwise, group: "general", keywords: ["git", "remote", "machines"] },
 	{ value: "phone", label: "Phone access", icon: IconPhone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },

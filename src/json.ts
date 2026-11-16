@@ -122,6 +122,12 @@ export function parseJson(text: string): unknown {
 	}
 }
 
+/** The strings of the JSON array `raw` holds; anything unreadable, or absent, holds none. */
+export function parseStrings(raw: string | null | undefined): string[] {
+	const value = parseJson(raw ?? "[]");
+	return Array.isArray(value) ? value.filter(isString) : [];
+}
+
 /** `value` as JSON text that does not depend on the order its keys were written in. */
 export function canonicalJson(value: unknown): string {
 	const sorted = (node: unknown): unknown =>

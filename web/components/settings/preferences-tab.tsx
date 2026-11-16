@@ -13,7 +13,10 @@ import { playSound, useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
 import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
-import { OrderButton, Section } from "./editor";
+import { LINK, OrderButton, Section } from "./editor";
+import { isWebModuleId } from "../../modules";
+import { useModulesOff } from "../../modules-off";
+import { hashForSettings } from "../../routing";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { putJson } from "../../api";
 import { useEditableRead } from "../../editable-read";
@@ -39,6 +42,7 @@ function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string;
 /** The sidebar's tabs in the order they show, each with a switch to hide it and buttons to move it. */
 function SidebarTabs() {
 	const { layout, setLayout, signedOut } = useSidebarTabs();
+	const [off] = useModulesOff();
 	return (
 		<Section
 			title="Sidebar tabs"
@@ -52,8 +56,17 @@ function SidebarTabs() {
 							<row.icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 							<div className="min-w-0 flex-1">
 								{row.label}
-								{row.integration !== undefined && signedOut.has(tab) && (
-									<p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
+								{isWebModuleId(tab) && off.has(tab) ? (
+									<p className="text-xs text-muted-foreground">
+										Shows only while turned on in{" "}
+										<a href={hashForSettings("modules")} className={LINK}>
+											Settings › Modules
+										</a>
+										.
+									</p>
+								) : (
+									row.integration !== undefined &&
+									signedOut.has(tab) && <p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
 								)}
 							</div>
 							<ToggleSwitch

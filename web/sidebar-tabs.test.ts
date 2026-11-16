@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
-import { type Page, routeFromHash } from "./routing";
+import { type Page, routeFromHash, type SidebarTab } from "./routing";
 import {
+	mergeAbsent,
 	DEFAULT_TAB_LAYOUT,
 	decodeTabLayout,
 	encodeTabLayout,
@@ -153,4 +154,11 @@ test("the page list's current row is the page's tab, and none for the panes or a
 	expect(navRowOf(pageAt("#new"), none)).toBe("new");
 	expect(navRowOf(pageAt("#todo"), new Set(["todo"] as const))).toBeNull();
 	expect(navRowOf(pageAt("#get-started"), none)).toBeNull();
+});
+
+test("the absent tabs are the signed-out ones and the modules turned off, each once", () => {
+	const signedOut: ReadonlySet<SidebarTab> = new Set(["tickets", "email"]);
+	expect([...mergeAbsent(signedOut, new Set())]).toEqual(["tickets", "email"]);
+	expect([...mergeAbsent(signedOut, new Set(["sport", "email"]))]).toEqual(["tickets", "email", "sport"]);
+	expect(shownTabs(DEFAULT, mergeAbsent(new Set(), new Set(["sport"])))).not.toContain("sport");
 });

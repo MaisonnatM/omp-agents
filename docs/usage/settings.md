@@ -2,8 +2,8 @@
 
 - The sidebar's **Settings** row opens **Settings**; Cmd+, does the same, and pressing it again returns to the panes.
   While Settings is open the sidebar lists its sections under its **Settings** row; select another row, such as **Sessions**, to leave.
-  The sidebar lists twenty sections in four groups.
-  **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Workspaces**, **Sync**, **Phone access**, and **Storage**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
+  The sidebar lists twenty-three sections in four groups.
+  **Usage** holds **Analytics** and **Activity**, **General** holds **Preferences**, **Keyboard**, **Modules**, **Workspaces**, **Sync**, **Phone access**, **Storage**, and **What's new**, and **Connections** holds **Providers**, **Integrations**, **MCP servers**, and **Source control**; these are the same whatever the workspace.
   **This workspace** holds **Models**, **Agents**, **omp settings**, **omp memory**, **Files**, **Extensions**, **Workflows**, **Decisions**, and **Worktrees**, which show omp's config and files, package discovery, and the repository's records and worktrees, as a session in the sidebar's workspace sees them; only these sections show the workspace picker.
   The command menu finds a section by its name or by what it holds, such as "theme" or "github", under **Settings**.
   The gear button and Cmd+, reopen the section you last had open in this app, **Analytics** the first time, and the header names the open section.
@@ -164,6 +164,15 @@
   A record's **Supersedes** and **Superseded by** open and scroll to the records they name, and a link to another file in the repository opens it in the file dialog.
   The section only reads the records, since a record changes in the same commit as the code it covers.
   With **All workspaces**, the same timeline is grouped by workspace, one section per repository that keeps records, and a record's links stay inside its own repository. A workspace with no records is left out of the list.
+- **Modules** lists every module the app is built with: **Tickets**, **Calendar**, **Sport**, and **Email**.
+  Each row has the module's icon, what it is for, a switch that turns it on or off, and a **⋯** menu with **Edit** and **Delete**; every module is on at first.
+  A module turned off loses its page, its sidebar tab, its shortcuts, and its commands, and its address shows that it is turned off, with a link back to **Modules**.
+  Turning **Sport** off also stops new sessions from getting the sport tool; sessions already running keep it.
+  While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says so, with a link to **Integrations**.
+  The choice is saved like **Preferences**, so every window and, through **Sync**, your other machines follow it.
+  Modules are code, so an agent writes them: **New module** asks for a **Name** and **What should it do?**, **Edit** asks **What should change?**, and each opens the New session page in the omp agents checkout with a request in the message box for you to review and send.
+  **Delete** asks first under the row; **Turn off and open session** turns the module off at once and opens a draft asking to remove its code, leaving its saved data on disk.
+  The packaged app has no checkout, so it hides **New module**, **Edit**, and **Delete** and says why.
 - **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files.
   The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines; **Stop idle processes** is the server's own and stays on this machine.
   The width of a sidebar or a split, a folded section, and what you last picked in a menu stay with the browser that set them.
@@ -172,6 +181,7 @@
   **Sidebar tabs** lists the nine sidebar tabs in the order they show, each with a switch that shows or hides it, and buttons that move it up or down.
   A hidden tab only leaves the sidebar's page list: its page, its command in the command menu, its G pair, and links to it still work.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
+  A module turned off in **Modules** says its tab shows only while it is turned on there.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.
   **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 minutes, 30 minutes, 1 hour, or 2 hours, 30 minutes by default.
