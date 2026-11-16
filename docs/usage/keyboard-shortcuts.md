@@ -53,7 +53,6 @@ Alt is Option on macOS.
 | O | Pull requests page, outside text fields | Open the pull request on GitHub |
 | . | Pull requests page, outside text fields | Open the pull request's `⋯` menu |
 | E | Pull requests page, outside text fields | Give the pull request's next move to an agent |
-| Space | Pull requests board, a card's title focused | Pick up the card; ← and → choose a column, Space or Enter drops it, and Escape puts it back |
 | Cmd+Shift+K / Cmd+Shift+, | Pull requests page showing a PR | Copy its `#N` / GitHub link |
 | / | Todo page, outside text fields | Search the todos |
 | ↓ / ↑ or J / K | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |

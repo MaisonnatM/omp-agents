@@ -5,7 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
-- The Pull requests page no longer shows a list at its left, so the table or the board takes the whole page.
+- The Pull requests page no longer has a Board view; it always shows the list.
+- The Pull requests page no longer shows a list at its left, so the table takes the whole page.
 - Repositories, at the top of the Pull requests page, hides or shows each repository and moves it up or down; a hidden repository also leaves the Pull requests tab's count, and Reset the order keeps it hidden.
 - The sidebar's foot now shows plan usage as full-width rows with a bar, instead of a grid of rings, so long account emails read in full.
 - The Mac's CPU, free memory, and free disk no longer show in the sidebar; Settings › Storage still shows the free disk space.

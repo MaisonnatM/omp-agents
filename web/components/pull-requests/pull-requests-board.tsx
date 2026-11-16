@@ -1,4 +1,4 @@
-/** What the page's list and board of the pull requests share: their state, their keys, and the list's repositories, sections, and rows. */
+/** What the Pull requests page's list and its details page share: the pull requests' state, their keys, and the list's repositories, sections, and rows. */
 import { IconArrowBottomTop, IconCloudSimpleDisconnected } from "central-icons";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
@@ -53,7 +53,6 @@ import { type RowBase, type RowProps, rowElement, rowId, sameSessions, sessionsB
 /** The repositories and sections flipped from their default fold: `owner/repo`, and `owner/repo:<section title>`. */
 const FOLDS_KEY = "omp-agents.inbox-collapsed";
 const ORDER_KEY = "omp-agents.inbox-order";
-const VIEW_KEY = "omp-agents.pull-requests-view";
 const PLACEMENT_KEY = "omp-agents.pull-request-details-placement";
 const HIDDEN_KEY = "omp-agents.pull-requests-hidden";
 
@@ -65,15 +64,7 @@ export const usePullRequestsFolds = (): Folds => useFolds(FOLDS_KEY, foldedByDef
 /** The repositories you hid from the Pull requests page, by `repoKey`, which the browser keeps apart from their order. */
 export const useHiddenRepos = () => useStoredKeys(HIDDEN_KEY);
 
-/** How the Pull requests page shows the pull requests: a table per repository, or a board with a column per section. */
-export type PullRequestsView = "list" | "board";
-
-const decodeView = (raw: string | null): PullRequestsView => (raw === "board" ? "board" : "list");
-
-/** The Pull requests page's view, which the browser keeps. */
-export const usePullRequestsView = () => useStoredState(VIEW_KEY, decodeView);
-
-/** Where the Pull requests page shows a pull request's details: docked beside the list or the board, or on a page of their own. */
+/** Where the Pull requests page shows a pull request's details: docked beside the list, or on a page of their own. */
 export type PullRequestDetailsPlacement = "beside" | "page";
 
 const decodePlacement = (raw: string | null): PullRequestDetailsPlacement => (raw === "page" ? "page" : "beside");
@@ -96,8 +87,8 @@ function placeOf(list: PullRequestList, pr: PullRequest, agent: AgentOn): { repo
 }
 
 /**
- * Binds the keys of a view of `pulls`, over `shown`, the pull requests it shows in order. Mount it once per screen,
- * since its keys are global. ↓ and ↑ move between those rows or cards, or, while the main area shows a pull request's
+ * Binds the keys of a screen of `pulls`, over `shown`, the pull requests it shows in order. Mount it once per screen,
+ * since its keys are global. ↓ and ↑ move between those rows, or, while the main area shows a pull request's
  * details, show the next or previous one; on its changes page they step through its files instead. O opens the pull
  * request on GitHub, `.` opens a row's `⋯` menu, and E starts the quick action that makes the move of the focused
  * row's pull request, or the one the main area shows, the one its row's menu would. A key that has nothing to act on
@@ -256,7 +247,7 @@ export interface RepoView extends Placed {
 }
 
 
-/** The pull requests of a workspace, read from GitHub, and what every view of them shares. */
+/** The pull requests of a workspace, read from GitHub, and what the list and the details page share. */
 export interface PullRequests {
 	poll: PolledEntry<PullRequestList>;
 	refresh: () => void;
@@ -278,7 +269,7 @@ export interface PullRequests {
 	onToggleHidden: (key: string) => void;
 	/** Every pull request's key in the order the list shows them now; placing one by hand starts the manual sort from it. */
 	shownOrder: string[];
-	/** What a list row or a board card of `row` takes, from functions every row shares, so a row's props change only with what it shows. */
+	/** What a list row of `row` takes, from functions every row shares, so a row's props change only with what it shows. */
 	rowBase: (row: SectionRow, cwd: string) => RowBase;
 	onQuickAction: RowBase["onQuickAction"];
 	onRebase: RowBase["onRebase"];
@@ -337,7 +328,7 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
 	}, [hosts, past]);
 }
 
-/** The pull requests of the sidebar's scope, with the state and the functions that their list and their board share. */
+/** The pull requests of the sidebar's scope, with the state and the functions that the list and the details page share. */
 export function usePullRequests({ hosts, past, route }: PullRequestsProps): PullRequests {
 	const targetKey = route.target ? prKey(route.target) : null;
 	const { open, start } = useDashboardActions();

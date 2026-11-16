@@ -62,7 +62,6 @@ export type ShortcutId =
 	| "previousPullRequest"
 	| "pullRequestOnGitHub"
 	| "pullRequestActions"
-	| "liftPullRequest"
 	| "giveToAgent"
 	| "copyPullRequestNumber"
 	| "copyPullRequestLink"
@@ -338,12 +337,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	{ id: "pullRequestOnGitHub", category: "pull-requests", label: "Pull requests: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
 	{ id: "pullRequestActions", category: "pull-requests", label: "Pull requests: open the pull request's actions menu", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
-	{
-		id: "liftPullRequest",
-		category: "pull-requests",
-		label: "Pull requests board: pick up the focused card, then ← and → choose a column, Space or Enter drops it there, and Esc puts it back",
-		keys: [{ chord: { key: " " }, scope: "outside-fields" }],
-	},
 	{ id: "giveToAgent", category: "pull-requests", label: "Pull requests: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{ id: "copyPullRequestNumber", category: "pull-requests", label: "Open pull request: copy #N", keys: [{ chord: { key: "k", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "copyPullRequestLink", category: "pull-requests", label: "Open pull request: copy its GitHub link", keys: [{ chord: { key: ",", mod: true, shift: true }, scope: "anywhere" }] },

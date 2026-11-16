@@ -1,6 +1,6 @@
 /**
  * The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it
- * is; or on a board, a column per section. Either docks the details of the pull request it shows beside it.
+ * is, with the details of the pull request it shows docked beside it.
  */
 import { IconArrowRotateClockwise, IconCrossMedium, IconExpand, IconSettingsSliderHor } from "central-icons";
 import { type PullRequest, prKey, repoKey } from "../../../src/shared/github";
@@ -11,7 +11,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { activityControl } from "../../activity";
 import { shownPullRequests, withRepoStepped } from "../../pull-requests-model";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import { useRebasing } from "../../pull-request-rebases";
@@ -23,13 +22,11 @@ import { Separator, useDragSeparator } from "../drag-separator";
 import { FoldButton } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
-import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
 import { OrderButton } from "../settings/editor";
 import { Spinner } from "../spinner";
 import { ToggleSwitch } from "../toggle-switch";
 import {
 	type PullRequests,
-	type PullRequestsView,
 	RepoReadError,
 	type RepoView,
 	type SectionView,
@@ -40,10 +37,8 @@ import {
 	usePullRequestsBoard,
 	usePullRequestsFolds,
 	usePullRequestDetailsPlacement,
-	usePullRequestsView,
 	workspacesLabel,
 } from "./pull-requests-board";
-import { PullRequestsKanban } from "./pull-requests-kanban";
 import type { PullRequestDetailTab } from "./pr-details";
 import { PullRequestDetailPage, PullRequestDetails, usePullRequestCopyShortcuts } from "./pr-page";
 import { PullRequestTableRow } from "./pr-row";
@@ -53,7 +48,7 @@ const note = (text: string) => <p className="text-sm text-muted-foreground">{tex
 const DETAILS_WIDTH = 480;
 const MIN_DETAILS = 360;
 const MAX_DETAILS = 1200;
-/** Narrowest the list or board gets beside the details: a narrower page takes the width from the details. */
+/** Narrowest the list gets beside the details: a narrower page takes the width from the details. */
 const MIN_LIST = 320;
 const STEP = 16;
 
@@ -185,7 +180,7 @@ function RepositoriesMenu({ pulls: { everyRepo, hidden, onToggleHidden, order, s
 	);
 }
 
-/** The details of the pull request `route` names, docked beside the list or the board at the width you drag their edge to, with buttons that show them as a page or close them. */
+/** The details of the pull request `route` names, docked beside the list at the width you drag their edge to, with buttons that show them as a page or close them. */
 function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onExpand: () => void }) {
 	// The docked details keep their own tab, starting on Code when the route opens a file.
 	const [tab, setTab] = useState<PullRequestDetailTab>(route.files ? "code" : "summary");
@@ -262,18 +257,17 @@ function RebaseBehindButton({ pulls }: { pulls: PullRequests }) {
 interface PullRequestsPageProps {
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The pull request whose details the page shows: docked beside the list or the board, or on a page of their own. */
+	/** The pull request whose details the page shows: docked beside the list, or on a page of their own. */
 	route: PullRequestsRoute;
 }
 
-/** The Pull requests page: a pull request's details on a page of their own while you chose so and `route` names one; else the pull requests as a table or a board. */
+/** The Pull requests page: a pull request's details on a page of their own while you chose so and `route` names one; else the pull requests' table. */
 export function PullRequestsPage(props: PullRequestsPageProps) {
-	const [view, setView] = usePullRequestsView();
 	const [placement, setPlacement] = usePullRequestDetailsPlacement();
 	const { hosts, past, route } = props;
 	if (route.target && placement === "page")
 		return <DetailsPage key={prKey(route.target)} hosts={hosts} past={past} route={route} onDock={() => setPlacement("beside")} />;
-	return <PullRequestsOverview {...props} view={view} onView={setView} onExpand={() => setPlacement("page")} />;
+	return <PullRequestsOverview {...props} onExpand={() => setPlacement("page")} />;
 }
 
 /** A pull request's details on a page of their own, whose keys step through the list's pull requests in its order, leaving out what its folds hide. */
@@ -287,10 +281,10 @@ function DetailsPage({ hosts, past, route, onDock }: { hosts: RosterHost[]; past
 }
 
 /**
- * The pull requests in the main area, as a table or a board: those of the sidebar's workspace, or of every workspace,
- * read from GitHub, leaving out the repositories you hid. The browser keeps which view it shows.
+ * The pull requests in the main area, as a table per repository: those of the sidebar's workspace, or of every
+ * workspace, read from GitHub, leaving out the repositories you hid.
  */
-function PullRequestsOverview({ hosts, past, route, view, onView, onExpand }: PullRequestsPageProps & { view: PullRequestsView; onView: (view: PullRequestsView) => void; onExpand: () => void }) {
+function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPageProps & { onExpand: () => void }) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const pulls = usePullRequests({ hosts, past, route });
@@ -310,29 +304,17 @@ function PullRequestsOverview({ hosts, past, route, view, onView, onExpand }: Pu
 						<>
 							<UnmatchedTip unmatched={unmatched} />
 							<RebaseBehindButton pulls={pulls} />
-							<SegmentedTabs value={view} onValueChange={next => onView(next as PullRequestsView)} activationMode="manual">
-								<SegmentedTabsList aria-label="View">
-									<SegmentedTab {...activityControl("pull-requests.view.list")} value="list">List</SegmentedTab>
-									<SegmentedTab {...activityControl("pull-requests.view.board")} value="board">Board</SegmentedTab>
-								</SegmentedTabsList>
-							</SegmentedTabs>
 							<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />
 							{pulls.everyRepo.length > 0 && <RepositoriesMenu pulls={pulls} />}
 						</>
 					}
 					notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
-					className={view === "board" ? "max-w-none space-y-4" : "max-w-7xl space-y-8"}
+					className="max-w-7xl space-y-8"
 				>
 					{() => {
 						if (pulls.everyRepo.length === 0) return note("No session ran in a GitHub repository.");
 						if (pulls.repos.length === 0) return note("Every repository is hidden. Show them from Repositories.");
-						if (view === "list") return <RepoTables pulls={pulls} />;
-						return (
-							<>
-								{pulls.repos.map(repo => ("error" in repo ? <RepoReadError key={repoKey(repo)} name={`${repo.owner}/${repo.repo}`} error={repo.error} className="text-sm" /> : null))}
-								<PullRequestsKanban pulls={pulls} />
-							</>
-						);
+						return <RepoTables pulls={pulls} />;
 					}}
 				</ListPage>
 			</div>
