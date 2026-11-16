@@ -52,7 +52,6 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Pull requests](architecture/http-api-pull-requests.md)
   - [Source control, sync, worktrees, and workspaces](architecture/http-api-workspaces.md)
   - [Models, skills, and session starts](architecture/http-api-models-and-starts.md)
-  - [Linear tickets](architecture/http-api-linear.md)
   - [Integrations](architecture/http-api-integrations.md)
   - [MCP servers](architecture/http-api-mcp-servers.md)
   - [Providers](architecture/http-api-providers.md)

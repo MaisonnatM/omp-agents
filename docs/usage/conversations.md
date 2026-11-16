@@ -89,10 +89,10 @@
   omp's own `/` commands, such as `/model` or `/rename`, show no dimmed prompt; a `/skill:` prompt does.
 - User and assistant messages render GitHub-flavored Markdown, including tables, task lists, fenced code, and links.
   Images in agent text show as links rather than loading remote images; only inline `data:` images show in place.
-  Linear, GitHub, and Slack links show only their title and service icon, in conversations and rendered GitHub or Linear text.
+  GitHub and Slack links show only their title and service icon, in conversations and rendered GitHub text.
   Bare GitHub pull request URLs resolve to the PR's actual title through your signed-in GitHub CLI.
   Explicit Markdown labels and link titles stay as written.
-  While a PR title loads, or if GitHub cannot read it, its repository and number stay visible; other bare service links use an issue identifier or **Slack message**.
+  While a PR title loads, or if GitHub cannot read it, its repository and number stay visible; a bare Slack link reads **Slack message**.
   The link still opens its original address in your default browser.
   Other HTTP and HTTPS links keep their original label, with no icon.
   Link labels are semibold (font weight 600) and underlined beside their icons, without underlining the icons.
@@ -119,9 +119,9 @@
   That covers skills sent from the dashboard, from omp's terminal, and to a subagent, in live and past sessions.
   Copy copies the prompt as typed.
   File commands show their expanded text, because omp records only that.
-- A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, the todos, tickets, pull requests, and sessions the `@` menu inserted, and annotations attached from the Browser.
+- A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, the todos, pull requests, and sessions the `@` menu inserted, and annotations attached from the Browser.
   Hover a chip for the full path or title, or the start of a Browser annotation's comment and elements.
-  A todo, session, ticket, or pull request chip opens it here in the dashboard: the todo in its list, or in **Archive** once put away; a deleted todo's chip opens nothing.
+  A todo, session, or pull request chip opens it here in the dashboard: the todo in its list, or in **Archive** once put away; a deleted todo's chip opens nothing.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
 - Right after a session's title, live or past, before the trajectory switch, a copy button copies the session's ID, which its tooltip names; its icon turns into a check mark for a moment.
 - **Open pull request** in the command menu acts on the focused pane's session while the panes show, and is offered while that session is running, the dashboard can prompt it, it works on a branch other than its repository's default branch, and GitHub names no pull request from that branch.
@@ -136,11 +136,10 @@
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
   Hover it to see the full model selector.
   The settings page labels models the same way.
-- Click the branch of a pull request's details or of a Linear issue's detail view to copy it; its icon turns into a check mark for a moment.
-  A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
+- Click the branch of a pull request's details to copy it; its icon turns into a check mark for a moment.
+  A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
   Copying the head branch of a pull request's details also removes the linked worktree that has it checked out, so you can check the branch out elsewhere, and keeps the branch.
   It applies the checks of **Settings → Worktrees**: it never removes a repository's main checkout, a locked checkout, one with uncommitted or untracked changes, one a live session or this dashboard uses, or one with a nested repository.
   A toast names the worktree it removed, or the one it kept and why; a branch that no linked worktree has checked out shows no toast.
-  Copying the branch of a Linear issue only copies.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.

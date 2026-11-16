@@ -226,7 +226,7 @@ export async function gitCheckout(cwd: string): Promise<GitCheckout | null> {
 	};
 }
 
-/** How long a start waits on `git fetch` for the branch a pull request or ticket names. */
+/** How long a start waits on `git fetch` for the branch a pull request names. */
 const FETCH_MS = 30_000;
 
 /**

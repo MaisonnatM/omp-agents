@@ -6,10 +6,9 @@ import type { RoutineSpec, Schedule } from "../routines";
 import type { BotId } from "../shared/bots";
 import { MAX_CAPTURE_ID } from "../shared/dictation";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
-import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequestChange } from "../shared/github";
 import type { ReviewDraftEdit } from "../shared/review-drafts";
-import { MAX_QUEUED_STACK, parseAccountOrder, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseTrustChange, parseWorkspaceChange } from "./wire";
+import { MAX_QUEUED_STACK, parseAccountOrder, parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationTarget, parseMcpServerAdd, parseMergeQueueChange, parseNewEvent, parseProcessStop, parsePromptDocument, parsePullRequestAttachment, parsePullRequestCheckout, parsePullRequestEdit, parsePullRequestFilesQuery, parsePullRequestQuery, parsePullRequestRebase, parsePullRequestViewedEdit, parseRepoQuery, parseReviewDraftEdit, parseReviewDraftPost, parseSlackClient, parseTrustChange, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -131,8 +130,8 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "x", assignee: "user" })).toMatchObject({ change: { assignee: "user" } });
 		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "x", assignee: "robot" })).toBeNull();
 		expect(change({ op: "move", id: "a", afterId: null, categoryId: "w" })).toEqual({ t: "user-todo", change: { op: "move", id: "a", afterId: null, categoryId: "w" } });
-		expect(change({ op: "link", id: "a", link: { kind: "ticket", identifier: "ENG-1" } })).toMatchObject({ change: { link: { kind: "ticket", identifier: "ENG-1" } } });
-		expect(change({ op: "link", id: "a", link: { kind: "ticket" } })).toBeNull();
+		expect(change({ op: "link", id: "a", link: { kind: "session", sessionId: "s1" } })).toMatchObject({ change: { link: { kind: "session", sessionId: "s1" } } });
+		expect(change({ op: "link", id: "a", link: { kind: "session" } })).toBeNull();
 		expect(change({ op: "empty-archive" })).toEqual({ t: "user-todo", change: { op: "empty-archive" } });
 		expect(change({ op: "clear-done", categoryId: null })).toEqual({ t: "user-todo", change: { op: "clear-done", categoryId: null } });
 		expect(change({ op: "edit-body", id: "a", body: "# Notes\n" })).toEqual({ t: "user-todo", change: { op: "edit-body", id: "a", body: "# Notes\n" } });
@@ -328,9 +327,6 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", branch: { kind: "new", name: "feat", base: "main" } })).toMatchObject({
 			branch: { kind: "new", name: "feat", base: "main" },
 		});
-		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "ticket", id: "ENG-7", action: "work" } })).toMatchObject({
-			subject: { kind: "ticket", id: "ENG-7" },
-		});
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 12 } } })).toMatchObject({
 			subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 12 } },
 		});
@@ -363,8 +359,6 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", thinking: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "two words" })).toBeNull();
-		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "ticket", id: "eng 7" } })).toBeNull();
-		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "ticket", id: "ENG-7" }, reviewDraft: true })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", reviewDraft: "yes" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 0 } } })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "fork", view: live, entryId: "" })).toBeNull();
@@ -690,15 +684,15 @@ describe("parseRepoQuery", () => {
 
 describe("parseIntegrationTarget", () => {
 	test("takes an MCP integration, an account only for Gmail or Google Calendar, and null to add one", () => {
-		expect(parseIntegrationTarget({ id: "linear" })?.ok).toEqual({ id: "linear", account: null });
+		expect(parseIntegrationTarget({ id: "slack" })?.ok).toEqual({ id: "slack", account: null });
 		expect(parseIntegrationTarget({ id: "slack", account: null })?.ok).toEqual({ id: "slack", account: null });
 		expect(parseIntegrationTarget({ id: "gmail", account: "gmail-2" })?.ok).toEqual({ id: "gmail", account: "gmail-2" });
 		expect(parseIntegrationTarget({ id: "google-calendar", account: null })?.ok).toEqual({ id: "google-calendar", account: null });
-		expect(parseIntegrationTarget({ id: "linear", account: "linear" })).toBeNull();
+		expect(parseIntegrationTarget({ id: "slack", account: "slack" })).toBeNull();
 		expect(parseIntegrationTarget({ id: "gmail", account: "" })).toBeNull();
-		expect(parseIntegrationTarget({ id: "Linear" })).toBeNull();
+		expect(parseIntegrationTarget({ id: "Slack" })).toBeNull();
 		expect(parseIntegrationTarget({ id: "google" })).toBeNull();
-		expect(parseIntegrationTarget("linear")).toBeNull();
+		expect(parseIntegrationTarget("slack")).toBeNull();
 		expect(parseIntegrationTarget(null)).toBeNull();
 	});
 });
@@ -809,83 +803,6 @@ describe("parseGoogleClient", () => {
 		expect(parseGoogleClient({ ...client, clientSecret: 7 })).toHaveProperty("error");
 		expect(parseGoogleClient({ ...client, callbackPort: 0 })).toHaveProperty("error");
 		expect(parseGoogleClient({ ...client, callbackPort: "3119" })).toHaveProperty("error");
-	});
-});
-
-describe("parseTicketEdit", () => {
-	test("keeps each field given, null clearing the ones that clear, and the labels once each", () => {
-		expect(parseTicketEdit({ id: "ENG-1", state: "In Review", priority: 0, labels: ["Bug", "Front", "Bug"], dueDate: "2026-10-09", extra: true })?.ok).toEqual({
-			id: "ENG-1",
-			state: "In Review",
-			priority: 0,
-			labels: ["Bug", "Front"],
-			dueDate: "2026-10-09",
-		});
-		expect(parseTicketEdit({ id: "ENG-1", assignee: null, project: null, dueDate: null, labels: [] })?.ok).toEqual({ id: "ENG-1", assignee: null, project: null, dueDate: null, labels: [] });
-	});
-
-	test("rejects an edit that changes nothing, names no issue, or gives a field of the wrong kind", () => {
-		expect(parseTicketEdit({ id: "ENG-1" })).toBeNull();
-		expect(parseTicketEdit({ id: "eng-1", priority: 1 })).toBeNull();
-		expect(parseTicketEdit({ priority: 1 })).toBeNull();
-		expect(parseTicketEdit({ id: "ENG-1", priority: 5 })).toBeNull();
-		expect(parseTicketEdit({ id: "ENG-1", state: null })).toBeNull();
-		expect(parseTicketEdit({ id: "ENG-1", state: " " })).toBeNull();
-		expect(parseTicketEdit({ id: "ENG-1", labels: "Bug" })).toBeNull();
-		expect(parseTicketEdit({ id: "ENG-1", labels: ["Bug", 2] })).toBeNull();
-		expect(parseTicketEdit({ id: "ENG-1", dueDate: "next week" })).toBeNull();
-		expect(parseTicketEdit({ id: "ENG-1", assignee: 3 })).toBeNull();
-	});
-});
-
-describe("parseTicketDraft", () => {
-	test("keeps the trimmed title, the description as written, and the fields the pills set", () => {
-		expect(parseTicketDraft({ title: "  Fix login ", description: "", team: "t1", state: "Todo", priority: 2, assignee: null, labels: ["Bug", "Bug"], project: "Web", dueDate: "2026-10-09" })?.ok).toEqual({
-			title: "Fix login",
-			description: "",
-			team: "t1",
-			state: "Todo",
-			priority: 2,
-			assignee: null,
-			labels: ["Bug"],
-			project: "Web",
-			dueDate: "2026-10-09",
-		});
-	});
-
-	test("rejects a draft without a title or team, or with a field of the wrong kind", () => {
-		expect(parseTicketDraft({ title: " ", description: "", team: "t1" })).toBeNull();
-		expect(parseTicketDraft({ title: "Fix", description: "", team: "" })).toBeNull();
-		expect(parseTicketDraft({ title: "Fix", team: "t1" })).toBeNull();
-		expect(parseTicketDraft({ title: "Fix", description: "", team: "t1", priority: 7 })).toBeNull();
-		expect(parseTicketDraft({ title: "Fix", description: "", team: "t1", dueDate: "soon" })).toBeNull();
-	});
-});
-
-describe("parseTodoTicket", () => {
-	test("takes a todo and a team by id, and drops any other field", () => {
-		expect(parseTodoTicket({ todoId: "a", team: "t1", title: "ignored" })?.ok).toEqual({ todoId: "a", team: "t1" });
-		expect(parseTodoTicket({ todoId: "", team: "t1" })).toBeNull();
-		expect(parseTodoTicket({ todoId: "x".repeat(65), team: "t1" })).toBeNull();
-		expect(parseTodoTicket({ todoId: "a", team: " " })).toBeNull();
-		expect(parseTodoTicket({ todoId: "a" })).toBeNull();
-	});
-});
-
-describe("parseTicketAttachment", () => {
-	const file = { issue: "ENG-1", name: "shot.png", type: "image/png", data: "aGVsbG8=" };
-
-	test("takes a named file in base64 for an issue, an empty file included", () => {
-		expect(parseTicketAttachment(file)?.ok).toEqual(file);
-		expect(parseTicketAttachment({ ...file, data: "" })?.ok).toEqual({ ...file, data: "" });
-	});
-
-	test("rejects a file for no issue, without a name or type, not in base64, or over the size limit", () => {
-		expect(parseTicketAttachment({ ...file, issue: "eng-1" })).toBeNull();
-		expect(parseTicketAttachment({ ...file, name: "" })).toBeNull();
-		expect(parseTicketAttachment({ ...file, type: "" })).toBeNull();
-		expect(parseTicketAttachment({ ...file, data: "not base64!" })).toBeNull();
-		expect(parseTicketAttachment({ ...file, data: "A".repeat((MAX_TICKET_ATTACHMENT_BYTES / 3) * 4 + 4) })).toBeNull();
 	});
 });
 

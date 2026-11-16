@@ -23,7 +23,6 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Per-project agent setup](usage/per-project-agent-setup.md)
 - [Pull requests](usage/pull-requests.md)
 - [Pull request details](usage/pull-request-details.md)
-- [Linear tickets](usage/linear-tickets.md)
 - [Providers](usage/providers.md)
 - [Integrations](usage/integrations.md)
 - [MCP servers](usage/mcp-servers.md)

@@ -36,11 +36,10 @@
   The bar above the images counts the selection and sends it, in the order you selected it.
   **Add to PR description** lists the session's pull requests by number and title, and appends the images to the one you pick with `gh pr edit --attach`; it takes PNG, JPEG, GIF, WebP, and SVG images of up to 10 MB, 50 at a time.
   An image with a file on this computer goes as that file, under its name and with its name as alt text; any other goes as shown, with the call's summary as alt text.
-  **Attach to Linear issue** lists the session's issues, and attaches each image to the one you pick, as the new-issue dialog attaches files; the images Linear refused stay selected.
-  Either button is disabled, with a tooltip saying why, when the session has no pull request or no issue; **Clear** empties the selection.
+  The button is disabled, with a tooltip saying why, when the session has no pull request; **Clear** empties the selection.
 - **Sources** lists the web pages and remote items the agent and its subagents at any depth opened, each address once, oldest first.
   It counts a `read` or fetch of a web address, a page the browser opened from `eval`, a GitHub pull request or issue read through `pr://` or `issue://`, and the web addresses in the arguments of an MCP call that gets, reads, fetches, finds, or analyzes something.
-  A failed call, a page on this computer such as a dev server, and search results the agent never opened are left out, and so are the session's own pull requests and Linear issues, which the [session details sidebar](session-details-sidebar.md) shows.
+  A failed call, a page on this computer such as a dev server, and search results the agent never opened are left out, and so are the session's own pull requests, which the [session details sidebar](session-details-sidebar.md) shows.
   Each row shows the site's icon, the site, and the page's path; its tooltip names the full address, the agent and tool, what the call said it did, and how long ago.
   The dashboard's server fetches the icons from the sites themselves, so no outside icon service learns which sites a session opened; a site without one shows a globe.
   Click a row to open the page in your browser.

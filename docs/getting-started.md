@@ -48,12 +48,6 @@ Open **Settings › Integrations**.
 Each service there reaches omp's sessions through an MCP server, so connecting it once gives both the dashboard and every new omp session its tools.
 [Integrations](usage/integrations.md) describes each row's states and menu.
 
-### Linear
-
-1. Make sure nothing listens on port 3000: Linear sends the browser back to `localhost:3000`.
-2. Click **Connect** on the Linear row and sign in.
-3. Open the **Linear tickets** tab.
-
 ### Google Calendar
 
 1. In a Google Cloud project, turn on the [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com).

@@ -77,7 +77,6 @@ Every transcript comes from the session files on this machine, not from a networ
   The Overview tab's Images section sends selected images on: `PUT /api/pull-request/attachment` takes `PullRequestAttachment` from `src/shared/github.ts`, a pull request and 1 to 50 PNG, JPEG, GIF, WebP, or SVG images of up to 10 MB in base64, each with alt text, which are the limits and types of `gh pr edit --attach`.
   `attachToPullRequest` in `src/pull-request-edit.ts` writes them to a temporary directory, each named for its place and ending in its type's extension, since `gh` reads the type from it, runs `gh pr edit <n> -R <owner>/<repo> --attach <file>#<alt>` for every image, which appends them and keeps the body, and removes the directory however `gh` ends.
   When some uploads fail, `gh` exits non-zero yet still adds the others, so the error the page shows can come with a changed description.
-  Each image for a Linear issue goes through `PUT /api/ticket/attachment`, as the new-issue dialog's files do.
 - A view whose **Trajectory** a socket shows also gets a trajectory tail (`src/trajectory.ts`), which folds the view's own file into turns: a turn opens at each user message or `custom_message` that the transcript shows as a prompt, so the turns match the minimap's.
   Entries that wait for the model, such as a model change, a `model_usage` side call, a `ttsr_injection`, or a hidden `custom_message`, join the turn in which the next assistant message reads them, and are left out until one does.
   Each assistant message is a request with the `usage` omp recorded on it; `model_usage` entries are only side calls such as auto-thinking and cache warming, so a turn's usage adds both.
@@ -91,7 +90,7 @@ Every transcript comes from the session files on this machine, not from a networ
   It also skips an omp session that omp went on with in another file, which `findSessionContinuation` names, so the copy, which **Resume** opens either way, lists in its place, unless the copy is itself such an `omp -p` run, since the conversation would then list nowhere.
   omp names a copy only while it holds the session's newest turn and has a turn of its own after it, so a session whose own process went on writing it after the copy was made lists beside the copy.
   `SessionFiles` asks omp only about a session that a listed file names in its header's `continuationOf`, and only during a listing or re-read that changed a file in that session's directory, where omp writes the copy; `past` stays a synchronous read of the answer it kept.
-  The server still finds the skipped session's file by its id, so a resume or **Continue all** that names it opens the copy; the copy's row reads its pull requests, Linear issues, and /ship step from its own file, which holds the same turns.
+  The server still finds the skipped session's file by its id, so a resume or **Continue all** that names it opens the copy; the copy's row reads its pull requests and /ship step from its own file, which holds the same turns.
   The server looks up files by session id in this listing, so the page never sends a path.
   While no page is connected, it skips building the roster and the past list.
   The past list goes out whole when a page connects; after that the server compares each session with what it last sent and sends only the sessions that changed, joined, or left, so an untouched row keeps its object on the page and skips its render.
@@ -104,14 +103,6 @@ Every transcript comes from the session files on this machine, not from a networ
   A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
   `resolveLinks` lists the pull requests a call worked on, submitted, or pushed, or that the session's branch heads, before those the session's own prompt only links or names, each in the order found, since the session details sidebar shows the first.
 - The same scan folds each `omp-arena.state` entry of the session's own file, which `templates/omp/agent/extensions/arena.ts` appends at each `arena` call, into `SessionFacts.arenas`: one record per set of runners, the latest call's in place of an earlier one naming the same runners.
-- The same scan collects the Linear issues each session worked on, by identifier, from the arguments of its Linear MCP calls: a direct `mcp__linear_<tool>` call or a `write` to `xd://mcp__linear_<tool>`, whose `content` holds the arguments as JSON.
-  `get_issue` and `save_issue` name the issue in `id`, `list_comments` and `save_comment` in `issueId`; a `save_issue` with no `id` opens one, whose identifier its result's JSON `id` names.
-  A UUID is left out, since the tickets page opens an issue by identifier.
-  A `save_issue`, a `save_comment`, the `/ship` state's `issue`, and a Linear issue link in the session's own prompts each link the issue on their own.
-  A read (`get_issue`, `list_comments`), the identifier in the session's own prompts, and the session's branch naming it, in a `/`-separated segment that starts with it as `eng-123-fix` or `me/eng-123` do, are weaker: an issue with only these links once two different kinds agree, so a subagent that reads its parent's issue for context does not link it.
-  The session's own prompts are the user prompts in its own file, a skill's arguments without the skill's text, and no dashboard prompt; a subagent's prompt is its assignment, so it names nothing.
-  `#resolve` in `src/session-facts.ts` decides which issues link, since the branch is known only once git answers.
-  Session rows carry them as `tickets`, the session's own first.
 - The same scan reads the branch each session that wrote works on, in its worktree else its directory, through `worktreeAt` in `src/git.ts`.
   In a linked worktree that is the branch checked out now; in a repository's main checkout it is the branch `headHistory` and `branchAt` in `src/git.ts` find checked out at the session file's last write, from the HEAD reflog.
   `defaultBranchOf` there reads the repository's default branch from `origin/HEAD` with one `git symbolic-ref` per directory of a session that wrote, so a moved `origin/HEAD` updates the `defaultBranch` of every session in that directory.

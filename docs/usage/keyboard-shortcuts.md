@@ -15,7 +15,7 @@ Alt is Option on macOS.
 | Cmd+K | Anywhere | Open the command menu |
 | Cmd+[ / Cmd+] | Anywhere | Go back or forward in the header tab on screen, as its Back and Forward buttons and the mouse's back and forward buttons do |
 | Alt+Shift+← / Alt+Shift+→ | A focused header tab | Move the tab left or right |
-| Cmd+Shift+O / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+Shift+O creates a Linear ticket |
+| Cmd+Shift+O / S | Anywhere / outside text fields | Start a new session |
 | Cmd+F | Anywhere | Find text in the focused session's conversation, or in the pull request the Pull requests page shows |
 | Cmd+Shift+F | Anywhere | Put the cursor in the sidebar's session search |
 | Cmd+T | Anywhere | Open a new header tab on the new-session draft |
@@ -46,7 +46,6 @@ Alt is Option on macOS.
 | V / R / D / E | Browser while picking, outside text fields, the app in it too | Switch to Select, Region, Draw, or Erase |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
-| C | Outside text fields, except on the Todo, Calendar, and Email pages | Create a Linear ticket, when connected |
 | G then M | Outside text fields | Go to your email, when connected |
 | Cmd+, | Anywhere | Open or close Settings |
 | G then W | Outside text fields | Choose the sidebar's workspace |
@@ -96,10 +95,10 @@ Alt is Option on macOS.
   ↑ moves the last queued message back only while the composer is empty, as ↑ edits your last message in Slack.
   On a focused queued row, Cmd+Enter sends it now, Enter or F2 edits it, and Delete removes it.
   With a draft, ↑ moves the caret as usual.
-- Cmd+K opens the command menu, which searches every running and past session, in every workspace, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
-  What you type also searches your todos, closed ones too, the Linear tickets assigned to you once Linear is connected, the open pull requests of the sidebar's workspace, and the sections of Settings, each under its own heading; each must hold every word typed, in any order.
+- Cmd+K opens the command menu, which searches every running and past session, in every workspace, by title, directory, or pull request, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
+  What you type also searches your todos, closed ones too, the open pull requests of the sidebar's workspace, and the sections of Settings, each under its own heading; each must hold every word typed, in any order.
   With nothing typed they list only under **Suggestions**, once you use one often enough.
-  A todo opens beside its list on the Todo page, a ticket opens its details, and a pull request opens its details on the Pull requests page; Cmd+Enter opens a ticket in Linear and a pull request on GitHub.
+  A todo opens beside its list on the Todo page, and a pull request opens its details on the Pull requests page; Cmd+Enter opens a pull request on GitHub.
   **In conversations**, under those, lists the sessions whose prompts or replies hold every word typed, up to 30, the latest active first, each by the latest such message and how many match; tool output and thinking are not searched.
   Enter opens the session scrolled to that message, and Cmd+Enter opens it in a split.
   The search button in the sidebar header opens it too.
@@ -115,11 +114,10 @@ Alt is Option on macOS.
   Whatever you type also offers **Create todo**, last, which adds it at the end of **All**, with no category.
   You stay on the page you were on.
   The title can end with a due day or a `#category`, as in [Todo list](todo-list.md).
-  With Linear connected, it also offers **Create ticket**, which opens the new-ticket dialog with what you typed as the title; see [Linear tickets](linear-tickets.md).
   Cmd+Alt+↑ and Cmd+Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then the ones waiting on subagents, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   ↓ and ↑, or J and K, do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
-- Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does; on the tickets page it opens the new-issue dialog instead.
+- Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does.
   S outside a text field does it too; on the Todo page, S changes a focused or open todo's status instead.
   Cmd+T opens a new header tab on the new-session draft, as the + after the tabs does.
   Cmd+W closes the header tab on screen and leaves its session running; it does nothing when the page has no header tab, or when the tab on screen is pinned.
@@ -135,7 +133,7 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in the app.
-- **Go to pull requests** in the command menu opens the Pull requests page, and **Go to tickets** opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo, Calendar, and Email pages, where it adds a todo, an event, or a new mail.
+- **Go to pull requests** in the command menu opens the Pull requests page; C on the Todo, Calendar, and Email pages adds a todo, an event, or a new mail.
   **Go to sessions** goes back from the Pull requests page, the todo list, the calendar, the email, a Bot, Settings, or the new-session draft to the panes.
   The **Todo** and **Calendar** buttons in the header open those pages, and G then M the **Email** page when connected to Gmail.
   Cmd+, opens Settings, as the header's gear button does, where the model roles and the integrations live, and closes it again.

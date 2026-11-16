@@ -32,7 +32,7 @@ describe("splitSystemPrompt", () => {
 		"## MCP Server Instructions",
 		"### datadog",
 		"Load a skill first.",
-		"### linear",
+		"### sentry",
 		"Send real newlines.",
 	].join("\n");
 	const parts = splitSystemPrompt([role, context]);
@@ -42,7 +42,7 @@ describe("splitSystemPrompt", () => {
 			"file:/repo/AGENTS.md",
 			"mcp:datadog",
 			"mcp:google_calendar",
-			"mcp:linear",
+			"mcp:sentry",
 			"mcp:slack",
 			"prompt:MCP Server Instructions",
 			"prompt:MCP Tool Routes",

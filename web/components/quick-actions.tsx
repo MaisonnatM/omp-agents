@@ -1,4 +1,4 @@
-/** Quick actions on a pull request, an issue, or a todo: the row menu, the details' buttons, and the note when a start fails. */
+/** Quick actions on a pull request or a todo: the row menu, the details' buttons, and the note when a start fails. */
 import { IconBubbleText, IconChecklist, IconCircleX, IconEyeOpen, IconHammer, IconMerged, IconNuclearPowerPlant, IconToolbox, IconZap } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { RosterHost, View } from "../../src/shared/sessions";
@@ -25,7 +25,7 @@ const ICON: Record<QuickActionId, IconComponent> = {
 };
 
 export interface QuickActionsProps {
-	/** The actions that apply to the row's pull request or issue, in the order offered. */
+	/** The actions that apply to the row's pull request, in the order offered. */
 	actions: QuickActionId[];
 	/** The action whose session is starting for it, if any. */
 	pending: QuickActionId | null;
@@ -152,7 +152,7 @@ export function QuickStartNotice({ quick, onDismiss }: NoticeProps) {
 }
 
 interface DetailActionsProps extends QuickActionsProps {
-	/** The running sessions that work on the pull request or issue. */
+	/** The running sessions that work on the pull request. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
 }

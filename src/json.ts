@@ -16,7 +16,7 @@ export const isSafeInteger = (value: unknown): value is number => typeof value =
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** A day as `YYYY-MM-DD`, as a todo's `due`, a Linear issue's `dueDate`, and an all-day Google event name one, that the calendar has. */
+/** A day as `YYYY-MM-DD`, as a todo's `due` and an all-day Google event name one, that the calendar has. */
 export const isDay = (value: unknown): value is string => {
 	if (typeof value !== "string" || !DAY.test(value)) return false;
 	const time = Date.parse(`${value}T00:00:00Z`);
