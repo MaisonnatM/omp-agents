@@ -2,7 +2,7 @@
  * Get started's Tools and workflows step: GitHub, every Settings › Integrations service, and pstack, what still needs
  * you above what is ready, each folded to its name, status, and summary, and opening in place on its full row.
  */
-import { IconAgentNetwork, IconCheckmark1, IconChevronDownSmall, IconChevronTop, IconPullRequest } from "central-icons";
+import { IconAgentNetwork, IconCheckmark1, IconChevronDownSmall, IconChevronTopSmall, IconPullRequest } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -115,7 +115,7 @@ function Disclosure({ item, open, onToggle }: { item: Item; open: boolean; onTog
 					{item.row}
 				</ul>
 				<Button variant="ghost" size="icon-compact" aria-expanded aria-label={`Fold ${item.name}`} className="absolute end-4 top-4" onClick={onToggle}>
-					<IconChevronTop />
+					<IconChevronTopSmall />
 				</Button>
 			</li>
 		);

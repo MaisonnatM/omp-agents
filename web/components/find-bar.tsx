@@ -3,7 +3,7 @@
  * conversation or a pull request's details, steps through them with Enter and Shift+Enter, and follows that part as it changes.
  */
 import { useReducedMotion } from "framer-motion";
-import { IconChevronDownSmall, IconChevronTop, IconCrossMedium, IconMagnifyingGlass } from "central-icons";
+import { IconChevronDownSmall, IconChevronTopSmall, IconCrossMedium, IconMagnifyingGlass } from "central-icons";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -220,7 +220,7 @@ export function FindBar({ root: rootRef, enabled, label, className }: FindBarPro
 				</span>
 				<Tooltip content="Previous match" shortcut={[chordLabel({ key: "Enter", shift: true })]} side="bottom" disabled={count === 0}>
 					<Button {...activityControl("find-bar.step")} variant="ghost" size="icon-compact" aria-label="Previous match" disabled={count === 0} onClick={() => step(-1)}>
-						<IconChevronTop />
+						<IconChevronTopSmall />
 					</Button>
 				</Tooltip>
 				<Tooltip content="Next match" shortcut={[chordLabel({ key: "Enter" })]} side="bottom" disabled={count === 0}>

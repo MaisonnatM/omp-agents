@@ -1,7 +1,7 @@
 "use client";
 
 import { atom, useAtom } from "jotai";
-import { IconCheckmark1, IconChevronDownSmall, IconChevronLeft, IconChevronRightSmall } from "central-icons";
+import { IconCheckmark1, IconChevronDownSmall, IconChevronLeftSmall, IconChevronRightSmall } from "central-icons";
 import {
   createContext,
   type ReactNode,
@@ -264,7 +264,7 @@ export const CalendarDatePagination = ({
         size="icon"
         variant="ghost"
       >
-        <IconChevronLeft size={16} />
+        <IconChevronLeftSmall size={16} />
       </Button>
       <Button
         aria-label="Next month"
