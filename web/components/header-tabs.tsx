@@ -165,7 +165,6 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClo
 				<MenuItem onClick={onCopyUrl}>
 					<IconChainLink1 />
 					Copy URL
-					<MenuShortcut>{shortcutLabels("copyTabUrl")[0]}</MenuShortcut>
 				</MenuItem>
 				<MenuSeparator />
 				{!pinned && (
@@ -202,8 +201,8 @@ interface HeaderTabsProps {
  * and ⌃⇧⇥ to the next and previous. Drag one, or press Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it,
  * closing the one on screen shows its neighbour, closing the last leaves a new one, and ⌥⌘W closes all but the pinned ones and the one on screen.
  * ⇧⌘T reopens the last closed tab where it was. Pin or Unpin in a tab's menu, or ⌃⇧P on the one on screen, moves it among the pinned
- * tabs, which sit first, show only their icon, and stay open until unpinned. The menu also duplicates a tab, copies its address, as ⌘L does
- * for the one on screen, and closes the tabs to its right.
+ * tabs, which sit first, show only their icon, and stay open until unpinned. The menu also duplicates a tab, copies its address, and closes the
+ * tabs to its right.
  */
 export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps) {
 	const { openNewSession } = useDashboardActions();
@@ -278,11 +277,6 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 		pinTab: () => {
 			if (activeId === null) return false;
 			togglePin(activeId);
-		},
-		copyTabUrl: () => {
-			const active = tabs[row.active];
-			if (!active) return false;
-			copyUrl(active);
 		},
 		selectTab: index => {
 			if (index >= tabs.length) return false;

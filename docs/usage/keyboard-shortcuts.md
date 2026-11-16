@@ -23,7 +23,6 @@ Alt is Option on macOS.
 | Cmd+Alt+W | Anywhere | Close every header tab but the pinned ones and the one on screen |
 | Cmd+Shift+T | Anywhere | Reopen the last closed header tab, where it was |
 | Ctrl+Shift+P | Anywhere | Pin or unpin the header tab on screen |
-| Cmd+L | Anywhere | Copy the URL of the header tab on screen |
 | Ctrl+Tab / Ctrl+Shift+Tab | Anywhere | Go to the next or previous header tab |
 | Cmd+Alt+→ / Cmd+Alt+← | Anywhere | Go to the next or previous header tab |
 | Cmd+1 … Cmd+9 | Anywhere | Go to the first … ninth header tab |
@@ -127,7 +126,6 @@ Alt is Option on macOS.
   Cmd+Alt+W closes every header tab but the pinned ones and the one on screen, and Ctrl+Tab and Ctrl+Shift+Tab, or Cmd+Alt+→ and Cmd+Alt+←, go to the next or previous one, wrapping around.
   Cmd+Shift+T reopens the last closed header tab at its place, on the page it showed, as in Capy; pressed again it reopens the one closed before, up to the last 20.
   Ctrl+Shift+P pins or unpins the header tab on screen, with Ctrl on macOS too as in Capy, so it stays apart from Cmd+Shift+P in the command menu.
-  Cmd+L copies the URL of the header tab on screen, as **Copy URL** in a tab's menu does; Capy's other key for it, Cmd+Shift+C, stays the command menu's Copy path.
   **Archive session** in a session's header ends it; **Resume** continues it from the past sessions.
   `/` or Cmd+I puts the cursor in the focused pane's composer.
 - Inside the command menu, Cmd+Shift+P pins or unpins the highlighted session.
