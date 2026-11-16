@@ -2,7 +2,7 @@
  * `TicketsPage`: your assigned Linear issues grouped by workflow state, as Linear's My issues lists them, or by
  * **Display**'s grouping, under a bar of tabs, **Filter**, and **Display**, with the open one beside them.
  */
-import { IconBox, IconPlusLarge, IconTodos } from "central-icons";
+import { IconPlusLarge, IconTodos } from "central-icons";
 import { useRef, useState } from "react";
 import { callable } from "../../../src/shared/accounts";
 import type { RosterHost } from "../../../src/shared/sessions";
@@ -25,13 +25,14 @@ import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { DisconnectedPage } from "../integrations/disconnected-page";
 import type { CoreData } from "../module-views";
 import { FoldButton, useFolds } from "../fold";
+import { NothingMatches } from "../list-filter-bar";
 import { PolledContent, PolledPageFrame, useReturnFocus } from "../list-page";
 import { type BarAction, CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
 import { SearchField } from "../search-field";
 import type { TicketsRoute } from "./module";
 import { TicketDetailContent } from "./ticket-details";
-import { PRIORITY_ICON, statusIcon, TicketRow, ticketRowId } from "./ticket-row";
+import { headingIcon, TicketRow, ticketRowId } from "./ticket-row";
 import { TicketViewBar } from "./ticket-view-bar";
 
 /** Folded groups, by fold key: a status's name, `priority:<n>`, or `project:<name>`. */
@@ -56,7 +57,7 @@ function GroupSection({ group, open, target, onToggle, quick, onQuickAction }: G
 	const { heading } = group;
 	const rows = (
 		// A row scrolled into view clears the sticky h-10 heading above it.
-		<ul id={`${id}-list`} className="py-1 *:scroll-mt-12 *:scroll-mb-2">
+		<ul id={`${id}-list`} aria-label={heading === null ? "Assigned issues" : undefined} className="py-1 *:scroll-mt-12 *:scroll-mb-2">
 			{group.entries.flatMap(({ ticket, subIssues }) =>
 				[ticket, ...subIssues].map(row => (
 					<TicketRow
@@ -72,13 +73,13 @@ function GroupSection({ group, open, target, onToggle, quick, onQuickAction }: G
 		</ul>
 	);
 	if (heading === null) return rows;
-	const [Icon, color] = heading.by === "status" ? statusIcon(heading.status) : heading.by === "priority" ? PRIORITY_ICON[heading.priority] : [IconBox, "text-muted-foreground"];
+	const [Icon, color] = headingIcon(heading);
 	return (
 		<section aria-labelledby={`${id}-heading`}>
 			<h3 id={`${id}-heading`} className="sticky top-0 z-10 flex h-10 items-center rounded-md bg-muted px-3 text-sm font-medium">
 				<FoldButton open={open} onToggle={onToggle} controls={`${id}-list`} className="items-center gap-2.5">
 					<Icon aria-hidden className={`size-4 shrink-0 ${color}`} />
-					{group.title}
+					{heading.title}
 					<span className="tabular-nums text-muted-foreground">{group.count}</span>
 				</FoldButton>
 			</h3>
@@ -108,39 +109,6 @@ export function TicketsPage({ route: { target }, core }: { route: TicketsRoute; 
 	return <TicketsList target={target} cwd={core.cwd} hosts={core.hosts} />;
 }
 
-/** The note and the button of a list that the search, **Filter**, or the tab leave empty. */
-function nothingMatches(search: string, filtering: boolean, view: string): { text: string; clear: string } {
-	if (search && filtering) return { text: "No issues match the search and these filters.", clear: "Clear the search and filters" };
-	if (search) return { text: `No issues match “${search}”.`, clear: "Clear the search" };
-	if (filtering) return { text: "No issues match these filters.", clear: "Clear the filters" };
-	return { text: `No ${view.toLowerCase()} issues assigned to you.`, clear: "Show all issues" };
-}
-
-/** What a list with assigned issues shows while the search, **Filter**, or the tab keep none: a note and a button that clears them, the tab last. */
-function NothingMatches({ query, onQuery }: { query: string; onQuery: (query: string) => void }) {
-	const [filter, setFilter] = useTicketsFilter();
-	const search = query.trim();
-	const filtering = filters(filter);
-	const { text, clear } = nothingMatches(search, filtering, VIEW_PRESETS[filter.view].label);
-	return (
-		<div className="space-y-3 px-3 py-2">
-			<p className="text-sm text-muted-foreground">{text}</p>
-			<Button
-				{...activityControl(search || filtering ? "tickets.filter.clear" : "tickets.view")}
-				size="compact"
-				variant="outline"
-				onClick={() => {
-					if (search) onQuery("");
-					if (filtering) setFilter(withoutFilters(filter));
-					if (!search && !filtering) setFilter({ ...filter, view: "all" });
-				}}
-			>
-				{clear}
-			</Button>
-		</div>
-	);
-}
-
 /**
  * The viewer's assigned Linear issues that the tab, **Filter**, and the search keep, by workflow state as Linear's My
  * issues lists them or by **Display**'s grouping, and beside them the issue `target` names.
@@ -153,15 +121,15 @@ function TicketsList({ target, cwd, hosts }: TicketsListProps) {
 	const detailRead = useEditableRead<TicketDetail>(target && `/api/ticket?${new URLSearchParams({ id: target })}`);
 	const folds = useFolds(COLLAPSED_KEY);
 	const [query, setQuery] = useState("");
-	const [filter] = useTicketsFilter();
-	const [{ grouping }] = useTicketsDisplay();
+	const [filter, setFilter] = useTicketsFilter();
+	const [display, setDisplay] = useTicketsDisplay();
 	const start = (ticket: Ticket, action: WorkActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
 	const listRef = useRef<HTMLDivElement>(null);
 	useReturnFocus(target, id => id, id => document.getElementById(ticketRowId(id))?.querySelector<HTMLElement>("a"), poll.read, () => listRef.current);
 	// On this page ⌘⇧O creates a ticket, where the App's binding of it starts a session.
 	useShortcuts({ ticketsNew: () => openNewTicket("") });
 
-	const groups = groupedTickets(grouping, filteredTickets(tickets, filter, query, Date.now()));
+	const groups = groupedTickets(display.grouping, filteredTickets(tickets, filter, query, Date.now()));
 	// The rows in the list's order, sub-issues under their parents, which the open issue's previous and next step through.
 	const rows = listedRows(groups);
 	const at = rows.findIndex(row => row.id === target);
@@ -198,10 +166,21 @@ function TicketsList({ target, cwd, hosts }: TicketsListProps) {
 							<PolledContent noun="the tickets" loading="Asking Linear for your issues…" poll={poll}>
 								{() => (
 									<>
-										{tickets.length > 0 && <TicketViewBar tickets={tickets} />}
+										{tickets.length > 0 && <TicketViewBar tickets={tickets} filter={filter} onFilter={setFilter} display={display} onDisplay={setDisplay} />}
 										<div ref={listRef} tabIndex={-1} className="space-y-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
 											{tickets.length === 0 && <p className="px-3 text-sm text-muted-foreground">No issues assigned to you.</p>}
-											{tickets.length > 0 && groups.length === 0 && <NothingMatches query={query} onQuery={setQuery} />}
+											{tickets.length > 0 && groups.length === 0 && (
+												<NothingMatches
+													noneMatch="No issues match"
+													search={query.trim()}
+													filtering={filters(filter)}
+													control="tickets.filter.clear"
+													onClearSearch={() => setQuery("")}
+													onClearFilters={() => setFilter(withoutFilters(filter))}
+													fallback={{ text: VIEW_PRESETS[filter.view].empty, label: "Show all issues", control: "tickets.view", onClick: () => setFilter({ ...filter, view: "all" }) }}
+													focusTarget={listRef}
+												/>
+											)}
 											{groups.map(group => (
 												<GroupSection
 													key={group.foldKey}

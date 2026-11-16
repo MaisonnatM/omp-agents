@@ -63,9 +63,10 @@
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
 - Right-click a todo, or focus it and press the context-menu key or Shift+F10, for **Open**, **Rename**, **Add a todo under it** on a top-level todo, and **Delete**.
 - The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
-  **Filter**, in the bar above every list, keeps the top-level todos of the checked priorities, the checked assignees, or with a link of a checked kind (**Session**, **Pull request**, or **Linear issue**, among those the list's todos carry), those due within the next day to the next month, overdue ones and those with an open todo under them due by then too, and those added within the last day to the last month.
-  Each filter that leaves something out shows as a chip under the bar, such as `Due within the next week`, whose × removes it, with **Clear all** once there are two; the app keeps them in this browser, while the search starts empty.
-  When the search or the filters leave nothing, the list says so with a button that clears them.
+  **Filter**, in the bar above every list, keeps the top-level todos of the checked priorities, the checked assignees, or with a link of a checked kind (**Session**, **Pull request**, or **Linear issue**, among those the list's todos carry), those due within a day, 3, 7, 14, or 30 days, overdue ones and those with an open todo under them due by then too, and those added within the last day to the last month.
+  **Link** shows only while the list's todos carry a link.
+  Each filter that leaves something out shows as a chip under the bar, such as `Due is within 7 days`, whose × removes it, with **Clear all** once there are two; the app keeps them in this browser, while the search starts empty.
+  When the search or the filters leave nothing, the list says so with a button that clears them, and focus moves to the list.
   Outside a text field, ↓ and ↑ focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
   While a todo is open, ↓ and ↑ open the next and previous one instead, and Esc closes it.
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.

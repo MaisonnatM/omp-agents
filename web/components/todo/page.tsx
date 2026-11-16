@@ -11,15 +11,17 @@ import { ALL_WORKSPACES, folderName } from "../../labels";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
 import { PRIORITY_LABEL } from "../../tickets-model";
+import { sectionId } from "../../section";
 import { groupFoldKey, groupTodos, keepsTodo, NO_FILTER, filters, type TodoGroup } from "../../todo-filter";
+import { useTodoDisplay, useTodoFilter } from "../../todo-state";
 import { inScope, LIST_KINDS, lastOf, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf, leftIn } from "../../todo-views";
-import { activityControl } from "../../activity";
 import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
 import { type OpenPicker, useTodoKeys } from "../../use-todo-keys";
 import { useDashboardStatus } from "../dashboard-context";
 import { FoldButton, useFolds } from "../fold";
+import { NothingMatches } from "../list-filter-bar";
 import { PageFrame } from "../list-page";
 import { ListSplit } from "../list-split";
 import { TodoDetail } from "./detail";
@@ -28,7 +30,7 @@ import { ASSIGNEE, AssigneeIcon, PriorityIcon, StatusIcon } from "./fields";
 import type { KnownSessions } from "./links";
 import { ArchivedRow, DraftRow, TodoRow } from "./row";
 import { TodoSearch } from "./search";
-import { TodoViewBar, useTodoDisplay, useTodoFilter } from "./view-bar";
+import { TodoViewBar } from "./view-bar";
 
 interface TodoPageProps {
 	/** `null` until the server sends the list. */
@@ -53,25 +55,79 @@ interface TodoPageProps {
 const FOLDS_KEY = "omp-agents.todo-status-folds";
 const foldedByDefault = (key: string): boolean => key === "done" || key === "canceled";
 
-/** A group's heading: its icon and its name. */
-function groupHeading(group: TodoGroup<unknown>): { icon: ReactNode; label: string } {
+/** A group of the list as the page draws it. */
+interface TodoGroupView {
+	/** Its fold key, which its element ids derive from. */
+	key: string;
+	/** Its icon and name; `null` for the one group of no grouping, which shows no heading. */
+	heading: { icon: ReactNode; label: string } | null;
+	todos: UserTodo[];
+	/** By status, the status of the group and of a todo added to it; `null` under other groupings. */
+	status: TodoStatus | null;
+}
+
+function groupView(group: TodoGroup<UserTodo>): TodoGroupView {
+	const view = { key: group.foldKey, todos: group.todos, status: null };
 	switch (group.by) {
 		case "status":
-			return { icon: <StatusIcon status={group.key} />, label: TODO_STATUS[group.key].label };
+			return { ...view, heading: { icon: <StatusIcon status={group.key} />, label: TODO_STATUS[group.key].label }, status: group.key };
 		case "priority":
-			return { icon: <PriorityIcon priority={group.key} />, label: PRIORITY_LABEL[group.key] };
+			return { ...view, heading: { icon: <PriorityIcon priority={group.key} />, label: PRIORITY_LABEL[group.key] } };
 		case "assignee":
-			return { icon: <AssigneeIcon assignee={group.key} />, label: ASSIGNEE[group.key ?? "none"].label };
+			return { ...view, heading: { icon: <AssigneeIcon assignee={group.key} />, label: ASSIGNEE[group.key ?? "none"].label } };
 		case "none":
-			return { icon: null, label: "Todos" };
+			return { ...view, heading: null };
 	}
 }
 
-/** The note and the button of a list that the search, **Filter**, or both leave empty. */
-function nothingMatches(search: string, filtering: boolean): { text: string; clear: string } {
-	if (search && filtering) return { text: "No todo matches the search and these filters.", clear: "Clear the search and filters" };
-	if (search) return { text: `No todo matches “${search}”.`, clear: "Clear the search" };
-	return { text: "No todo matches these filters.", clear: "Clear the filters" };
+interface TodoGroupSectionProps {
+	group: TodoGroupView;
+	open: boolean;
+	/** The list's name, which names the rows' list. */
+	listTitle: string;
+	onToggle: () => void;
+	/** Starts a todo in a status's group; `null` where the list takes none. */
+	onAdd: ((status: TodoStatus) => void) | null;
+	/** The group's rows, then what follows them: the new todo typed at its end, and the add row. */
+	children: ReactNode;
+}
+
+/** A group's heading, which folds it, and its rows; the one group of no grouping is its rows alone. */
+function TodoGroupSection({ group: { key, heading, todos, status }, open, listTitle, onToggle, onAdd, children }: TodoGroupSectionProps) {
+	if (heading === null) {
+		return (
+			<ul aria-label={`Todos of ${listTitle}`} className="flex flex-col gap-0.5 py-1">
+				{children}
+			</ul>
+		);
+	}
+	const id = sectionId("todo", key);
+	const { icon, label } = heading;
+	return (
+		<section aria-labelledby={`${id}-heading`}>
+			<h3 id={`${id}-heading`} className="sticky top-0 z-10 flex h-10 items-center gap-2 rounded-md bg-muted px-3 text-sm font-medium">
+				<FoldButton open={open} onToggle={onToggle} controls={`${id}-list`} className="items-center gap-2.5">
+					{icon}
+					{label}
+					<span className="tabular-nums text-muted-foreground">{todos.length}</span>
+				</FoldButton>
+				{status !== null && isClosed(status) && <span className="ml-auto text-xs font-normal text-muted-foreground">Archived after {DONE_KEPT_HOURS} hours</span>}
+				{status !== null && onAdd && (
+					<Tooltip content={`Add a todo to ${label}`}>
+						<Button variant="ghost" size="icon-compact" aria-label={`Add a todo to ${label}`} className={isClosed(status) ? undefined : "ml-auto"} onClick={() => onAdd(status)}>
+							<IconPlusLarge />
+						</Button>
+					</Tooltip>
+				)}
+			</h3>
+			{open && (
+				// A row scrolled into view clears the sticky h-10 heading above it.
+				<ul id={`${id}-list`} aria-label={`${label} todos of ${listTitle}`} className="flex flex-col gap-0.5 py-1 *:scroll-mt-12">
+					{children}
+				</ul>
+			)}
+		</section>
+	);
 }
 
 /** Your own todos, each with todos of its own, two deep at most, beside the open one's notes. */
@@ -126,28 +182,31 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const left = leftIn(list, view, day, sessions, hidden, scope);
 	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
 	const search = query.trim();
-	const unmatched = section.todos.length === 0 && listed.length > 0 && (search !== "" || filtering) ? nothingMatches(search, filtering) : null;
+	const unmatched = section.todos.length === 0 && listed.length > 0 && (search !== "" || filtering);
 	const emptyText = (): string | null => {
 		if (scope.workspace !== null) return `No todo here names ${folderName(scope.workspace) ?? scope.workspace}, the workspace the sidebar shows. Choose ${ALL_WORKSPACES} in the sidebar to see every todo.`;
 		return kind.empty;
 	};
 	const empty = section.todos.length > 0 || unmatched ? null : emptyText();
 	const groups = (grouping === null ? [] : groupTodos(grouping, section.todos))
-		.filter(group => group.todos.length > 0 || (group.by === "status" && group.key === "todo" && canAdd))
+		.map(groupView)
+		.filter(group => group.todos.length > 0 || (group.status === "todo" && canAdd))
 		// A search shows every match, closed ones too.
-		.map(group => ({ group, key: groupFoldKey(group), open: query !== "" || group.by === "none" || !folds.isFolded(groupFoldKey(group)) }));
+		.map(group => ({ group, open: query !== "" || group.heading === null || !folds.isFolded(group.key) }));
 	const shown = kind.readOnly ? section.todos : groups.flatMap(({ group, open }) => (open ? group.todos : []));
 	useOpenLatest(id => hashForTodo(view, id), openId, shown[0]?.id ?? null, true);
 	const order = shown.flatMap(todo => [todo.id, ...(kind.readOnly ? [] : todo.children.map(child => child.id))]);
 	const at = open ? order.indexOf(open.todo.id) : -1;
+	/**
+	 * Where a new top-level todo of `status` goes: by status, last of its status's group, which unfolds to show it;
+	 * under other groupings, last of the list, where the list's end shows it.
+	 */
+	const draftPlace = (status: TodoStatus): { afterId: string | null; unfold: string[] } =>
+		byStatus ? { afterId: lastOf(section.todos, status), unfold: [groupFoldKey("status", status)] } : { afterId: null, unfold: [] };
 	const startDraft = (status: TodoStatus): void => {
-		if (!byStatus) {
-			// Outside the grouping by status the new todo goes last, where the list's end shows it.
-			editing.startDraft({ parentId: null, afterId: null, categoryId: section.categoryId, status });
-			return;
-		}
-		folds.unfold([status]);
-		editing.startDraft({ parentId: null, afterId: lastOf(section.todos, status), categoryId: section.categoryId, status });
+		const { afterId, unfold } = draftPlace(status);
+		folds.unfold(unfold);
+		editing.startDraft({ parentId: null, afterId, categoryId: section.categoryId, status });
 	};
 	const openStep = useTodoKeys({
 		listRef,
@@ -260,8 +319,8 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 				detailLabel="Open todo"
 				empty={{ icon: IconTodos, title: "No todo open", hint: `Click a todo, or focus one with ${shortcutKeys("todoNext")} and press Enter.` }}
 				list={
-					<section ref={listRef} aria-label={title} className="mx-auto w-full max-w-3xl space-y-2 px-3 py-2">
-						<TodoViewBar todos={listed} filter={filter} onFilter={setFilter} grouping={grouping} onGrouping={next => setDisplay({ ...display, grouping: next })} />
+					<section ref={listRef} tabIndex={-1} aria-label={title} className="outline-none focus-visible:ring-2 focus-visible:ring-ring mx-auto w-full max-w-3xl space-y-2 px-3 py-2">
+						<TodoViewBar todos={listed} filter={filter} onFilter={setFilter} display={kind.readOnly ? null : display} onDisplay={setDisplay} />
 						{kind.readOnly ? (
 							<ul aria-label="Archived todos" className="flex flex-col gap-0.5">
 								{section.todos.map(todo => (
@@ -270,47 +329,20 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 							</ul>
 						) : (
 							<>
-								{groups.map(({ group, key, open: groupOpen }) => {
-									const { todos } = group;
-									const { icon, label } = groupHeading(group);
-									const id = `todo-group-${key.replace(":", "-")}`;
-									const rows = todos.map(todo => rowsOf(todo, todos));
-									if (group.by === "none") {
-										return (
-											<ul key={key} aria-label={`Todos of ${title}`} className="flex flex-col gap-0.5 py-1">
-												{rows}
-											</ul>
-										);
-									}
-									const status = group.by === "status" ? group.key : null;
-									return (
-										<section key={key} aria-labelledby={`${id}-heading`}>
-											<h3 id={`${id}-heading`} className="sticky top-0 z-10 flex h-10 items-center gap-2 rounded-md bg-muted px-3 text-sm font-medium">
-												<FoldButton open={groupOpen} onToggle={() => folds.toggle(key)} controls={`${id}-list`} className="items-center gap-2.5">
-													{icon}
-													{label}
-													<span className="tabular-nums text-muted-foreground">{todos.length}</span>
-												</FoldButton>
-												{status !== null && isClosed(status) && <span className="ml-auto text-xs font-normal text-muted-foreground">Archived after {DONE_KEPT_HOURS} hours</span>}
-												{status !== null && canAdd && (
-													<Tooltip content={`Add a todo to ${label}`}>
-														<Button variant="ghost" size="icon-compact" aria-label={`Add a todo to ${label}`} className={isClosed(status) ? undefined : "ml-auto"} onClick={() => startDraft(status)}>
-															<IconPlusLarge />
-														</Button>
-													</Tooltip>
-												)}
-											</h3>
-											{groupOpen && (
-												// A row scrolled into view clears the sticky h-10 heading above it.
-												<ul id={`${id}-list`} aria-label={`${label} todos of ${title}`} className="flex flex-col gap-0.5 py-1 *:scroll-mt-12">
-													{rows}
-													{status !== null && draftAt(null, null, status)}
-													{status === "todo" && addRow}
-												</ul>
-											)}
-										</section>
-									);
-								})}
+								{groups.map(({ group, open: groupOpen }) => (
+									<TodoGroupSection
+										key={group.key}
+										group={group}
+										open={groupOpen}
+										listTitle={title}
+										onToggle={() => folds.toggle(group.key)}
+										onAdd={canAdd ? startDraft : null}
+									>
+										{group.todos.map(todo => rowsOf(todo, group.todos))}
+										{group.status !== null && draftAt(null, null, group.status)}
+										{group.status === "todo" && addRow}
+									</TodoGroupSection>
+								))}
 								{!byStatus && canAdd && (
 									<ul aria-label={`New todos of ${title}`} className="flex flex-col gap-0.5">
 										{draftAt(null, null)}
@@ -320,20 +352,15 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 							</>
 						)}
 						{unmatched && (
-							<div className="space-y-3 px-2">
-								<p className="text-sm text-muted-foreground">{unmatched.text}</p>
-								<Button
-									{...activityControl("todo.filter.clear")}
-									size="compact"
-									variant="outline"
-									onClick={() => {
-										if (search) setQuery("");
-										if (filtering) setFilter(NO_FILTER);
-									}}
-								>
-									{unmatched.clear}
-								</Button>
-							</div>
+							<NothingMatches
+								noneMatch="No todo matches"
+								search={search}
+								filtering={filtering}
+								control="todo.filter.clear"
+								onClearSearch={() => setQuery("")}
+								onClearFilters={() => setFilter(NO_FILTER)}
+								focusTarget={listRef}
+							/>
 						)}
 						{empty && <p className="px-2 text-sm text-muted-foreground">{empty}</p>}
 					</section>

@@ -14,7 +14,7 @@
   A sub-issue whose parent is not listed, such as one assigned to someone else, is a row of its own with the parent's identifier as a chip.
 - A bar above the list holds the tabs **All**, **Active** (started states, In Review included), **Todo** (unstarted states), and **Backlog**, and at its end **Filter** and **Display**.
   A tab keeps one kind of state; **All**, the default, keeps every issue, triage, completed, and canceled ones included.
-  **Filter** has a submenu per field: **Status**, each state the tab's issues are in with how many there are, **Priority**, **Label**, **Project**, **Team**, shown only while your issues come from more than one team, **Created**, and **Updated**, which keep the issues of the last day, 3 days, week, 2 weeks, or month.
+  **Filter** has a submenu per field: **Status**, each state the tab's issues are in with how many there are, **Priority**, **Label** and **Project**, each shown only while the tab's issues carry one, **Team**, shown only while your issues come from more than one team, **Created**, and **Updated**, which keep the issues of the last day, 3 days, week, 2 weeks, or month.
   Check several values of a field to keep issues with any of them; the tab and every field apply together, so the **Todo** status under the **Active** tab keeps nothing.
   Each field that leaves something out shows as a chip under the bar, whose value reopens its choices and whose × removes it, with **Clear all** once there are two; **Clear all** keeps the tab.
   Filtering looks at each issue on its own: a sub-issue whose parent it leaves out shows as a row of its own, with the parent's identifier as a chip.
@@ -23,7 +23,8 @@
   Each grouping keeps its own folded headings.
   The tab, the filters, and the grouping stay across reloads, in this browser.
 - **Search tickets**, in the page header, keeps the issues whose identifier, title, labels, project, or team hold every word you type, in any order and any case; Escape clears it, and a reload forgets it.
-  When the search, the filters, or the tab leave nothing, the list says so with a button that clears the search and the filters, or, for the tab alone, **Show all issues**.
+  When the search or the filters leave nothing, the list says so with a button that clears them, and focus moves to the list.
+  When the tab alone leaves nothing, the list says which issues it lacks, such as `No issues in Backlog are assigned to you.`, with **Show all issues**.
 - With no issue open the list spans the page's width, like Linear's, and each group's heading stays at the top of the list while its issues scroll under it.
 - A row shows the priority, the identifier, the state, and the title, then the due date when there is one, the labels, and the project as chips, then the day Linear opened the issue and the day it last changed.
   A day this year reads `Oct 6`, an earlier one `Mar 2025`; hover a day for its full time.

@@ -1,7 +1,7 @@
 /** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
 import { IconAiBotHead, IconArchive, IconBubbleQuestion, IconCalendarClock, IconTodos } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
+import type { TodoAssignee, TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
 import { everyWord } from "../src/shared/every-word";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "../src/shared/days";
@@ -52,12 +52,11 @@ export const TODO_STATUS: Record<TodoStatus, { label: string; kind: StatusKind }
 	canceled: { label: "Canceled", kind: "canceled" },
 };
 
+/** Who a todo is assigned to, as its assignee picker and **Filter** name them. */
+export const ASSIGNEE_LABELS: Record<TodoAssignee, string> = { user: "You", agent: "Agent" };
+
 /** The statuses in the order a list groups its todos, as Linear's lists do: started work first, closed work last. */
 export const STATUS_GROUPS: readonly TodoStatus[] = ["in-progress", "todo", "backlog", "done", "canceled"];
-
-/** `todos` in a group per status, in `STATUS_GROUPS`' order, each in the order `todos` has them. */
-export const byStatus = <T extends UserTodoLeaf>(todos: readonly T[]): { status: TodoStatus; todos: T[] }[] =>
-	STATUS_GROUPS.map(status => ({ status, todos: todos.filter(todo => todo.status === status) }));
 
 export const titleOf = (list: UserTodoList, view: TodoListView): string =>
 	view.kind === "category" ? (list.categories.find(({ id }) => id === view.id)?.name ?? LIST_KINDS.category.title) : LIST_KINDS[view.kind].title;

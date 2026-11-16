@@ -4,14 +4,14 @@
  */
 import { IconArrowRotateClockwise, IconCrossMedium, IconExpand } from "central-icons";
 import { type PullRequest, prKey, repoKey, type RepoPullRequests } from "../../../src/shared/github";
-import { useState } from "react";
+import { type RefObject, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { filters, NO_FILTER } from "../../pull-requests-filter";
-import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsFilter, usePullRequestsFolds } from "../../pull-requests-state";
+import { filters, NO_FILTER, type PullRequestFilter } from "../../pull-requests-filter";
+import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsDisplay, usePullRequestsFilter, usePullRequestsFolds } from "../../pull-requests-state";
 import { activityControl } from "../../activity";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import { useRebasing } from "../../pull-request-rebases";
@@ -22,6 +22,7 @@ import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { FoldButton } from "../fold";
 import { ListPage } from "../list-page";
+import { NothingMatches } from "../list-filter-bar";
 import { QuickStartNotice } from "../quick-actions";
 import { SearchField } from "../search-field";
 import { Spinner } from "../spinner";
@@ -140,40 +141,33 @@ function ListTables({ pulls }: { pulls: PullRequests }) {
 	);
 }
 
-/** The note and the button of a list that the search, **Filter**, or both leave empty. */
-function nothingMatches(search: string, filtering: boolean): { text: string; clear: string } {
-	if (search && filtering) return { text: "No pull requests match the search and these filters.", clear: "Clear the search and filters" };
-	if (search) return { text: `No pull requests match “${search}”.`, clear: "Clear the search" };
-	return { text: "No pull requests match these filters.", clear: "Clear the filters" };
+interface PullRequestsBodyProps {
+	pulls: PullRequests;
+	query: string;
+	onQuery: (query: string) => void;
+	filter: PullRequestFilter;
+	onFilter: (filter: PullRequestFilter) => void;
+	/** What takes focus once the search and the filters clear: the list. */
+	listRef: RefObject<HTMLElement | null>;
 }
 
 /** What the list shows: the tables, a note while the search or the filters keep nothing, or one while you hid every repository. */
-function PullRequestsBody({ pulls, query, onQuery }: { pulls: PullRequests; query: string; onQuery: (query: string) => void }) {
+function PullRequestsBody({ pulls, query, onQuery, filter, onFilter, listRef }: PullRequestsBodyProps) {
 	const [hidden] = useHiddenRepos();
-	const [filter, setFilter] = usePullRequestsFilter();
 	if (pulls.everyRepo.length === 0) return note("No session ran in a GitHub repository.");
 	if (pulls.everyRepo.every(repo => hidden.has(repoKey(repo)))) return <EveryRepositoryHidden everyRepo={pulls.everyRepo} />;
-	if (pulls.groups.length === 0) {
-		const search = query.trim();
-		const filtering = filters(filter);
-		const { text, clear } = nothingMatches(search, filtering);
+	if (pulls.groups.length === 0)
 		return (
-			<div className="space-y-3">
-				{note(text)}
-				<Button
-					{...activityControl("pull-requests.filter.clear")}
-					size="compact"
-					variant="outline"
-					onClick={() => {
-						if (search) onQuery("");
-						if (filtering) setFilter(NO_FILTER);
-					}}
-				>
-					{clear}
-				</Button>
-			</div>
+			<NothingMatches
+				noneMatch="No pull requests match"
+				search={query.trim()}
+				filtering={filters(filter)}
+				control="pull-requests.filter.clear"
+				onClearSearch={() => onQuery("")}
+				onClearFilters={() => onFilter(NO_FILTER)}
+				focusTarget={listRef}
+			/>
 		);
-	}
 	return <ListTables pulls={pulls} />;
 }
 
@@ -295,6 +289,9 @@ function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPage
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const [query, setQuery] = useState("");
+	const [filter, setFilter] = usePullRequestsFilter();
+	const [display, setDisplay] = usePullRequestsDisplay();
+	const listRef = useRef<HTMLDivElement>(null);
 	const pulls = usePullRequests({ hosts, past, route, query });
 	const unmatched = pulls.poll.read?.data.unmatched ?? [];
 	const docked = route.target !== null ? route : null;
@@ -323,8 +320,10 @@ function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPage
 				>
 					{() => (
 						<>
-							<PullRequestViewBar pulls={pulls} />
-							<PullRequestsBody pulls={pulls} query={query} onQuery={setQuery} />
+							<PullRequestViewBar pulls={pulls} filter={filter} onFilter={setFilter} display={display} onDisplay={setDisplay} />
+							<div ref={listRef} tabIndex={-1} className="outline-none focus-visible:ring-2 focus-visible:ring-ring">
+								<PullRequestsBody pulls={pulls} query={query} onQuery={setQuery} filter={filter} onFilter={setFilter} listRef={listRef} />
+							</div>
 						</>
 					)}
 				</ListPage>

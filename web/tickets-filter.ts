@@ -1,32 +1,27 @@
 /** What the Tickets page's list keeps and how it groups them: its tabs, **Filter**, search, and **Display**. */
 import { isObject, isTexts, oneOf, parseJson } from "../src/json";
 import { everyWord } from "../src/shared/every-word";
-import { TICKET_PRIORITIES, type Ticket, type TicketPriority, type TicketStatus, type TicketStatusType } from "../src/shared/tickets";
-import { DAY, type DayRange, type FilterOption, isDayRange } from "./list-filter";
-import { PRIORITY_LABEL, priorityRank, statusOrder, type TicketEntry, ticketGroups, ticketOrder } from "./tickets-model";
+import type { Ticket, TicketPriority, TicketStatus, TicketStatusType } from "../src/shared/tickets";
+import { countBy, countedOptions, type DayRange, type FilterOption, type GroupingDisplay, groupingDisplay, isDayRange, withinLast } from "./list-filter";
+import { isPriorityKey, PRIORITY_LABEL, PRIORITY_ORDER, type PriorityKey, statusOrder, type TicketEntry, ticketGroups, ticketOrder } from "./tickets-model";
 
 /** The tabs above the list, in order: every issue, then those of one kind of workflow state. */
 export const TICKET_VIEWS = ["all", "active", "todo", "backlog"] as const;
 
 export type TicketView = (typeof TICKET_VIEWS)[number];
 
-/** Each tab's name and the state type it keeps; `null` keeps every issue. In Review is a started state, so **Active** keeps it. */
-export const VIEW_PRESETS: Record<TicketView, { label: string; statusType: TicketStatusType | null }> = {
-	all: { label: "All", statusType: null },
-	active: { label: "Active", statusType: "started" },
-	todo: { label: "Todo", statusType: "unstarted" },
-	backlog: { label: "Backlog", statusType: "backlog" },
+/**
+ * Each tab's name, the state type it keeps, `null` for every issue, and what the list says while it keeps none of
+ * your issues. In Review is a started state, so **Active** keeps it.
+ */
+export const VIEW_PRESETS: Record<TicketView, { label: string; statusType: TicketStatusType | null; empty: string }> = {
+	all: { label: "All", statusType: null, empty: "No issues are assigned to you." },
+	active: { label: "Active", statusType: "started", empty: "No active issues are assigned to you." },
+	todo: { label: "Todo", statusType: "unstarted", empty: "No issues in Todo are assigned to you." },
+	backlog: { label: "Backlog", statusType: "backlog", empty: "No issues in Backlog are assigned to you." },
 };
 
 const isView = oneOf(TICKET_VIEWS);
-
-/** A priority as **Filter** keys it: the number as text. */
-export type PriorityKey = `${TicketPriority}`;
-
-const isPriorityKey = oneOf(TICKET_PRIORITIES.map(priority => `${priority}` as PriorityKey));
-
-/** Urgent first, then high, medium, and low, and no priority last: the order of **Filter**'s priorities and of the priority headings. */
-const PRIORITY_ORDER = TICKET_PRIORITIES.toSorted((a, b) => priorityRank(a) - priorityRank(b));
 
 /**
  * What the list keeps: the tab, and what **Filter** picked, which the tab ANDs with; an empty set keeps every status,
@@ -78,22 +73,10 @@ export const encodeFilter = ({ view, statuses, priorities, labels, projects, tea
 	JSON.stringify({ view, statuses: [...statuses], priorities: [...priorities], labels: [...labels], projects: [...projects], teams: [...teams], created, updated });
 
 /** The tickets tab `view` keeps. */
-export const inView = (tickets: readonly Ticket[], view: TicketView): Ticket[] => {
+export const inView = (tickets: readonly Ticket[], view: TicketView): readonly Ticket[] => {
 	const { statusType } = VIEW_PRESETS[view];
-	return statusType === null ? [...tickets] : tickets.filter(ticket => ticket.statusType === statusType);
+	return statusType === null ? tickets : tickets.filter(ticket => ticket.statusType === statusType);
 };
-
-/** Each key of `counts`, most first, then by name, and each key of `checked` with none, so you can uncheck it. */
-function countedOptions(counts: Map<string, number>, checked: ReadonlySet<string>): FilterOption[] {
-	for (const key of checked) if (!counts.has(key)) counts.set(key, 0);
-	return [...counts].toSorted(([a, aCount], [b, bCount]) => bCount - aCount || a.localeCompare(b)).map(([key, count]) => ({ key, label: key, count }));
-}
-
-function countBy(tickets: readonly Ticket[], keysOf: (ticket: Ticket) => readonly string[]): Map<string, number> {
-	const counts = new Map<string, number>();
-	for (const ticket of tickets) for (const key of keysOf(ticket)) counts.set(key, (counts.get(key) ?? 0) + 1);
-	return counts;
-}
 
 /** The statuses **Filter** offers, those of `tickets` in the groups' order with how many issues each holds, then each name of `checked` none holds, with none. */
 export function statusOptions(tickets: readonly Ticket[], checked: ReadonlySet<string>): FilterOption[] {
@@ -110,7 +93,7 @@ export function statusOptions(tickets: readonly Ticket[], checked: ReadonlySet<s
 /** Every priority, urgent first and no priority last, with how many of `tickets` hold each. */
 export function priorityOptions(tickets: readonly Ticket[]): FilterOption<PriorityKey>[] {
 	const counts = countBy(tickets, ({ priority }) => [`${priority}`]);
-	return PRIORITY_ORDER.map(priority => ({ key: `${priority}` as PriorityKey, label: PRIORITY_LABEL[priority], count: counts.get(`${priority}`) ?? 0 }));
+	return PRIORITY_ORDER.map((priority): FilterOption<PriorityKey> => ({ key: `${priority}`, label: PRIORITY_LABEL[priority], count: counts.get(`${priority}`) ?? 0 }));
 }
 
 /** The labels **Filter** offers, of `tickets`, most worn first, then by name, and each of `checked` none wears. */
@@ -140,8 +123,8 @@ export function filteredTickets(tickets: readonly Ticket[], filter: TicketFilter
 			(labels.size === 0 || ticket.labels.some(({ name }) => labels.has(name))) &&
 			(projects.size === 0 || (ticket.project !== null && projects.has(ticket.project))) &&
 			(teams.size === 0 || teams.has(ticket.team)) &&
-			(created === null || Date.parse(ticket.createdAt) >= now - created * DAY) &&
-			(updated === null || Date.parse(ticket.updatedAt) >= now - updated * DAY) &&
+			withinLast(Date.parse(ticket.createdAt), created, now) &&
+			withinLast(Date.parse(ticket.updatedAt), updated, now) &&
 			matches([ticket.id, ticket.title, ...ticket.labels.map(({ name }) => name), ticket.project ?? "", ticket.team].join(" ")),
 	);
 }
@@ -153,31 +136,18 @@ export type TicketGrouping = (typeof GROUPINGS)[number];
 
 export const GROUPING_LABELS: Record<TicketGrouping, string> = { status: "Status", priority: "Priority", project: "Project", none: "No grouping" };
 
-const isGrouping = oneOf(GROUPINGS);
-
 /** What **Display** sets: the grouping. */
-export interface TicketDisplay {
-	grouping: TicketGrouping;
-}
+export type TicketDisplay = GroupingDisplay<TicketGrouping>;
 
-export const DEFAULT_DISPLAY: TicketDisplay = { grouping: "status" };
+export const { DEFAULT_DISPLAY, decodeDisplay, encodeDisplay } = groupingDisplay(GROUPINGS, "status");
 
-export function decodeDisplay(raw: string | null): TicketDisplay {
-	const stored = parseJson(raw ?? "null");
-	if (!isObject(stored)) return DEFAULT_DISPLAY;
-	return { grouping: isGrouping(stored.grouping) ? stored.grouping : DEFAULT_DISPLAY.grouping };
-}
-
-export const encodeDisplay = (display: TicketDisplay): string => JSON.stringify(display);
-
-/** What a heading shows besides its title: a status's or a priority's glyph, or a project's. */
-export type TicketHeading = { by: "status"; status: TicketStatus } | { by: "priority"; priority: TicketPriority } | { by: "project" };
+/** A group's heading: its title, and the status's or the priority's glyph it shows, or a project's. */
+export type TicketHeading = { title: string } & ({ by: "status"; status: TicketStatus } | { by: "priority"; priority: TicketPriority } | { by: "project" });
 
 /** A heading of the list and its rows; under no grouping the one group has no heading. */
 export interface TicketListGroup {
 	/** Under its grouping, which the browser keeps the folds by. */
 	foldKey: string;
-	title: string;
 	heading: TicketHeading | null;
 	entries: TicketEntry[];
 	/** The rows the group shows, nested ones included. */
@@ -185,7 +155,7 @@ export interface TicketListGroup {
 }
 
 /** The title of the project heading of issues in none. */
-export const NO_PROJECT = "No project";
+const NO_PROJECT = "No project";
 
 /**
  * A heading's fold key under `grouping`, which the browser keeps in localStorage: under the grouping by status the
@@ -206,11 +176,11 @@ const flat = (tickets: readonly Ticket[]): TicketEntry[] => tickets.toSorted(tic
 export function groupedTickets(grouping: TicketGrouping, tickets: readonly Ticket[]): TicketListGroup[] {
 	switch (grouping) {
 		case "status":
-			return ticketGroups(tickets).map(({ status, statusType, entries, count }) => ({ foldKey: groupFoldKey("status", status), title: status, heading: { by: "status", status: { status, statusType } }, entries, count }));
+			return ticketGroups(tickets).map(({ status, statusType, entries, count }) => ({ foldKey: groupFoldKey("status", status), heading: { title: status, by: "status", status: { status, statusType } }, entries, count }));
 		case "priority":
 			return PRIORITY_ORDER.flatMap(priority => {
 				const entries = flat(tickets.filter(ticket => ticket.priority === priority));
-				return entries.length === 0 ? [] : [{ foldKey: groupFoldKey("priority", `${priority}`), title: PRIORITY_LABEL[priority], heading: { by: "priority", priority }, entries, count: entries.length }];
+				return entries.length === 0 ? [] : [{ foldKey: groupFoldKey("priority", `${priority}`), heading: { title: PRIORITY_LABEL[priority], by: "priority", priority }, entries, count: entries.length }];
 			});
 		case "project": {
 			const names = [...new Set(tickets.flatMap(({ project }) => (project === null ? [] : [project])))].toSorted((a, b) => a.localeCompare(b));
@@ -218,10 +188,10 @@ export function groupedTickets(grouping: TicketGrouping, tickets: readonly Ticke
 			const none = tickets.filter(({ project }) => project === null);
 			if (none.length > 0) groups.push({ name: null, tickets: none });
 			// The issues in no project fold by an empty key, which no project's name is.
-			return groups.map(({ name, tickets: those }) => ({ foldKey: groupFoldKey("project", name ?? ""), title: name ?? NO_PROJECT, heading: { by: "project" }, entries: flat(those), count: those.length }));
+			return groups.map(({ name, tickets: those }) => ({ foldKey: groupFoldKey("project", name ?? ""), heading: { title: name ?? NO_PROJECT, by: "project" }, entries: flat(those), count: those.length }));
 		}
 		case "none":
-			return tickets.length === 0 ? [] : [{ foldKey: groupFoldKey("none", ""), title: "", heading: null, entries: flat(tickets), count: tickets.length }];
+			return tickets.length === 0 ? [] : [{ foldKey: groupFoldKey("none", ""), heading: null, entries: flat(tickets), count: tickets.length }];
 	}
 }
 

@@ -1,5 +1,6 @@
 /** The tickets page's status groups and the status picker's order. In Review leads; the rest follow Linear's My issues order. */
-import { TICKET_STATUS_TYPES, type Ticket, type TicketPriority, type TicketRelative, type TicketStatus } from "../src/shared/tickets";
+import { oneOf } from "../src/json";
+import { TICKET_PRIORITIES, TICKET_STATUS_TYPES, type Ticket, type TicketPriority, type TicketRelative, type TicketStatus } from "../src/shared/tickets";
 import { hashForPage } from "./routing";
 
 export const PRIORITY_LABEL: Record<TicketPriority, string> = {
@@ -12,6 +13,14 @@ export const PRIORITY_LABEL: Record<TicketPriority, string> = {
 
 /** Urgent first, then high, medium, and low; no priority after all of them. */
 export const priorityRank = (priority: TicketPriority): number => (priority === 0 ? 5 : priority);
+
+/** Urgent first, then high, medium, and low, and no priority last: the order a priority filter and the priority headings list them in, of issues and todos alike. */
+export const PRIORITY_ORDER: readonly TicketPriority[] = TICKET_PRIORITIES.toSorted((a, b) => priorityRank(a) - priorityRank(b));
+
+/** A priority as **Filter** keys it: the number as text. */
+export type PriorityKey = `${TicketPriority}`;
+
+export const isPriorityKey = oneOf(TICKET_PRIORITIES.map((priority): PriorityKey => `${priority}`));
 
 /** By priority, then most recently updated first: the order of a group's rows. */
 export const ticketOrder = (a: Ticket, b: Ticket): number => priorityRank(a.priority) - priorityRank(b.priority) || b.updatedAt.localeCompare(a.updatedAt);

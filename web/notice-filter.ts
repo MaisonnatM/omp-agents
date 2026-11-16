@@ -1,7 +1,8 @@
 /** What the Notifications page's bar keeps and shows: its tab, its **Filter**, its search, and its **Display** grouping. */
 import type { Notice } from "../src/shared/notices";
 import { isObject, isTexts, oneOf, parseJson } from "../src/json";
-import { DAY, type DayRange, type FilterOption, isDayRange } from "./list-filter";
+import { everyWord } from "../src/shared/every-word";
+import { type DayRange, type FilterOption, type GroupingDisplay, groupingDisplay, isDayRange, withinLast } from "./list-filter";
 import { type NoticeSource, presentNotice } from "./notice-model";
 
 /** Every source, in menu and group order. */
@@ -71,24 +72,18 @@ export const listNotice = (notice: Notice, now: number): ListedNotice => {
 	return { notice, source, headline, preview };
 };
 
-/** Each source with how many of `listed` are unread from it. */
-export const sourceOptions = (listed: readonly ListedNotice[]): FilterOption<NoticeSource>[] =>
-	NOTICE_SOURCES.map(source => ({ key: source, label: SOURCE_LABELS[source], count: listed.filter(item => item.source === source && !item.notice.read).length }));
+const onTab = (item: ListedNotice, view: NoticeView): boolean => view === "all" || !item.notice.read;
+
+/** Each source with how many of `listed` it sent that `view`'s tab shows: all of them on **All**, the unread ones on **Unread**. */
+export const sourceOptions = (listed: readonly ListedNotice[], view: NoticeView): FilterOption<NoticeSource>[] =>
+	NOTICE_SOURCES.map(source => ({ key: source, label: SOURCE_LABELS[source], count: listed.filter(item => item.source === source && onTab(item, view)).length }));
 
 /** Whether every word of `query` is in the notice's headline, text, or source name; an empty query matches all. */
-export function matchesQuery({ source, headline, preview }: ListedNotice, query: string): boolean {
-	const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-	if (words.length === 0) return true;
-	const text = `${headline} ${preview} ${SOURCE_LABELS[source]}`.toLowerCase();
-	return words.every(word => text.includes(word));
-}
+export const matchesQuery = ({ source, headline, preview }: ListedNotice, query: string): boolean => everyWord(query)(`${headline} ${preview} ${SOURCE_LABELS[source]}`);
 
 /** Whether `item` is on `filter`'s tab, passes its fields, and matches `query`, at `now` in ms. */
 export const keepsNotice = (item: ListedNotice, { view, sources, received }: NoticeFilter, query: string, now: number): boolean =>
-	(view === "all" || !item.notice.read) &&
-	(sources.size === 0 || sources.has(item.source)) &&
-	(received === null || item.notice.at >= now - received * DAY) &&
-	matchesQuery(item, query);
+	onTab(item, view) && (sources.size === 0 || sources.has(item.source)) && withinLast(item.notice.at, received, now) && matchesQuery(item, query);
 
 /** How the list groups its notices: unread under **New** and the rest under **Earlier**, by source, or not at all. */
 export const GROUPINGS = ["new", "source", "none"] as const;
@@ -97,26 +92,15 @@ export type NoticeGrouping = (typeof GROUPINGS)[number];
 
 export const GROUPING_LABELS: Record<NoticeGrouping, string> = { new: "New and earlier", source: "Source", none: "No grouping" };
 
-const isGrouping = oneOf(GROUPINGS);
+/** What **Display** sets: the grouping. */
+export type NoticeDisplay = GroupingDisplay<NoticeGrouping>;
 
-export interface NoticeDisplay {
-	grouping: NoticeGrouping;
-}
+export const { DEFAULT_DISPLAY, decodeDisplay, encodeDisplay } = groupingDisplay(GROUPINGS, "new");
 
-export const DEFAULT_DISPLAY: NoticeDisplay = { grouping: "new" };
-
-export function decodeDisplay(raw: string | null): NoticeDisplay {
-	const stored = parseJson(raw ?? "null");
-	if (!isObject(stored)) return DEFAULT_DISPLAY;
-	return { grouping: isGrouping(stored.grouping) ? stored.grouping : DEFAULT_DISPLAY.grouping };
-}
-
-export const encodeDisplay = (display: NoticeDisplay): string => JSON.stringify(display);
-
-/** A group of the list; `title` is null for the one group of **No grouping**. */
+/** A group of the list; the one group of **No grouping** has no heading. */
 export interface NoticeGroup {
 	key: string;
-	title: string | null;
+	heading: { title: string } | null;
 	items: ListedNotice[];
 }
 
@@ -127,11 +111,11 @@ export function groupedNotices(grouping: NoticeGrouping, listed: readonly Listed
 	const groups: NoticeGroup[] =
 		grouping === "new"
 			? [
-					{ key: "new", title: "New", items: unread },
-					{ key: "earlier", title: "Earlier", items: read },
+					{ key: "new", heading: { title: "New" }, items: unread },
+					{ key: "earlier", heading: { title: "Earlier" }, items: read },
 				]
 			: grouping === "source"
-				? NOTICE_SOURCES.map(source => ({ key: `source:${source}`, title: SOURCE_LABELS[source], items: [...unread, ...read].filter(item => item.source === source) }))
-				: [{ key: "none", title: null, items: [...unread, ...read] }];
+				? NOTICE_SOURCES.map(source => ({ key: `source:${source}`, heading: { title: SOURCE_LABELS[source] }, items: [...unread, ...read].filter(item => item.source === source) }))
+				: [{ key: "none", heading: null, items: [...unread, ...read] }];
 	return groups.filter(group => group.items.length > 0);
 }

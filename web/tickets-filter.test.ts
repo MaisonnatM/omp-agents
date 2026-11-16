@@ -155,7 +155,7 @@ describe("grouping", () => {
 	const parent = ticket("ENG-10", { status: "In Progress", statusType: "started", project: "Login" });
 	const child = ticket("ENG-11", { parentId: "ENG-10", priority: 1 });
 	const shape = (grouping: Parameters<typeof groupedTickets>[0], tickets: readonly Ticket[]) =>
-		groupedTickets(grouping, tickets).map(({ foldKey, title, count, entries }) => [foldKey, title, count, entries.map(({ ticket: row, subIssues }) => [row.id, ...ids(subIssues)])]);
+		groupedTickets(grouping, tickets).map(({ foldKey, heading, count, entries }) => [foldKey, heading?.title, count, entries.map(({ ticket: row, subIssues }) => [row.id, ...ids(subIssues)])]);
 
 	test("by status, nests a sub-issue under its listed parent and folds by the status's name", () => {
 		expect(shape("status", [parent, child, todo])).toEqual([

@@ -16,8 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { folderName } from "../../labels";
 import { PRIORITY_LABEL } from "../../tickets-model";
-import { ASSIGNEE_LABELS } from "../../todo-filter";
-import { dueLabel, TODO_STATUS } from "../../todo-views";
+import { ASSIGNEE_LABELS, dueLabel, TODO_STATUS } from "../../todo-views";
 import { type Choice, DuePicker, FieldPicker } from "../field-picker";
 import { PRIORITY_ICON, STATUS_ICON } from "../tickets/ticket-row";
 

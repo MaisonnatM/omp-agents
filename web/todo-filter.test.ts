@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { UserTodo } from "../src/user-todos-shared";
-import { decodeDisplay, decodeFilter, DEFAULT_DISPLAY, encodeFilter, groupFoldKey, groupTodos, keepsTodo, linkOptions, NO_FILTER, type TodoFilter } from "./todo-filter";
+import { decodeDisplay, decodeFilter, DEFAULT_DISPLAY, encodeFilter, groupTodos, keepsTodo, linkOptions, NO_FILTER, type TodoFilter } from "./todo-filter";
 
 const todo = (id: string, fields: Partial<UserTodo> = {}): UserTodo => ({
 	id,
@@ -113,7 +113,7 @@ describe("groupTodos", () => {
 	});
 
 	test("fold keys keep a status's own key and never collide across groupings", () => {
-		const keys = [...groupTodos("status", todos), ...groupTodos("priority", todos), ...groupTodos("assignee", todos)].map(groupFoldKey);
+		const keys = [...groupTodos("status", todos), ...groupTodos("priority", todos), ...groupTodos("assignee", todos)].map(({ foldKey }) => foldKey);
 		expect(keys).toContain("done");
 		expect(keys).toContain("priority:1");
 		expect(keys).toContain("assignee:none");

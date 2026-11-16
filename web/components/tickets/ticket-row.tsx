@@ -6,6 +6,7 @@ import type { Ticket, TicketPriority, TicketStatus } from "../../../src/shared/t
 import { cn } from "@/lib/utils";
 import { dateLabel, dayLabel } from "../../labels";
 import { type QuickActionId, ticketActions, type WorkActionId } from "../../quick-actions";
+import type { TicketHeading } from "../../tickets-filter";
 import { hashForTickets, PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
 import { IconTip } from "../pull-requests/avatars";
 import { AddToTodo } from "../todo/add-button";
@@ -34,6 +35,18 @@ export const PRIORITY_ICON: Record<TicketPriority, [IconComponent, string]> = {
 
 /** The element id of an issue's row, used to restore focus after its details close. */
 export const ticketRowId = (id: string): string => `ticket-${id}`;
+
+/** The glyph of a group's heading: its status's, its priority's, or a project's box. */
+export function headingIcon(heading: TicketHeading): [IconComponent, string] {
+	switch (heading.by) {
+		case "status":
+			return statusIcon(heading.status);
+		case "priority":
+			return PRIORITY_ICON[heading.priority];
+		case "project":
+			return [IconBox, "text-muted-foreground"];
+	}
+}
 
 /** A pill for a value on an issue, its glyph then its truncating text: a label, the project, or the due date. */
 export function TicketChip({ icon, title, className, children }: { icon: ReactNode; title?: string; className?: string; children: ReactNode }) {

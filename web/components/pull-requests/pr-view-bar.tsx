@@ -8,8 +8,8 @@ import { useId, useRef, useState } from "react";
 import { repoKey, repoName } from "../../../src/shared/github";
 import { MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger, MenuSwitchItem } from "@/components/ui/menu";
 import { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
-import { withToggled } from "../../list-filter";
 import {
+	atLeastOneSection,
 	authorOptions,
 	EVERY_SECTION,
 	filters,
@@ -17,74 +17,63 @@ import {
 	GROUPINGS,
 	NO_FILTER,
 	PULL_REQUEST_VIEWS,
+	type PullRequestDisplay,
 	type PullRequestFilter,
-	type PullRequestGrouping,
 	repoOptions,
 	VIEW_PRESETS,
 	viewOf,
-	withSectionToggled,
 } from "../../pull-requests-filter";
 import { DEFAULT_ORDER, PULL_REQUEST_SORTS, type PullRequestSort, SORT_LABELS, sectionTitles, withRepoStepped } from "../../pull-requests-model";
 import { activityControl } from "../../activity";
-import { useHiddenRepos, usePullRequestsDisplay, usePullRequestsFilter } from "../../pull-requests-state";
-import { DisplayButton, dayField, FilterChips, type FilterField, FilterMenu, setField, ViewTabs } from "../list-filter-bar";
+import { useHiddenRepos } from "../../pull-requests-state";
+import { DisplayButton, dayField, type FilterField, GroupingSubmenu, ListFilterBar, setField, ViewTabs } from "../list-filter-bar";
 import { ShownOrderList } from "../shown-order-list";
 import type { PullRequests } from "./pull-requests-list";
 
-
 /** Each field of **Filter**, in menu order, from the pull requests of the repositories you did not hide. */
-function useFilterFields(pulls: PullRequests): { filter: PullRequestFilter; setFilter: (filter: PullRequestFilter) => void; fields: FilterField[] } {
-	const [filter, setFilter] = usePullRequestsFilter();
+function useFilterFields(pulls: PullRequests, filter: PullRequestFilter, onFilter: (filter: PullRequestFilter) => void): FilterField[] {
 	const [hidden] = useHiddenRepos();
 	const { order, everyRepo } = pulls;
 	const shownRepos = everyRepo.filter(repo => !hidden.has(repoKey(repo)));
-	const set = (change: Partial<PullRequestFilter>): void => setFilter({ ...filter, ...change });
-	return {
-		filter,
-		setFilter,
-		fields: [
-			setField({
-				id: "section",
-				label: "Section",
-				icon: IconLayersTwo,
-				control: "pull-requests.filter.section",
-				noun: "sections",
-				options: sectionTitles(order).map(title => ({ key: title, label: title })),
-				checked: filter.sections,
-				active: filter.sections.size < EVERY_SECTION.size,
-				onToggle: title => set({ sections: withSectionToggled(filter.sections, title) }),
-				clear: () => set({ sections: EVERY_SECTION }),
-				// The last shown section stays on, since the list always shows a section.
-				disabled: title => filter.sections.size === 1 && filter.sections.has(title),
-			}),
-			setField({
-				id: "repository",
-				label: "Repository",
-				icon: IconFolder1,
-				control: "pull-requests.filter.repository",
-				noun: "repositories",
-				options: repoOptions(shownRepos, filter.repos),
-				checked: filter.repos,
-				active: filter.repos.size > 0,
-				onToggle: key => set({ repos: withToggled(filter.repos, key) }),
-				clear: () => set({ repos: new Set() }),
-			}),
-			setField({
-				id: "author",
-				label: "Author",
-				icon: IconUser,
-				control: "pull-requests.filter.author",
-				noun: "authors",
-				options: authorOptions(shownRepos, filter.authors),
-				checked: filter.authors,
-				active: filter.authors.size > 0,
-				onToggle: login => set({ authors: withToggled(filter.authors, login) }),
-				clear: () => set({ authors: new Set() }),
-			}),
-			dayField({ id: "created", label: "Created", icon: IconCalendar4, control: "pull-requests.filter.created", value: filter.created, onValue: created => set({ created }) }),
-			dayField({ id: "updated", label: "Updated", icon: IconCalendarClock4, control: "pull-requests.filter.updated", value: filter.updated, onValue: updated => set({ updated }) }),
-		],
-	};
+	const set = (change: Partial<PullRequestFilter>): void => onFilter({ ...filter, ...change });
+	return [
+		setField({
+			id: "section",
+			label: "Section",
+			icon: IconLayersTwo,
+			control: "pull-requests.filter.section",
+			noun: "sections",
+			options: sectionTitles(order).map(title => ({ key: title, label: title })),
+			checked: filter.sections,
+			onChecked: sections => set({ sections: atLeastOneSection(sections, filter.sections) }),
+			active: filter.sections.size < EVERY_SECTION.size,
+			clear: () => set({ sections: EVERY_SECTION }),
+			// The last shown section stays on, since the list always shows a section.
+			disabled: title => filter.sections.size === 1 && filter.sections.has(title),
+		}),
+		setField({
+			id: "repository",
+			label: "Repository",
+			icon: IconFolder1,
+			control: "pull-requests.filter.repository",
+			noun: "repositories",
+			options: repoOptions(shownRepos, filter.repos),
+			checked: filter.repos,
+			onChecked: repos => set({ repos }),
+		}),
+		setField({
+			id: "author",
+			label: "Author",
+			icon: IconUser,
+			control: "pull-requests.filter.author",
+			noun: "authors",
+			options: authorOptions(shownRepos, filter.authors),
+			checked: filter.authors,
+			onChecked: authors => set({ authors }),
+		}),
+		dayField({ id: "created", label: "Created", icon: IconCalendar4, control: "pull-requests.filter.created", value: filter.created, onValue: created => set({ created }) }),
+		dayField({ id: "updated", label: "Updated", icon: IconCalendarClock4, control: "pull-requests.filter.updated", value: filter.updated, onValue: updated => set({ updated }) }),
+	];
 }
 
 /** The repositories, each with a switch that hides it and buttons that move it among all of them, so a hidden one can move too. */
@@ -113,8 +102,7 @@ function RepositoriesPanel({ pulls }: { pulls: PullRequests }) {
  * **Display**: the grouping, the order, whether empty sections show, and **Repositories…**, which opens a popover under
  * the same button that hides repositories and changes their order.
  */
-function DisplayMenu({ pulls }: { pulls: PullRequests }) {
-	const [display, setDisplay] = usePullRequestsDisplay();
+function DisplayMenu({ pulls, display, onDisplay }: { pulls: PullRequests; display: PullRequestDisplay; onDisplay: (display: PullRequestDisplay) => void }) {
 	const [hidden] = useHiddenRepos();
 	const [repositories, setRepositories] = useState(false);
 	const [menu, setMenu] = useState(false);
@@ -136,46 +124,35 @@ function DisplayMenu({ pulls }: { pulls: PullRequests }) {
 						tooltipHidden={repositories}
 						buttonRef={button}
 					>
-							<MenuSubmenu>
-								<MenuSubmenuTrigger value={GROUPING_LABELS[display.grouping]}>Grouping</MenuSubmenuTrigger>
-								<MenuSubmenuContent className="w-48">
-									<MenuRadioGroup value={display.grouping} onValueChange={(grouping: PullRequestGrouping) => setDisplay({ ...display, grouping })}>
-										{GROUPINGS.map(grouping => (
-											<MenuRadioItem {...activityControl("pull-requests.display.grouping")} key={grouping} value={grouping} closeOnClick>
-												{GROUPING_LABELS[grouping]}
-											</MenuRadioItem>
-										))}
-									</MenuRadioGroup>
-								</MenuSubmenuContent>
-							</MenuSubmenu>
-							<MenuSubmenu>
-								<MenuSubmenuTrigger value={SORT_LABELS[order.sort]}>Ordering</MenuSubmenuTrigger>
-								<MenuSubmenuContent className="w-52">
-									<MenuRadioGroup value={order.sort} onValueChange={(sort: PullRequestSort) => onSort(sort)}>
-										{PULL_REQUEST_SORTS.map(sort => (
-											<MenuRadioItem key={sort} value={sort} closeOnClick>
-												{SORT_LABELS[sort]}
-											</MenuRadioItem>
-										))}
-									</MenuRadioGroup>
-									<MenuSeparator />
-									<MenuItem disabled={JSON.stringify(order) === JSON.stringify(DEFAULT_ORDER)} onClick={onReset}>
-										Reset the order
-									</MenuItem>
-								</MenuSubmenuContent>
-							</MenuSubmenu>
-							<MenuSwitchItem {...activityControl("pull-requests.display.empty")} checked={display.empty} closeOnClick={false} onCheckedChange={empty => setDisplay({ ...display, empty })}>
-								Show empty sections
-							</MenuSwitchItem>
-							{everyRepo.length > 0 && (
-								<>
-									<MenuSeparator />
-									<MenuItem {...activityControl("pull-requests.repositories")} onClick={() => setRepositories(true)}>
-										Repositories…
-										{hiddenCount > 0 && <span className="ml-auto pl-4 text-xs text-muted-foreground">{hiddenCount} hidden</span>}
-									</MenuItem>
-								</>
-							)}
+						<GroupingSubmenu groupings={GROUPINGS} labels={GROUPING_LABELS} value={display.grouping} control="pull-requests.display.grouping" onValue={grouping => onDisplay({ ...display, grouping })} />
+						<MenuSubmenu>
+							<MenuSubmenuTrigger value={SORT_LABELS[order.sort]}>Ordering</MenuSubmenuTrigger>
+							<MenuSubmenuContent className="w-52">
+								<MenuRadioGroup value={order.sort} onValueChange={(sort: PullRequestSort) => onSort(sort)}>
+									{PULL_REQUEST_SORTS.map(sort => (
+										<MenuRadioItem key={sort} value={sort} closeOnClick>
+											{SORT_LABELS[sort]}
+										</MenuRadioItem>
+									))}
+								</MenuRadioGroup>
+								<MenuSeparator />
+								<MenuItem disabled={JSON.stringify(order) === JSON.stringify(DEFAULT_ORDER)} onClick={onReset}>
+									Reset the order
+								</MenuItem>
+							</MenuSubmenuContent>
+						</MenuSubmenu>
+						<MenuSwitchItem {...activityControl("pull-requests.display.empty")} checked={display.empty} closeOnClick={false} onCheckedChange={empty => onDisplay({ ...display, empty })}>
+							Show empty sections
+						</MenuSwitchItem>
+						{everyRepo.length > 0 && (
+							<>
+								<MenuSeparator />
+								<MenuItem {...activityControl("pull-requests.repositories")} onClick={() => setRepositories(true)}>
+									Repositories…
+									{hiddenCount > 0 && <span className="ml-auto pl-4 text-xs text-muted-foreground">{hiddenCount} hidden</span>}
+								</MenuItem>
+							</>
+						)}
 					</DisplayButton>
 				</span>
 			</PopoverAnchor>
@@ -202,25 +179,33 @@ function DisplayMenu({ pulls }: { pulls: PullRequests }) {
 	);
 }
 
+interface PullRequestViewBarProps {
+	pulls: PullRequests;
+	filter: PullRequestFilter;
+	onFilter: (filter: PullRequestFilter) => void;
+	display: PullRequestDisplay;
+	onDisplay: (display: PullRequestDisplay) => void;
+}
+
 /** The tabs, **Filter** and **Display** at the end of their row, and under them a chip per filter that leaves something out. */
-export function PullRequestViewBar({ pulls }: { pulls: PullRequests }) {
-	const { filter, setFilter, fields } = useFilterFields(pulls);
+export function PullRequestViewBar({ pulls, filter, onFilter, display, onDisplay }: PullRequestViewBarProps) {
+	const fields = useFilterFields(pulls, filter, onFilter);
 	return (
-		<div className="space-y-2">
-			<div className="flex items-center gap-2">
+		<ListFilterBar
+			tabs={
 				<ViewTabs
 					views={PULL_REQUEST_VIEWS}
 					labelOf={view => VIEW_PRESETS[view].label}
 					picked={viewOf(filter.sections)}
 					control="pull-requests.view"
-					onPick={view => setFilter({ ...filter, sections: VIEW_PRESETS[view].sections })}
+					onPick={view => onFilter({ ...filter, sections: VIEW_PRESETS[view].sections })}
 				/>
-				<div className="ml-auto flex shrink-0 items-center gap-1.5">
-					<FilterMenu fields={fields} active={filters(filter)} control="pull-requests.filter" />
-					<DisplayMenu pulls={pulls} />
-				</div>
-			</div>
-			<FilterChips fields={fields} clearControl="pull-requests.filter.clear" onClearAll={() => setFilter(NO_FILTER)} />
-		</div>
+			}
+			fields={fields}
+			filtering={filters(filter)}
+			controls={{ filter: "pull-requests.filter", clear: "pull-requests.filter.clear" }}
+			onClearAll={() => onFilter(NO_FILTER)}
+			display={<DisplayMenu pulls={pulls} display={display} onDisplay={onDisplay} />}
+		/>
 	);
 }

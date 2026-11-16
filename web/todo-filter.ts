@@ -1,36 +1,16 @@
 /** What the Todo page's list keeps and how it groups it: **Filter**, by priority, assignee, link, due day, and creation, and **Display**'s grouping. */
 import { isObject, isTexts, oneOf, parseJson } from "../src/json";
 import { addDays } from "../src/shared/days";
-import {
-	TODO_ASSIGNEES,
-	TODO_PRIORITIES,
-	type TodoAssignee,
-	type TodoPriority,
-	type TodoStatus,
-	type UserTodo,
-	type UserTodoLeaf,
-	type UserTodoLink,
-} from "../src/user-todos-shared";
-import { DAY, type DayRange, type FilterOption, isDayRange } from "./list-filter";
-import { PRIORITY_LABEL } from "./tickets-model";
-import { earliestDue, STATUS_GROUPS } from "./todo-views";
-
-/** A priority as **Filter** keys it, its digit. */
-export type PriorityKey = `${TodoPriority}`;
+import { TODO_ASSIGNEES, type TodoAssignee, type TodoPriority, type TodoStatus, type UserTodo, type UserTodoLeaf, type UserTodoLink } from "../src/user-todos-shared";
+import { type DayRange, type FilterOption, type GroupingDisplay, groupingDisplay, isDayRange, withinLast } from "./list-filter";
+import { isPriorityKey, PRIORITY_LABEL, PRIORITY_ORDER, type PriorityKey } from "./tickets-model";
+import { ASSIGNEE_LABELS, earliestDue, STATUS_GROUPS } from "./todo-views";
 
 export type LinkKind = UserTodoLink["kind"];
 
 const LINK_KINDS: readonly LinkKind[] = ["session", "pull-request", "ticket"];
 
-export const LINK_LABELS: Record<LinkKind, string> = { session: "Session", "pull-request": "Pull request", ticket: "Linear issue" };
-
-/** Who a todo is assigned to, as its assignee picker names them. */
-export const ASSIGNEE_LABELS: Record<TodoAssignee, string> = { user: "You", agent: "Agent" };
-
-/** The priorities in the order Linear lists them: Urgent first, no priority last. */
-export const PRIORITY_ORDER: readonly TodoPriority[] = [1, 2, 3, 4, 0];
-
-const priorityKey = (priority: TodoPriority): PriorityKey => `${priority}`;
+const LINK_LABELS: Record<LinkKind, string> = { session: "Session", "pull-request": "Pull request", ticket: "Linear issue" };
 
 /** What **Filter** keeps; an empty set keeps every priority, assignee, or link, and `null` any day. */
 export interface TodoFilter {
@@ -49,7 +29,6 @@ export const NO_FILTER: TodoFilter = { priorities: new Set(), assignees: new Set
 export const filters = ({ priorities, assignees, links, due, created }: TodoFilter): boolean =>
 	priorities.size > 0 || assignees.size > 0 || links.size > 0 || due !== null || created !== null;
 
-const isPriorityKey = oneOf(TODO_PRIORITIES.map(priorityKey));
 const isAssignee = oneOf(TODO_ASSIGNEES);
 const isLinkKind = oneOf(LINK_KINDS);
 
@@ -70,7 +49,7 @@ export function decodeFilter(raw: string | null): TodoFilter {
 export const encodeFilter = ({ priorities, assignees, links, due, created }: TodoFilter): string =>
 	JSON.stringify({ priorities: [...priorities], assignees: [...assignees], links: [...links], due, created });
 
-export const PRIORITY_OPTIONS: readonly FilterOption<PriorityKey>[] = PRIORITY_ORDER.map(priority => ({ key: priorityKey(priority), label: PRIORITY_LABEL[priority] }));
+export const PRIORITY_OPTIONS: readonly FilterOption<PriorityKey>[] = PRIORITY_ORDER.map((priority): FilterOption<PriorityKey> => ({ key: `${priority}`, label: PRIORITY_LABEL[priority] }));
 
 export const ASSIGNEE_OPTIONS: readonly FilterOption<TodoAssignee>[] = TODO_ASSIGNEES.map(assignee => ({ key: assignee, label: ASSIGNEE_LABELS[assignee] }));
 
@@ -87,15 +66,14 @@ export function linkOptions(todos: readonly UserTodo[], checked: ReadonlySet<Lin
  * days; a todo from before creation times were kept passes no **Created**.
  */
 export function keepsTodo(todo: UserTodo, { priorities, assignees, links, due, created }: TodoFilter, day: string, now: number): boolean {
-	if (priorities.size > 0 && !priorities.has(priorityKey(todo.priority))) return false;
+	if (priorities.size > 0 && !priorities.has(`${todo.priority}`)) return false;
 	if (assignees.size > 0 && (todo.assignee === null || !assignees.has(todo.assignee))) return false;
 	if (links.size > 0 && !todo.links.some(link => links.has(link.kind))) return false;
 	if (due !== null) {
 		const earliest = earliestDue(todo);
 		if (earliest === null || earliest > addDays(day, due)) return false;
 	}
-	if (created !== null && (todo.createdAt === null || Date.parse(todo.createdAt) < now - created * DAY)) return false;
-	return true;
+	return created === null || (todo.createdAt !== null && withinLast(Date.parse(todo.createdAt), created, now));
 }
 
 /** The list's headings, in menu order: by status, as the list always grouped, by priority, by assignee, or one list. */
@@ -105,29 +83,18 @@ export type TodoGrouping = (typeof GROUPINGS)[number];
 
 export const GROUPING_LABELS: Record<TodoGrouping, string> = { status: "Status", priority: "Priority", assignee: "Assignee", none: "No grouping" };
 
-const isGrouping = oneOf(GROUPINGS);
+/** What **Display** sets: the grouping. */
+export type TodoDisplay = GroupingDisplay<TodoGrouping>;
 
-/** What **Display** sets. */
-export interface TodoDisplay {
-	grouping: TodoGrouping;
-}
+export const { DEFAULT_DISPLAY, decodeDisplay, encodeDisplay } = groupingDisplay(GROUPINGS, "status");
 
-export const DEFAULT_DISPLAY: TodoDisplay = { grouping: "status" };
-
-export function decodeDisplay(raw: string | null): TodoDisplay {
-	const stored = parseJson(raw ?? "null");
-	if (!isObject(stored)) return DEFAULT_DISPLAY;
-	return { grouping: isGrouping(stored.grouping) ? stored.grouping : DEFAULT_DISPLAY.grouping };
-}
-
-export const encodeDisplay = (display: TodoDisplay): string => JSON.stringify(display);
-
-/** A heading of the list: a status, a priority's digit, an assignee or `none`, or `all` under no grouping. */
-export type TodoGroup<T> =
-	| { by: "status"; key: TodoStatus; todos: T[] }
-	| { by: "priority"; key: TodoPriority; todos: T[] }
-	| { by: "assignee"; key: TodoAssignee | null; todos: T[] }
-	| { by: "none"; key: null; todos: T[] };
+/** A heading of the list, with its fold key: a status, a priority, an assignee or no one, or the one group of no grouping. */
+export type TodoGroup<T> = { foldKey: string; todos: T[] } & (
+	| { by: "status"; key: TodoStatus }
+	| { by: "priority"; key: TodoPriority }
+	| { by: "assignee"; key: TodoAssignee | null }
+	| { by: "none"; key: null }
+);
 
 /**
  * `todos` under `grouping`, each group in the order `todos` has them: by status every status in `STATUS_GROUPS` order,
@@ -137,24 +104,23 @@ export type TodoGroup<T> =
 export function groupTodos<T extends UserTodoLeaf>(grouping: TodoGrouping, todos: readonly T[]): TodoGroup<T>[] {
 	switch (grouping) {
 		case "status":
-			return STATUS_GROUPS.map(status => ({ by: "status", key: status, todos: todos.filter(todo => todo.status === status) }));
+			return STATUS_GROUPS.map(status => ({ by: "status", key: status, foldKey: groupFoldKey("status", status), todos: todos.filter(todo => todo.status === status) }));
 		case "priority":
-			return PRIORITY_ORDER.map((priority): TodoGroup<T> => ({ by: "priority", key: priority, todos: todos.filter(todo => todo.priority === priority) })).filter(
+			return PRIORITY_ORDER.map((priority): TodoGroup<T> => ({ by: "priority", key: priority, foldKey: groupFoldKey("priority", `${priority}`), todos: todos.filter(todo => todo.priority === priority) })).filter(
 				group => group.todos.length > 0,
 			);
 		case "assignee":
 			return [...TODO_ASSIGNEES, null]
-				.map((assignee): TodoGroup<T> => ({ by: "assignee", key: assignee, todos: todos.filter(todo => todo.assignee === assignee) }))
+				.map((assignee): TodoGroup<T> => ({ by: "assignee", key: assignee, foldKey: groupFoldKey("assignee", assignee ?? "none"), todos: todos.filter(todo => todo.assignee === assignee) }))
 				.filter(group => group.todos.length > 0);
 		case "none":
-			return todos.length === 0 ? [] : [{ by: "none", key: null, todos: [...todos] }];
+			return todos.length === 0 ? [] : [{ by: "none", key: null, foldKey: groupFoldKey("none", ""), todos: [...todos] }];
 	}
 }
 
 /**
- * A group's fold key, which the browser keeps: by status the status alone, as before there were groupings, else the
- * grouping and its key, so a priority's or an assignee's fold never folds a status, nor Done's default fold anything else.
+ * A heading's fold key under `grouping`, which the browser keeps: by status the status alone, as before there were
+ * groupings, else the grouping, `:`, and the heading's key, so a priority's or an assignee's fold never folds a status,
+ * nor Done's default fold anything else.
  */
-export function groupFoldKey(group: TodoGroup<unknown>): string {
-	return group.by === "status" ? group.key : `${group.by}:${group.key ?? "none"}`;
-}
+export const groupFoldKey = (grouping: TodoGrouping, key: string): string => (grouping === "status" ? key : `${grouping}:${key}`);

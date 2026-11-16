@@ -1,6 +1,7 @@
 /** What the Pull requests page's list keeps and how it groups them: its tabs, **Filter**, search, and **Display**. */
 import { isObject, isTexts, oneOf, parseJson } from "../src/json";
-import { DAY, type DayRange, type FilterOption, isDayRange, withToggled } from "./list-filter";
+import { countBy, countedOptions, type DayRange, type FilterOption, isDayRange, withinLast } from "./list-filter";
+import { everyWord } from "../src/shared/every-word";
 import type { AgentOn } from "../src/shared/moves";
 import { type PullRequestSummary, type RepoPullRequests, repoKey, repoName } from "../src/shared/github";
 import { GROUP_TITLES, listedPullRequests, type MoveGroup, type PullRequestOrder, type PullRequestSection, pullRequestSections, type SectionRow, sectionTitles } from "./pull-requests-model";
@@ -30,12 +31,8 @@ const sameSections = (a: ShownSections, b: ShownSections): boolean => a.size ===
 /** The tab whose preset `shown` is, `null` for sections you picked one by one. */
 export const viewOf = (shown: ShownSections): PullRequestView | null => PULL_REQUEST_VIEWS.find(view => sameSections(VIEW_PRESETS[view].sections, shown)) ?? null;
 
-
-/** `shown` with `title` flipped; the same set when that would leave no section. */
-export function withSectionToggled(shown: ShownSections, title: MoveGroup): ShownSections {
-	const next = withToggled(shown, title);
-	return next.size === 0 ? shown : next;
-}
+/** `next`, the sections **Filter** would leave, or `shown` when that would leave none, since the list always shows a section. */
+export const atLeastOneSection = (next: ShownSections, shown: ShownSections): ShownSections => (next.size === 0 ? shown : next);
 
 /** What **Filter** keeps; an empty set keeps every repository or author, and `null` any date. */
 export interface PullRequestFilter {
@@ -72,7 +69,6 @@ export function decodeFilter(raw: string | null): PullRequestFilter {
 export const encodeFilter = ({ sections, repos, authors, created, updated }: PullRequestFilter): string =>
 	JSON.stringify({ sections: GROUP_TITLES.filter(title => sections.has(title)), repos: [...repos], authors: [...authors], created, updated });
 
-
 /**
  * The repositories **Filter** offers, those of `repos` in their order, each with how many pull requests it lists, then
  * each key of `checked` that none of them is, such as a repository you hid since, with none, so you can uncheck it.
@@ -84,27 +80,14 @@ export function repoOptions(repos: readonly RepoPullRequests[], checked: Readonl
 }
 
 /** The authors **Filter** offers, of the pull requests of `repos`, most first, then by login, and each login of `checked` with none, so you can uncheck it. */
-export function authorOptions(repos: readonly RepoPullRequests[], checked: ReadonlySet<string>): FilterOption[] {
-	const counts = new Map<string, number>();
-	for (const pr of listedPullRequests(repos)) counts.set(pr.author.login, (counts.get(pr.author.login) ?? 0) + 1);
-	for (const login of checked) if (!counts.has(login)) counts.set(login, 0);
-	return [...counts].toSorted(([a, aCount], [b, bCount]) => bCount - aCount || a.localeCompare(b)).map(([login, count]) => ({ key: login, label: login, count }));
-}
+export const authorOptions = (repos: readonly RepoPullRequests[], checked: ReadonlySet<string>): FilterOption[] => countedOptions(countBy(listedPullRequests(repos), pr => [pr.author.login]), checked);
 
 /** Whether every word of `query` is in `pr`'s title, `#number`, branch, author, or repository; an empty query matches all. */
-export function matchesQuery(pr: PullRequestSummary, query: string): boolean {
-	const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-	if (words.length === 0) return true;
-	const text = `${pr.title} #${pr.number} ${pr.head} ${pr.author.login} ${pr.owner}/${pr.repo}`.toLowerCase();
-	return words.every(word => text.includes(word));
-}
+export const matchesQuery = (pr: PullRequestSummary, query: string): boolean => everyWord(query)(`${pr.title} #${pr.number} ${pr.head} ${pr.author.login} ${pr.owner}/${pr.repo}`);
 
 /** Whether `pr` passes `filter`'s author and dates and matches `query`, at `now` in ms; sections and repositories filter whole groups instead. */
 export const keepsPullRequest = (pr: PullRequestSummary, { authors, created, updated }: PullRequestFilter, query: string, now: number): boolean =>
-	(authors.size === 0 || authors.has(pr.author.login)) &&
-	(created === null || pr.createdAt >= now - created * DAY) &&
-	(updated === null || pr.updatedAt >= now - updated * DAY) &&
-	matchesQuery(pr, query);
+	(authors.size === 0 || authors.has(pr.author.login)) && withinLast(pr.createdAt, created, now) && withinLast(pr.updatedAt, updated, now) && matchesQuery(pr, query);
 
 /** `sections` less those `shown` leaves out; with `empty`, each shown section in page order, those with no pull request too. */
 export function shownSectionsOf(sections: readonly PullRequestSection[], shown: ShownSections, order: PullRequestOrder, empty: boolean): PullRequestSection[] {

@@ -1,7 +1,7 @@
 /** The Notifications page: pull request, Slack, provider, sign-in, calendar, stopped-session, and update notices, with its tabs, **Filter**, **Display**, and search, each drawn from its {@link presentNotice} projection. */
 import { IconArrowLoopDownLeft, IconArrowsRepeatRightLeft, IconBell, IconBubbleText, IconCalendarClock, IconCalendarClock4, IconCircleX, IconCrossMedium, IconDoubleCheckmark1, IconExclamationCircle, IconEyeOpen, IconGauge, IconKey1, IconLayersTwo, IconMerged, IconSparklesTwo, IconWallet1 } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { type AccountsService, MCP_SERVICES } from "../../src/shared/accounts";
 import type { PullRequestSummary } from "../../src/shared/github";
 import type { YourMove } from "../../src/shared/moves";
@@ -13,12 +13,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { type NoticeAction as Action, type NoticeFace, follow, presentNotice } from "../notice-model";
-import { withToggled } from "../list-filter";
 import {
-	decodeDisplay,
-	decodeFilter,
-	encodeDisplay,
-	encodeFilter,
+	DEFAULT_DISPLAY,
 	filters,
 	GROUPING_LABELS,
 	GROUPINGS,
@@ -26,14 +22,12 @@ import {
 	keepsNotice,
 	listNotice,
 	NOTICE_VIEWS,
-	type NoticeGrouping,
 	sourceOptions,
 	VIEW_LABELS,
 	withoutFilters,
 } from "../notice-filter";
-import { useStoredState } from "../stored-state";
-import { MenuRadioGroup, MenuRadioItem, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
-import { DisplayButton, dayField, FilterChips, FilterMenu, setField, ViewTabs } from "./list-filter-bar";
+import { useNoticesDisplay, useNoticesFilter } from "../notice-state";
+import { DisplayButton, dayField, GroupingSubmenu, ListFilterBar, NothingMatches, setField, ViewTabs } from "./list-filter-bar";
 import { SearchField } from "./search-field";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
@@ -337,45 +331,14 @@ function NoticeRow({ notice, send }: { notice: Notice; send: Send }) {
 	);
 }
 
-const FILTER_KEY = "omp-agents.notifications-filter";
-const DISPLAY_KEY = "omp-agents.notifications-display";
-
-/** **Display**: the grouping. */
-function DisplayMenu() {
-	const [display, setDisplay] = useStoredState(DISPLAY_KEY, decodeDisplay, encodeDisplay);
-	const [open, setOpen] = useState(false);
-	return (
-		<DisplayButton label="Display" control="notices.display" active={display.grouping !== "new"} open={open} onOpenChange={setOpen}>
-			<MenuSubmenu>
-				<MenuSubmenuTrigger value={GROUPING_LABELS[display.grouping]}>Grouping</MenuSubmenuTrigger>
-				<MenuSubmenuContent className="w-48">
-					<MenuRadioGroup value={display.grouping} onValueChange={(grouping: NoticeGrouping) => setDisplay({ grouping })}>
-						{GROUPINGS.map(grouping => (
-							<MenuRadioItem {...activityControl("notices.display.grouping")} key={grouping} value={grouping} closeOnClick>
-								{GROUPING_LABELS[grouping]}
-							</MenuRadioItem>
-						))}
-					</MenuRadioGroup>
-				</MenuSubmenuContent>
-			</MenuSubmenu>
-		</DisplayButton>
-	);
-}
-
-/** The note and the button of a list that the search, **Filter**, or both leave empty. */
-function nothingMatches(search: string, filtering: boolean): { text: string; clear: string } {
-	if (search && filtering) return { text: "No notifications match the search and these filters.", clear: "Clear the search and filters" };
-	if (search) return { text: `No notifications match “${search}”.`, clear: "Clear the search" };
-	return { text: "No notifications match these filters.", clear: "Clear the filters" };
-}
-
 /** The Notifications page: how many notices are unread, its bar, and the list of them grouped as **Display** says, unread first. */
 export function NotificationsPage({ notices }: { notices: Notice[] }) {
 	const { send } = useDashboardActions();
 	const { connected } = useDashboardStatus();
-	const [filter, setFilter] = useStoredState(FILTER_KEY, decodeFilter, encodeFilter);
-	const [display] = useStoredState(DISPLAY_KEY, decodeDisplay, encodeDisplay);
+	const [filter, setFilter] = useNoticesFilter();
+	const [display, setDisplay] = useNoticesDisplay();
 	const [query, setQuery] = useState("");
+	const listRef = useRef<HTMLDivElement>(null);
 	const now = Date.now();
 	const listed = notices.map(notice => listNotice(notice, now));
 	const unreadCount = listed.filter(({ notice }) => !notice.read).length;
@@ -383,40 +346,23 @@ export function NotificationsPage({ notices }: { notices: Notice[] }) {
 	const shownUnread = shown.filter(({ notice }) => !notice.read);
 	const set = (change: Partial<typeof filter>): void => setFilter({ ...filter, ...change });
 	const fields = [
-		setField({
-			id: "source",
-			label: "Source",
-			icon: IconLayersTwo,
-			control: "notices.filter.source",
-			noun: "sources",
-			options: sourceOptions(listed),
-			checked: filter.sources,
-			active: filter.sources.size > 0,
-			onToggle: source => set({ sources: withToggled(filter.sources, source) }),
-			clear: () => set({ sources: new Set() }),
-		}),
+		setField({ id: "source", label: "Source", icon: IconLayersTwo, control: "notices.filter.source", noun: "sources", options: sourceOptions(listed, filter.view), checked: filter.sources, onChecked: sources => set({ sources }) }),
 		dayField({ id: "received", label: "Received", icon: IconCalendarClock4, control: "notices.filter.received", value: filter.received, onValue: received => set({ received }) }),
 	];
 	const search = query.trim();
 	const filtering = filters(filter);
 	const empty = () => {
 		if (search || filtering) {
-			const { text, clear } = nothingMatches(search, filtering);
 			return (
-				<div className="space-y-3 px-3 py-4">
-					<p className="text-sm text-muted-foreground">{text}</p>
-					<Button
-						{...activityControl("notices.filter.clear")}
-						size="compact"
-						variant="outline"
-						onClick={() => {
-							if (search) setQuery("");
-							if (filtering) setFilter(withoutFilters(filter));
-						}}
-					>
-						{clear}
-					</Button>
-				</div>
+				<NothingMatches
+					noneMatch="No notifications match"
+					search={search}
+					filtering={filtering}
+					control="notices.filter.clear"
+					onClearSearch={() => setQuery("")}
+					onClearFilters={() => setFilter(withoutFilters(filter))}
+					focusTarget={listRef}
+				/>
 			);
 		}
 		return (
@@ -445,28 +391,33 @@ export function NotificationsPage({ notices }: { notices: Notice[] }) {
 			}
 		>
 			<div className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-8">
-				<div className="sticky top-0 z-10 space-y-2 bg-background py-2">
-					<div className="flex items-center gap-2">
-						<ViewTabs views={NOTICE_VIEWS} labelOf={view => VIEW_LABELS[view]} picked={filter.view} control="notices.view" onPick={view => set({ view })} />
-						<div className="ml-auto flex shrink-0 items-center gap-1.5">
-							<FilterMenu fields={fields} active={filtering} control="notices.filter" />
-							<DisplayMenu />
-						</div>
-					</div>
-					<FilterChips fields={fields} clearControl="notices.filter.clear" onClearAll={() => setFilter(withoutFilters(filter))} />
+				<ListFilterBar
+					tabs={<ViewTabs views={NOTICE_VIEWS} labelOf={view => VIEW_LABELS[view]} picked={filter.view} control="notices.view" onPick={view => set({ view })} />}
+					fields={fields}
+					filtering={filtering}
+					controls={{ filter: "notices.filter", clear: "notices.filter.clear" }}
+					onClearAll={() => setFilter(withoutFilters(filter))}
+					display={
+						<DisplayButton label="Display" control="notices.display" active={display.grouping !== DEFAULT_DISPLAY.grouping}>
+							<GroupingSubmenu groupings={GROUPINGS} labels={GROUPING_LABELS} value={display.grouping} control="notices.display.grouping" onValue={grouping => setDisplay({ ...display, grouping })} />
+						</DisplayButton>
+					}
+					className="sticky top-0 z-10 bg-background py-2"
+				/>
+				<div ref={listRef} tabIndex={-1} className="outline-none focus-visible:ring-2 focus-visible:ring-ring">
+					{shown.length === 0
+						? empty()
+						: groupedNotices(display.grouping, shown).map(({ key, heading, items }) => (
+								<section key={key} aria-label={heading?.title ?? "Notifications"}>
+									{heading !== null && <h3 className="px-3 pt-3 pb-1 text-[11px] font-medium text-muted-foreground">{heading.title}</h3>}
+									<ul className="flex flex-col">
+										{items.map(({ notice }) => (
+											<NoticeRow key={notice.id} notice={notice} send={send} />
+										))}
+									</ul>
+								</section>
+							))}
 				</div>
-				{shown.length === 0
-					? empty()
-					: groupedNotices(display.grouping, shown).map(({ key, title, items }) => (
-							<section key={key} aria-label={title ?? "Notifications"}>
-								{title !== null && <h3 className="px-3 pt-3 pb-1 text-[11px] font-medium text-muted-foreground">{title}</h3>}
-								<ul className="flex flex-col">
-									{items.map(({ notice }) => (
-										<NoticeRow key={notice.id} notice={notice} send={send} />
-									))}
-								</ul>
-							</section>
-						))}
 			</div>
 		</PageFrame>
 	);

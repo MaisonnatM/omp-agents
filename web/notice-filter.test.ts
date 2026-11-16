@@ -40,10 +40,11 @@ describe("filtering notices", () => {
 		expect(kept(notices, NO_FILTER, "  ")).toEqual(["a", "b"]);
 	});
 
-	test("Source options count unread notices", () => {
-		const options = sourceOptions(listed([slack("a", "hi"), slack("b", "yo", { read: true }), omp("c", { read: true })]));
-		expect(options.find(({ key }) => key === "slack")?.count).toBe(1);
-		expect(options.find(({ key }) => key === "updates")?.count).toBe(0);
+	test("Source options count the notices the tab shows: all of them on All, the unread ones on Unread", () => {
+		const notices = listed([slack("a", "hi"), slack("b", "yo", { read: true }), omp("c", { read: true })]);
+		const count = (view: "all" | "unread", source: string) => sourceOptions(notices, view).find(({ key }) => key === source)?.count;
+		expect([count("all", "slack"), count("all", "updates")]).toEqual([2, 1]);
+		expect([count("unread", "slack"), count("unread", "updates")]).toEqual([1, 0]);
 	});
 
 	test("the tab is not a filter, and clearing the filters keeps it", () => {
@@ -75,7 +76,7 @@ describe("stored filter and display", () => {
 
 describe("grouping", () => {
 	const notices = listed([omp("u-read", { read: true }), slack("s-read", "a", { read: true }), slack("s-unread", "b"), omp("u-unread")]);
-	const shape = (grouping: "new" | "source" | "none") => groupedNotices(grouping, notices).map(({ key, title, items }) => [key, title, items.map(({ notice }) => notice.id)]);
+	const shape = (grouping: "new" | "source" | "none") => groupedNotices(grouping, notices).map(({ key, heading, items }) => [key, heading?.title ?? null, items.map(({ notice }) => notice.id)]);
 
 	test("New and earlier splits unread from read", () => {
 		expect(shape("new")).toEqual([
