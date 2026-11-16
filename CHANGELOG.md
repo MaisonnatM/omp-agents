@@ -9,6 +9,8 @@ The dashboard shows the same lines in Settings › What's new.
 - Sessions no longer have a Tickets tab, the New ticket shortcut is gone, and todos no longer link to or create Linear tickets.
 - Routines can no longer start from a new email or a calendar event, and agents can no longer add reminders for you to see.
 - Settings › Integrations no longer offers Linear, Gmail, or Google Calendar. Your saved events and Google account list stay on disk, unused.
+- Resting the pointer on a link to another site shows a card with its whole address in place of the address at the bottom left of the window; for a link outside an agent's text, the card also shows the site and the page's title and description.
+- Behind the scenes: site icons and link cards share one safe way to read public web pages, and a site's icon now shows even when its home page is large. Emails show `&nbsp;` and `&apos;` as the characters they stand for.
 - Linear tickets has the Pull requests header: a search, All, Active, Todo, and Backlog tabs, a Filter by status, priority, label, project, team, and dates, and a Display menu to group by status, priority, project, or nothing.
 - Todo has Filter and Display above its list: filter by priority, assignee, link, due date, and creation date, and group by status, priority, assignee, or nothing.
 - Notifications has a search, All and Unread tabs, a Filter by source and date in place of the source buttons, and a Display menu to group by new and earlier, source, or nothing.

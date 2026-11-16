@@ -306,6 +306,8 @@ export interface MarkdownPreset {
 	urlTransform: UrlTransform;
 	/** Whether a click on one of the text's images opens it large, with ←/→ to the text's other images. */
 	openImages: boolean;
+	/** Whether the link preview card may have the server read a link's page and icon; agent text may not, since a prompt-injected agent can write a secret into an address. */
+	linkPages: boolean;
 }
 
 /** `RAW_HTML`, or, should its chunk fail to load, no plugins, which leaves the raw HTML as escaped text. */
@@ -317,7 +319,7 @@ export const loadRawHtml = (): Promise<unknown> => rawHtmlPlugins.load();
  * Agent text: the path of a file opens it in the file dialog, a relative one against `FileBaseContext`; an image or
  * video on this computer shows in place when the text writes it as an image, and under the text when it only names it.
  */
-export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rawHtml: false, rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform, openImages: true };
+export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rawHtml: false, rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform, openImages: true, linkPages: false };
 
 /** A user's prompt, read as agent text with its skill, command, file, pull request, todo, and session references as chips. */
 export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS };
@@ -354,7 +356,7 @@ export const BOT_MESSAGE_PRESET: MarkdownPreset = { ...SESSION_AGENT_PRESET, rem
  * Text written on GitHub, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which follows
  * GitHub's; HTML comments drop out, as GitHub hides them. Images load from GitHub's hosts.
  */
-export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rawHtml: true, rehype: [], components: GITHUB_COMPONENTS, urlTransform, openImages: false };
+export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rawHtml: true, rehype: [], components: GITHUB_COMPONENTS, urlTransform, openImages: false, linkPages: true };
 
 /**
  * Markdown text is untrusted. react-markdown escapes raw HTML and filters unsafe link schemes, and images load only
@@ -369,7 +371,7 @@ export const MessageMarkdown = memo(function MessageMarkdown({ text, preset = AG
 	const images = useMarkdownImages(root);
 	if (preset.rawHtml && !rawHtml) return null;
 	const body = (
-		<div ref={root} className="message-markdown max-w-full whitespace-normal break-words">
+		<div ref={root} data-link-preview={preset.linkPages ? undefined : "address"} className="message-markdown max-w-full whitespace-normal break-words">
 			<ReactMarkdown remarkPlugins={preset.remark} rehypePlugins={rawHtml && preset.rawHtml ? [...rawHtml, ...preset.rehype] : preset.rehype} components={preset.components} urlTransform={preset.urlTransform}>
 				{text}
 			</ReactMarkdown>
