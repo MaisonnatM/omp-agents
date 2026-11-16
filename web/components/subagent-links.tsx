@@ -1,6 +1,6 @@
-/** `SubagentLinks`, where a live view's subagents open and stop, `useSubagentLinks`, which builds it, `agentLink`, one subagent's link, and `CancelAgentButton`, the stop button after a running subagent's link. */
+/** `useSubagentLinks`, where a live view's subagents open and stop, `agentLink`, one subagent's link, and `CancelAgentButton`, the stop button after a running subagent's link. */
 import { IconStopCircle } from "central-icons";
-import { createContext, type MouseEvent, useMemo } from "react";
+import { type MouseEvent, useMemo } from "react";
 import type { AgentRow, LiveView, RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -23,9 +23,6 @@ export interface SubagentLinksValue {
 	onOpen: (view: View, mode: OpenMode) => void;
 	onCancel: ((view: SubagentView) => Promise<void>) | null;
 }
-
-/** `null` in a past session, whose subagents have no view of their own. */
-export const SubagentLinks = createContext<SubagentLinksValue | null>(null);
 
 /** The links for `view`'s subagents from its session's roster row `host`; `null` for a past view. */
 export function useSubagentLinks(view: View, host: RosterHost | null): SubagentLinksValue | null {

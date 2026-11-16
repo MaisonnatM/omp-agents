@@ -14,8 +14,8 @@ const save = (file: string, hash: string, extra: Partial<ArtifactSave> = {}): Ar
 	savedAt: 1_700_000_000_000,
 	...extra,
 });
-const saved = (id: string, artifact: ArtifactSave): Item => ({ id, kind: "tool", name: "artifact", summary: artifact.file, status: "ok", agents: [], artifact });
-const running = (id: string): Item => ({ id, kind: "tool", name: "artifact", summary: "", status: "running", agents: [] });
+const saved = (id: string, artifact: ArtifactSave): Item => ({ id, kind: "tool", name: "artifact", summary: artifact.file, status: "ok", artifact });
+const running = (id: string): Item => ({ id, kind: "tool", name: "artifact", summary: "", status: "running" });
 const reply: Item = { id: "r", kind: "assistant", text: "done", streaming: false, suggestions: [] };
 
 describe("artifactsOf", () => {

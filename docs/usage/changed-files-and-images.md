@@ -22,7 +22,7 @@
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
-- Subagents are listed in the **Subagents** section above these, and from their links in the transcript, under the call that spawned them.
+- Subagents are listed in the **Subagents** section above these.
 - **Images** shows a horizontal thumbnail strip of the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   It also shows the image files the session wrote that a tool call or its result named, such as the `page.png` a script saved; a named file counts as written when it changed after the session started, so paths in source code and older files stay out.
   Each file shows once, at the first time a tool named or returned it.

@@ -26,7 +26,6 @@ import { activityControl } from "../activity";
 import { openArtifact, useShownArtifact } from "../artifact-requests";
 import { versionNumber } from "../artifacts-model";
 import { mediaSrc } from "../api";
-import { SPLIT_CLICK, subagentModeOf } from "../labels";
 import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { useArtifacts, usePaneLoaded, useTranscript } from "../pane-store";
@@ -40,11 +39,9 @@ import { AttachedFileDialog } from "./file-dialog";
 import { PromptFileChips } from "./prompt-file-chips";
 import { ImageViewer } from "./media-viewer";
 import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
-import { StatusDot, statusLabel } from "./status-dot";
 import { RoutineRunCard } from "./routines/routine-run-card";
 import { BotMessageCard } from "./bots/bot-message-card";
 import { PromptHistory } from "./prompt-history";
-import { CancelAgentButton, SubagentLinks } from "./subagent-links";
 import { FindBar, PaneFocused } from "./find-bar";
 import { TranscriptMinimap } from "./transcript-minimap";
 import { latestReviewPages, requestReview } from "../review-pages";
@@ -134,48 +131,6 @@ const OpenImage = createContext<(id: string, at: number) => void>(() => {});
 /** Opens a prompt's attached file in the transcript's dialog; outside a `Transcript` it does nothing. */
 const OpenFile = createContext<(file: PromptFile) => void>(() => {});
 
-/** The subagents a `task` call spawned, each a link to its own view with its status. */
-function SpawnedAgents({ ids }: { ids: string[] }) {
-	const links = useContext(SubagentLinks);
-	const chip = "inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs ring-1 ring-border";
-	return (
-		<span className="-mt-1 ml-6 flex flex-wrap gap-1.5" data-subagents>
-			{ids.map(id => {
-				if (!links) {
-					return (
-						<span key={id} className={cn(chip, "text-muted-foreground")}>
-							<span className="truncate">{id}</span>
-						</span>
-					);
-				}
-				const view = { kind: "live", instanceId: links.instanceId, agentId: id } as const;
-				const agent = links.agents.find(row => row.id === id);
-				const facts = agent ? [agent.kind, statusLabel(agent.status), agent.activity].filter(Boolean).join(" · ") : "not registered";
-				return (
-					<span key={id} className="inline-flex max-w-full items-center gap-0.5">
-						<Tooltip content={`${id} · ${facts}. ${SPLIT_CLICK} to open in a split`}>
-							<a
-								href={hashForView(view)}
-								className={cn(chip, "text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring")}
-								onClick={event => {
-									// Shift- and middle-clicks keep the link's own new-window behavior.
-									if (event.button !== 0 || event.shiftKey || event.altKey) return;
-									event.preventDefault();
-									links.onOpen(view, subagentModeOf(event));
-								}}
-							>
-								{agent && <StatusDot status={agent.status} />}
-								<span className="truncate">{id}</span>
-							</a>
-						</Tooltip>
-						{links.onCancel && <CancelAgentButton view={view} onCancel={links.onCancel} running={agent?.status === "running"} />}
-					</span>
-				);
-			})}
-		</span>
-	);
-}
-
 /** The images a tool's result returned, as thumbnails under its line; one opens large in the transcript's viewer. */
 function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: string }) {
 	const openImage = useContext(OpenImage);
@@ -207,8 +162,8 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 	const running =
 		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind === "thinking" && entry.streaming);
 	const failed = tools.filter(tool => tool.status === "error").length;
-	// A group that spawned subagents or returned images stays open, so their links and images stay in sight.
-	const pinned = tools.some(tool => tool.agents.length > 0 || tool.images);
+	// A group that returned images stays open, so its images stay in sight.
+	const pinned = tools.some(tool => tool.images);
 	// Open while running, else as `expanded` says; a manual toggle wins until `expanded` flips.
 	const [toggle, setToggle] = useState<{ open: boolean; expanded: boolean } | null>(null);
 	const open = toggle?.expanded === expanded ? toggle.open : running || expanded || pinned;
@@ -260,7 +215,6 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 										{entry.summary && <span className="text-muted-foreground/70"> {entry.summary}</span>}
 									</TraceTitle>
 								</TraceLine>
-								{entry.agents.length > 0 && <SpawnedAgents ids={entry.agents} />}
 								{entry.images && <ToolImages id={entry.id} srcs={entry.images} tool={entry.name} />}
 							</Fragment>
 						);

@@ -27,12 +27,6 @@
   The choice is saved in the app.
   Cmd+Shift+E shows or hides the tool rows, and Alt+T (Option+T on macOS) shows or hides the thinking.
   Cmd+E still opens or closes the group.
-- A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.
-  A tool group that spawned subagents stays open.
-  In a live session or subagent, each id is a link with the subagent's status dot (none while running, blue idle, hollow parked, red aborted); hover it for the subagent's type, status, and what it is doing.
-  Click it to open the subagent in this pane, in place of the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
-  A subagent's own `task` calls link its subagents the same way.
-  A past session's ids are not links, because the dashboard opens subagents only of a running session.
 - A tool call whose result returned images, such as a browser screenshot or a `read` of an image file, shows them as thumbnails under its row; click one to open it large, with the tool and what the call said it did.
   The arrows, or the Left and Right keys, step to the previous and next image of the conversation, across calls and the images your messages carried, and the external-link button opens the image in your default browser.
   An image you sent opens the same way from its thumbnail above your message, captioned "Your message".
@@ -57,7 +51,7 @@
   In a subagent of a session that the dashboard started, a message steers a running subagent at its next step, through omp's RPC `steer_subagent`.
   omp's RPC mode reaches only a running subagent, so the composer offers no follow-up there and is disabled once the subagent stops.
   The composer is also disabled for aborted subagents and read-only rooms.
-- The stop button after a running subagent's link cancels it, as the kill in omp's Agent Hub does, and leaves the session's own turn running.
+- The stop button after a running subagent in the **Overview** tab cancels it, as the kill in omp's Agent Hub does, and leaves the session's own turn running.
   The subagent's task ends with an aborted result; since omp 18.12.3, a message or a revive in omp resumes it from its transcript, while the dashboard's composer stays disabled for it.
   It is offered in every room that the dashboard can write to.
 - The conversation follows new output while you are at the bottom.
@@ -71,14 +65,13 @@
   Enter and Shift+Enter, or the bar's arrows, step to the next and previous match and scroll the conversation to it; Esc or the close button closes the bar.
   It searches the text the conversation shows, so folded tool calls and hidden thinking are left out, and it keeps counting as new output streams in.
   Focusing another pane closes it; while no conversation shows, Cmd+F keeps the browser's own Find.
-- In a live session, the **Subagents** section of the [session details sidebar](session-details-sidebar.md)'s **Overview** tab lists the session's subagents, so you can reach one without scrolling back to the `task` call that started it.
+- In a live session, the **Subagents** section of the [session details sidebar](session-details-sidebar.md)'s **Overview** tab lists the session's subagents; the conversation does not list them under the `task` call that started them.
   A subagent that another subagent started sits indented under it.
-  Each row shows a robot icon with the subagent's status dot on its corner, the same dot as on its link in the conversation, then its id and what it is doing now.
+  Each row shows a robot icon with the subagent's status dot on its corner (none while running, blue idle, hollow parked, red aborted), then its id and what it is doing now.
   A second line names its model after the logo of the org that makes it, labeled as the composer labels models, then its type and how long it has run, such as `Haiku 5.5 · task · 5m`; the time counts up while the subagent runs and stops when it does.
   A subagent the dashboard did not see start, or saw stopped without seeing when, shows no time; hover a row for its full activity.
   The section's title counts the subagents, and how many are running.
   Click a row to open the subagent in this pane, in place of the conversation, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.
-  The stop button after a running subagent cancels it, as the one after its link in the conversation does, in every room the dashboard can write to.
   A subagent's own view lists only the subagents it started, and theirs; a past session shows no section, because the dashboard opens subagents only of a running session.
   When the agent gives two or more subagents the same task and records them with the kit's `arena` tool, those runners show above the other rows in an **Arena** box with the task, as cards side by side lettered A, B, C in the order it started them.
   Each card shows the runner's id, its status, what it is doing, and the same model, type, and time line as a row; the judge, once the agent records one, sits on a row under the cards.

@@ -17,7 +17,6 @@ import type { FileBase } from "../file-paths";
 import { PastConversation } from "./past-conversation";
 import { RenderBoundary } from "./render-boundary";
 import { SidebarToggle } from "./sidebar-panel";
-import { SubagentLinks, useSubagentLinks } from "./subagent-links";
 import { PaneFocused } from "./find-bar";
 
 interface PaneProps {
@@ -70,7 +69,6 @@ interface ViewConversationProps {
 export const ViewConversation = memo(function ViewConversation({ view, focused, host, lastHost, session, models, workspaces, actions, header, placeholder }: ViewConversationProps) {
 	const { send, start, end } = useDashboardActions();
 	const { fork, resume } = useDashboardStatus().starts;
-	const links = useSubagentLinks(view, host);
 	const onFork = useCallback((itemId: string, point: ForkPoint) => start({ kind: "fork", view, itemId, point }), [start, view]);
 	const onResume = useCallback(() => view.kind === "past" && start({ kind: "resume", sessionId: view.sessionId }), [start, view]);
 	// Kept by view, so a pane that switches to another session shows its transcript.
@@ -128,13 +126,11 @@ export const ViewConversation = memo(function ViewConversation({ view, focused, 
 	const fileBase = useFileBase(view.kind === "past" ? session : (host ?? lastHost));
 	return (
 		<PaneFocused.Provider value={focused}>
-			<SubagentLinks.Provider value={links}>
-				<FileBaseContext.Provider value={fileBase}>
-					<RenderBoundary resetKey={hashForView(view)} actions={actions}>
-						{content}
-					</RenderBoundary>
-				</FileBaseContext.Provider>
-			</SubagentLinks.Provider>
+			<FileBaseContext.Provider value={fileBase}>
+				<RenderBoundary resetKey={hashForView(view)} actions={actions}>
+					{content}
+				</RenderBoundary>
+			</FileBaseContext.Provider>
 		</PaneFocused.Provider>
 	);
 });

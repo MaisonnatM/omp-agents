@@ -57,8 +57,6 @@ Every transcript comes from the session files on this machine, not from a networ
 - The same read folds each line into the view's changed files as well, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file.
   The view's socket topic carries them as `work` messages: the whole list with the transcript, then only the files each later read changed, which the page puts in place by path.
   A subagent's view folds its own file, so it shows its own changes.
-- A `task` result names the subagents it spawned in `details.progress` and `details.results`; the tool item lists their ids, which name each subagent's view.
-  A running `task` reports them sooner through `tool_execution_update` events.
 - A tool result's images, through `imagesOf` in `src/session-entries.ts` as a prompt's, ride on its tool item as `images`, which the transcript shows under the call's row; only the view's own file adds them, while the media tree below also collects its subagents'.
 - A successful `artifact` result contributes its checked `details` as `Item.artifact`, from both live `tool_execution_end` events and saved `toolResult` messages.
   `parseArtifactSave` in `src/shared/artifacts.ts` checks its identity, kind, title, change note, hash, byte count, and save time once at that boundary.
