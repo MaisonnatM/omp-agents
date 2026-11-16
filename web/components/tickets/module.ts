@@ -4,6 +4,7 @@
  */
 import { TICKET_ID } from "../../../src/shared/tickets";
 import { PAGE_ICON } from "../../page-icons";
+import { LINEAR_LOGO } from "../integrations/brand-logos";
 import type { PageModule } from "../../modules";
 
 /** The tickets list, or the Linear issue whose details replace it when `target` is non-null. */
@@ -14,7 +15,7 @@ export interface TicketsRoute {
 
 export const TICKETS_PAGE: PageModule<"tickets", TicketsRoute, "ticketsNew"> = {
 	id: "tickets",
-	tab: { label: "Tickets", icon: PAGE_ICON.tickets, place: 20, integration: "linear" },
+	tab: { label: "Tickets", icon: PAGE_ICON.tickets, logo: LINEAR_LOGO, place: 20, integration: "linear" },
 	about: "Your Linear tickets, to open and start a session on.",
 	home: { target: null },
 	/** `#tickets` lists the viewer's assigned Linear issues, and `#tickets/<identifier>` opens that issue's details beside them; any other `#tickets/…` opens the list alone. */

@@ -109,7 +109,7 @@ export function ModulesTab() {
 						<IntegrationRow
 							key={id}
 							name={tab.label}
-							mark={<MarkTile icon={tab.icon} name={tab.label} />}
+							mark={<MarkTile logo={tab.logo} icon={tab.icon} name={tab.label} />}
 							status={null}
 							summary={about}
 							meta={
