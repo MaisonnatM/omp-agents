@@ -1,5 +1,5 @@
 /** The Calendar module's page half, which `WEB_MODULES` in `web/modules.ts` lists; its components are in this folder. */
-import { IconCalendarClock } from "central-icons";
+import { brandIcon, GOOGLE_CALENDAR_LOGO } from "../integrations/brand-logos";
 import type { PageModule } from "../../modules";
 
 /** The Calendar page has one view, so its route holds nothing besides its kind. */
@@ -7,7 +7,7 @@ export type CalendarRoute = Record<never, never>;
 
 export const CALENDAR_PAGE: PageModule<"calendar", CalendarRoute, "calendarNewEvent", "calendar.routines.toggle"> = {
 	id: "calendar",
-	tab: { label: "Calendar", icon: IconCalendarClock, place: 40 },
+	tab: { label: "Calendar", icon: brandIcon(GOOGLE_CALENDAR_LOGO), place: 40 },
 	about: "Your month of events, routine runs, and due todos and tickets in one calendar.",
 	home: {},
 	/** `#calendar` is a month of routine runs, due todos, and due tickets; nothing follows it. */

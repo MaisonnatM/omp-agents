@@ -1,5 +1,5 @@
 /** The Email module's page half, which `WEB_MODULES` in `web/modules.ts` lists; its components are in this folder. */
-import { IconEmail1 } from "central-icons";
+import { brandIcon, GMAIL_LOGO } from "../integrations/brand-logos";
 import { decodeSegment } from "../../hash-segment";
 import type { PageModule } from "../../modules";
 
@@ -22,7 +22,7 @@ const outside = (...keys: string[]) => keys.map(key => ({ chord: { key }, scope:
 
 export const EMAIL_PAGE: PageModule<"email", EmailRoute, EmailShortcut> = {
 	id: "email",
-	tab: { label: "Email", icon: IconEmail1, place: 70, integration: "gmail" },
+	tab: { label: "Email", icon: brandIcon(GMAIL_LOGO), place: 70, integration: "gmail" },
 	about: "Your Gmail inboxes, to read, reply to, and write mail here.",
 	home: { target: null },
 	/** `#email` is your Gmail inboxes' latest conversations, `#email/new` a new mail, and `#email/<account>/<thread id>` that account's conversation in full. */
