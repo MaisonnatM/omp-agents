@@ -27,6 +27,8 @@ export type StartOp =
 			todoId: string | null;
 			/** The session is deleted with everything it wrote when it ends. */
 			private: boolean;
+			/** It came from the New session page, whose draft a start that succeeds clears; false for a start from another page. */
+			fromDraft: boolean;
 	  }
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
 	| { kind: "resume"; sessionId: string }

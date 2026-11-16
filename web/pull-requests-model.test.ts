@@ -8,12 +8,8 @@ import {
 	commentCount,
 	DEFAULT_ORDER,
 	decodeOrder,
-	decodeShownSections,
-	encodeShownSections,
-	EVERY_SECTION,
 	lineCommentsBlocked,
 	foldedByDefault,
-	PULL_REQUEST_VIEWS,
 	type PullRequestOrder,
 	pullRequestSections,
 	listedPullRequest,
@@ -27,8 +23,6 @@ import {
 	sectionTitles,
 	shownPullRequests,
 	rebaseOrder,
-	viewOf,
-	withSectionToggled,
 	threadStarters,
 	withPullRequestReviewers,
 	withPullRequestState,
@@ -38,6 +32,21 @@ import {
 	withRepoStepped,
 	yourMoveCount,
 } from "./pull-requests-model";
+import {
+	decodeFilter,
+	encodeFilter,
+	EVERY_SECTION,
+	groupedList,
+	groupedPullRequests,
+	groupFoldKey,
+	keepsPullRequest,
+	type ListGroup,
+	matchesQuery,
+	NO_FILTER,
+	PULL_REQUEST_VIEWS,
+	viewOf,
+	withSectionToggled,
+} from "./pull-requests-filter";
 
 const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullRequestSummary => ({
 	owner: "acme",
@@ -60,6 +69,7 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
 	viewerApproved: false,
+	createdAt: 0,
 	updatedAt: number,
 	...fields,
 });
@@ -374,11 +384,62 @@ describe("shown sections", () => {
 		expect(withSectionToggled(one, "Recently merged")).toBe(one);
 	});
 
-	test("what is stored comes back, and a missing, unreadable, or empty value shows every section", () => {
-		const picked = new Set(["Drafts", "Your move"] as const);
-		expect(decodeShownSections(encodeShownSections(picked))).toEqual(picked);
-		for (const raw of [null, "{", "[]", '["Gone"]']) expect(decodeShownSections(raw)).toBe(EVERY_SECTION);
-		expect(decodeShownSections('["Gone","Drafts"]')).toEqual(new Set(["Drafts"]));
+	test("what is stored comes back, and a missing, unreadable, or empty value keeps everything", () => {
+		const picked = { ...NO_FILTER, sections: new Set(["Drafts", "Your move"] as const), repos: new Set(["acme/api"]), authors: new Set(["teammate"]), created: 7 as const, since: null };
+		expect(decodeFilter(encodeFilter(picked))).toEqual(picked);
+		for (const raw of [null, "{", "[]", '{"sections":["Gone"]}']) expect(decodeFilter(raw)).toEqual(NO_FILTER);
+		expect(decodeFilter('{"sections":["Gone","Drafts"],"created":5}')).toEqual({ ...NO_FILTER, sections: new Set(["Drafts"]) });
+	});
+});
+
+describe("filtering and searching pull requests", () => {
+	const day = 86_400_000;
+	const now = 100 * day;
+
+	test("a date range keeps what was created or updated within it, its first moment included", () => {
+		const week = { ...NO_FILTER, created: 7 as const };
+		expect(keepsPullRequest(pr(1, { createdAt: now - 7 * day }), week, "", now)).toBe(true);
+		expect(keepsPullRequest(pr(1, { createdAt: now - 7 * day - 1 }), week, "", now)).toBe(false);
+		expect(keepsPullRequest(pr(1, { updatedAt: now - 2 * day }), { ...NO_FILTER, since: 1 }, "", now)).toBe(false);
+		expect(keepsPullRequest(pr(1, { author: teammate }), { ...NO_FILTER, authors: new Set(["me"]) }, "", now)).toBe(false);
+	});
+
+	test("every word of a search must match the title, number, branch, author, or repository, in any case", () => {
+		const one = pr(42, { title: "Fix login redirect", head: "me/oauth" });
+		expect(matchesQuery(one, "  LOGIN #42 ")).toBe(true);
+		expect(matchesQuery(one, "oauth acme/webapp")).toBe(true);
+		expect(matchesQuery(one, "login signup")).toBe(false);
+	});
+});
+
+describe("grouping", () => {
+	const repo = (name: string, pullRequests: PullRequestSummary[]): RepoPullRequests => ({ owner: "acme", repo: name, cwds: [`/code/${name}`], pullRequests });
+	const repos = [repo("webapp", [pr(1), pr(2, { review: "changes-requested" })]), repo("api", [pr(3, { repo: "api", review: "changes-requested", author: teammate, role: "reviewer" }), pr(4, { repo: "api", review: "changes-requested" })])];
+	const sectionsOf = sectionsOfRepos(repos, DEFAULT_ORDER, noAgent);
+	const shape = (groups: ListGroup[]) => groups.map(({ title, cards }) => [title, cards.map(({ title, rows }) => [title, rows.map(({ row }) => `${row.pr.repo}#${row.pr.number}`)])]);
+
+	test("by section, a heading per section in page order with a table per repository", () => {
+		const groups = groupedList("section", repos, sectionsOf, DEFAULT_ORDER);
+		expect(groups.map(({ title }) => title)).toEqual(sectionTitles(DEFAULT_ORDER).filter(title => groups.some(group => group.title === title)));
+		expect(shape(groups).find(([title]) => title === "Your move")?.[1]).toEqual([
+			["acme/webapp", ["webapp#2"]],
+			["acme/api", ["api#3", "api#4"]],
+		]);
+	});
+
+	test("by author, the author with the most pull requests first; under no grouping, one table in the list's order", () => {
+		expect(groupedList("author", repos, sectionsOf, DEFAULT_ORDER).map(({ title }) => title)).toEqual(["me", "teammate"]);
+		const none = groupedList("none", repos, sectionsOf, DEFAULT_ORDER);
+		expect(none).toHaveLength(1);
+		expect(none[0]!.title).toBeNull();
+		expect(groupedPullRequests("none", none, () => false).map(({ repo, number }) => `${repo}#${number}`)).toEqual(shownOf(repos, DEFAULT_ORDER));
+	});
+
+	test("a folded heading hides its pull requests from the keys, and the merged heading starts folded", () => {
+		const groups = groupedList("section", repos, sectionsOf, DEFAULT_ORDER);
+		const folded = groupFoldKey("section", "Your move");
+		expect(groupedPullRequests("section", groups, key => key === folded).map(({ number }) => number)).not.toContain(2);
+		expect(foldedByDefault(groupFoldKey("section", "Recently merged"))).toBe(true);
 	});
 });
 

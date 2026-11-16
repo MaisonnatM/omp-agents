@@ -226,6 +226,26 @@ function MenuSwitchItem({
   )
 }
 
+/** A row that picks one of several values, checked at its end while picked, as a filter's values are; it keeps the check's room, so trailing text stays aligned. */
+function MenuCheckItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.CheckboxItem>) {
+  return (
+    <MenuPrimitive.CheckboxItem
+      data-slot="menu-check-item"
+      className={cn(itemClassName, className)}
+      {...props}
+    >
+      {children}
+      <MenuPrimitive.CheckboxItemIndicator keepMounted className="ml-auto pl-4 data-unchecked:invisible">
+        <IconCheckmark1 />
+      </MenuPrimitive.CheckboxItemIndicator>
+    </MenuPrimitive.CheckboxItem>
+  )
+}
+
 function MenuGroup({
   ...props
 }: React.ComponentProps<typeof MenuPrimitive.Group>) {
@@ -301,6 +321,7 @@ export {
   MenuSubmenuContent,
   MenuGroup,
   MenuGroupLabel,
+  MenuCheckItem,
   MenuSwitchItem,
   MenuRadioGroup,
   MenuRadioItem,

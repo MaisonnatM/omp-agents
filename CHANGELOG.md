@@ -6,13 +6,15 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-16
 
 - The Pull requests page has tabs above the list, Open, Your move, Approved, Merged, and All, that show only those sections, and the page remembers your pick.
-- Filter, beside the tabs, switches each section on or off, and a chip under the tabs names what the list shows; its × shows every section again.
-- The sort and Repositories buttons moved from the page's header to the end of the tabs' row.
+- Filter, beside the tabs, filters the Pull requests page by section, repository, author, and when a pull request was created or last updated, and each filter shows as a chip under the tabs that you can change or remove.
+- The Pull requests page has a search in its header that finds pull requests by title, number, branch, author, or repository.
+- Display, beside Filter, groups the Pull requests page by repository, section, or author, or not at all, and holds the order, Show empty sections, and Repositories.
+- The + in the Pull requests page's header starts a session that makes the change you describe in a repository you pick and opens a pull request for it.
 - The Pull requests page no longer has a Board view, so it always shows the list.
 - The Pull requests page no longer shows a list at its left, so the table takes the whole page.
-- Repositories, at the top of the Pull requests page, hides or shows each repository and moves it up or down.
+- Repositories, under Display on the Pull requests page, hides or shows each repository and moves it up or down.
 - A hidden repository also leaves the Pull requests tab's count, and Reset the order keeps it hidden.
-- While you hide any repository, the Repositories button says how many, and a page with every repository hidden offers Show all repositories.
+- While you hide any repository, the Display button's tooltip says how many, and a page with every repository hidden offers Show all repositories.
 - In Settings, the up and down arrows that move a sidebar tab, an account, or a list entry keep focus at the top or bottom of the list, and their tooltip says why they do nothing there.
 - Behind the scenes: the Pull requests page and Settings › Preferences share one list of switches and arrows.
 - Settings has a search field above its sections: type a name or a related word, such as git, to list only the matching sections, and press Enter to open the first one.

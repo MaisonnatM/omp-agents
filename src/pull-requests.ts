@@ -27,7 +27,7 @@ const REVIEW_FIELDS = `author { login ${AVATAR} }
 	viewerLatestReview { state }`;
 
 const PR_FIELDS = `... on PullRequest {
-	number title isDraft state reviewDecision mergeable viewerCanUpdateBranch headRefName baseRefName updatedAt mergedAt additions deletions
+	number title isDraft state reviewDecision mergeable viewerCanUpdateBranch headRefName baseRefName createdAt updatedAt mergedAt additions deletions
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
@@ -176,6 +176,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 		role,
 		stackedOn: defaultBranch !== undefined && head.base !== defaultBranch ? head.base : null,
 		behind: state !== "merged" && node.viewerCanUpdateBranch === true,
+		createdAt: Date.parse(str(node.createdAt) ?? "") || updatedAt,
 		updatedAt,
 		conversations: totalOf(node.comments) + totalOf(node.reviewThreads),
 	};

@@ -2,34 +2,34 @@
  * The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it
  * is, with the details of the pull request it shows docked beside it.
  */
-import { IconArrowRotateClockwise, IconCrossMedium, IconExpand, IconSettingsSliderHor } from "central-icons";
-import { type PullRequest, prKey, repoKey, type RepoPullRequests, repoName } from "../../../src/shared/github";
-import { useId, useState } from "react";
+import { IconArrowRotateClockwise, IconCrossMedium, IconExpand, IconMagnifyingGlass } from "central-icons";
+import { type PullRequest, prKey, repoKey, type RepoPullRequests } from "../../../src/shared/github";
+import { useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { EVERY_SECTION, type PullRequestOrder, withRepoStepped } from "../../pull-requests-model";
-import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsFolds, useShownSections } from "../../pull-requests-state";
+import type { ListGroup } from "../../pull-requests-filter";
+import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsFolds } from "../../pull-requests-state";
 import { activityControl } from "../../activity";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import { useRebasing } from "../../pull-request-rebases";
 import { useStoredState } from "../../stored-state";
 import { DROP_LINE } from "../../order";
 import { useInlineConfirm } from "../../use-inline-confirm";
+import type { DragItem } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { FoldButton } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
-import { ShownOrderList } from "../shown-order-list";
 import { Spinner } from "../spinner";
-import { type PullRequests, RepoReadError, type RepoView, type SectionView, SortMenu, UnmatchedTip, usePullRequestKeys, usePullRequests, usePullRequestsList, workspacesLabel } from "./pull-requests-list";
+import { type PullRequests, RepoReadError, type RepoView, UnmatchedTip, useGroupedList, usePullRequestKeys, usePullRequests, usePullRequestsList, workspacesLabel } from "./pull-requests-list";
 import type { PullRequestDetailTab } from "./pr-details";
+import { NewPullRequestButton } from "./pr-new";
 import { PullRequestDetailPage, PullRequestDetails, usePullRequestCopyShortcuts } from "./pr-page";
-import { PullRequestTableRow } from "./pr-row";
+import { PullRequestTableRow, type RowProps } from "./pr-row";
 import { PullRequestViewBar } from "./pr-view-bar";
 
 const note = (text: string) => <p className="text-sm text-muted-foreground">{text}</p>;
@@ -43,10 +43,8 @@ const STEP = 16;
 
 const clampDetails = (width: number, room: number): number => Math.round(Math.max(MIN_DETAILS, Math.min(MAX_DETAILS, room - MIN_LIST, width)));
 
-/** How many pull requests a section lists; folded, it sums up their moves in its tooltip. */
-function SectionCount({ section: { section, summary } }: { section: SectionView }) {
-	const { length } = section.rows;
-	const yours = section.title === "Your move";
+/** How many pull requests a table lists, stronger for **Your move**; folded, it sums up their moves in its tooltip. */
+function TableCount({ length, yours, summary }: { length: number; yours: boolean; summary: string | null }) {
 	const label = `${length} pull request${length === 1 ? "" : "s"}${summary ? `: ${summary}` : ""}`;
 	const count = (
 		<span
@@ -60,26 +58,40 @@ function SectionCount({ section: { section, summary } }: { section: SectionView 
 	return summary ? <Tooltip content={summary}>{count}</Tooltip> : count;
 }
 
-function SectionCard({ view }: { view: SectionView }) {
-	const { section, listId, open, toggle, drag, moveId, rows } = view;
+interface TableCardProps {
+	title: string;
+	/** Whether it lists **Your move**, whose count draws stronger. */
+	yours: boolean;
+	listId: string;
+	open: boolean;
+	toggle: () => void;
+	summary: string | null;
+	rows: RowProps[];
+	/** What moves it; `null` where the tables keep the list's order. */
+	drag: DragItem | null;
+	moveId: string | null;
+}
+
+/** A table of pull requests under a heading that folds it. */
+function TableCard({ title, yours, listId, open, toggle, summary, rows, drag, moveId }: TableCardProps) {
 	const headingId = `${listId}-heading`;
 	return (
 		<section
 			aria-labelledby={headingId}
-			{...drag.target}
-			data-move={moveId}
-			className={cn("relative rounded-md border border-border", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
+			{...drag?.target}
+			data-move={moveId ?? undefined}
+			className={cn("relative rounded-md border border-border", drag?.dragging && "opacity-50", drag?.dropAt && DROP_LINE[drag.dropAt])}
 		>
-			<h3 id={headingId} {...drag.handle} className="flex items-center gap-2 rounded-t-md bg-muted/50 px-3 py-1.5 text-sm font-medium">
+			<h3 id={headingId} {...drag?.handle} className={cn("flex items-center gap-2 bg-muted/50 px-3 py-1.5 text-sm font-medium", open && rows.length > 0 ? "rounded-t-md" : "rounded-md")}>
 				<FoldButton open={open} onToggle={toggle} controls={listId} className="items-center">
-					{section.title}
+					{title}
 				</FoldButton>
-				<SectionCount section={view} />
+				<TableCount length={rows.length} yours={yours} summary={summary} />
 			</h3>
-			{open && (
-				<ul id={listId} aria-label={section.title} className="divide-y divide-border border-t border-border">
+			{open && rows.length > 0 && (
+				<ul id={listId} aria-label={title} className="divide-y divide-border border-t border-border">
 					{rows.map(row => (
-						<PullRequestTableRow key={row.row.pr.number} {...row} />
+						<PullRequestTableRow key={prKey(row.row.pr)} {...row} />
 					))}
 				</ul>
 			)}
@@ -87,7 +99,7 @@ function SectionCard({ view }: { view: SectionView }) {
 	);
 }
 
-function RepoTable({ view, empty }: { view: RepoView; empty: string }) {
+function RepoTable({ view }: { view: RepoView }) {
 	const { repo, name, bodyId, open, toggle, drag, moveId, sections } = view;
 	const workspaces = workspacesLabel(repo);
 	return (
@@ -109,9 +121,9 @@ function RepoTable({ view, empty }: { view: RepoView; empty: string }) {
 					{"error" in repo ? (
 						<RepoReadError name={name} error={repo.error} className="text-sm" />
 					) : sections.length === 0 ? (
-						note(empty)
+						note("No open pull requests of yours and no reviews waiting on you.")
 					) : (
-						sections.map(section => <SectionCard key={section.section.title} view={section} />)
+						sections.map(({ section, ...card }) => <TableCard key={section.title} {...card} title={section.title} yours={section.title === "Your move"} />)
 					)}
 				</div>
 			)}
@@ -119,75 +131,100 @@ function RepoTable({ view, empty }: { view: RepoView; empty: string }) {
 	);
 }
 
-/** The list's tables, one per repository, with what one says while the sections it shows hold none of its pull requests. */
+/** The list's tables, one per repository, which you drag or move with the keys. */
 function RepoTables({ pulls }: { pulls: PullRequests }) {
-	const [shown] = useShownSections();
-	const empty = shown.size < EVERY_SECTION.size ? "No pull requests in these sections." : "No open pull requests of yours and no reviews waiting on you.";
 	return (
 		<div className="space-y-8">
 			{usePullRequestsList(pulls).map(each => (
-				<RepoTable key={each.key} view={each} empty={empty} />
+				<RepoTable key={each.key} view={each} />
 			))}
 		</div>
 	);
 }
 
-/**
- * **Repositories**: `everyRepo`, every repository of the list in page order, each with a switch that shows or hides it
- * and buttons that move it one place among all of them, so a hidden one can move too.
- */
-function RepositoriesMenu({ everyRepo, order, setOrder }: { everyRepo: RepoPullRequests[]; order: PullRequestOrder; setOrder: (order: PullRequestOrder) => void }) {
-	const [open, setOpen] = useState(false);
-	const [hidden, toggleHidden] = useHiddenRepos();
-	const titleId = useId();
-	const rows = everyRepo.map(repo => {
-		const key = repoKey(repo);
-		return { key, label: repoName(repo), shown: !hidden.has(key) };
-	});
-	const keys = rows.map(({ key }) => key);
-	const hiddenCount = rows.filter(({ shown }) => !shown).length;
-	const label = hiddenCount === 0 ? "Repositories" : `Repositories: ${hiddenCount} hidden`;
+/** The list under a grouping other than by repository: a heading per group, each with its tables, in the list's order. */
+function GroupedTables({ pulls, groups }: { pulls: PullRequests; groups: ListGroup[] }) {
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<Tooltip content={label} forceOpen={open ? false : undefined}>
-				<PopoverTrigger asChild>
-					<Button
-						{...activityControl("pull-requests.repositories")}
-						variant="outline"
-						size={hiddenCount === 0 ? "icon-compact" : "compact"}
-						leadingIcon={hiddenCount === 0 ? undefined : IconSettingsSliderHor}
-						aria-label={`${label}. Hide repositories or change their order`}
-						data-state={open ? "open" : "closed"}
-						active={open}
-					>
-						{hiddenCount === 0 ? <IconSettingsSliderHor /> : `${hiddenCount} hidden`}
-					</Button>
-				</PopoverTrigger>
-			</Tooltip>
-			<PopoverContent
-				align="end"
-				collisionPadding={8}
-				aria-labelledby={titleId}
-				className="max-h-(--radix-popover-content-available-height) w-96 max-w-[calc(100vw-2rem)] space-y-3 overflow-y-auto p-3"
-			>
-				<PopoverHeader>
-					<PopoverTitle id={titleId} className="text-sm">
-						Repositories
-					</PopoverTitle>
-					<PopoverDescription className="text-xs">Hidden repositories also leave the tab's count. Saved in this browser.</PopoverDescription>
-				</PopoverHeader>
-				<ShownOrderList
-					rows={rows}
-					onShow={key => toggleHidden(key)}
-					onMove={(key, by) => {
-						const next = withRepoStepped(order, keys, keys, key, by);
-						if (next) setOrder(next);
-					}}
-					controls={{ show: "pull-requests.repository.toggle", move: "pull-requests.repository.move" }}
-				/>
-			</PopoverContent>
-		</Popover>
+		<div className="space-y-8">
+			{useGroupedList(pulls, groups).map(({ key, title, bodyId, open, toggle, cards }) => {
+				const tables = cards.map(({ key, section, ...card }) => <TableCard key={key} {...card} yours={section === "Your move"} summary={null} drag={null} moveId={null} />);
+				if (title === null)
+					return (
+						<div key={key} className="@container/pull-requests">
+							{tables}
+						</div>
+					);
+				return (
+					<section key={key} aria-label={title} className="@container/pull-requests space-y-3">
+						<h2 className="flex items-baseline gap-2 text-sm" style={{ fontVariationSettings: fontWeights.semibold }}>
+							<FoldButton open={open} onToggle={toggle} controls={bodyId}>
+								<span className="truncate">{title}</span>
+								<span className="text-xs tabular-nums text-muted-foreground" style={{ fontVariationSettings: fontWeights.normal }}>
+									{cards.reduce((sum, { rows }) => sum + rows.length, 0)}
+								</span>
+							</FoldButton>
+						</h2>
+						{open && (
+							<div id={bodyId} className="space-y-3">
+								{tables}
+							</div>
+						)}
+					</section>
+				);
+			})}
+		</div>
 	);
+}
+
+/** The search: a button that opens a field, which matches the title, number, branch, author, and repository; Escape clears and closes it. */
+function SearchField({ query, onQuery }: { query: string; onQuery: (query: string) => void }) {
+	const [open, setOpen] = useState(false);
+	if (!open && query === "")
+		return (
+			<Tooltip content="Search">
+				<Button {...activityControl("pull-requests.search")} variant="ghost" size="icon-compact" aria-label="Search pull requests" onClick={() => setOpen(true)}>
+					<IconMagnifyingGlass />
+				</Button>
+			</Tooltip>
+		);
+	const close = (): void => {
+		onQuery("");
+		setOpen(false);
+	};
+	return (
+		<div className="flex h-7 w-56 items-center gap-1.5 rounded-md border border-border bg-background pr-0.5 pl-2 focus-within:ring-1 focus-within:ring-ring">
+			<IconMagnifyingGlass aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+			<input
+				// biome-ignore lint/a11y/noAutofocus: the field opens on a click that asks to type in it
+				autoFocus
+				type="search"
+				value={query}
+				placeholder="Search pull requests"
+				aria-label="Search pull requests"
+				onChange={event => onQuery(event.target.value)}
+				onBlur={() => query === "" && setOpen(false)}
+				onKeyDown={event => {
+					if (event.key !== "Escape") return;
+					event.preventDefault();
+					close();
+				}}
+				className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+			/>
+			<Button variant="ghost" size="icon-compact" className="size-6 text-muted-foreground" aria-label="Clear the search" onMouseDown={event => event.preventDefault()} onClick={close}>
+				<IconCrossMedium />
+			</Button>
+		</div>
+	);
+}
+
+/** What the list shows: the tables, a note while the filters keep nothing, or one while you hid every repository. */
+function PullRequestsBody({ pulls }: { pulls: PullRequests }) {
+	const [hidden] = useHiddenRepos();
+	if (pulls.everyRepo.length === 0) return note("No session ran in a GitHub repository.");
+	if (pulls.everyRepo.every(repo => hidden.has(repoKey(repo)))) return <EveryRepositoryHidden everyRepo={pulls.everyRepo} />;
+	const empty = pulls.groups ? pulls.groups.length === 0 : pulls.repos.length === 0;
+	if (empty) return note("No pull requests match the filters.");
+	return pulls.groups ? <GroupedTables pulls={pulls} groups={pulls.groups} /> : <RepoTables pulls={pulls} />;
 }
 
 /** What the page shows while you hid every repository of `everyRepo`, with a button that shows them all again. */
@@ -195,7 +232,7 @@ function EveryRepositoryHidden({ everyRepo }: { everyRepo: RepoPullRequests[] })
 	const [, toggleHidden] = useHiddenRepos();
 	return (
 		<div className="space-y-3">
-			{note("Every repository is hidden. Show them from Repositories.")}
+			{note("Every repository is hidden. Show them from Display, then Repositories.")}
 			<Button {...activityControl("pull-requests.repositories.show-all")} size="compact" variant="outline" onClick={() => toggleHidden(...everyRepo.map(repoKey))}>
 				Show all repositories
 			</Button>
@@ -295,7 +332,7 @@ export function PullRequestsPage(props: PullRequestsPageProps) {
 
 /** A pull request's details on a page of their own, whose keys step through the list's pull requests in its order, leaving out what its folds hide. */
 function DetailsPage({ hosts, past, route, onDock }: { hosts: RosterHost[]; past: PastSession[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onDock: () => void }) {
-	const pulls = usePullRequests({ hosts, past, route });
+	const pulls = usePullRequests({ hosts, past, route, query: "" });
 	usePullRequestKeys(pulls, usePullRequestsFolds().isFolded);
 	return <PullRequestDetailPage hosts={hosts} target={route.target} files={route.files} onDock={onDock} />;
 }
@@ -307,7 +344,8 @@ function DetailsPage({ hosts, past, route, onDock }: { hosts: RosterHost[]; past
 function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPageProps & { onExpand: () => void }) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const pulls = usePullRequests({ hosts, past, route });
+	const [query, setQuery] = useState("");
+	const pulls = usePullRequests({ hosts, past, route, query });
 	const unmatched = pulls.poll.read?.data.unmatched ?? [];
 	const docked = route.target !== null ? route : null;
 	return (
@@ -324,6 +362,8 @@ function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPage
 						<>
 							<UnmatchedTip unmatched={unmatched} />
 							<RebaseBehindButton pulls={pulls} />
+							<SearchField query={query} onQuery={setQuery} />
+							{pulls.everyRepo.length > 0 && <NewPullRequestButton everyRepo={pulls.everyRepo} />}
 						</>
 					}
 					notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
@@ -331,22 +371,8 @@ function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPage
 				>
 					{() => (
 						<>
-							<PullRequestViewBar
-								order={pulls.order}
-								menus={
-									<>
-										<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />
-										{pulls.everyRepo.length > 0 && <RepositoriesMenu everyRepo={pulls.everyRepo} order={pulls.order} setOrder={pulls.setOrder} />}
-									</>
-								}
-							/>
-							{pulls.everyRepo.length === 0 ? (
-								note("No session ran in a GitHub repository.")
-							) : pulls.repos.length === 0 ? (
-								<EveryRepositoryHidden everyRepo={pulls.everyRepo} />
-							) : (
-								<RepoTables pulls={pulls} />
-							)}
+							<PullRequestViewBar pulls={pulls} />
+							<PullRequestsBody pulls={pulls} />
 						</>
 					)}
 				</ListPage>

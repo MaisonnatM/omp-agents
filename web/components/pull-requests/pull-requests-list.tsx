@@ -1,18 +1,17 @@
 /** What the Pull requests page's list and its details page share: the pull requests' state, their keys, and the list's repositories, sections, and rows. */
-import { IconArrowBottomTop, IconCloudSimpleDisconnected } from "central-icons";
+import { IconCloudSimpleDisconnected } from "central-icons";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
 import { type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, repoName, samePullRequest } from "../../../src/shared/github";
 import { type AgentOn, agentOn, moveOf } from "../../../src/shared/moves";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
 	DEFAULT_ORDER,
 	PULL_REQUEST_SORTS,
 	type ListChange,
+	type MoveGroup,
 	type PullRequestOrder,
 	type SectionRow,
 	type PullRequestSection,
@@ -30,7 +29,8 @@ import {
 	withRepoMoved,
 	withRepoStepped,
 } from "../../pull-requests-model";
-import { useHiddenRepos, usePullRequestsFolds, usePullRequestsOrder, useShownSections } from "../../pull-requests-state";
+import { cardFoldKey, filters, groupedList, groupedPullRequests, groupFoldKey, keepsPullRequest, type ListGroup, type PullRequestDisplay, shownSectionsOf } from "../../pull-requests-filter";
+import { useHiddenRepos, usePullRequestsDisplay, usePullRequestsFilter, usePullRequestsFolds, usePullRequestsOrder } from "../../pull-requests-state";
 import { moveKey, stepTarget, type Where } from "../../order";
 import { folderName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
@@ -46,8 +46,6 @@ import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { useReveal } from "../fold";
 import { stepRows } from "../list-page";
 import { type RowBase, type RowProps, rowElement, rowId, sameSessions, sessionsByPullRequest } from "./pr-row";
-
-const SORTS = Object.keys(PULL_REQUEST_SORTS) as PullRequestSort[];
 
 /** Moves a focused heading or row one place; `false` at the edge. */
 type Move = (by: 1 | -1) => boolean;
@@ -71,10 +69,13 @@ function placeOf(repos: readonly RepoPullRequests[], sectionsOf: readonly PullRe
  * action that makes the move of the focused row's pull request, or the one the main area shows, the one its row's menu
  * would, even in a repository you hid. A key that has nothing to act on keeps its usual meaning.
  */
-export function usePullRequestKeys({ poll, repos, sectionsOf, agent, route, onActionsOpenChange }: PullRequests, isFolded: (key: string) => boolean): void {
+export function usePullRequestKeys({ poll, repos, sectionsOf, groups, display, agent, route, onActionsOpenChange }: PullRequests, isFolded: (key: string) => boolean): void {
 	const { start } = useDashboardActions();
 	const { target } = route;
-	const shown = useMemo(() => shownPullRequests(repos, sectionsOf, isFolded), [repos, sectionsOf, isFolded]);
+	const shown = useMemo(
+		() => (groups ? groupedPullRequests(display.grouping, groups, isFolded) : shownPullRequests(repos, sectionsOf, isFolded)),
+		[groups, display.grouping, repos, sectionsOf, isFolded],
+	);
 	const current = (): number =>
 		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowElement(pr)?.contains(document.activeElement) ?? false);
 	const step = (by: 1 | -1): boolean => {
@@ -138,33 +139,6 @@ function useMoveKeys(moves: ReadonlyMap<string, Move>): void {
 	useShortcuts({ moveUp: () => move(-1), moveDown: () => move(1) });
 }
 
-export function SortMenu({ order, onSort, onReset }: { order: PullRequestOrder; onSort: (sort: PullRequestSort) => void; onReset: () => void }) {
-	const [open, setOpen] = useState(false);
-	const label = `Sort: ${PULL_REQUEST_SORTS[order.sort]}`;
-	return (
-		<DropdownMenu open={open} onOpenChange={setOpen}>
-			<Tooltip content={label} forceOpen={open ? false : undefined}>
-				<DropdownMenuTrigger render={<Button variant="outline" size="icon-compact" aria-label={`${label}. Change the pull requests' order`} />}>
-					<IconArrowBottomTop />
-				</DropdownMenuTrigger>
-			</Tooltip>
-			<DropdownMenuContent align="end" className="w-52">
-				<MenuRadioGroup value={order.sort} onValueChange={(sort: PullRequestSort) => onSort(sort)}>
-					{SORTS.map(sort => (
-						<MenuRadioItem key={sort} value={sort} closeOnClick>
-							{PULL_REQUEST_SORTS[sort]}
-						</MenuRadioItem>
-					))}
-				</MenuRadioGroup>
-				<MenuSeparator />
-				<MenuItem disabled={JSON.stringify(order) === JSON.stringify(DEFAULT_ORDER)} onClick={onReset}>
-					Reset the order
-				</MenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
-
 /** The workspace a repository's heading names after it: a lone workspace whose folder is not the repository's name, or how many there are. */
 export function workspacesLabel({ repo, cwds }: RepoPullRequests): string | null {
 	if (cwds.length !== 1) return `${cwds.length} workspaces`;
@@ -224,6 +198,28 @@ export interface RepoView extends Placed {
 	sections: SectionView[];
 }
 
+/** A table under a heading of a grouping other than by repository, whose rows keep the list's order. */
+export interface CardView {
+	key: string;
+	title: string;
+	/** The section it lists, whose count **Your move** draws stronger; `null` for a table of several sections. */
+	section: MoveGroup | null;
+	listId: string;
+	open: boolean;
+	toggle: () => void;
+	rows: RowProps[];
+}
+
+/** A heading of a grouping other than by repository; `title` is `null` under no grouping, whose one table has none. */
+export interface GroupView {
+	key: string;
+	title: string | null;
+	bodyId: string;
+	open: boolean;
+	toggle: () => void;
+	cards: CardView[];
+}
+
 /** The pull requests of a workspace, read from GitHub, and what the list and the details page share. */
 export interface PullRequests {
 	poll: PolledEntry<PullRequestList>;
@@ -235,9 +231,14 @@ export interface PullRequests {
 	setOrder: (order: PullRequestOrder) => void;
 	onSort: (sort: PullRequestSort) => void;
 	onReset: () => void;
-	/** The repositories you did not hide, in the list's order, and the sections of each that the tab or Filter shows, at the same index. */
+	/** The repositories the list shows, in its order, and the sections of each that the tab or **Filter** shows, at the same index. */
 	repos: RepoPullRequests[];
 	sectionsOf: PullRequestSection[][];
+	/** The list's headings and tables under a grouping other than by repository; `null` while it groups by repository. */
+	groups: ListGroup[] | null;
+	display: PullRequestDisplay;
+	/** Whether **Filter** or the search leaves any pull request out. */
+	filtering: boolean;
 	/** Every repository in the list's order, those you hid too. */
 	everyRepo: RepoPullRequests[];
 	/** Every pull request's key in the order the list shows them now; placing one by hand starts the manual sort from it. */
@@ -258,6 +259,8 @@ interface PullRequestsProps {
 	past: PastSession[];
 	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
 	route: PullRequestsRoute;
+	/** What the search field holds; empty matches every pull request. */
+	query: string;
 }
 
 /** What makes an item's drag: the arguments of `useDragOrder`'s function, which change with every drag and so are called in a pass of their own. */
@@ -302,14 +305,15 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
 }
 
 /** The pull requests of the sidebar's scope, with the state and the functions that the list and the details page share. */
-export function usePullRequests({ hosts, past, route }: PullRequestsProps): PullRequests {
+export function usePullRequests({ hosts, past, route, query }: PullRequestsProps): PullRequests {
 	const targetKey = route.target ? prKey(route.target) : null;
 	const { open, start } = useDashboardActions();
 	const { starts: { quick }, pullRequestsScope: scope } = useDashboardStatus();
 	const poll = pullRequestsStore.use(scope);
 	const read = poll.read?.data ?? null;
 	const [hidden] = useHiddenRepos();
-	const [shown] = useShownSections();
+	const [filter] = usePullRequestsFilter();
+	const [display] = usePullRequestsDisplay();
 	const [order, setOrder] = usePullRequestsOrder();
 	const agent = useMemo(() => agentOn(hosts), [hosts]);
 	const sessions = useSessionsByPullRequest(hosts, past);
@@ -348,7 +352,22 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 	const everyRepo = useMemo(() => (read ? orderedRepos(read.repos, order) : []), [read, order]);
 	const repos = useMemo(() => (hidden.size === 0 ? everyRepo : everyRepo.filter(repo => !hidden.has(repoKey(repo)))), [everyRepo, hidden]);
 	const everySectionOf = useMemo(() => sectionsOfRepos(repos, order, agent), [repos, order, agent]);
-	const sectionsOf = useMemo(() => everySectionOf.map(sections => sections.filter(({ title }) => shown.has(title))), [everySectionOf, shown]);
+	const filtering = filters(filter) || query.trim() !== "";
+	// What the list shows: the repositories Filter keeps, the pull requests it and the search keep, sectioned again so stacks join among those alone.
+	const listed = useMemo(() => {
+		const now = Date.now();
+		const kept = repos
+			.filter(repo => filter.repos.size === 0 || filter.repos.has(repoKey(repo)))
+			.map(repo => ("error" in repo ? repo : { ...repo, pullRequests: repo.pullRequests.filter(pr => keepsPullRequest(pr, filter, query, now)) }));
+		const sections = sectionsOfRepos(kept, order, agent).map(each => shownSectionsOf(each, filter.sections, order, display.empty));
+		// A filter leaves out a repository it empties, unless Show empty sections keeps them.
+		const at = kept.flatMap((repo, index) => (!filtering || display.empty || "error" in repo || sections[index]!.some(({ rows }) => rows.length > 0) ? [index] : []));
+		return { repos: at.map(index => kept[index]!), sectionsOf: at.map(index => sections[index]!) };
+	}, [repos, filter, query, order, agent, display.empty, filtering]);
+	const groups = useMemo(
+		() => (display.grouping === "repository" ? null : groupedList(display.grouping, listed.repos, listed.sectionsOf, order)),
+		[display.grouping, listed, order],
+	);
 	const behind = useMemo(
 		() =>
 			repos.flatMap((repo): RebaseJob[] => {
@@ -372,8 +391,11 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 		setOrder,
 		onSort: sort => setOrder({ ...order, sort, manual: sort === "manual" ? shownOrder : order.manual }),
 		onReset: () => setOrder(DEFAULT_ORDER),
-		repos,
-		sectionsOf,
+		repos: listed.repos,
+		sectionsOf: listed.sectionsOf,
+		groups,
+		display,
+		filtering,
 		everyRepo,
 		shownOrder,
 		rowBase,
@@ -490,4 +512,54 @@ export function usePullRequestsList(pulls: PullRequests): RepoView[] {
 			})),
 		}));
 	}, [layout, drag, rowBase]);
+}
+
+/**
+ * The list under a grouping other than by repository: `pulls.groups` with their folds and the keys that move through
+ * their rows. Its rows keep the list's order, so nothing drags. Mount it once per screen, in place of
+ * {@link usePullRequestsList}.
+ */
+export function useGroupedList(pulls: PullRequests, groups: readonly ListGroup[]): GroupView[] {
+	const { route: { target }, display: { grouping }, rowBase } = pulls;
+	const folds = usePullRequestsFolds();
+	const place = useMemo(() => {
+		if (!target) return null;
+		for (const group of groups) {
+			const card = group.cards.find(({ rows }) => rows.some(({ row }) => samePullRequest(row.pr, target)));
+			if (card) {
+				const key = groupFoldKey(grouping, group.key);
+				return group.title === null ? [cardFoldKey(key, card.key)] : [key, cardFoldKey(key, card.key)];
+			}
+		}
+		return null;
+	}, [groups, grouping, target]);
+	const reveal = target && place ? { id: rowId(target), folds: place } : null;
+	useReveal(reveal, folds, { token: reveal?.id, block: "nearest", focus: false });
+	usePullRequestKeys(pulls, folds.isFolded);
+	return useMemo(
+		() =>
+			groups.map((group): GroupView => {
+				const key = groupFoldKey(grouping, group.key);
+				return {
+					key: group.key,
+					title: group.title,
+					bodyId: sectionId("pull-requests", key),
+					open: group.title === null || !folds.isFolded(key),
+					toggle: () => folds.toggle(key),
+					cards: group.cards.map((card): CardView => {
+						const cardKey = cardFoldKey(key, card.key);
+						return {
+							key: card.key,
+							title: card.title,
+							section: card.section,
+							listId: sectionId("pull-requests", cardKey),
+							open: !folds.isFolded(cardKey),
+							toggle: () => folds.toggle(cardKey),
+							rows: card.rows.map(({ row, repo }): RowProps => ({ ...rowBase(row, repo.cwds[0]!), drag: null, moveId: null })),
+						};
+					}),
+				};
+			}),
+		[groups, grouping, folds, rowBase],
+	);
 }

@@ -252,7 +252,7 @@ export function useDashboard(): Dashboard {
 							// A fork's composer opens on the prompt it branched at, to edit, and a sent first message leaves the new-session draft.
 							// Both are written before `answer` shows the layout, which mounts the fork's composer.
 							if (op.kind === "fork" && op.point.prefill && msg.result.prompt) putDraft(liveDraftKey({ kind: "live", instanceId: msg.result.instanceId, agentId: null }), msg.result.prompt);
-							if (op.kind === "new") clearDraft(newDraftKey(op.todoId));
+							if (op.kind === "new" && op.fromDraft) clearDraft(newDraftKey(op.todoId));
 						}
 						answer(msg, start && msg.result.ok ? layoutAfterStart(layoutRef.current, start.op, msg.result.instanceId) : null);
 						return;

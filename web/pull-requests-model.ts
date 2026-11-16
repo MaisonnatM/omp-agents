@@ -47,50 +47,8 @@ const GROUPS: Record<MoveGroup, { folded: boolean }> = {
 	"Recently merged": { folded: true },
 };
 
-const GROUP_TITLES = Object.keys(GROUPS) as MoveGroup[];
-
-/** The sections the list shows, which the filter above it picks; never empty. */
-export type ShownSections = ReadonlySet<MoveGroup>;
-
-export const EVERY_SECTION: ShownSections = new Set(GROUP_TITLES);
-
-/** A tab above the list, which shows a preset of its sections. */
-export type PullRequestView = "open" | "your-move" | "approved" | "merged" | "all";
-
-export const PULL_REQUEST_VIEWS: Record<PullRequestView, { label: string; sections: ShownSections }> = {
-	open: { label: "Open", sections: new Set(GROUP_TITLES.filter(title => title !== "Recently merged")) },
-	"your-move": { label: "Your move", sections: new Set(["Your move"]) },
-	approved: { label: "Approved", sections: new Set(["Approved"]) },
-	merged: { label: "Merged", sections: new Set(["Recently merged"]) },
-	all: { label: "All", sections: EVERY_SECTION },
-};
-
-const sameSections = (a: ShownSections, b: ShownSections): boolean => a.size === b.size && [...a].every(title => b.has(title));
-
-/** The tab whose preset `shown` is, `null` for sections you picked one by one. */
-export const viewOf = (shown: ShownSections): PullRequestView | null =>
-	(Object.keys(PULL_REQUEST_VIEWS) as PullRequestView[]).find(view => sameSections(PULL_REQUEST_VIEWS[view].sections, shown)) ?? null;
-
-/** `shown` with `title` flipped; the same set when that would leave no section. */
-export function withSectionToggled(shown: ShownSections, title: MoveGroup): ShownSections {
-	const next = new Set(shown);
-	if (!next.delete(title)) next.add(title);
-	return next.size === 0 ? shown : next;
-}
-
-/** The stored sections, or {@link EVERY_SECTION} for what is missing, unreadable, or names none. */
-export function decodeShownSections(raw: string | null): ShownSections {
-	let stored: unknown;
-	try {
-		stored = JSON.parse(raw ?? "null");
-	} catch {
-		return EVERY_SECTION;
-	}
-	const titles = strings(stored).filter((title): title is MoveGroup => Object.hasOwn(GROUPS, title));
-	return titles.length === 0 ? EVERY_SECTION : new Set(titles);
-}
-
-export const encodeShownSections = (shown: ShownSections): string => JSON.stringify(GROUP_TITLES.filter(title => shown.has(title)));
+/** The list's sections in page order, before your own order of them. */
+export const GROUP_TITLES = Object.keys(GROUPS) as MoveGroup[];
 
 /** The moves, in rank order, that leave an approved pull request of yours in **Approved**: none asks you to fix anything. */
 const APPROVED_MOVES: MoveId[] = ["merge", "checks-running", "draft"];
@@ -247,7 +205,7 @@ export interface PullRequestOrder {
 
 export const DEFAULT_ORDER: PullRequestOrder = { repos: [], sections: [], sort: "updated", manual: [] };
 
-const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter(item => typeof item === "string") : []);
+export const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter(item => typeof item === "string") : []);
 
 /** The stored order, or {@link DEFAULT_ORDER} for what is missing or unreadable. */
 export function decodeOrder(raw: string | null): PullRequestOrder {

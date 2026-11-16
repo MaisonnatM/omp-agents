@@ -142,7 +142,7 @@ export const PageSwitch = memo(function PageSwitch({
 						dismissStart("new");
 						location.hash = hashForNewSession(next, page.todoId);
 					}}
-					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId })}
+					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId, fromDraft: true })}
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}

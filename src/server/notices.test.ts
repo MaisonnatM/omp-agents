@@ -55,6 +55,7 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
 	viewerApproved: false,
+	createdAt: 0,
 	updatedAt: 1_000,
 	...fields,
 });
