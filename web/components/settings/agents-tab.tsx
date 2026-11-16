@@ -24,8 +24,6 @@ const selectors = (value: AgentModelOverride | undefined): string =>
 
 function EffectiveModel({ agent, compact = false }: { agent: AgentDefinitionPreview; compact?: boolean }) {
 	switch (agent.model.kind) {
-		case "source-session":
-			return <>Model chosen from source session or invocation</>;
 		case "inherited":
 			return <>Inherits the session model</>;
 		case "resolved":
@@ -59,7 +57,7 @@ function OverrideEditor({
 	name: string;
 	value: AgentModelOverride | undefined;
 	workspace?: AgentModelOverride;
-	mode: "editable" | "missing" | "seance";
+	mode: "editable" | "missing";
 	roles: string[];
 	editing: Editing;
 	projectFile?: OmpFile;
@@ -90,7 +88,7 @@ function OverrideEditor({
 				<span id={label} className="text-sm font-medium">
 					User model override
 				</span>
-				{(mode !== "seance" || value !== undefined) && <EditBar editor={editor} label={`${name} model override`} />}
+				<EditBar editor={editor} label={`${name} model override`} />
 			</div>
 			{viewing ? (
 				<p className="break-words text-sm">{selectors(value)}</p>
@@ -142,12 +140,7 @@ function OverrideEditor({
 					)}
 				</fieldset>
 			)}
-			{mode === "seance" && (
-				<p className="text-xs text-muted-foreground">
-					Not used by bundled seance. You can clear a saved override, but its model comes from the source session or invocation.
-				</p>
-			)}
-			{workspace !== undefined && mode !== "seance" && (
+			{workspace !== undefined && (
 				<p className="text-xs text-muted-foreground">
 					Saved for other workspaces. This workspace still uses {selectors(workspace)}.{" "}
 					{projectFile && (
@@ -221,13 +214,13 @@ function AgentRow({
 						{agent.tools === null ? "Full capabilities; runtime availability varies" : agent.tools.length ? agent.tools.join(", ") : "No tools declared"}
 					</dd>
 					<dt className="text-muted-foreground">Isolation</dt>
-					<dd>{agent.seance ? "Unsupported for bundled seance" : `Chosen per task, ${isolation ? "allowed here" : "not allowed here"}`}</dd>
+					<dd>Chosen per task, {isolation ? "allowed here" : "not allowed here"}</dd>
 					<dt className="text-muted-foreground">Definition</dt>
 					<dd className="break-words">{agent.definition.join(", ") || "Inherit session model"}</dd>
 					<dt className="text-muted-foreground">Effective</dt>
 					<dd className="break-words">
 						<EffectiveModel agent={agent} />
-						{agent.workspace !== undefined ? " · Workspace override" : agent.user !== undefined && !agent.seance ? " · User override" : ""}
+						{agent.workspace !== undefined ? " · Workspace override" : agent.user !== undefined ? " · User override" : ""}
 					</dd>
 					{agent.effective.length > 0 && (
 						<>
@@ -241,7 +234,7 @@ function AgentRow({
 					name={agent.name}
 					value={agent.user}
 					workspace={agent.workspace}
-					mode={agent.seance ? "seance" : "editable"}
+					mode="editable"
 					roles={catalog.roles}
 					editing={editing}
 					projectFile={projectFile}

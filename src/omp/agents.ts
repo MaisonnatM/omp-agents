@@ -50,22 +50,20 @@ export async function readAgentCatalog(cwd: string | null, settings: OmpSettings
 	}
 	const rows = agents.filter(agent => cwd !== null || agent.source !== "project").map((agent): AgentDefinitionPreview => {
 		const root = agent.filePath && roots.find(root => agent.filePath!.startsWith(`${root.path}${sep}`));
-		const seance = agent.name === "seance" && agent.source === "bundled";
-		const selection = modelResolver.resolveAgentModelSelection({ settingsOverride: seance ? undefined : overrides[agent.name], agentModel: agent.model, settings, activeModelPattern: PARENT_MODEL });
+		const selection = modelResolver.resolveAgentModelSelection({ settingsOverride: overrides[agent.name], agentModel: agent.model, settings, activeModelPattern: PARENT_MODEL });
 		const inherited = selection.patterns.includes(PARENT_MODEL);
-		const effective = inherited || seance ? [] : selection.patterns;
+		const effective = inherited ? [] : selection.patterns;
 		const resolved = modelResolver.resolveModelOverride(effective, { getAvailable: () => pool }, settings);
 		return {
 			name: agent.name, description: agent.description, scope: agent.source,
 			origin: agent.source === "bundled" ? "bundled" : root ? "plugin" : "native",
 			...(root ? { package: root.name } : {}), ...(agent.filePath ? { path: agent.filePath } : {}),
 			tools: agent.tools ?? null, readOnly: agentReadOnly.isReadOnlyAgent(agent), disabled: disabled.includes(agent.name),
-			seance,
 			definition: agent.model ?? [],
 			...(Object.hasOwn(userOverrides, agent.name) ? { user: userOverrides[agent.name] } : {}),
 			...(Object.hasOwn(workspaceOverrides, agent.name) ? { workspace: workspaceOverrides[agent.name] } : {}),
 			effective,
-			model: seance ? { kind: "source-session" } : inherited ? { kind: "inherited" } : resolved.model ? { kind: "resolved", selector: `${resolved.model.provider}/${resolved.model.id}`, ...(resolved.thinkingLevel ? { thinking: resolved.thinkingLevel } : {}) } : { kind: "unresolved", ...(resolved.warning ? { warning: resolved.warning } : {}) },
+			model: inherited ? { kind: "inherited" } : resolved.model ? { kind: "resolved", selector: `${resolved.model.provider}/${resolved.model.id}`, ...(resolved.thinkingLevel ? { thinking: resolved.thinkingLevel } : {}) } : { kind: "unresolved", ...(resolved.warning ? { warning: resolved.warning } : {}) },
 		};
 	}).sort((a, b) => a.name.localeCompare(b.name));
 	return {
