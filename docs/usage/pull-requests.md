@@ -128,15 +128,15 @@
 - Tabs above the list show part of it: **Open** every section but **Recently merged**, **Your move**, **Approved**, and **Merged** that one section, and **All**, the default, every section.
   A tab reads as picked only while the sections shown are exactly its own, so sections you switch one by one leave no tab picked.
 - **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section**, **Repository**, and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.
-  Each field you set adds a chip under the tabs, such as **Author is MaisonnatM** or **Repository is either of 2 repositories**, whose tooltip names them; click the value to change it, or its × to drop the field, and **Clear all** drops every field once two chips show.
+  Each field you set adds a chip under the tabs, such as **Author is MaisonnatM** or **Repository is any of 2 repositories**, whose tooltip names them; click the value to change it, or its × to drop the field, and **Clear all** drops every field once two chips show.
   The last section shown stays on.
   The author, date, and search filters apply before stacks join, so a stack keeps only the pull requests that match.
-  While any filter or search is set, a repository with nothing left leaves the page, unless **Show empty sections** in **Display** is on; "No pull requests match the filters." shows when nothing is left.
+  While any filter or search is set, a repository with nothing left leaves the page, unless **Show empty sections** in **Display** is on; when nothing is left, a note names the search or the filters with a button that clears them.
   The filtered pull requests leave the table and ↓ and ↑; **Rebase N behind** and the **Pull requests** tab's count still cover them.
   The browser keeps the filter across reloads.
-- The magnifier in the page header opens a search field that keeps the pull requests whose title, number, branch, author, or repository contain every word you type; Escape or its × clears it.
+- The search field in the page header keeps the pull requests whose title, number, branch, author, or repository contain every word you type; Escape clears it.
   The page forgets the search when you leave it.
-- **Display**, the sliders button beside **Filter**, holds **Grouping**, **Ordering**, **Show empty sections**, and **Repositories…**.
+- **Display**, the sliders button beside **Filter**, holds **Grouping**, **Ordering**, **Show empty sections**, and **Repositories…**; it stays highlighted while you hide a repository.
   **Grouping** lays the list out by **Repository**, the default, by **Section** with a table per repository under each section, by **Author**, most pull requests first, with a table per section under each author, or with **No grouping**, one table of every pull request, in section order.
   Every grouping but **Repository** folds its own headings and keeps no drag; **Waiting on others** and **Recently merged** start folded there too.
   **Ordering** orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.

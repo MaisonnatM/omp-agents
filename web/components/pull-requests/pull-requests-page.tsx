@@ -2,7 +2,7 @@
  * The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it
  * is, with the details of the pull request it shows docked beside it.
  */
-import { IconArrowRotateClockwise, IconCrossMedium, IconExpand, IconMagnifyingGlass } from "central-icons";
+import { IconArrowRotateClockwise, IconCrossMedium, IconExpand } from "central-icons";
 import { type PullRequest, prKey, repoKey, type RepoPullRequests } from "../../../src/shared/github";
 import { useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import type { ListGroup } from "../../pull-requests-filter";
-import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsFolds } from "../../pull-requests-state";
+import { filters, type ListGroup, NO_FILTER } from "../../pull-requests-filter";
+import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsFilter, usePullRequestsFolds } from "../../pull-requests-state";
 import { activityControl } from "../../activity";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import { useRebasing } from "../../pull-request-rebases";
@@ -24,6 +24,7 @@ import { Separator, useDragSeparator } from "../drag-separator";
 import { FoldButton } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
+import { SearchField } from "../search-field";
 import { Spinner } from "../spinner";
 import { type PullRequests, RepoReadError, type RepoView, UnmatchedTip, useGroupedList, usePullRequestKeys, usePullRequests, usePullRequestsList, workspacesLabel } from "./pull-requests-list";
 import type { PullRequestDetailTab } from "./pr-details";
@@ -176,54 +177,34 @@ function GroupedTables({ pulls, groups }: { pulls: PullRequests; groups: ListGro
 	);
 }
 
-/** The search: a button that opens a field, which matches the title, number, branch, author, and repository; Escape clears and closes it. */
-function SearchField({ query, onQuery }: { query: string; onQuery: (query: string) => void }) {
-	const [open, setOpen] = useState(false);
-	if (!open && query === "")
-		return (
-			<Tooltip content="Search">
-				<Button {...activityControl("pull-requests.search")} variant="ghost" size="icon-compact" aria-label="Search pull requests" onClick={() => setOpen(true)}>
-					<IconMagnifyingGlass />
-				</Button>
-			</Tooltip>
-		);
-	const close = (): void => {
-		onQuery("");
-		setOpen(false);
-	};
-	return (
-		<div className="flex h-7 w-56 items-center gap-1.5 rounded-md border border-border bg-background pr-0.5 pl-2 focus-within:ring-1 focus-within:ring-ring">
-			<IconMagnifyingGlass aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-			<input
-				// biome-ignore lint/a11y/noAutofocus: the field opens on a click that asks to type in it
-				autoFocus
-				type="search"
-				value={query}
-				placeholder="Search pull requests"
-				aria-label="Search pull requests"
-				onChange={event => onQuery(event.target.value)}
-				onBlur={() => query === "" && setOpen(false)}
-				onKeyDown={event => {
-					if (event.key !== "Escape") return;
-					event.preventDefault();
-					close();
-				}}
-				className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
-			/>
-			<Button variant="ghost" size="icon-compact" className="size-6 text-muted-foreground" aria-label="Clear the search" onMouseDown={event => event.preventDefault()} onClick={close}>
-				<IconCrossMedium />
-			</Button>
-		</div>
-	);
-}
-
-/** What the list shows: the tables, a note while the filters keep nothing, or one while you hid every repository. */
-function PullRequestsBody({ pulls }: { pulls: PullRequests }) {
+/** What the list shows: the tables, a note while the search or the filters keep nothing, or one while you hid every repository. */
+function PullRequestsBody({ pulls, query, onQuery }: { pulls: PullRequests; query: string; onQuery: (query: string) => void }) {
 	const [hidden] = useHiddenRepos();
+	const [filter, setFilter] = usePullRequestsFilter();
 	if (pulls.everyRepo.length === 0) return note("No session ran in a GitHub repository.");
 	if (pulls.everyRepo.every(repo => hidden.has(repoKey(repo)))) return <EveryRepositoryHidden everyRepo={pulls.everyRepo} />;
 	const empty = pulls.groups ? pulls.groups.length === 0 : pulls.repos.length === 0;
-	if (empty) return note("No pull requests match the filters.");
+	if (empty) {
+		const searching = query.trim() !== "";
+		const filtering = filters(filter);
+		const what = searching && filtering ? "the search and these filters" : searching ? `“${query.trim()}”` : "these filters";
+		return (
+			<div className="space-y-3">
+				{note(`No pull requests match ${what}.`)}
+				<Button
+					{...activityControl("pull-requests.filter.clear")}
+					size="compact"
+					variant="outline"
+					onClick={() => {
+						if (searching) onQuery("");
+						if (filtering) setFilter(NO_FILTER);
+					}}
+				>
+					{searching && filtering ? "Clear the search and filters" : searching ? "Clear the search" : "Clear the filters"}
+				</Button>
+			</div>
+		);
+	}
 	return pulls.groups ? <GroupedTables pulls={pulls} groups={pulls.groups} /> : <RepoTables pulls={pulls} />;
 }
 
@@ -362,7 +343,9 @@ function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPage
 						<>
 							<UnmatchedTip unmatched={unmatched} />
 							<RebaseBehindButton pulls={pulls} />
-							<SearchField query={query} onQuery={setQuery} />
+							<span {...activityControl("pull-requests.search")}>
+								<SearchField label="Search pull requests" placeholder="Search" query={query} onQuery={setQuery} className="w-36" />
+							</span>
 							{pulls.everyRepo.length > 0 && <NewPullRequestButton everyRepo={pulls.everyRepo} />}
 						</>
 					}
@@ -372,7 +355,7 @@ function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPage
 					{() => (
 						<>
 							<PullRequestViewBar pulls={pulls} />
-							<PullRequestsBody pulls={pulls} />
+							<PullRequestsBody pulls={pulls} query={query} onQuery={setQuery} />
 						</>
 					)}
 				</ListPage>

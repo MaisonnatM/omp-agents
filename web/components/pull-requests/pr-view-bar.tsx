@@ -4,7 +4,7 @@
  * filter that leaves something out.
  */
 import { IconCalendar4, IconCalendarClock4, IconCrossMedium, IconFilter1, IconFolder1, IconLayersTwo, IconSettingsSliderHor, IconUser } from "central-icons";
-import { type ComponentType, type ReactNode, useId, useState } from "react";
+import { type ComponentType, type ReactNode, useId, useRef, useState } from "react";
 import { repoKey, repoName } from "../../../src/shared/github";
 import type { ControlId as ActivityControlId } from "../../../src/shared/activity";
 import { Button } from "@/components/ui/button";
@@ -99,7 +99,7 @@ function useFilterFields(pulls: PullRequests): { filter: PullRequestFilter; setF
 	const set = (change: Partial<PullRequestFilter>): void => setFilter({ ...filter, ...change });
 	const day = (id: "created" | "since", label: string, icon: FilterField["icon"], control: ActivityControlId): FilterField => {
 		const value = filter[id];
-		return { id, label, icon, control, active: value !== null, verb: "in", value: value === null ? "Any time" : DAY_RANGES[value], full: "", clear: () => set({ [id]: null }), items: dayItems(value, control, next => set({ [id]: next })) };
+		return { id, label, icon, control, active: value !== null, verb: "in the", value: value === null ? "Any time" : DAY_RANGES[value].toLowerCase(), full: "", clear: () => set({ [id]: null }), items: dayItems(value, control, next => set({ [id]: next })) };
 	};
 	return {
 		filter,
@@ -111,7 +111,7 @@ function useFilterFields(pulls: PullRequests): { filter: PullRequestFilter; setF
 				icon: IconLayersTwo,
 				control: "pull-requests.filter.section",
 				active: filter.sections.size < EVERY_SECTION.size,
-				verb: shownTitles.length === 1 ? "is" : "is either of",
+				verb: shownTitles.length === 1 ? "is" : "is any of",
 				value: setValue(shownTitles, "sections"),
 				full: shownTitles.join(", "),
 				clear: () => set({ sections: EVERY_SECTION }),
@@ -130,7 +130,7 @@ function useFilterFields(pulls: PullRequests): { filter: PullRequestFilter; setF
 				icon: IconFolder1,
 				control: "pull-requests.filter.repository",
 				active: filter.repos.size > 0,
-				verb: repoNames.length === 1 ? "is" : "is either of",
+				verb: repoNames.length === 1 ? "is" : "is any of",
 				value: setValue(repoNames, "repositories"),
 				full: repoNames.join(", "),
 				clear: () => set({ repos: new Set() }),
@@ -147,7 +147,7 @@ function useFilterFields(pulls: PullRequests): { filter: PullRequestFilter; setF
 				icon: IconUser,
 				control: "pull-requests.filter.author",
 				active: filter.authors.size > 0,
-				verb: filter.authors.size === 1 ? "is" : "is either of",
+				verb: filter.authors.size === 1 ? "is" : "is any of",
 				value: setValue([...filter.authors], "authors"),
 				full: [...filter.authors].join(", "),
 				clear: () => set({ authors: new Set() }),
@@ -167,8 +167,9 @@ function useFilterFields(pulls: PullRequests): { filter: PullRequestFilter; setF
 /** `Field · verb · value · ×`: what a filter keeps, whose value reopens its rows and whose × removes it. */
 function FilterChip({ field }: { field: FilterField }) {
 	const { label, icon: Icon, verb, value, full, clear, items } = field;
+	const [open, setOpen] = useState(false);
 	const cell = "flex items-center px-2";
-	const pressable = "outline-none transition-colors hover:bg-accent focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)] focus-visible:ring-inset";
+	const pressable = "outline-none transition-colors hover:bg-accent focus-visible:ring-1 focus-visible:ring-focus-ring focus-visible:ring-inset";
 	return (
 		<div role="group" aria-label={`Filter: ${label}`} className="inline-flex h-7 items-stretch divide-x divide-border overflow-hidden rounded-md border border-border bg-popover text-xs">
 			<span className={`${cell} gap-1.5 font-medium`}>
@@ -176,8 +177,10 @@ function FilterChip({ field }: { field: FilterField }) {
 				{label}
 			</span>
 			<span className={`${cell} text-muted-foreground`}>{verb}</span>
-			<DropdownMenu>
-				<DropdownMenuTrigger render={<button type="button" title={full || undefined} className={`${cell} font-medium ${pressable}`} />}>{value}</DropdownMenuTrigger>
+			<DropdownMenu open={open} onOpenChange={setOpen}>
+				<Tooltip content={full || value} forceOpen={open ? false : undefined}>
+					<DropdownMenuTrigger render={<button type="button" className={`${cell} font-medium ${pressable}`} />}>{value}</DropdownMenuTrigger>
+				</Tooltip>
 				<DropdownMenuContent align="start" className="w-56">
 					{items}
 				</DropdownMenuContent>
@@ -193,9 +196,10 @@ function FilterChip({ field }: { field: FilterField }) {
 
 /** **Filter**: a submenu per field, each naming what it keeps while it leaves something out. */
 function FilterMenu({ fields, active }: { fields: FilterField[]; active: boolean }) {
+	const [open, setOpen] = useState(false);
 	return (
-		<DropdownMenu>
-			<Tooltip content="Filter">
+		<DropdownMenu open={open} onOpenChange={setOpen}>
+			<Tooltip content="Filter" forceOpen={open ? false : undefined}>
 				<DropdownMenuTrigger render={<Button {...activityControl("pull-requests.filter")} variant="outline" size="icon-compact" aria-label="Filter" active={active} />}>
 					<IconFilter1 />
 				</DropdownMenuTrigger>
@@ -245,6 +249,8 @@ function DisplayMenu({ pulls }: { pulls: PullRequests }) {
 	const [display, setDisplay] = usePullRequestsDisplay();
 	const [hidden] = useHiddenRepos();
 	const [repositories, setRepositories] = useState(false);
+	const [menu, setMenu] = useState(false);
+	const button = useRef<HTMLButtonElement>(null);
 	const titleId = useId();
 	const { order, onSort, onReset, everyRepo } = pulls;
 	const hiddenCount = everyRepo.filter(repo => hidden.has(repoKey(repo))).length;
@@ -253,13 +259,15 @@ function DisplayMenu({ pulls }: { pulls: PullRequests }) {
 		<Popover open={repositories} onOpenChange={setRepositories}>
 			<PopoverAnchor asChild>
 				<span className="inline-flex">
-					<DropdownMenu>
-						<Tooltip content={label}>
-							<DropdownMenuTrigger render={<Button {...activityControl("pull-requests.display")} variant="outline" size="icon-compact" aria-label={label} active={repositories} />}>
+					<DropdownMenu open={menu} onOpenChange={setMenu}>
+						<Tooltip content={label} forceOpen={menu || repositories ? false : undefined}>
+							<DropdownMenuTrigger
+								render={<Button ref={button} {...activityControl("pull-requests.display")} variant="outline" size="icon-compact" aria-label={label} active={repositories || hiddenCount > 0} />}
+							>
 								<IconSettingsSliderHor />
 							</DropdownMenuTrigger>
 						</Tooltip>
-						<DropdownMenuContent align="end" className="w-64">
+						<DropdownMenuContent align="end" className="w-72">
 							<MenuSubmenu>
 								<MenuSubmenuTrigger value={GROUPINGS[display.grouping]}>Grouping</MenuSubmenuTrigger>
 								<MenuSubmenuContent className="w-48">
@@ -304,7 +312,17 @@ function DisplayMenu({ pulls }: { pulls: PullRequests }) {
 					</DropdownMenu>
 				</span>
 			</PopoverAnchor>
-			<PopoverContent align="end" collisionPadding={8} aria-labelledby={titleId} className="max-h-(--radix-popover-content-available-height) w-96 max-w-[calc(100vw-2rem)] space-y-3 overflow-y-auto p-3">
+			<PopoverContent
+				align="end"
+				collisionPadding={8}
+				aria-labelledby={titleId}
+				// With no trigger of its own, the popover hands focus back to **Display** as it closes.
+				onCloseAutoFocus={event => {
+					event.preventDefault();
+					button.current?.focus();
+				}}
+				className="max-h-(--radix-popover-content-available-height) w-96 max-w-[calc(100vw-2rem)] space-y-3 overflow-y-auto p-3"
+			>
 				<PopoverHeader>
 					<PopoverTitle id={titleId} className="text-sm">
 						Repositories

@@ -15,7 +15,7 @@ import { readPinnedSkill } from "../../pinned-skill";
 import { chordLabel } from "../../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { isSubmitChord } from "../form-dialog";
-import { TEXT_AREA } from "../form-field";
+import { Field, TEXT_AREA } from "../form-field";
 
 /** A workspace the new pull request can start in: `value` is its directory, `label` its repository, with the folder when the repository has several. */
 type WorkspaceChoice = { value: string; label: string; repo: Repo };
@@ -35,6 +35,8 @@ export function NewPullRequestButton({ everyRepo }: { everyRepo: RepoPullRequest
 	// The picked workspace until it leaves the list, then the first.
 	const choice = choices.find(({ value }) => value === picked) ?? choices[0];
 	const ready = choice !== undefined && change.trim() !== "" && connected;
+	const blocked = !connected ? "Waiting for the server to reconnect" : change.trim() === "" ? "Describe the change first" : null;
+	const changeId = useId();
 
 	const launch = (): void => {
 		if (!ready) return;
@@ -88,7 +90,7 @@ export function NewPullRequestButton({ everyRepo }: { everyRepo: RepoPullRequest
 				>
 					{choice && (
 						<Select items={choices} value={choice.value} onValueChange={next => next && setPicked(next)}>
-							<SelectTrigger aria-label="Repository" className="w-full min-w-0 [&>span]:truncate">
+							<SelectTrigger aria-label="Workspace" className="w-full min-w-0 [&>span]:truncate">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent alignItemWithTrigger={false}>
@@ -100,25 +102,29 @@ export function NewPullRequestButton({ everyRepo }: { everyRepo: RepoPullRequest
 							</SelectContent>
 						</Select>
 					)}
-					<textarea
-						ref={textareaRef}
-						value={change}
-						rows={4}
-						placeholder="What should change?"
-						aria-label="What should change?"
-						onChange={event => setChange(event.target.value)}
-						onKeyDown={event => {
-							if (!isSubmitChord(event)) return;
-							event.preventDefault();
-							launch();
-						}}
-						className={`${TEXT_AREA} resize-none`}
-					/>
+					<Field label="What should change?" htmlFor={changeId}>
+						<textarea
+							id={changeId}
+							ref={textareaRef}
+							value={change}
+							rows={4}
+							onChange={event => setChange(event.target.value)}
+							onKeyDown={event => {
+								if (!isSubmitChord(event)) return;
+								event.preventDefault();
+								launch();
+							}}
+							className={`${TEXT_AREA} resize-none`}
+						/>
+					</Field>
 					<div className="flex justify-end">
-						<Tooltip content="Start a session that opens the pull request" shortcut={[chordLabel({ key: "Enter", mod: true })]} side="top" disabled={!ready}>
-							<Button {...activityControl("pull-requests.new.start")} type="submit" size="compact" disabled={!ready}>
-								Start
-							</Button>
+						<Tooltip content={blocked ?? "Start a session that opens the pull request"} shortcut={blocked ? undefined : [chordLabel({ key: "Enter", mod: true })]} side="top">
+							{/* A disabled button takes no pointer events, so the tooltip that says why sits on a wrapper. */}
+							<span className="inline-flex">
+								<Button {...activityControl("pull-requests.new.start")} type="submit" size="compact" disabled={!ready}>
+									Start
+								</Button>
+							</span>
 						</Tooltip>
 					</div>
 				</form>
