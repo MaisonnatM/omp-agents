@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- The Pull requests page has tabs above the list, Open, Your move, Approved, Merged, and All, that show only those sections, and the page remembers your pick.
+- Filter, beside the tabs, switches each section on or off, and a chip under the tabs names what the list shows; its × shows every section again.
+- The sort and Repositories buttons moved from the page's header to the end of the tabs' row.
 - The Pull requests page no longer has a Board view, so it always shows the list.
 - The Pull requests page no longer shows a list at its left, so the table takes the whole page.
 - Repositories, at the top of the Pull requests page, hides or shows each repository and moves it up or down.

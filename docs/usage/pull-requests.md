@@ -125,7 +125,13 @@
   One toast with a spinner and a running clock counts the run, such as `Rebasing 2 of 5 pull requests`, and names the branch rebasing now with its step, such as `me/fix: Pushing through the pre-push checks`; when the last one ends, it sums up the run, such as `Rebased 3 of 5 pull requests`, with how many already had their base, stopped at a conflict, failed, or were skipped.
   A conflict or a failure also toasts on its own as it happens.
   The button reads **Rebasing…** beside a spinner and waits while any rebase is queued or running.
-- The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
+- Tabs above the list show part of it: **Open** every section but **Recently merged**, **Your move**, **Approved**, and **Merged** that one section, and **All**, the default, every section.
+  **Filter**, the funnel at the end of the tabs' row, switches each section on or off; the last one shown stays on.
+  A tab reads as picked only while the sections shown are exactly its own, so sections you switch one by one leave no tab picked.
+  While the list leaves a section out, a chip under the tabs reads **Section is** and the section, or **Section is either of N sections**, whose tooltip names them; click the value to switch sections, or its × to show every section.
+  The filtered sections leave the table and ↓ and ↑, and a repository with none of its pull requests in the shown sections says "No pull requests in these sections."
+  The browser keeps the choice across reloads.
+- The sort button, at the end of the tabs' row, orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
   Any sort but **Manual** keeps your moves in their order and sorts within each move.
   Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.
   In **Manual**, a pull request you never placed comes first, most recently updated first.
@@ -133,7 +139,7 @@
   Drag a repository's name on the page to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The app keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
-- **Repositories** at the top of the Pull requests page, beside the sort button, lists every repository the page covers, each with a switch that shows or hides it and buttons that move it up or down.
+- **Repositories**, at the end of the tabs' row beside the sort button, lists every repository the page covers, each with a switch that shows or hides it and buttons that move it up or down.
   Its line under the title says that a hidden repository also leaves the tab's count, and that the browser keeps the choice.
   While you hide any, the button reads **N hidden** and its tooltip **Repositories: N hidden**.
   A hidden repository leaves the table, **Rebase N behind**, ↓ and ↑, and the **Pull requests** tab's count, and keeps its place in the order, so it comes back where it was.

@@ -11,8 +11,8 @@ import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitl
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { type PullRequestOrder, withRepoStepped } from "../../pull-requests-model";
-import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsFolds } from "../../pull-requests-state";
+import { EVERY_SECTION, type PullRequestOrder, withRepoStepped } from "../../pull-requests-model";
+import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsFolds, useShownSections } from "../../pull-requests-state";
 import { activityControl } from "../../activity";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import { useRebasing } from "../../pull-request-rebases";
@@ -30,6 +30,7 @@ import { type PullRequests, RepoReadError, type RepoView, type SectionView, Sort
 import type { PullRequestDetailTab } from "./pr-details";
 import { PullRequestDetailPage, PullRequestDetails, usePullRequestCopyShortcuts } from "./pr-page";
 import { PullRequestTableRow } from "./pr-row";
+import { PullRequestViewBar } from "./pr-view-bar";
 
 const note = (text: string) => <p className="text-sm text-muted-foreground">{text}</p>;
 
@@ -86,7 +87,7 @@ function SectionCard({ view }: { view: SectionView }) {
 	);
 }
 
-function RepoTable({ view }: { view: RepoView }) {
+function RepoTable({ view, empty }: { view: RepoView; empty: string }) {
 	const { repo, name, bodyId, open, toggle, drag, moveId, sections } = view;
 	const workspaces = workspacesLabel(repo);
 	return (
@@ -108,7 +109,7 @@ function RepoTable({ view }: { view: RepoView }) {
 					{"error" in repo ? (
 						<RepoReadError name={name} error={repo.error} className="text-sm" />
 					) : sections.length === 0 ? (
-						note("No open pull requests of yours and no reviews waiting on you.")
+						note(empty)
 					) : (
 						sections.map(section => <SectionCard key={section.section.title} view={section} />)
 					)}
@@ -118,9 +119,17 @@ function RepoTable({ view }: { view: RepoView }) {
 	);
 }
 
-/** The list's tables, one per repository. */
+/** The list's tables, one per repository, with what one says while the sections it shows hold none of its pull requests. */
 function RepoTables({ pulls }: { pulls: PullRequests }) {
-	return usePullRequestsList(pulls).map(each => <RepoTable key={each.key} view={each} />);
+	const [shown] = useShownSections();
+	const empty = shown.size < EVERY_SECTION.size ? "No pull requests in these sections." : "No open pull requests of yours and no reviews waiting on you.";
+	return (
+		<div className="space-y-8">
+			{usePullRequestsList(pulls).map(each => (
+				<RepoTable key={each.key} view={each} empty={empty} />
+			))}
+		</div>
+	);
 }
 
 /**
@@ -144,7 +153,7 @@ function RepositoriesMenu({ everyRepo, order, setOrder }: { everyRepo: RepoPullR
 				<PopoverTrigger asChild>
 					<Button
 						{...activityControl("pull-requests.repositories")}
-						variant="ghost"
+						variant="outline"
 						size={hiddenCount === 0 ? "icon-compact" : "compact"}
 						leadingIcon={hiddenCount === 0 ? undefined : IconSettingsSliderHor}
 						aria-label={`${label}. Hide repositories or change their order`}
@@ -315,18 +324,31 @@ function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPage
 						<>
 							<UnmatchedTip unmatched={unmatched} />
 							<RebaseBehindButton pulls={pulls} />
-							<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />
-							{pulls.everyRepo.length > 0 && <RepositoriesMenu everyRepo={pulls.everyRepo} order={pulls.order} setOrder={pulls.setOrder} />}
 						</>
 					}
 					notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
-					className="max-w-7xl space-y-8"
+					className="max-w-7xl space-y-4"
 				>
-					{() => {
-						if (pulls.everyRepo.length === 0) return note("No session ran in a GitHub repository.");
-						if (pulls.repos.length === 0) return <EveryRepositoryHidden everyRepo={pulls.everyRepo} />;
-						return <RepoTables pulls={pulls} />;
-					}}
+					{() => (
+						<>
+							<PullRequestViewBar
+								order={pulls.order}
+								menus={
+									<>
+										<SortMenu order={pulls.order} onSort={pulls.onSort} onReset={pulls.onReset} />
+										{pulls.everyRepo.length > 0 && <RepositoriesMenu everyRepo={pulls.everyRepo} order={pulls.order} setOrder={pulls.setOrder} />}
+									</>
+								}
+							/>
+							{pulls.everyRepo.length === 0 ? (
+								note("No session ran in a GitHub repository.")
+							) : pulls.repos.length === 0 ? (
+								<EveryRepositoryHidden everyRepo={pulls.everyRepo} />
+							) : (
+								<RepoTables pulls={pulls} />
+							)}
+						</>
+					)}
 				</ListPage>
 			</div>
 			{docked && <DockedDetails hosts={hosts} route={docked} onExpand={onExpand} />}

@@ -30,7 +30,7 @@ import {
 	withRepoMoved,
 	withRepoStepped,
 } from "../../pull-requests-model";
-import { useHiddenRepos, usePullRequestsFolds, usePullRequestsOrder } from "../../pull-requests-state";
+import { useHiddenRepos, usePullRequestsFolds, usePullRequestsOrder, useShownSections } from "../../pull-requests-state";
 import { moveKey, stepTarget, type Where } from "../../order";
 import { folderName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
@@ -144,7 +144,7 @@ export function SortMenu({ order, onSort, onReset }: { order: PullRequestOrder; 
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<Tooltip content={label} forceOpen={open ? false : undefined}>
-				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={`${label}. Change the pull requests' order`} />}>
+				<DropdownMenuTrigger render={<Button variant="outline" size="icon-compact" aria-label={`${label}. Change the pull requests' order`} />}>
 					<IconArrowBottomTop />
 				</DropdownMenuTrigger>
 			</Tooltip>
@@ -235,7 +235,7 @@ export interface PullRequests {
 	setOrder: (order: PullRequestOrder) => void;
 	onSort: (sort: PullRequestSort) => void;
 	onReset: () => void;
-	/** The repositories you did not hide, in the list's order, and the sections of each, at the same index. */
+	/** The repositories you did not hide, in the list's order, and the sections of each that the tab or Filter shows, at the same index. */
 	repos: RepoPullRequests[];
 	sectionsOf: PullRequestSection[][];
 	/** Every repository in the list's order, those you hid too. */
@@ -309,6 +309,7 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 	const poll = pullRequestsStore.use(scope);
 	const read = poll.read?.data ?? null;
 	const [hidden] = useHiddenRepos();
+	const [shown] = useShownSections();
 	const [order, setOrder] = usePullRequestsOrder();
 	const agent = useMemo(() => agentOn(hosts), [hosts]);
 	const sessions = useSessionsByPullRequest(hosts, past);
@@ -346,7 +347,8 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 	);
 	const everyRepo = useMemo(() => (read ? orderedRepos(read.repos, order) : []), [read, order]);
 	const repos = useMemo(() => (hidden.size === 0 ? everyRepo : everyRepo.filter(repo => !hidden.has(repoKey(repo)))), [everyRepo, hidden]);
-	const sectionsOf = useMemo(() => sectionsOfRepos(repos, order, agent), [repos, order, agent]);
+	const everySectionOf = useMemo(() => sectionsOfRepos(repos, order, agent), [repos, order, agent]);
+	const sectionsOf = useMemo(() => everySectionOf.map(sections => sections.filter(({ title }) => shown.has(title))), [everySectionOf, shown]);
 	const behind = useMemo(
 		() =>
 			repos.flatMap((repo): RebaseJob[] => {
@@ -356,9 +358,10 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 			}),
 		[repos],
 	);
+	// Every section's pull requests, the filtered ones too, so a manual sort started under a filter keeps their places.
 	const shownOrder = useMemo(
-		() => (order.sort === "manual" && order.manual.length > 0 ? order.manual : sectionsOf.flatMap(sections => sections.flatMap(({ rows }) => rows.map(row => prKey(row.pr))))),
-		[order, sectionsOf],
+		() => (order.sort === "manual" && order.manual.length > 0 ? order.manual : everySectionOf.flatMap(sections => sections.flatMap(({ rows }) => rows.map(row => prKey(row.pr))))),
+		[order, everySectionOf],
 	);
 	return {
 		poll,

@@ -8,8 +8,12 @@ import {
 	commentCount,
 	DEFAULT_ORDER,
 	decodeOrder,
+	decodeShownSections,
+	encodeShownSections,
+	EVERY_SECTION,
 	lineCommentsBlocked,
 	foldedByDefault,
+	PULL_REQUEST_VIEWS,
 	type PullRequestOrder,
 	pullRequestSections,
 	listedPullRequest,
@@ -23,6 +27,8 @@ import {
 	sectionTitles,
 	shownPullRequests,
 	rebaseOrder,
+	viewOf,
+	withSectionToggled,
 	threadStarters,
 	withPullRequestReviewers,
 	withPullRequestState,
@@ -352,6 +358,27 @@ describe("hidden repositories", () => {
 		const shown = ["acme/a", "acme/c", "acme/d"];
 		expect(withRepoStepped(order, keys, shown, "acme/d", -1)?.repos).toEqual(["acme/a", "acme/b", "acme/d", "acme/c"]);
 		expect(withRepoStepped(order, keys, shown, "acme/c", -1)?.repos).toEqual(["acme/c", "acme/a", "acme/b", "acme/d"]);
+	});
+});
+
+describe("shown sections", () => {
+	test("a tab is active only while the shown sections are exactly its preset", () => {
+		expect(viewOf(EVERY_SECTION)).toBe("all");
+		expect(viewOf(new Set(["Approved"]))).toBe("approved");
+		expect(viewOf(withSectionToggled(EVERY_SECTION, "Recently merged"))).toBe("open");
+		expect(viewOf(new Set(["Your move", "Approved"]))).toBeNull();
+	});
+
+	test("the last shown section cannot be switched off", () => {
+		const one = PULL_REQUEST_VIEWS.merged.sections;
+		expect(withSectionToggled(one, "Recently merged")).toBe(one);
+	});
+
+	test("what is stored comes back, and a missing, unreadable, or empty value shows every section", () => {
+		const picked = new Set(["Drafts", "Your move"] as const);
+		expect(decodeShownSections(encodeShownSections(picked))).toEqual(picked);
+		for (const raw of [null, "{", "[]", '["Gone"]']) expect(decodeShownSections(raw)).toBe(EVERY_SECTION);
+		expect(decodeShownSections('["Gone","Drafts"]')).toEqual(new Set(["Drafts"]));
 	});
 });
 
