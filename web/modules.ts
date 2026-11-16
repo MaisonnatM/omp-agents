@@ -5,7 +5,6 @@
  * The hubs read this list as they load, so this file and every definition it lists import no hub but for types.
  */
 import type { IconComponent } from "@/lib/icon-context";
-import type { BrandLogo } from "./components/integrations/brand-logos";
 import type { ModuleChanges, ModuleValues, StoredModuleId } from "../src/modules";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import { CALENDAR_PAGE } from "./components/calendar/module";
@@ -38,9 +37,8 @@ export interface PageModule<Id extends string, Route, Shortcut extends string = 
 	/**
 	 * The module's sidebar tab, whose id is the module's. `place` orders it among every tab, the core's too, lowest first.
 	 * A tab with an `integration` shows, and its shortcut applies, only while omp holds a sign-in to that service.
-	 * `logo` is the mark of the company whose service the module shows, which its row of Settings › Modules draws instead of `icon`.
 	 */
-	readonly tab: { label: string; icon: IconComponent; logo?: BrandLogo; place: number; integration?: McpIntegrationId };
+	readonly tab: { label: string; icon: IconComponent; place: number; integration?: McpIntegrationId };
 	/** One plain line on what the module is for, which its row of Settings › Modules shows. */
 	readonly about: string;
 	/** What else turning the module off changes, beyond its page, tab, shortcuts, and commands, which its row of Settings › Modules shows. */

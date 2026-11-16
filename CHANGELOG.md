@@ -5,7 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
-- Settings › Modules shows each module with the logo of the service it uses: Linear for Tickets, Google Calendar for Calendar, and Gmail for Email.
+- Modules show the logo of the service they use, in the sidebar, the tabs, the command palette, and Settings › Modules: Linear for Tickets, Google Calendar for Calendar, and Gmail for Email.
 - The Pull requests page no longer has a Board view, so it always shows the list.
 - The Pull requests page no longer shows a list at its left, so the table takes the whole page.
 - Repositories, at the top of the Pull requests page, hides or shows each repository and moves it up or down.
