@@ -1,9 +1,10 @@
 # Linear tickets
 
-- The **Tickets** tab, or a `#tickets` address, opens the Linear issues assigned to you, as Linear's **My issues › Assigned** lists them.
-  The sidebar then lists the workflow states with their issue counts; click one to scroll the page to it and move focus there, and a folded state unfolds.
+- The **Linear tickets** tab, or a `#tickets` address, opens the Linear issues assigned to you, as Linear's **My issues › Assigned** lists them.
+  The tab, and its go-to shortcut, reopen the last issue you had open on the page, in this browser; until you open one they show the list alone.
+  The sidebar shows no list under the tab; the page's own state headings fold and unfold the groups.
 - The page groups the issues by workflow state.
-  **In Review** comes first, in the sidebar and on the page, with a green circle-dot icon.
+  **In Review** comes first, with a green circle-dot icon.
   The other states follow Linear's order: triage, started (such as **In Progress**), unstarted (**Todo**), backlog, completed, and canceled.
   Duplicates count as canceled.
   Completed and canceled issues show only when they changed in the last seven days, like the recent merges on the Pull requests page.
@@ -71,7 +72,7 @@
   A saved tickets list without each issue's opening date is discarded, and the page reads Linear again.
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.
 - The dashboard reads Linear through omp's Linear MCP server and its sign-in, so there is no key to set.
-  Until omp is signed in to that server, the sidebar has no **Tickets** tab, and a `#tickets` address shows Linear's integration row instead of the issues.
+  Until omp is signed in to that server, the sidebar has no **Linear tickets** tab, and a `#tickets` address shows Linear's integration row instead of the issues.
 - To connect, open **Settings › Integrations** and choose **Connect** on Linear's row; see [Integrations](integrations.md).
-  Your default browser opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
-  When Linear later refuses the sign-in, the **Tickets** tab stays and its page shows Linear's row with **Reconnect**; the Todo page's **Create Linear ticket** and the Calendar's tickets hide until it works again.
+  Your default browser opens Linear's sign-in page; approve omp there, and the **Linear tickets** tab appears within a few seconds.
+  When Linear later refuses the sign-in, the **Linear tickets** tab stays and its page shows Linear's row with **Reconnect**; the Todo page's **Create Linear ticket** and the Calendar's tickets hide until it works again.

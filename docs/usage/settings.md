@@ -165,11 +165,11 @@
   A record's **Supersedes** and **Superseded by** open and scroll to the records they name, and a link to another file in the repository opens it in the file dialog.
   The section only reads the records, since a record changes in the same commit as the code it covers.
   With **All workspaces**, the same timeline is grouped by workspace, one section per repository that keeps records, and a record's links stay inside its own repository. A workspace with no records is left out of the list.
-- **Modules** lists every module the app is built with: **Tickets**, **Calendar**, **Sport**, and **Email**.
+- **Modules** lists every module the app is built with: **Linear tickets**, **Calendar**, **Sport**, and **Email**.
   Each row has the module's icon, what it is for, a switch that turns it on or off, and a **⋯** menu with **Edit** and **Delete**; every module is on at first.
   A module turned off loses its page, its sidebar tab, its shortcuts, and its commands, and its address shows that it is turned off, with a link back to **Modules**.
   Turning **Sport** off also stops new sessions from getting the sport tool; sessions already running keep it.
-  While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says so, with a link to **Integrations**.
+  While omp holds no sign-in to Linear or Gmail, that service's row says so, with a link to **Integrations**.
   The choice is saved like **Preferences**, so every window and, through **Sync**, your other machines follow it.
   Modules are code, so an agent writes them: **New module** asks for a **Name** and **What should it do?**, **Edit** asks **What should change?**, and each opens the New session page in the omp agents checkout with a request in the message box for you to review and send.
   **Delete** asks first under the row; **Turn off and open session** turns the module off at once and opens a draft asking to remove its code, leaving its saved data on disk.
@@ -181,7 +181,7 @@
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
   **Sidebar tabs** lists the nine sidebar tabs in the order they show, each with a switch that shows or hides it, and buttons that move it up or down.
   A hidden tab only leaves the sidebar's page list: its page, its command in the command menu, its G pair, and links to it still work.
-  While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says that tab shows only once the service is connected.
+  While omp holds no sign-in to Linear or Gmail, that service's row says its tab shows only once the service is connected.
   A module turned off in **Modules** says its tab shows only while it is turned on there.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.

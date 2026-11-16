@@ -56,7 +56,7 @@ import { useFocusedSession } from "./use-focused-session";
 import { useOverlays } from "./use-overlays";
 import { usePageShortcuts } from "./use-page-shortcuts";
 import { useSessionLists } from "./use-session-lists";
-import { useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
+import { useLatestTicket, useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
 
@@ -93,7 +93,8 @@ export function App() {
 	const settings = useSettingsRoute(page);
 	const botList = useMemo(() => (state.bots === null ? null : botRows(state.bots, state.hosts, state.botLasts)), [state.bots, state.hosts, state.botLasts]);
 	const latestBot = botList?.[0]?.bot.id ?? null;
-	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
+	const latestTicket = useLatestTicket(page);
+	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, latestTicket, navigate, show });
 	const maximized = layout.maximized && !page;
 	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */

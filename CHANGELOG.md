@@ -8,6 +8,9 @@ The dashboard shows the same lines in Settings › What's new.
 - Down chevrons, on menus, pickers, and folding rows, use the smaller chevron-down-small icon.
 - A session left idle for 12 hours now stops on its own and moves to Past, keeping its worktree, so Resume picks it back up where it was. A session still waiting on a subagent is not idle.
 - Settings › Preferences has a new Stop idle sessions choice: Off, or after 4 hours, 12 hours, 24 hours, or 3 days. Sessions started in a terminal, private sessions, and Bots' conversations keep running.
+- The Tickets tab and page are now called Linear tickets, and so are their groups in the command menu and Settings › Keyboard.
+- The Linear tickets page no longer shows a list at its left, so the issues take the whole page.
+- The Linear tickets tab reopens the last issue you had open, or the list when you have opened none yet.
 - Modules show the logo of the service they use, in the sidebar, the tabs, the command palette, and Settings › Modules: Linear for Tickets, Google Calendar for Calendar, and Gmail for Email.
 - Cmd+Shift+T reopens the last tab you closed in the header, in its old place and on the page it showed.
 - Right-click a header tab to Pin tab, Unpin tab, open a New tab, Close tab, or Close other tabs, and Ctrl+Shift+P pins or unpins the tab on screen.
