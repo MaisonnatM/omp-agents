@@ -10,14 +10,9 @@ import type { RosterHost } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { SectionTarget } from "../section";
-import { CalendarNav } from "./calendar/calendar-nav";
-import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
-import { EmailNav } from "./email/email-nav";
-import { EmailPage } from "./email/email-page";
 import { SportNav } from "./sport/nav";
 import { SportPage } from "./sport/page";
-import { TicketsPage } from "./tickets/tickets-page";
 
 /** The core's data a module's page reads but does not own. */
 export interface CoreData {
@@ -62,10 +57,7 @@ interface ModuleViews<I extends WebModuleId> {
 }
 
 const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
-	tickets: { Page: TicketsPage },
-	calendar: { Page: CalendarPage, Nav: CalendarNav },
 	sport: { Page: SportPage, Nav: SportNav },
-	email: { Page: EmailPage, Nav: EmailNav },
 };
 
 /** Module `page.kind`'s page, given the stored modules' states and the core's data. */
