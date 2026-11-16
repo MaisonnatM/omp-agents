@@ -40,7 +40,7 @@ omp's `task` call has no `readonly`, `environment`, or `run_in_background` field
 | Cursor term | omp route |
 | --- | --- |
 | `AskQuestion` | `ask` |
-| Playbook todolist | `todo` with `op: "init"`. The playbook's steps go in verbatim as the first phase. |
+| Playbook todolist | `todo` with `op: "init"`. The playbook's steps go in verbatim as the first phase, except Babysit: copy only the steps its declared mode runs, and leave out the polling, stack, and merge steps a `check`, `threads-only`, or one-time rebase run never reaches, rather than listing them as skipped. |
 | `deslop` (`cursor-team-kit`) | Review the diff for needless abstractions, dead paths, and defensive workarounds, then apply `skill://no-comments`. |
 | `control-ui` | Read the repository's smoke guide and `xd://eval/browser`, then exercise the real surface. Yampa console proof follows `.agents/skills/verify-yampa/SKILL.md`. |
 | `control-cli` | Launch the actual command with `bash`, drive interactive programs through a PTY, and observe the output and the resulting state. |
