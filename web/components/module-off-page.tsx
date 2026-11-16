@@ -11,7 +11,7 @@ export function ModuleOffPage({ page }: { page: ModulePage }) {
 			<div className="mx-auto w-full max-w-3xl space-y-1 px-6 py-6 text-sm">
 				<p>{label} is turned off</p>
 				<p className="text-muted-foreground">
-					<a href={hashForSettings(page.kind)} className={LINK}>
+					<a href={hashForSettings("modules")} className={LINK}>
 						Turn it on in Settings › Modules
 					</a>
 				</p>

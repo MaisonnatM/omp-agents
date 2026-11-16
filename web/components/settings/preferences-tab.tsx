@@ -57,7 +57,7 @@ function SidebarTabs() {
 								{isWebModuleId(tab) && off.has(tab) ? (
 									<p className="text-xs text-muted-foreground">
 										Shows only while turned on in{" "}
-										<a href={hashForSettings(tab)} className={LINK}>
+										<a href={hashForSettings("modules")} className={LINK}>
 											Settings › Modules
 										</a>
 										.

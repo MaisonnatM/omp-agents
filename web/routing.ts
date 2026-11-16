@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage } from "central-icons";
+import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage, IconWidgets } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
@@ -51,7 +51,6 @@ const AS_LOADED = { workspace: "As a session in this workspace loads them", none
 export const SETTINGS_GROUPS = [
 	{ value: "usage", label: "Usage" },
 	{ value: "general", label: "General" },
-	{ value: "modules", label: "Modules" },
 	{ value: "connections", label: "Connections" },
 	{ value: "workspace", label: "This workspace" },
 ] as const;
@@ -61,12 +60,17 @@ export type SettingsGroup = (typeof SETTINGS_GROUPS)[number]["value"];
 /** Each settings sidebar group's label. */
 export const SETTINGS_GROUP_LABEL = Object.fromEntries(SETTINGS_GROUPS.map(group => [group.value, group.label])) as Record<SettingsGroup, string>;
 
-/** The core's settings sections, which the modules' join in Settings › Modules. */
-const CORE_SETTINGS_SECTIONS = [
+/**
+ * The settings page's sections, in the sidebar's order, each in the `group` that lists it, with `keywords` the command
+ * menu also finds it by. A `workspace` section shows omp's files and config as a session in the chosen workspace loads
+ * them, and its header says so in `meta`; a section of any other group is the same whatever the workspace.
+ */
+export const SETTINGS_SECTIONS = [
 	{ value: "analytics", label: "Analytics", icon: IconChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
 	{ value: "activity", label: "Activity", icon: IconCursorClick, group: "usage", keywords: ["features", "used", "time"] },
 	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
 	{ value: "keyboard", label: "Keyboard", icon: IconKeyboard, group: "general", keywords: ["shortcuts", "keys", "hotkeys", "keybindings"] },
+	{ value: "modules", label: "Modules", icon: IconWidgets, group: "general", keywords: [...MODULE_LIST.map(({ tab }) => tab.label.toLowerCase()), "turn off", "enable", "disable", "add", "new"] },
 	{ value: "workspaces", label: "Workspaces", icon: IconFolders, group: "general", keywords: ["directories", "folders", "hide"] },
 	{ value: "sync", label: "Sync", icon: IconArrowRotateCounterClockwise, group: "general", keywords: ["git", "remote", "machines"] },
 	{ value: "phone", label: "Phone access", icon: IconPhone, group: "general", keywords: ["tailscale", "mobile", "pair", "qr"] },
@@ -87,24 +91,11 @@ const CORE_SETTINGS_SECTIONS = [
 	{ value: "worktrees", label: "Worktrees", icon: IconBranch, group: "workspace", keywords: ["branches", "cleanup"], meta: AS_LOADED },
 ] as const satisfies readonly { value: string; label: string; icon: IconComponent; group: SettingsGroup; keywords: readonly string[]; meta?: { workspace: string; none: string } }[];
 
-/** Settings › Modules: a section per module, whose id it takes, to turn it on or off. */
-const MODULE_SETTINGS_SECTIONS = MODULE_LIST.map(({ id, tab }) => ({ value: id, label: tab.label, icon: tab.icon, group: "modules" as const, keywords: [tab.label.toLowerCase(), "modules", "turn off", "turn on", "enable", "disable"] }));
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 
-type SettingsSectionRow = (typeof CORE_SETTINGS_SECTIONS)[number] | (typeof MODULE_SETTINGS_SECTIONS)[number];
-
-/**
- * The settings page's sections, in the sidebar's order, each in the `group` that lists it, with `keywords` the command
- * menu also finds it by. A `workspace` section shows omp's files and config as a session in the chosen workspace loads
- * them, and its header says so in `meta`; a section of any other group is the same whatever the workspace.
- */
-export const SETTINGS_SECTIONS: readonly SettingsSectionRow[] = [...CORE_SETTINGS_SECTIONS, ...MODULE_SETTINGS_SECTIONS].toSorted(
-	(a, b) => SETTINGS_GROUPS.findIndex(({ value }) => value === a.group) - SETTINGS_GROUPS.findIndex(({ value }) => value === b.group),
-);
-
-export type SettingsSection = SettingsSectionRow["value"];
-
-/** The settings section `segment` names, else Analytics, which bare `#settings`, an unknown section, and nothing remembered open. */
-export const settingsSection = (segment: string | null): SettingsSection => SETTINGS_SECTIONS.find(({ value }) => value === segment)?.value ?? "analytics";
+/** The settings section `segment` names, else Analytics, which bare `#settings`, an unknown section, and nothing remembered open; a module's id, which once named its own section, names Modules. */
+export const settingsSection = (segment: string | null): SettingsSection =>
+	segment !== null && isWebModuleId(segment) ? "modules" : (SETTINGS_SECTIONS.find(({ value }) => value === segment)?.value ?? "analytics");
 
 /** The open section of the settings page; its workspace sections read the sidebar's workspace. */
 export interface SettingsRoute {

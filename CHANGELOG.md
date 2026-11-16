@@ -5,9 +5,11 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
-- Settings has a new Modules group with Tickets, Calendar, Sport, and Email, each with a switch to turn it on or off.
-- A module you turn off leaves the sidebar, and its shortcuts and commands stop working; opening its page says it is off and links to its switch.
+- Settings has a new Modules page listing Tickets, Calendar, Sport, and Email, each with a switch to turn it on or off.
+- A module you turn off leaves the sidebar, and its shortcuts and commands stop working; opening its page says it is off and links to Modules.
 - Turning Sport off also stops new sessions from getting the sport tool.
+- New module, Edit, and Delete on the Modules page open a new session with a request already written for an agent to add, change, or remove the module; you review it and send it.
+- Delete turns the module off right away, and its saved data stays on your computer.
 - In poteto mode, a Babysit run's todo list now holds only the steps its mode runs, so a one-time rebase or a review-thread fix no longer ends with a turn spent ticking off polling and merge steps.
 
 ## 2026-11-13

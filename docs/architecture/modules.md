@@ -50,7 +50,7 @@ A `PageModule` describes the module's page.
 
 - `tab`: the sidebar tab's label, icon, and `place`, which orders it among the core's tabs.
   A tab with an `integration` shows only while omp holds a sign-in to that service.
-- `about`: one plain line on what the module is for, which its section of Settings › Modules shows.
+- `about`: one plain line on what the module is for, which its row of Settings › Modules shows.
 - `home`: the route the tab opens.
 - `address`: how `#<id>/<rest>?<query>` reads into a route and back.
 - `title`: what the window and a header tab call the page.
@@ -74,7 +74,8 @@ Every module's `Nav` takes its `route`, the chosen `section`, and `onSection`, w
 
 ## Turning a module off
 
-Settings › Modules has a section per module, built from `MODULE_LIST`, with a switch that turns the module on or off.
+Settings › Modules lists every module, a row each in `MODULE_LIST` order, with a switch that turns the module on or off.
+The old `#settings/<module id>` addresses open it too.
 The modules turned off are kept as a JSON array of ids under the portable preference `omp-agents.modules-off`, which `parseModulesOff` in `src/shared/modules-off.ts` reads on both sides, ignoring unknown ids.
 On the page, `useModulesOff` in `web/modules-off.ts` reads it, and `useSidebarTabs` merges it into its `absent` set with the signed-out tabs.
 So a module turned off loses its tab, its go-to shortcut, its palette commands, and its nav row, as a signed-out tab does.
@@ -91,3 +92,8 @@ On the server, `moduleJoins` gives what a new session joins with, less the joins
 
 Removing a module is removing those entries and the module's files.
 A module's saved data, addresses, localStorage keys, and control ids keep its id, so they never move when the module does.
+
+Settings › Modules starts this work but does not do it, because a module is code.
+**New module**, **Edit**, and **Delete** build a request with `web/module-prompts.ts`, append it to the New session draft, and open that draft in the checkout `ServedBuild.source` from `GET /api/dashboard/build` names, so the user reviews the request and sends it.
+**Delete** also turns the module off at once.
+A packaged app serves a prebuilt page with no checkout, so `source` is `null` and the page hides the three actions.
