@@ -94,11 +94,6 @@ describe("layout hash", () => {
 		expect([settingsSection("files"), settingsSection(null), settingsSection("gone")]).toEqual(["files", "analytics", "analytics"]);
 	});
 
-	test("a module's id, which once named its own settings section, opens Modules", () => {
-		expect(routeFromHash("#settings/sport")).toEqual({ kind: "page", page: { kind: "settings", section: "modules" } });
-		expect(settingsSection("calendar")).toBe("modules");
-	});
-
 	test("the new-session draft is not read as a layout, and its directory keeps its slashes and tilde", () => {
 		const hash = hashForNewSession("~/code/my app");
 		expect(hash).toBe("#new/~%2Fcode%2Fmy%20app");

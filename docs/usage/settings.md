@@ -165,13 +165,13 @@
   The section only reads the records, since a record changes in the same commit as the code it covers.
   With **All workspaces**, the same timeline is grouped by workspace, one section per repository that keeps records, and a record's links stay inside its own repository. A workspace with no records is left out of the list.
 - **Modules** lists every module the app is built with: **Tickets**, **Calendar**, **Sport**, and **Email**.
-  Each row has the module's icon, what it is for, a **Show** switch that turns it on or off, and a **⋯** menu with **Edit** and **Delete**; every module is on at first.
+  Each row has the module's icon, what it is for, a switch that turns it on or off, and a **⋯** menu with **Edit** and **Delete**; every module is on at first.
   A module turned off loses its page, its sidebar tab, its shortcuts, and its commands, and its address shows that it is turned off, with a link back to **Modules**.
   Turning **Sport** off also stops new sessions from getting the sport tool; sessions already running keep it.
   While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Email** row says so, with a link to **Integrations**.
   The choice is saved like **Preferences**, so every window and, through **Sync**, your other machines follow it.
   Modules are code, so an agent writes them: **New module** asks for a **Name** and **What should it do?**, **Edit** asks **What should change?**, and each opens the New session page in the omp agents checkout with a request in the message box for you to review and send.
-  **Delete** asks first, turns the module off at once, and opens a draft asking to remove its code, leaving its saved data on disk.
+  **Delete** asks first under the row; **Turn off and open session** turns the module off at once and opens a draft asking to remove its code, leaving its saved data on disk.
   The packaged app has no checkout, so it hides **New module**, **Edit**, and **Delete** and says why.
 - **Preferences** holds the dashboard's own choices, saved in the app, not in omp's files.
   The server keeps them too, so every window you open shows the same, and **Sync** carries them to your other machines; **Stop idle processes** is the server's own and stays on this machine.

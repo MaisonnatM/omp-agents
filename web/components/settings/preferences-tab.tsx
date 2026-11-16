@@ -15,6 +15,7 @@ import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
 import { LINK, OrderButton, Section } from "./editor";
 import { isWebModuleId } from "../../modules";
+import { useModulesOff } from "../../modules-off";
 import { hashForSettings } from "../../routing";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { putJson } from "../../api";
@@ -40,7 +41,8 @@ function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string;
 
 /** The sidebar's tabs in the order they show, each with a switch to hide it and buttons to move it. */
 function SidebarTabs() {
-	const { layout, setLayout, signedOut, off } = useSidebarTabs();
+	const { layout, setLayout, signedOut } = useSidebarTabs();
+	const [off] = useModulesOff();
 	return (
 		<Section
 			title="Sidebar tabs"

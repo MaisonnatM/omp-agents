@@ -3,7 +3,6 @@ import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
 import { connectionsOf, type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
-import type { WebModuleId } from "./modules";
 import { useModulesOff } from "./modules-off";
 import { integrationsStore } from "./reads";
 import { type Page, SIDEBAR_TABS, type SidebarTab } from "./routing";
@@ -127,11 +126,11 @@ export function useSignedOutTabs(): ReadonlySet<SidebarTab> {
 }
 
 /** The tabs that neither show nor take their shortcuts: those whose service omp holds no sign-in to, and the modules' turned `off`. */
-export const absentTabs = (signedOut: ReadonlySet<SidebarTab>, off: ReadonlySet<SidebarTab>): ReadonlySet<SidebarTab> => (off.size === 0 ? signedOut : new Set([...signedOut, ...off]));
+export const mergeAbsent = (signedOut: ReadonlySet<SidebarTab>, off: ReadonlySet<SidebarTab>): ReadonlySet<SidebarTab> => new Set([...signedOut, ...off]);
 
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
- * `signedOut`, the {@link useSignedOutTabs}, stays the same set until one signs in or out, `off` until a module turns on or off, `absent` with both, and `shown` with it until the layout changes.
+ * `signedOut`, the {@link useSignedOutTabs}, stays the same set until one signs in or out, `absent` until that or a module turns on or off, and `shown` with it until the layout changes.
  * A stored layout that differs from how it decodes, such as one naming {@link LEGACY_EMAIL_TAB} or {@link LEGACY_NOTES_TAB}, is stored again, so old ids leave this browser and Settings › Sync.
  */
 export function useSidebarTabs(): {
@@ -139,8 +138,6 @@ export function useSidebarTabs(): {
 	setLayout: (next: TabLayout | ((prev: TabLayout) => TabLayout)) => void;
 	/** The tabs whose service omp holds no sign-in to. */
 	signedOut: ReadonlySet<SidebarTab>;
-	/** The modules' tabs the user turned off in Settings › Modules. */
-	off: ReadonlySet<WebModuleId>;
 	/** The tabs that neither show nor take their shortcuts: signed out or turned off. */
 	absent: ReadonlySet<SidebarTab>;
 	shown: readonly SidebarTab[];
@@ -152,7 +149,7 @@ export function useSidebarTabs(): {
 	}, [layout, setLayout]);
 	const signedOut = useSignedOutTabs();
 	const [off] = useModulesOff();
-	const absent = useMemo(() => absentTabs(signedOut, off), [signedOut, off]);
+	const absent = useMemo(() => mergeAbsent(signedOut, off), [signedOut, off]);
 	const shown = useMemo(() => shownTabs(layout, absent), [layout, absent]);
-	return { layout, setLayout, signedOut, off, absent, shown };
+	return { layout, setLayout, signedOut, absent, shown };
 }

@@ -75,13 +75,13 @@ Every module's `Nav` takes its `route`, the chosen `section`, and `onSection`, w
 ## Turning a module off
 
 Settings › Modules lists every module, a row each in `MODULE_LIST` order, with a switch that turns the module on or off.
-The old `#settings/<module id>` addresses open it too.
 The modules turned off are kept as a JSON array of ids under the portable preference `omp-agents.modules-off`, which `parseModulesOff` in `src/shared/modules-off.ts` reads on both sides, ignoring unknown ids.
 On the page, `useModulesOff` in `web/modules-off.ts` reads it, and `useSidebarTabs` merges it into its `absent` set with the signed-out tabs.
 So a module turned off loses its tab, its go-to shortcut, its palette commands, and its nav row, as a signed-out tab does.
 Its address shows `ModuleOffPage` in place of its `Page`, so its own shortcut rows, which its page binds, never fire.
 On the server, `moduleJoins` gives what a new session joins with, less the joins of the modules the server's preferences turn off.
 `Dashboard.#joinFor` calls it for every session it starts, so a session already running keeps the tool it joined with.
+A module whose turning off changes more, such as Sport's join, says so in its page definition's `offNote`, which its row shows.
 
 ## Adding a module
 

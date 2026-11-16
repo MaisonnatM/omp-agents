@@ -51,6 +51,7 @@ export const SPORT_PAGE: StoredPageModule<"sport", SportRoute, SportState, Sport
 	id: "sport",
 	tab: { label: "Sport", icon: IconDumbell, place: 60 },
 	about: "Your training plan, workout log, and progress, which a session can read and fill in for you.",
+	offNote: "While Sport is off, new sessions don't get the sport tool; running sessions keep it.",
 	home: { tab: "week", day: null },
 	/** `#sport` is this week, `?day=<YYYY-MM-DD>` that day's week with that day open, `#sport/journal` the workout journal, `?open=<log id>` with that log open, and `#sport/progress` the progress charts. */
 	address: {

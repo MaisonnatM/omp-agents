@@ -27,4 +27,4 @@ New, Edit, and Delete only fill the draft; nothing runs until the user sends it.
 
 ## Confirmation
 
-The preference parser, the absent-tab merge, and the session join tests cover the switch; the prompt builder tests cover the requests, and the routing tests the old addresses.
+The preference parser, the absent-tab merge, and the session join tests cover the switch; the prompt builder tests cover the requests.

@@ -93,9 +93,8 @@ export const SETTINGS_SECTIONS = [
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 
-/** The settings section `segment` names, else Analytics, which bare `#settings`, an unknown section, and nothing remembered open; a module's id, which once named its own section, names Modules. */
-export const settingsSection = (segment: string | null): SettingsSection =>
-	segment !== null && isWebModuleId(segment) ? "modules" : (SETTINGS_SECTIONS.find(({ value }) => value === segment)?.value ?? "analytics");
+/** The settings section `segment` names, else Analytics, which bare `#settings`, an unknown section, and nothing remembered open. */
+export const settingsSection = (segment: string | null): SettingsSection => SETTINGS_SECTIONS.find(({ value }) => value === segment)?.value ?? "analytics";
 
 /** The open section of the settings page; its workspace sections read the sidebar's workspace. */
 export interface SettingsRoute {

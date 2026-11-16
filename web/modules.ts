@@ -41,6 +41,8 @@ export interface PageModule<Id extends string, Route, Shortcut extends string = 
 	readonly tab: { label: string; icon: IconComponent; place: number; integration?: McpIntegrationId };
 	/** One plain line on what the module is for, which its row of Settings › Modules shows. */
 	readonly about: string;
+	/** What else turning the module off changes, beyond its page, tab, shortcuts, and commands, which its row of Settings › Modules shows. */
+	readonly offNote?: string;
 	/** The route the tab opens. */
 	readonly home: Route;
 	readonly address: PageAddress<Route>;

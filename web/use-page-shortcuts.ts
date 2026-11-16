@@ -16,7 +16,7 @@ export interface PageShortcutInput {
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through, and ⌥1 to ⌥9 count. */
 	listed: View[];
 	view: View | null;
-	/** The sidebar tabs whose service omp holds no sign-in to; their shortcuts and commands do not apply. */
+	/** The sidebar tabs signed out or turned off; their shortcuts and commands do not apply. */
 	absentTabs: ReadonlySet<SidebarTab>;
 	/** The dashboard can create Linear issues, and the sidebar shows Tickets, so the new-ticket shortcut applies. */
 	ticketsCallable: boolean;
