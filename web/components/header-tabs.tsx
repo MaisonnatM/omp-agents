@@ -121,8 +121,6 @@ interface HeaderTabsProps {
 	address: string;
 	hosts: readonly RosterHost[];
 	past: readonly PastSession[];
-	/** What sits at the row's right end, such as the machine's stats. */
-	trailing?: ReactNode;
 }
 
 /**
@@ -131,7 +129,7 @@ interface HeaderTabsProps {
  * and ⌃⇧⇥ to the next and previous. Drag one, or press Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it,
  * closing the one on screen shows its neighbour, closing the last leaves a new one, and ⌥⌘W closes all but the one on screen.
  */
-export function HeaderTabs({ className, address, hosts, past, trailing }: HeaderTabsProps) {
+export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps) {
 	const { openNewSession } = useDashboardActions();
 	const [row, setRow] = useStoredState(HEADER_TABS_KEY, decodeHeaderTabs, encodeHeaderTabs);
 	useEffect(() => {
@@ -243,7 +241,6 @@ export function HeaderTabs({ className, address, hosts, past, trailing }: Header
 					<IconPlusLarge />
 				</Button>
 			</Tooltip>
-			{trailing && <div className="ml-auto flex shrink-0 items-center pr-2">{trailing}</div>}
 		</div>
 	);
 }
