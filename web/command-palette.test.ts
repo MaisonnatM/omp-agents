@@ -143,9 +143,9 @@ describe("paletteSections", () => {
 		]);
 		const found = paletteSections(items, "login", {}, NOW);
 		expect(found.map(section => [section.heading, section.items.map(entry => entry.id)]).toSorted()).toEqual([
+			["Linear tickets", ["ticket:ENG-1"]],
 			["Pull requests", ["pr:o/r#4"]],
 			["Running", ["session:r"]],
-			["Tickets", ["ticket:ENG-1"]],
 			["Todos", ["todo:t"]],
 		]);
 	});

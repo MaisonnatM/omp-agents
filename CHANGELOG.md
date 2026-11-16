@@ -5,7 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
-- The Tickets tab and page are now called Linear tickets.
+- The Tickets tab and page are now called Linear tickets, and so are their groups in the command menu and Settings › Keyboard.
 - The Linear tickets page no longer shows a list at its left, so the issues take the whole page.
 - The Linear tickets tab reopens the last issue you had open, or the list when you have opened none yet.
 - Modules show the logo of the service they use, in the sidebar, the tabs, the command palette, and Settings › Modules: Linear for Tickets, Google Calendar for Calendar, and Gmail for Email.
