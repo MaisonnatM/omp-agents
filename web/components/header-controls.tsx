@@ -1,5 +1,5 @@
 /** The Back and Forward buttons at the left end of the header tabs. */
-import { IconChevronLeft, IconChevronRight } from "central-icons";
+import { IconChevronLeft, IconChevronRightSmall } from "central-icons";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
@@ -18,7 +18,7 @@ export function HistoryButtons() {
 			</Tooltip>
 			<Tooltip content="Forward" shortcut={shortcutLabels("forward")} side="bottom" disabled={!canGoForward}>
 				<Button {...activityControl("header.forward")} variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Forward" disabled={!canGoForward} onClick={() => goInHeaderTab(1)}>
-					<IconChevronRight />
+					<IconChevronRightSmall />
 				</Button>
 			</Tooltip>
 		</div>

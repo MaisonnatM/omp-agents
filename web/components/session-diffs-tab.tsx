@@ -1,5 +1,5 @@
 /** The session details sidebar's **Diffs** tab: what the session's checkout changed against its branch base, a row per file that opens that file's diff. */
-import { IconArrowLeft, IconArrowRotateClockwise, IconBranch, IconChevronRight } from "central-icons";
+import { IconArrowLeft, IconArrowRotateClockwise, IconBranch, IconChevronRightSmall } from "central-icons";
 import { useMemo, useState } from "react";
 import type { ChangedEntry, SessionChanges } from "../../src/shared/changes";
 import { Button } from "@/components/ui/button";
@@ -137,7 +137,7 @@ function DrillInList({ files, fileUrl, version }: ListProps) {
 						<span className="truncate">{labels[index]!.name}</span>
 						<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{labels[index]!.dir}</span>
 						<LineCounts added={file.added} removed={file.removed} />
-						<IconChevronRight aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+						<IconChevronRightSmall aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 					</button>
 				</li>
 			))}

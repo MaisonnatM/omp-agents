@@ -1,5 +1,5 @@
 /** The Sport page's week: the day list of this week and the next, beside the open day, under a pain flag that holds today. */
-import { IconCheckmark1, IconChevronLeft, IconChevronRight } from "central-icons";
+import { IconCheckmark1, IconChevronLeft, IconChevronRightSmall } from "central-icons";
 import { useEffect } from "react";
 import { addDays, mondayOf } from "../../../src/shared/days";
 import type { Plan, RoutineCheck, SportState } from "../../../src/shared/sport";
@@ -53,7 +53,7 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTime
 					<h2 className="min-w-0 flex-1 truncate text-center text-sm font-medium">{weekTitle(monday)}</h2>
 					<Tooltip content="Semaine suivante">
 						<Button variant="ghost" size="icon-compact" aria-label="Semaine suivante" asChild>
-							<a href={step(7)} {...activityControl("sport.week.step")}><IconChevronRight /></a>
+							<a href={step(7)} {...activityControl("sport.week.step")}><IconChevronRightSmall /></a>
 						</Button>
 					</Tooltip>
 				</div>

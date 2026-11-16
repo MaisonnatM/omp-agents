@@ -1,4 +1,4 @@
-import { IconChevronRight, IconPlay, IconPlusLarge, IconTicket } from "central-icons";
+import { IconChevronRightSmall, IconPlay, IconPlusLarge, IconTicket } from "central-icons";
 import { useState } from "react";
 import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
@@ -310,11 +310,11 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 						<span className="shrink-0">{category}</span>
 						{open.parent && (
 							<>
-								<IconChevronRight className="size-3 shrink-0" />
+								<IconChevronRightSmall className="size-3 shrink-0" />
 								<span className="truncate">{open.parent.text}</span>
 							</>
 						)}
-						<IconChevronRight className="size-3 shrink-0" />
+						<IconChevronRightSmall className="size-3 shrink-0" />
 						<StatusIcon status={todo.status} className="size-3.5" />
 						<span className="shrink-0">{TODO_STATUS[todo.status].label}</span>
 					</p>
