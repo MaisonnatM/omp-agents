@@ -1,7 +1,7 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a row of the tabs open in it with + to open more, and the open tab's panel. */
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import type { IconComponent } from "@/lib/icon-context";
-import { IconMagnifyingGlass, IconPlusLarge } from "central-icons";
+import { IconMagnifyingGlass, IconPlusSmall } from "central-icons";
 import { type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { Button } from "@/components/ui/button";
@@ -142,7 +142,7 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tab
 					{...activityControl("details.tab.add")}
 					render={<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Open a tab" />}
 				>
-					<IconPlusLarge />
+					<IconPlusSmall />
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="start" className="min-w-52">

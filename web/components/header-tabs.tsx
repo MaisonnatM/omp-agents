@@ -1,5 +1,5 @@
 /** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, pinned ones first, and a + that opens a new one. */
-import { IconBubbleText, IconCalendarClock, IconChainLink1, IconCrossMedium, IconEditBig, IconHome, IconPin, IconPlusLarge, IconSparklesTwo, IconSquareBehindSquare2, IconUnpin } from "central-icons";
+import { IconBubbleText, IconCalendarClock, IconChainLink1, IconCrossMedium, IconEditBig, IconHome, IconPin, IconPlusSmall, IconSparklesTwo, IconSquareBehindSquare2, IconUnpin } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useRef } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
@@ -154,7 +154,7 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClo
 					<MenuShortcut>{shortcutLabels("pinTab")[0]}</MenuShortcut>
 				</MenuItem>
 				<MenuItem onClick={onNewTab}>
-					<IconPlusLarge />
+					<IconPlusSmall />
 					New tab
 					<MenuShortcut>{shortcutLabels("newTab")[0]}</MenuShortcut>
 				</MenuItem>
@@ -333,7 +333,7 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 			</nav>
 			<Tooltip content="New tab" shortcut={shortcutLabels("newTab")} side="bottom">
 				<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="New tab" onClick={openTab}>
-					<IconPlusLarge />
+					<IconPlusSmall />
 				</Button>
 			</Tooltip>
 		</div>

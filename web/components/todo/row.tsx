@@ -1,5 +1,5 @@
 /** The Todo page's rows: a todo's row, an archived todo's row, and a new todo's draft row. */
-import { IconArchive, IconArrowRotateCounterClockwise, IconCrossMedium, IconDotGrid2x3, IconNotebook, IconPencil, IconPlusLarge, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
+import { IconArchive, IconArrowRotateCounterClockwise, IconCrossMedium, IconDotGrid2x3, IconNotebook, IconPencil, IconPlusSmall, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
 import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf } from "../../../src/user-todos-shared";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem } from "@/components/ui/menu";
@@ -135,7 +135,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 									onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}
 									className="text-muted-foreground hover:text-foreground"
 								>
-									<IconPlusLarge />
+									<IconPlusSmall />
 								</button>
 							</Tooltip>
 						)}
@@ -163,7 +163,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 				</MenuItem>
 				{top && (
 					<MenuItem onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}>
-						<IconPlusLarge />
+						<IconPlusSmall />
 						Add a todo under it
 					</MenuItem>
 				)}

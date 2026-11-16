@@ -1,5 +1,5 @@
 /** The Sport page: the plan's week, the journal of logged sessions, and the progress charts, under one header. */
-import { IconLaw, IconPlusLarge } from "central-icons";
+import { IconLaw, IconPlusSmall } from "central-icons";
 import { type ReactNode, useState } from "react";
 import { errorText } from "../../../src/json";
 import { addDays, localDay } from "../../../src/shared/days";
@@ -74,7 +74,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	const entries = (
 		<>
 			<Tooltip content="Noter une séance hors du plan">
-				<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} disabled={disabled} onClick={() => logFor(selected, null)} {...activityControl("sport.log.free")}>
+				<Button variant="ghost" size="compact" leadingIcon={IconPlusSmall} disabled={disabled} onClick={() => logFor(selected, null)} {...activityControl("sport.log.free")}>
 					<span className="sr-only max-phone:not-sr-only @3xl/sport:not-sr-only">Séance libre</span>
 				</Button>
 			</Tooltip>

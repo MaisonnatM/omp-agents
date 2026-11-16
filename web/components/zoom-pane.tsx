@@ -1,5 +1,5 @@
 /** `ZoomPane`, what a viewer dialog shows zoomed in or out as a browser zooms a page, and `ZoomControls`, its −, level, and + buttons. */
-import { IconMinusLarge, IconPlusLarge } from "central-icons";
+import { IconMinusLarge, IconPlusSmall } from "central-icons";
 import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -74,7 +74,7 @@ export function ZoomControls({ zoom }: { zoom: Zoom }) {
 			</Tooltip>
 			<Tooltip content="Zoom in" shortcut={["+"]} disabled={zoom.level >= MAX}>
 				<Button {...activityControl("viewer.zoom")} variant="ghost" size="icon-compact" aria-label="Zoom in" disabled={zoom.level >= MAX} onClick={() => zoom.step(1)}>
-					<IconPlusLarge />
+					<IconPlusSmall />
 				</Button>
 			</Tooltip>
 		</div>

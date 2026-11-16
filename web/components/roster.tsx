@@ -1,5 +1,5 @@
 /** The left sidebar's roster: the Workspaces section, whose label picks the workspace, and its search, then the scheduled sends, the pinned sessions, each workspace's sessions, and the past ones. */
-import { IconArrowLoopDownLeft, IconDotGrid1x3Horizontal, IconFolder1, IconFolderOpen, IconLoader, IconMagnifyingGlass, IconPin, IconPlusLarge } from "central-icons";
+import { IconArrowLoopDownLeft, IconDotGrid1x3Horizontal, IconFolder1, IconFolderOpen, IconLoader, IconMagnifyingGlass, IconPin, IconPlusSmall } from "central-icons";
 import { type ReactNode, useContext, useState } from "react";
 import type { ScheduledSend } from "../../src/shared/scheduled";
 import type { PastSession, View } from "../../src/shared/sessions";
@@ -92,7 +92,7 @@ function WorkspaceFolder({ folder: { group, rows }, name, open, onOpenChange, on
 		<SidebarGroupActions className="top-0 h-7 opacity-0 transition-opacity group-hover/workspace:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
 			<Tooltip content={`New session in ${name}`} side="right">
 				<SidebarGroupAction aria-label={`New session in ${name}`} onClick={onNewSession}>
-					<IconPlusLarge />
+					<IconPlusSmall />
 				</SidebarGroupAction>
 			</Tooltip>
 		</SidebarGroupActions>

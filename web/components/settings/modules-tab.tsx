@@ -1,4 +1,4 @@
-import { IconPencil, IconPlusLarge, IconTrashCan } from "central-icons";
+import { IconPencil, IconPlusSmall, IconTrashCan } from "central-icons";
 import { useId, useState } from "react";
 import type { ServedBuild } from "../../../src/served-build";
 import { Button } from "@/components/ui/button";
@@ -90,7 +90,7 @@ export function ModulesTab() {
 			meta="The features beside sessions, each one you can turn off, change, or remove"
 			actions={
 				checkout !== null && (
-					<Button variant="secondary" size="compact" leadingIcon={IconPlusLarge} onClick={() => setAsking({ kind: "new" })}>
+					<Button variant="secondary" size="compact" leadingIcon={IconPlusSmall} onClick={() => setAsking({ kind: "new" })}>
 						New module
 					</Button>
 				)

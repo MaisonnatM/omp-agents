@@ -1,7 +1,7 @@
 /** The Fait dialog, which logs a session's loads, sends, pain, effort, and note, or a test's max and bodyweight; and the Pesée dialog. */
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
-import { IconCheckmark1, IconCrossMedium, IconExclamationTriangle, IconPlusLarge } from "central-icons";
+import { IconCheckmark1, IconCrossMedium, IconExclamationTriangle, IconPlusSmall } from "central-icons";
 import { type KeyboardEvent, useId, useState } from "react";
 import { errorText } from "../../../src/json";
 import { type Climb, CLIMB_KINDS, type ClimbKind, FRENCH_GRADES, type Measurement, type Metric, PAIN_PLACES, type PainPlace, type SportChange, type SportState, type WorkoutLog } from "../../../src/shared/sport";
@@ -327,7 +327,7 @@ function Climbs({ climbs, kind, onChange }: { climbs: Climb[]; kind: ClimbKind; 
 					<Button variant="ghost" size="icon-compact" aria-label="Retirer cette réussite" onClick={() => onChange(climbs.toSpliced(index, 1))}><IconCrossMedium /></Button>
 				</div>
 			))}
-			<Button variant="tertiary" size="compact" leadingIcon={IconPlusLarge} className="self-start" onClick={add}>Ajouter une réussite</Button>
+			<Button variant="tertiary" size="compact" leadingIcon={IconPlusSmall} className="self-start" onClick={add}>Ajouter une réussite</Button>
 		</div>
 	);
 }

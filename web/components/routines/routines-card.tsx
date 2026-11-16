@@ -1,5 +1,5 @@
 /** A Bot's routines as one card in place of its conversation, as Arc's Agent routines: a header, then a row per routine, one open at a time. */
-import { IconArrowLeft, IconPlusLarge } from "central-icons";
+import { IconArrowLeft, IconPlusSmall } from "central-icons";
 import type { KeyboardEvent } from "react";
 import { type Routine, runsHere } from "../../../src/routines";
 import type { Bot } from "../../../src/shared/bots";
@@ -52,7 +52,7 @@ export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardP
 								{runningHere} of {routines.length} on schedule
 							</p>
 						</div>
-						<Button {...activityControl("bots.routine.new")} asChild variant="outline" size="compact" leadingIcon={IconPlusLarge}>
+						<Button {...activityControl("bots.routine.new")} asChild variant="outline" size="compact" leadingIcon={IconPlusSmall}>
 							<a href={hashForBotRoutine(bot.id, { kind: "new" })}>New routine</a>
 						</Button>
 					</header>

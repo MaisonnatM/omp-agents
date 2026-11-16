@@ -2,7 +2,7 @@
  * The Bots tab: a search field, All Bots, and New Bot, then each Bot as a messaging app lists a conversation, under Pinned, its section, or Other Bots once any Bot is pinned or in one.
  * Dragging a Bot's row onto a group pins it or moves it there.
  */
-import { IconDotGrid1x3Horizontal, IconFolder1, IconFolderDelete, IconLayoutGrid1, IconPencil, IconPin, IconPlusLarge, IconUserGroup } from "central-icons";
+import { IconDotGrid1x3Horizontal, IconFolder1, IconFolderDelete, IconLayoutGrid1, IconPencil, IconPin, IconPlusSmall, IconUserGroup } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type DragEvent, type HTMLAttributes, type LiHTMLAttributes, useState } from "react";
 import type { Bot } from "../../../src/shared/bots";
@@ -103,7 +103,7 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 				<Tooltip content="New Bot" side="bottom">
 					<Button asChild variant="ghost" size="icon-compact" className="shrink-0">
 						<a href={hashForNewBot()} aria-label="New Bot" aria-current={openId === null ? "page" : undefined}>
-							<IconPlusLarge />
+							<IconPlusSmall />
 						</a>
 					</Button>
 				</Tooltip>

@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { IconArrowLeft, IconArrowRight, IconCheckmark1, IconCrossMedium, IconExclamationCircle, IconPlusLarge } from "central-icons";
+import { IconArrowLeft, IconArrowRight, IconCheckmark1, IconCrossMedium, IconExclamationCircle, IconPlusSmall } from "central-icons";
 import { useCallback, useEffect, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -290,7 +290,7 @@ function Wizard({ place, titleId, done, requiredFinished, rosterError, body, onP
 			Finish setup
 		</Button>
 	) : (
-		<Button leadingIcon={IconPlusLarge} onClick={onNewSession}>
+		<Button leadingIcon={IconPlusSmall} onClick={onNewSession}>
 			New session
 		</Button>
 	);
