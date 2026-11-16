@@ -1,6 +1,6 @@
 /** `ImageViewer`, one image of a list shown large, which the Overview tab's Images section, the transcript's tool images, the thumbnails under agent text, and a pull request's Markdown images open. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { IconChevronLeft, IconChevronRightSmall, IconCrossMedium, IconSquareArrowTopRight } from "central-icons";
+import { IconChevronLeftSmall, IconChevronRightSmall, IconCrossMedium, IconSquareArrowTopRight } from "central-icons";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -91,7 +91,7 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 					<div className="flex min-h-0 flex-1 items-center gap-2">
 						<Tooltip content={previousLabel} shortcut={["←"]} disabled={index === 0}>
 							<Button {...activityControl("media-viewer.step")} variant="ghost" size="icon-compact" aria-label={previousLabel} disabled={index === 0} onClick={() => step(-1)}>
-								<IconChevronLeft />
+								<IconChevronLeftSmall />
 							</Button>
 						</Tooltip>
 						<ZoomPane zoom={zoom} className="self-stretch">
