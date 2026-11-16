@@ -18,6 +18,7 @@ export type ShortcutId =
 	| "closeOtherTabs"
 	| "reopenClosedTab"
 	| "pinTab"
+	| "copyTabUrl"
 	| "newTab"
 	| "nextTab"
 	| "previousTab"
@@ -199,6 +200,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: [{ chord: { key: "t", mod: true, shift: true }, scope: "anywhere" }],
 	},
 	{ id: "pinTab", category: "general", label: "Pin or unpin the header tab on screen", command: "Pin or unpin tab", keys: [{ chord: { key: "p", ctrl: true, shift: true }, scope: "anywhere" }] },
+	{ id: "copyTabUrl", category: "general", label: "Copy the dashboard address of the header tab on screen", command: "Copy tab URL", keys: [{ chord: { key: "l", mod: true }, scope: "anywhere" }] },
 	{
 		id: "nextTab",
 		category: "general",

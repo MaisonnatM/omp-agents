@@ -3,7 +3,9 @@ import {
 	CLOSED_TABS_KEPT,
 	closeHeaderTab,
 	closeOtherHeaderTabs,
+	closeRightHeaderTabs,
 	decodeHeaderTabs,
+	duplicateHeaderTab,
 	encodeHeaderTabs,
 	type HeaderTabs,
 	NEW_TAB_HASH,
@@ -143,6 +145,50 @@ describe("closeOtherHeaderTabs", () => {
 
 	test("closes nothing when only pinned tabs are left beside it", () => {
 		expect(closeOtherHeaderTabs(browse(["#todo"]), "t0")).toBeNull();
+	});
+});
+
+describe("closeRightHeaderTabs", () => {
+	const row = browse(["#pull-requests", "+#todo", "+#past/a", "+#calendar"]);
+
+	test("closes the unpinned tabs after the one asked for, keeping the one on screen, and Reopen closed tab brings them back from the left", () => {
+		const pinned = pinHeaderTab(row, "t3", true);
+		const closed = closeRightHeaderTabs(pinned, "t0");
+		expect(closed?.go).toBeNull();
+		expect(shown(closed!.row)).toEqual(["*^#calendar", "#pull-requests"]);
+		expect(shown(reopen(closed!.row))).toEqual(["^#calendar", "#pull-requests", "*#todo"]);
+		expect(shown(closeRightHeaderTabs(pinned, "t3")!.row)).toEqual(["*^#calendar"]);
+	});
+
+	test("puts the tab asked for on screen when the one on screen closes", () => {
+		const closed = closeRightHeaderTabs(row, "t1");
+		expect(closed?.go).toBe("#todo");
+		expect(shown(closed!.row)).toEqual(["#pull-requests", "*#todo"]);
+	});
+
+	test("closes nothing from the last tab", () => {
+		expect(closeRightHeaderTabs(row, "t3")).toBeNull();
+	});
+});
+
+describe("duplicateHeaderTab", () => {
+	const row = browse(["#pull-requests", "+#todo", "+#past/a"]);
+
+	test("opens a copy right after the tab, on screen, on its page", () => {
+		const duplicated = duplicateHeaderTab(row, "t0", "copy");
+		expect(duplicated?.go).toBe("#pull-requests");
+		expect(duplicated?.row.tabs[1]).toEqual({ id: "copy", hash: "#pull-requests" });
+		expect(shown(duplicated!.row)).toEqual(["#pull-requests", "*#pull-requests", "#todo", "#past/a"]);
+	});
+
+	test("puts the unpinned copy of a pinned tab first of the others", () => {
+		expect(shown(duplicateHeaderTab(pinHeaderTab(row, "t2", true), "t2", "copy")!.row)).toEqual(["^#past/a", "*#past/a", "#pull-requests", "#todo"]);
+	});
+
+	test("a duplicated session shows in both tabs: going to it stays in the copy on screen, and from another tab focuses the first", () => {
+		const duplicated = duplicateHeaderTab(row, "t2", "copy")!.row;
+		expect(visitHeaderTab(duplicated, "#past/a", false, "x")).toBe(duplicated);
+		expect(shown(browse(["#past/a"], { ...duplicated, active: 0 }))).toEqual(["#pull-requests", "#todo", "*#past/a", "#past/a"]);
 	});
 });
 

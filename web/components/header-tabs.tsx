@@ -1,5 +1,5 @@
 /** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, pinned ones first, and a + that opens a new one. */
-import { IconBubbleText, IconCalendarClock, IconCrossMedium, IconEditBig, IconHome, IconPin, IconPlusLarge, IconSparklesTwo, IconUnpin } from "central-icons";
+import { IconBubbleText, IconCalendarClock, IconChainLink1, IconCrossMedium, IconEditBig, IconHome, IconPin, IconPlusLarge, IconSparklesTwo, IconSquareBehindSquare2, IconUnpin } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useRef } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
@@ -12,7 +12,9 @@ import { pageTitle, viewTitle } from "../document-title";
 import {
 	closeHeaderTab,
 	closeOtherHeaderTabs,
+	closeRightHeaderTabs,
 	decodeHeaderTabs,
+	duplicateHeaderTab,
 	encodeHeaderTabs,
 	type HeaderTab,
 	HEADER_TABS_KEY,
@@ -30,6 +32,7 @@ import { PAGE_ICON } from "../page-icons";
 import type { Page } from "../routing";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredState } from "../stored-state";
+import { useClipboard } from "../use-copy";
 import { type DragItem, useDragOrder } from "../use-drag-order";
 import { ClosableTab, useTabRowEdges } from "./closable-tab";
 import { useDashboardActions } from "./dashboard-context";
@@ -88,15 +91,19 @@ interface HeaderTabItemProps {
 	onClose: () => void;
 	onTogglePin: () => void;
 	onNewTab: () => void;
+	onDuplicate: () => void;
+	onCopyUrl: () => void;
 	/** `null` while no other tab would close: the row holds only pinned tabs besides this one. */
 	onCloseOthers: (() => void) | null;
+	/** `null` while every tab after this one is pinned. */
+	onCloseRight: (() => void) | null;
 }
 
 /**
  * One header tab, which drags from anywhere on it to reorder: its link and its ×, and the menu a right-click on it opens, in Capy's order.
  * A pinned tab shows only its icon and draws no ×.
  */
-function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClose, onTogglePin, onNewTab, onCloseOthers }: HeaderTabItemProps) {
+function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClose, onTogglePin, onNewTab, onDuplicate, onCopyUrl, onCloseOthers, onCloseRight }: HeaderTabItemProps) {
 	const pinned = tab.pinned === true;
 	return (
 		<ContextMenu>
@@ -150,6 +157,15 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClo
 					New tab
 					<MenuShortcut>{shortcutLabels("newTab")[0]}</MenuShortcut>
 				</MenuItem>
+				<MenuItem onClick={onDuplicate}>
+					<IconSquareBehindSquare2 />
+					Duplicate tab
+				</MenuItem>
+				<MenuItem onClick={onCopyUrl}>
+					<IconChainLink1 />
+					Copy URL
+					<MenuShortcut>{shortcutLabels("copyTabUrl")[0]}</MenuShortcut>
+				</MenuItem>
 				<MenuSeparator />
 				{!pinned && (
 					<MenuItem {...activityControl("header.tab.close")} onClick={onClose}>
@@ -160,6 +176,10 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClo
 				<MenuItem disabled={onCloseOthers === null} onClick={onCloseOthers ?? undefined}>
 					<IconCrossMedium />
 					Close other tabs
+				</MenuItem>
+				<MenuItem disabled={onCloseRight === null} onClick={onCloseRight ?? undefined}>
+					<IconCrossMedium />
+					Close tabs to the right
 				</MenuItem>
 			</ContextMenuContent>
 		</ContextMenu>
@@ -181,11 +201,13 @@ interface HeaderTabsProps {
  * and ⌃⇧⇥ to the next and previous. Drag one, or press Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it,
  * closing the one on screen shows its neighbour, closing the last leaves a new one, and ⌥⌘W closes all but the pinned ones and the one on screen.
  * ⇧⌘T reopens the last closed tab where it was. Pin or Unpin in a tab's menu, or ⌃⇧P on the one on screen, moves it among the pinned
- * tabs, which sit first, show only their icon, and stay open until unpinned.
+ * tabs, which sit first, show only their icon, and stay open until unpinned. The menu also duplicates a tab, copies its address, as ⌘L does
+ * for the one on screen, and closes the tabs to its right.
  */
 export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps) {
 	const { openNewSession } = useDashboardActions();
 	const [row, setRow] = useStoredState(HEADER_TABS_KEY, decodeHeaderTabs, encodeHeaderTabs);
+	const clipboard = useClipboard();
 	useEffect(() => {
 		setRow(current => visitHeaderTab(current, address, false, crypto.randomUUID()));
 	}, [address, setRow]);
@@ -240,6 +262,8 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 	const togglePin = (id: string): void => {
 		setRow(current => pinHeaderTab(current, id, current.tabs.find(tab => tab.id === id)?.pinned !== true));
 	};
+	/** Copies the address that opens the dashboard on what `tab` shows. */
+	const copyUrl = (tab: HeaderTab): void => clipboard.run(`${location.origin}${location.pathname}${tab.hash}`);
 	useShortcuts({
 		moveTabLeft: () => moveFocused(-1),
 		moveTabRight: () => moveFocused(1),
@@ -252,6 +276,11 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 		pinTab: () => {
 			if (activeId === null) return false;
 			togglePin(activeId);
+		},
+		copyTabUrl: () => {
+			const active = tabs[row.active];
+			if (!active) return false;
+			copyUrl(active);
 		},
 		selectTab: index => {
 			if (index >= tabs.length) return false;
@@ -298,7 +327,10 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 							onClose={() => close(tab.id)}
 							onTogglePin={() => togglePin(tab.id)}
 							onNewTab={openTab}
+							onDuplicate={() => apply(duplicateHeaderTab(row, tab.id, crypto.randomUUID()))}
+							onCopyUrl={() => copyUrl(tab)}
 							onCloseOthers={tabs.some(other => other.id !== tab.id && !other.pinned) ? () => apply(closeOtherHeaderTabs(row, tab.id)) : null}
+							onCloseRight={tabs.some((other, at) => at > index && !other.pinned) ? () => apply(closeRightHeaderTabs(row, tab.id)) : null}
 						/>
 					);
 				})}
