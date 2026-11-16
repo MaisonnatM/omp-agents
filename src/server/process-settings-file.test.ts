@@ -22,10 +22,10 @@ function writeSettings(path: string, value: unknown): void {
 }
 
 describe("ProcessSettingsFile", () => {
-	test("without a file the idle stops are 30 minutes and 24 hours, and a change saves it for the next server", () => {
+	test("without a file the idle stops are 30 minutes and 12 hours, and a change saves it for the next server", () => {
 		const path = settingsPath();
 		const first = new ProcessSettingsFile(path);
-		expect(first.value).toEqual({ stopIdleAfterMinutes: 30, stopIdleSessionsAfterHours: 24 });
+		expect(first.value).toEqual({ stopIdleAfterMinutes: 30, stopIdleSessionsAfterHours: 12 });
 		expect(first.apply({ stopIdleAfterMinutes: null, stopIdleSessionsAfterHours: 24 })).toBe(true);
 		expect(first.apply({ stopIdleAfterMinutes: null, stopIdleSessionsAfterHours: 24 })).toBe(false);
 		expect(new ProcessSettingsFile(path).value).toEqual({ stopIdleAfterMinutes: null, stopIdleSessionsAfterHours: 24 });
@@ -36,14 +36,14 @@ describe("ProcessSettingsFile", () => {
 	test("a file saved before the idle session stop existed keeps its process stop and takes the session stop's default", () => {
 		const path = settingsPath();
 		writeSettings(path, { stopIdleAfterMinutes: 60 });
-		expect(new ProcessSettingsFile(path).value).toEqual({ stopIdleAfterMinutes: 60, stopIdleSessionsAfterHours: 24 });
+		expect(new ProcessSettingsFile(path).value).toEqual({ stopIdleAfterMinutes: 60, stopIdleSessionsAfterHours: 12 });
 		expect(existsSync(`${path}.invalid`)).toBe(false);
 	});
 
 	test("a file that names a stop the page does not offer moves aside rather than being written over", () => {
 		const path = settingsPath();
 		writeSettings(path, { stopIdleAfterMinutes: 30, stopIdleSessionsAfterHours: 7 });
-		expect(new ProcessSettingsFile(path).value).toEqual({ stopIdleAfterMinutes: 30, stopIdleSessionsAfterHours: 24 });
+		expect(new ProcessSettingsFile(path).value).toEqual({ stopIdleAfterMinutes: 30, stopIdleSessionsAfterHours: 12 });
 		expect(existsSync(`${path}.invalid`)).toBe(true);
 	});
 });

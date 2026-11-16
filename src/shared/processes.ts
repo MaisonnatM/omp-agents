@@ -71,7 +71,7 @@ export const STOP_IDLE_CHOICES = [null, 15, 30, 60, 120] as const;
 /** The idle session stops the page offers, in hours; `null` is off. */
 export const STOP_IDLE_SESSION_CHOICES = [null, 4, 12, 24, 72] as const;
 
-export const DEFAULT_PROCESS_SETTINGS: ProcessSettings = { stopIdleAfterMinutes: 30, stopIdleSessionsAfterHours: 24 };
+export const DEFAULT_PROCESS_SETTINGS: ProcessSettings = { stopIdleAfterMinutes: 30, stopIdleSessionsAfterHours: 12 };
 
 /** Settings that name one of {@link STOP_IDLE_CHOICES} and one of {@link STOP_IDLE_SESSION_CHOICES}, as `processes.json` and `PUT /api/process-settings` hold them. */
 export function parseProcessSettings(value: unknown): Parsed<ProcessSettings> {

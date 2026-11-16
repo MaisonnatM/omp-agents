@@ -186,7 +186,7 @@
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **Notifications** turns the [session notifications](notifications.md#session-notifications) on or off, picks whether finished turns notify too, and picks their sound and whether it plays while the window is focused.
   **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 or 30 minutes, 1 hour, or 2 hours, 30 minutes by default.
-  A process stops once every session it serves has been idle that long, and **Stop idle sessions** stops the omp of a session left idle with no subagent running: **Off**, or after 4, 12, or 24 hours, or 3 days, 24 hours by default; see [Sessions sidebar](sessions-sidebar.md).
+  A process stops once every session it serves has been idle that long, and **Stop idle sessions** stops the omp of a session left idle with no subagent running: **Off**, or after 4, 12, or 24 hours, or 3 days, 12 hours by default; see [Sessions sidebar](sessions-sidebar.md).
   **New sessions** pins a skill.
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, a Linear issue, or a todo, then sends its first message through that skill.
   The picker lists the skills of the sidebar's workspace, and says which, or your own skills with **All workspaces**.

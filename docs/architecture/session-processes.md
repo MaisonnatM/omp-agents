@@ -59,7 +59,7 @@ Each live session has an idle clock: the time of the last sample that saw it any
 A process's idle stop time is the setting's minutes after the latest of its own start and the idle clocks of the sessions it serves, and there is none while one of them is busy.
 A job and an owned service serve their session, and a shared service every live session of its project, so the shared browser stops only once all of them have been idle that long.
 `ProcessSettingsFile` in `src/server/process-settings-file.ts` keeps the setting in `processes.json` beside the access token, as `{ stopIdleAfterMinutes, stopIdleSessionsAfterHours }`.
-The minutes are one of `null` for off, 15, 30, 60, and 120, 30 by default, and the hours one of `null` for off, 4, 12, 24, and 72, 24 by default.
+The minutes are one of `null` for off, 15, 30, 60, and 120, 30 by default, and the hours one of `null` for off, 4, 12, 24, and 72, 12 by default.
 A file without the hours, saved before [the idle session stop](#the-idle-session-stop) existed, takes their default; a file that holds anything else moves to `processes.json.invalid`.
 It is a shared `ReducerFile` and each sample reads it again, so a choice saved on any server reaches the one that stops processes.
 
