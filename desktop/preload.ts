@@ -3,7 +3,7 @@
  * reports the sessions that need you to `attention.ts`, asks for a sign-in, opens the system's folder dialog, and opens
  * another omp-agents server's page in an app of its own.
  */
-import { contextBridge, type IpcRendererEvent, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 import { isString, recordOf } from "../src/json";
 import { ACCESS_CHANNEL, ALERT_CHANNEL, BADGE_CHANNEL, BROWSER_CAPTURE_CHANNEL, BROWSER_PORTS_CHANNEL, BROWSER_SCREEN_CHANNEL, DESKTOP_BRIDGE, type DesktopBridge, INSTALL_STARTER_KIT_CHANNEL, OPEN_DASHBOARD_CHANNEL, PICK_DIRECTORY_CHANNEL, SIGN_IN_CHANNEL, SOUND_CHANNEL } from "../src/shared/desktop-bridge";
 

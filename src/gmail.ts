@@ -7,6 +7,7 @@
  */
 import { createCache } from "./cache";
 import type { AccountClients } from "./account-clients";
+import { decodeEntities } from "./html-text";
 import { errorText, isObject, nonEmptyStr, str } from "./json";
 import { mapLimit } from "./map-limit";
 import { ApiError, type SignedFetch } from "./signed-fetch";
@@ -22,17 +23,6 @@ const INBOX_SIZE = 50;
 const THREAD_READS = 8;
 /** How long an answer, the signed-in address, or a conversation is kept before Gmail is asked again. */
 const KEPT_MS = 60_000;
-
-const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"' };
-
-/** `html` with the entities Gmail's snippets use decoded: `&amp;`, `&lt;`, `&gt;`, `&quot;`, and numeric ones such as `&#39;`. */
-function decodeEntities(html: string): string {
-	return html.replace(/&(?:(amp|lt|gt|quot)|#(\d+)|#x([0-9a-f]+));/gi, (entity: string, name?: string, decimal?: string, hex?: string) => {
-		if (name) return NAMED_ENTITIES[name.toLowerCase()] ?? entity;
-		const code = decimal ? Number.parseInt(decimal, 10) : Number.parseInt(hex ?? "", 16);
-		return code <= 0x10ffff ? String.fromCodePoint(code) : entity;
-	});
-}
 
 /** One mailbox of an address header: `"Alice Doe" <alice@example.com>`, or a bare `alice@example.com` with no name. */
 function personOf(mailbox: string): MailPerson | null {

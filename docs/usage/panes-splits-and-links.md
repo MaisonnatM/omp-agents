@@ -52,5 +52,7 @@
   A page that fails shows the same in its place, and opening another view clears it.
 - Session conversations, their composers, and the new-session composer are at most 48rem wide.
 - A session header shows its **Copy session ID** and trajectory buttons only while the pointer is over the title, while one of them has keyboard focus, or always on a touch screen.
-- Resting the pointer on a link to another site, or tabbing to it, shows a card under it with the site's icon and name, the page's title and description, and the address; a page that is private or not on the public internet shows only its address.
-  Escape, a click, or a scroll closes it.
+- Resting the pointer on a link to another site, or tabbing to it, shows a card under it with the whole address, its `http://` shown when it is not HTTPS.
+  For an HTTPS link outside agent text, the server then reads the page, and the card adds the site's icon and name and the page's title and description; a page that is private or not on the public internet keeps only its address.
+  A link in an agent's or a prompt's text shows only its address, with a globe, and the server reads nothing from it, as [Conversations](conversations.md) says.
+  Escape, a click, or a scroll of what holds the link closes it.
