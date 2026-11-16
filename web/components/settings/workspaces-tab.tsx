@@ -1,6 +1,7 @@
 import { IconEyeOpen, IconEyeSlash, IconFolderAddRight, IconFolderOpen, IconShieldCrossed } from "central-icons";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { everyWord } from "../../../src/shared/every-word";
 import type { TrustChange, TrustedProject } from "../../../src/shared/project-trust";
 import type { Workspace, WorkspaceChange, WorkspaceList } from "../../../src/shared/workspaces";
 import { putJson } from "../../api";
@@ -8,6 +9,7 @@ import { folderName } from "../../labels";
 import { writeWorkspace } from "../../reads";
 import { useAction } from "../../use-action";
 import { IntegrationList } from "../integrations/integration-row";
+import { SearchField } from "../search-field";
 import { Section } from "./editor";
 
 /** The desktop app's bridge, whose folder dialog picks a workspace; absent in a browser, which keeps the typed path alone. */
@@ -84,10 +86,14 @@ function TrustedProjects({ projects }: { projects: TrustedProject[] }) {
 	);
 }
 
-/** The directories the pickers and the sidebar offer, a field to add one by path or, in the desktop app, from the folder dialog, the hidden ones, each a click from coming back, and the trusted projects. */
+/** The directories the pickers and the sidebar offer, a field to add one by path or, in the desktop app, from the folder dialog, a filter over them and the hidden ones, each a click from coming back, and the trusted projects. */
 export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProjects }: WorkspacesTabProps) {
 	const addedCwds = new Set(added.map(entry => entry.cwd));
 	const [path, setPath] = useState("");
+	const [query, setQuery] = useState("");
+	const matches = everyWord(query);
+	const shown = workspaces.filter(workspace => matches(workspace.cwdDisplay));
+	const shownHidden = hidden.filter(workspace => matches(workspace.cwdDisplay));
 	const { pending, error, change } = useChanges<WorkspaceChange>(writeWorkspace);
 	const add = (event: FormEvent): void => {
 		event.preventDefault();
@@ -120,11 +126,14 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 					)}
 				</form>
 				<ChangeError error={error} />
+				{workspaces.length + hidden.length > 0 && <SearchField label="Filter workspaces" placeholder="Filter workspaces" query={query} onQuery={setQuery} className="min-w-0 flex-1" />}
 				{workspaces.length === 0 ? (
 					<p className="text-sm text-muted-foreground">No workspaces yet. Start a session or add a directory.</p>
+				) : shown.length === 0 ? (
+					<p className="text-sm text-muted-foreground">No workspace matches.</p>
 				) : (
 					<IntegrationList label="Workspaces">
-						{workspaces.map(workspace => (
+						{shown.map(workspace => (
 							<WorkspaceRow
 								key={workspace.cwd}
 								workspace={workspace}
@@ -141,20 +150,24 @@ export function WorkspacesTab({ workspaces, list: { added, hidden }, trustedProj
 			</Section>
 			{hidden.length > 0 && (
 				<Section title="Hidden" meta="Left out of the pickers and the sidebar, with their sessions.">
-					<IntegrationList label="Hidden workspaces">
-						{hidden.map(workspace => (
-							<WorkspaceRow
-								key={workspace.cwd}
-								workspace={workspace}
-								note={null}
-								action={
-									<Button variant="ghost" size="compact" leadingIcon={IconEyeOpen} loading={pending?.op === "show" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "show", cwd: workspace.cwd })}>
-										Show
-									</Button>
-								}
-							/>
-						))}
-					</IntegrationList>
+					{shownHidden.length === 0 ? (
+						<p className="text-sm text-muted-foreground">No hidden workspace matches.</p>
+					) : (
+						<IntegrationList label="Hidden workspaces">
+							{shownHidden.map(workspace => (
+								<WorkspaceRow
+									key={workspace.cwd}
+									workspace={workspace}
+									note={null}
+									action={
+										<Button variant="ghost" size="compact" leadingIcon={IconEyeOpen} loading={pending?.op === "show" && pending.cwd === workspace.cwd} disabled={pending !== null} onClick={() => change({ op: "show", cwd: workspace.cwd })}>
+											Show
+										</Button>
+									}
+								/>
+							))}
+						</IntegrationList>
+					)}
 				</Section>
 			)}
 			<TrustedProjects projects={trustedProjects} />

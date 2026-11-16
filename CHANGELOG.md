@@ -7,6 +7,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 - omp-agents starts again on omp 18.21.0, which removed the piece the sandbox cleanup used to find a running ovnfs file system; the cleanup now asks `ovnfs status` itself, still without ever starting it. The weekly model replays run again too.
 - Settings › Agents no longer has a special case for omp's seance agent, which omp 18.21.0 removed.
+- Settings › Workspaces has a Filter workspaces field that narrows the Workspaces and Hidden lists by folder name or path as you type.
 - Every + button, on New session, New tab, New Bot, New routine, and Add, uses the smaller plus-small icon.
 - The app opens again after the update that removed Gmail and Google Calendar; it stayed blank while its saved Integrations answer still listed them.
 - The Email, Linear tickets, and Calendar pages are gone from the sidebar, along with everything that used Gmail, Google Calendar, or Linear.
