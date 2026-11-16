@@ -96,6 +96,15 @@ export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 /** The settings section `segment` names, else Analytics, which bare `#settings`, an unknown section, and nothing remembered open. */
 export const settingsSection = (segment: string | null): SettingsSection => SETTINGS_SECTIONS.find(({ value }) => value === segment)?.value ?? "analytics";
 
+/** The settings sidebar's groups holding a section whose label or a keyword contains `query`, ignoring case, each with those sections in the sidebar's order; `phone` drops Phone access, which a paired phone does not list. */
+export const settingsMatching = (query: string, { phone }: { phone: boolean }) => {
+	const needle = query.trim().toLowerCase();
+	const sections = SETTINGS_SECTIONS.filter(
+		entry => !(phone && entry.value === "phone") && (!needle || [entry.label, ...entry.keywords].some(text => text.toLowerCase().includes(needle))),
+	);
+	return SETTINGS_GROUPS.map(group => ({ group, entries: sections.filter(entry => entry.group === group.value) })).filter(({ entries }) => entries.length > 0);
+};
+
 /** The open section of the settings page; its workspace sections read the sidebar's workspace. */
 export interface SettingsRoute {
 	section: SettingsSection;

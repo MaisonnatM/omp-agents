@@ -1,21 +1,24 @@
 import { useState } from "react";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { isPhonePage } from "../../api";
-import { hashForSettings, SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsRoute } from "../../routing";
+import { hashForSettings, type SettingsRoute, settingsMatching } from "../../routing";
 import { SidebarSearch } from "../sidebar-search";
 
-/** The sidebar while the Settings page is open: a search over the sections' names and keywords, then each group's sections under its label, those the workspace picker changes last. */
+/** The sidebar while the Settings page is open: a search over the sections' names and keywords, where Enter opens the first match, then each group's sections under its label, those the workspace picker changes last. */
 export function SettingsNav({ route: { section } }: { route: SettingsRoute }) {
 	const [query, setQuery] = useState("");
-	const needle = query.trim().toLowerCase();
-	const sections = SETTINGS_SECTIONS.filter(
-		entry => !(isPhonePage() && entry.value === "phone") && (!needle || [entry.label, ...entry.keywords].some(text => text.toLowerCase().includes(needle))),
-	);
-	const groups = SETTINGS_GROUPS.map(group => ({ group, entries: sections.filter(entry => entry.group === group.value) })).filter(({ entries }) => entries.length > 0);
+	const groups = settingsMatching(query, { phone: isPhonePage() });
+	const first = groups[0]?.entries[0];
 	return (
 		<>
 			<SidebarGroup>
-				<SidebarSearch label="Filter the settings" placeholder="Search settings" query={query} onQuery={setQuery} />
+				<SidebarSearch
+					label="Filter the settings"
+					placeholder="Search settings"
+					query={query}
+					onQuery={setQuery}
+					onEnter={first && query.trim() ? () => (location.hash = hashForSettings(first.value)) : undefined}
+				/>
 			</SidebarGroup>
 			{groups.length === 0 && (
 				<SidebarGroup>
