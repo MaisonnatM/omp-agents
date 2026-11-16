@@ -28,6 +28,7 @@
   A provider whose key omp reads from an environment variable, with nothing stored, shows as connected with the variable's name; unset the variable to sign out, as Settings cannot remove it.
   A sign-in saved here takes precedence over that variable.
 - When a provider has two or more signed-in accounts, each shows its place in the order omp tries them, with up and down arrows.
+  The first account's up arrow and the last one's down arrow stay focusable, dimmed, and their tooltip says the account is already first or last.
   omp starts a session on the first account, and moves to the next one when the first nears its usage limit or fails.
   Moving an account saves the new order at once in omp's `auth.accountPolicies` setting, in `~/.omp/agent/config.yml`, which omp reads again without a restart.
   Moving keeps each account's other choices in that setting, such as the share of its plan held in reserve.

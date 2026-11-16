@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type LinkedPullRequest, type PullRequestSummary, type PullRequestComment, type PullRequestDetail, type PullRequestThread, type RepoPullRequests, type Reviewer, type StackedPullRequest } from "../src/shared/github";
+import { type LinkedPullRequest, type PullRequestSummary, type PullRequestComment, type PullRequestDetail, type PullRequestThread, type RepoPullRequests, type Reviewer, type StackedPullRequest, repoKey } from "../src/shared/github";
 import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
@@ -12,12 +12,14 @@ import {
 	foldedByDefault,
 	type PullRequestOrder,
 	pullRequestSections,
+	listedPullRequest,
 	listedPullRequests,
 	moveAction,
 	movesSummary,
 	orderedRepos,
 	placedManual,
 	reason,
+	sectionsOfRepos,
 	sectionTitles,
 	shownPullRequests,
 	rebaseOrder,
@@ -59,6 +61,12 @@ const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullReque
 const teammate = { login: "teammate", avatarUrl: null };
 
 const noAgent: AgentOn = () => null;
+
+/** The pull requests the page shows of `repos` in `order`, less what `isFolded` folds, as `owner#number`. */
+function shownOf(repos: readonly RepoPullRequests[], order: PullRequestOrder, isFolded: (key: string) => boolean = () => false): string[] {
+	const ordered = orderedRepos(repos, order);
+	return shownPullRequests(ordered, sectionsOfRepos(ordered, order, noAgent), isFolded).map(({ repo, number }) => `${repo}#${number}`);
+}
 
 describe("next move", () => {
 	test("each pull request waits on the first move that applies", () => {
@@ -266,7 +274,7 @@ test("the shown pull requests follow page order and leave out folded repositorie
 		unmatched: [],
 	};
 	const folded = new Set(["acme/folded", "acme/webapp:Recently merged"]);
-	expect(shownPullRequests(list, key => folded.has(key), DEFAULT_ORDER, noAgent).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
+	expect(shownOf(list.repos, DEFAULT_ORDER, key => folded.has(key))).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
 });
 
 describe("pull request order", () => {
@@ -308,8 +316,7 @@ describe("pull request order", () => {
 	test("the shown pull requests follow the custom order", () => {
 		const repo = (name: string, pullRequests: PullRequestSummary[]): RepoPullRequests => ({ owner: "acme", repo: name, cwds: [], pullRequests });
 		const list = { repos: [repo("webapp", [pr(1), pr(2, { role: "reviewer", author: teammate })]), repo("api", [pr(3, { repo: "api" })])], unmatched: [] };
-		const shown = shownPullRequests(list, () => false, order({ repos: ["acme/api"], sections: ["Waiting on others"] }), noAgent);
-		expect(shown.map(({ repo, number }) => `${repo}#${number}`)).toEqual(["api#3", "webapp#1", "webapp#2"]);
+		expect(shownOf(list.repos, order({ repos: ["acme/api"], sections: ["Waiting on others"] }))).toEqual(["api#3", "webapp#1", "webapp#2"]);
 	});
 
 	test("a stored order that cannot be read falls back to the default, field by field", () => {
@@ -326,21 +333,25 @@ describe("hidden repositories", () => {
 		unmatched: ["/x"],
 	};
 
-	test("drop out of the shown pull requests and the your-move count", () => {
-		const shown = withoutHidden(list, new Set(["acme/api"]));
+	test("drop out of the shown pull requests and the your-move count, yet E still finds their pull requests", () => {
+		const hidden = new Set(["acme/api"]);
+		const counted = withoutHidden(list, hidden);
 		expect(yourMoveCount(list, noAgent)).toBe(2);
-		expect(yourMoveCount(shown, noAgent)).toBe(1);
-		expect(shownPullRequests(shown, () => false, DEFAULT_ORDER, noAgent).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1"]);
-		expect(shown.unmatched).toEqual(["/x"]);
+		expect(yourMoveCount(counted, noAgent)).toBe(1);
+		expect(counted.unmatched).toEqual(["/x"]);
+		expect(shownOf(list.repos.filter(repo => !hidden.has(repoKey(repo))), DEFAULT_ORDER)).toEqual(["webapp#2", "webapp#1"]);
+		// E on the details page of a hidden repository's pull request looks it up in what GitHub returned, hidden repositories included.
+		expect(listedPullRequest(list, pr(3, { repo: "api" }))).toMatchObject({ pr: { repo: "api", number: 3 }, cwd: "/code/api" });
 	});
 
-	test("keep their place: a step in Repositories passes over them, and a move among the shown repositories leaves them where they were", () => {
+	test("keep their place: Repositories steps among every repository, and Alt+Shift+↑ steps over the hidden ones and leaves them where they were", () => {
 		const keys = ["acme/a", "acme/b", "acme/c", "acme/d"];
 		const order: PullRequestOrder = { ...DEFAULT_ORDER, repos: keys };
-		expect(withRepoStepped(order, keys, "acme/c", -1)?.repos).toEqual(["acme/a", "acme/c", "acme/b", "acme/d"]);
-		expect(withRepoStepped(order, keys, "acme/a", -1)).toBeNull();
-		// With acme/b hidden, the page moves acme/d one place up among a, c, and d.
-		expect(withRepoMoved(order, keys, "acme/d", "acme/c", "before").repos).toEqual(["acme/a", "acme/b", "acme/d", "acme/c"]);
+		expect(withRepoStepped(order, keys, keys, "acme/c", -1)?.repos).toEqual(["acme/a", "acme/c", "acme/b", "acme/d"]);
+		expect(withRepoStepped(order, keys, keys, "acme/a", -1)).toBeNull();
+		const shown = ["acme/a", "acme/c", "acme/d"];
+		expect(withRepoStepped(order, keys, shown, "acme/d", -1)?.repos).toEqual(["acme/a", "acme/b", "acme/d", "acme/c"]);
+		expect(withRepoStepped(order, keys, shown, "acme/c", -1)?.repos).toEqual(["acme/c", "acme/a", "acme/b", "acme/d"]);
 	});
 });
 

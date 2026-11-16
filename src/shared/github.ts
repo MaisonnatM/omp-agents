@@ -92,13 +92,16 @@ export function githubMediaPath(raw: string): string | null {
 /** A GitHub repository's key in maps and lookups: `owner/repo`, lowercased, since GitHub matches names in any case. */
 export const repoKey = ({ owner, repo }: Repo): string => `${owner}/${repo}`.toLowerCase();
 
+/** A GitHub repository's name as GitHub writes it: `owner/repo`. */
+export const repoName = ({ owner, repo }: Repo): string => `${owner}/${repo}`;
+
 /** A pull request's key: `owner/repo#number`, lowercased. */
 export const prKey = (pr: PullRequest): string => `${repoKey(pr)}#${pr.number}`;
 
 export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
 
 /** A pull request's name as GitHub writes it: `owner/repo#number`. */
-export const pullRequestName = (pr: PullRequest): string => `${pr.owner}/${pr.repo}#${pr.number}`;
+export const pullRequestName = (pr: PullRequest): string => `${repoName(pr)}#${pr.number}`;
 
 const PULL_REQUEST_URL = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#]|$)/;
 

@@ -257,10 +257,13 @@ export const withRepoMoved = (order: PullRequestOrder, keys: readonly string[], 
 	repos: moveKey([...keys, ...order.repos.filter(other => !keys.includes(other))], key, beside, where),
 });
 
-/** `order` with the repository `key` one place `by` among `keys`, which page order puts it in; `null` at the edge. */
-export function withRepoStepped(order: PullRequestOrder, keys: readonly string[], key: string, by: 1 | -1): PullRequestOrder | null {
-	const step = stepTarget(keys, key, by);
-	return step && withRepoMoved(order, keys, key, step.target, step.where);
+/**
+ * `order` with the repository `key` one place `by` among `among`, the repositories the page shows in page order, placed
+ * among `every`, all of them in page order, so the ones `among` leaves out keep their place; `null` at the edge.
+ */
+export function withRepoStepped(order: PullRequestOrder, every: readonly string[], among: readonly string[], key: string, by: 1 | -1): PullRequestOrder | null {
+	const step = stepTarget(among, key, by);
+	return step && withRepoMoved(order, every, key, step.target, step.where);
 }
 
 /** A repository's pull requests by whose move it is, leaving out the empty sections, each row with its move and its place in a stack. */
@@ -290,6 +293,10 @@ export function pullRequestSections(pullRequests: PullRequestSummary[], order: P
 		return [{ title, rows }];
 	});
 }
+
+/** The sections of each of `repos`, at the same index; none for a repository GitHub could not read. */
+export const sectionsOfRepos = (repos: readonly RepoPullRequests[], order: PullRequestOrder, agentOn: AgentOn): PullRequestSection[][] =>
+	repos.map(repo => ("error" in repo ? [] : pullRequestSections(repo.pullRequests, order, agentOn)));
 
 /** What a section holds by move, in rank order, such as `2 in review · 1 CI running`; `null` for a section only one move goes in, whose count says it all. */
 export function movesSummary({ title, rows }: PullRequestSection): string | null {
@@ -324,12 +331,12 @@ export const sectionFoldKey = (repo: string, title: string): string => `${repo}:
 /** Whether the list folds the repository or section that `key` names until you unfold it. */
 export const foldedByDefault = (key: string): boolean => GROUP_TITLES.some(title => GROUPS[title].folded && key.endsWith(`:${title}`));
 
-/** The pull requests the list shows, in its order: those of readable repositories and sections that `isFolded` leaves open. */
-export function shownPullRequests({ repos }: PullRequestList, isFolded: (key: string) => boolean, order: PullRequestOrder, agentOn: AgentOn): PullRequestSummary[] {
-	return orderedRepos(repos, order).flatMap(repo => {
+/** The pull requests the list shows, in its order: those of `repos` in the repositories and sections that `isFolded` leaves open, with `sectionsOf` each one's sections at the same index. */
+export function shownPullRequests(repos: readonly Repo[], sectionsOf: readonly PullRequestSection[][], isFolded: (key: string) => boolean): PullRequestSummary[] {
+	return repos.flatMap((repo, at) => {
 		const key = repoKey(repo);
-		if ("error" in repo || isFolded(key)) return [];
-		return pullRequestSections(repo.pullRequests, order, agentOn).flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
+		if (isFolded(key)) return [];
+		return sectionsOf[at]!.flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
 	});
 }
 

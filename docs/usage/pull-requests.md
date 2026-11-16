@@ -134,10 +134,12 @@
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The app keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
 - **Repositories** at the top of the Pull requests page, beside the sort button, lists every repository the page covers, each with a switch that shows or hides it and buttons that move it up or down.
-  Its tooltip reads **Repositories: N hidden** while you hide any.
+  Its line under the title says that a hidden repository also leaves the tab's count, and that the browser keeps the choice.
+  While you hide any, the button reads **N hidden** and its tooltip **Repositories: N hidden**.
   A hidden repository leaves the table, **Rebase N behind**, ↓ and ↑, and the **Pull requests** tab's count, and keeps its place in the order, so it comes back where it was.
+  E still works on the details of a hidden repository's pull request.
   **Reset the order** leaves the hidden repositories hidden, and the browser keeps the choice across reloads.
-  When every repository is hidden, the page says "Every repository is hidden. Show them from Repositories."
+  When every repository is hidden, the page says "Every repository is hidden. Show them from Repositories." above a **Show all repositories** button.
 
 - The Pull requests page works from the keyboard, outside text fields, while its tab shows.
   ↓ and ↑ move to the next and previous row, and Enter shows the focused row's details.

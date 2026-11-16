@@ -431,15 +431,13 @@ const sameStack = (a: StackPlace | null, b: StackPlace | null): boolean =>
 export const sameSessions = (a: SessionLink[], b: SessionLink[]): boolean =>
 	a.length === b.length && a.every((link, at) => link.sessionId === b[at]!.sessionId && link.label === b[at]!.label && link.link === b[at]!.link && link.status === b[at]!.status && sameView(link.view, b[at]!.view));
 
-/** How each prop of a row is compared, which decides whether it draws again. */
-type PropEqual<Props> = { [K in keyof Props]: (a: Props[K], b: Props[K]) => boolean };
-
 /**
- * The list keeps each prop the same object while what it shows holds, `sessions` included, except the row's data, which
- * it rebuilds whenever the roster or the sort changes, compared by what it holds, and its drag item, compared by its
- * handlers, which stay the same, and where a drop would land.
+ * How each prop of a row is compared, which decides whether it draws again. The list keeps each prop the same object
+ * while what it shows holds, `sessions` included, except the row's data, which it rebuilds whenever the roster or the
+ * sort changes, compared by what it holds, and its drag item, compared by its handlers, which stay the same, and where a
+ * drop would land.
  */
-const ROW_EQUAL: PropEqual<RowProps> = {
+const ROW_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => boolean } = {
 	row: (a, b) => a === b || (a.pr === b.pr && a.move === b.move && a.unit === b.unit && sameStack(a.stack, b.stack)),
 	sessions: Object.is,
 	targeted: Object.is,
