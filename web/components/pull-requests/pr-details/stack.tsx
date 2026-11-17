@@ -70,7 +70,7 @@ function OtherRow({ pr, onPick }: { pr: LinkedPullRequest; onPick?: (pr: PullReq
 			<span className="text-muted-foreground tabular-nums">#{pr.number}</span> {read.data?.title ?? pr.repo}
 		</>
 	);
-	const name = `#${pr.number} ${read.data?.title ?? pr.repo}`;
+	const name = `#${pr.number} ${read.data?.title ?? pr.repo}\nThis session ${LINK_VERB[pr.link]} it`;
 	return (
 		<li className="flex items-center gap-2 py-1.5 pr-3 pl-3 text-sm">
 			{read.data ? <IconTip icon={STATE_ICON[read.data.state]} className="[&_svg]:size-3.5" /> : <IconPullRequest className="size-3.5 shrink-0 text-muted-foreground" />}
@@ -83,7 +83,6 @@ function OtherRow({ pr, onPick }: { pr: LinkedPullRequest; onPick?: (pr: PullReq
 					{label}
 				</a>
 			)}
-			<span className="shrink-0 text-xs text-muted-foreground">{LINK_VERB[pr.link]}</span>
 			<GithubLink pr={pr} />
 		</li>
 	);
