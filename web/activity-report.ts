@@ -2,15 +2,14 @@
 import { ACTION_MESSAGES, type ActivityKind, type ActivityRead, type ActivityUse, CONTROLS, featureId } from "../src/shared/activity";
 import { commandKey, VIEWS } from "./activity";
 import { MODULE_LIST } from "./modules";
-import { SETTINGS_SECTIONS, type SidebarTab } from "./routing";
-import { SHORTCUTS, type Shortcut, type ShortcutId } from "./shortcuts";
+import { SETTINGS_SECTIONS } from "./routing";
+import { SHORTCUTS } from "./shortcuts";
 
-/** A feature as the page's registries name it; `tab` is the sidebar tab it goes with, which gates it on that tab's service. */
+/** A feature as the page's registries name it. */
 export interface Feature {
 	kind: Exclude<ActivityKind, "presence">;
 	key: string;
 	label: string;
-	tab?: SidebarTab;
 }
 
 /** A feature the range used, with its use. */
@@ -25,8 +24,6 @@ export interface ActivityReport {
 	mostUsed: UsedFeature[];
 	/** Not used in the range, with its last use ever, `null` for never. */
 	never: (Feature & { lastAt: number | null })[];
-	/** Gated on a tab whose service omp is not signed in to, so not counted against it. */
-	notSetUp: Feature[];
 }
 
 /** Under this many uses in the range, a feature is rarely used. */
@@ -34,45 +31,24 @@ const RARELY = 3;
 /** How many features **Most used** lists. */
 const MOST_USED = 20;
 
-/** The core's commands that go with a tab gated on a service: creating a ticket waits on Linear, as the Tickets tab does. */
-const COMMAND_TABS: Partial<Record<ShortcutId, SidebarTab>> = { newTicket: "tickets" };
-
-/** The core's `PUT` routes that go with a tab gated on a service, by path prefix: the ticket routes wait on Linear, as the Tickets tab does. */
-const ROUTE_TABS: Record<string, SidebarTab> = { "/api/ticket": "tickets" };
-
-/** The modules whose tab is gated on a service. */
-const GATED_MODULES = MODULE_LIST.filter(module => module.tab.integration);
-
-/** Module `id`'s tab, while that module's tab is gated on a service. */
-const gatedModule = (id: string): SidebarTab | undefined => GATED_MODULES.find(module => module.id === id)?.id;
-
-const commandTab = ({ id, category }: Shortcut): SidebarTab | undefined => COMMAND_TABS[id] ?? gatedModule(category) ?? gatedModule(id);
-const routeTab = (path: string): SidebarTab | undefined =>
-	Object.entries(ROUTE_TABS).find(([prefix]) => path.startsWith(prefix))?.[1] ?? GATED_MODULES.find(({ api }) => api !== undefined && path.startsWith(api))?.id;
-
 /** Every feature the page has: views, commands, actions, and tagged controls, from the registries that define them. */
 export function inventory(serverActions: readonly string[]): Feature[] {
-	const gated = (tab: SidebarTab | undefined) => (tab ? { tab } : {});
 	return [
-		...VIEWS.map((view): Feature => ({ kind: "view", key: view.key, label: view.label, ...gated("tab" in view ? view.tab : undefined) })),
+		...VIEWS.map((view): Feature => ({ kind: "view", key: view.key, label: view.label })),
 		...SETTINGS_SECTIONS.map(({ value, label }): Feature => ({ kind: "view", key: `settings/${value}`, label: `Settings › ${label}` })),
-		...SHORTCUTS.map((shortcut): Feature => ({ kind: "command", key: commandKey(shortcut.id), label: shortcut.command ?? shortcut.label, ...gated(commandTab(shortcut)) })),
+		...SHORTCUTS.map((shortcut): Feature => ({ kind: "command", key: commandKey(shortcut.id), label: shortcut.command ?? shortcut.label })),
 		...Object.entries(ACTION_MESSAGES).filter(([, action]) => action).map(([t]): Feature => ({ kind: "action", key: t, label: t })),
-		...serverActions.map((path): Feature => ({ kind: "action", key: `put ${path}`, label: `PUT ${path}`, ...gated(routeTab(path)) })),
+		...serverActions.map((path): Feature => ({ kind: "action", key: `put ${path}`, label: `PUT ${path}` })),
 		...[...CONTROLS, ...MODULE_LIST.flatMap(module => module.controls)].map(({ id, label }): Feature => ({ kind: "control", key: id, label })),
 	];
 }
 
-/** Splits `features` by their use in `answer`'s range; a feature whose tab is in `signedOut` is set apart. */
-export function report(features: readonly Feature[], answer: Pick<ActivityRead, "uses" | "lastUsed">, signedOut: ReadonlySet<SidebarTab>): ActivityReport {
+/** Splits `features` by their use in `answer`'s range. */
+export function report(features: readonly Feature[], answer: Pick<ActivityRead, "uses" | "lastUsed">): ActivityReport {
 	const uses = new Map(answer.uses.map(use => [featureId(use.kind, use.key), use]));
 	const last = new Map(answer.lastUsed.map(({ kind, key, at }) => [featureId(kind, key), at]));
-	const result: ActivityReport = { used: [], rarely: [], mostUsed: [], never: [], notSetUp: [] };
+	const result: ActivityReport = { used: [], rarely: [], mostUsed: [], never: [] };
 	for (const feature of features) {
-		if (feature.tab && signedOut.has(feature.tab)) {
-			result.notSetUp.push(feature);
-			continue;
-		}
 		const id = featureId(feature.kind, feature.key);
 		const use = uses.get(id);
 		if (!use) result.never.push({ ...feature, lastAt: last.get(id) ?? null });

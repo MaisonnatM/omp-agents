@@ -18,25 +18,17 @@
   **Merge stack**, under the rail, merges the whole stack into the bottom one's base, bottom first, after a confirmation with the merge methods the repository allows.
   The dashboard's server merges each one once the one below it merged, retargeting it onto that base, marking a draft ready, and updating its branch as GitHub requires, as a merge that waits until it is ready does; the line under the rail says which one it is on and what it waits on, with **Cancel**.
   It stops at the first one that fails, with the reason, and leaves the ones above it as they are.
-- A session's row menu has **Open ENG-2368** for each Linear issue the session worked on, by identifier, and so does the ticket button in its header.
-  It opens the issue's details beside the tickets list (`#tickets/<identifier>`), and shows the **Tickets** tab's icon.
-  An issue counts when the session or one of its subagents changed or opened it (`save_issue`) or commented on it (`save_comment`), when the session names it in its `/ship` step, or when a Linear link to it is in the session's own prompt.
-  Weaker evidence counts once two kinds of it agree: a read with omp's Linear tools (`get_issue`, `list_comments`), its identifier in the session's own prompt, and the session's branch, such as `eng-2716-agent-templates` or `me/eng-2712`.
-  So an issue a subagent only read for context does not count, and neither does one that a `list_issues` search only listed.
 - Agents start `/ship` on their own when a request will end in a pull request, and say so in their first reply; answer "no ship" to work without it.
   A /ship run has nine steps: ticket, plan, implementation, draft PR, interface review, thermonuclear review, ready gate, live review, and merged.
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.
   In the plan step the agent compares up to three ways to build the change and posts the one it chose on the Linear issue, or in the PR body when there is no issue.
   omp writes each step to its session file, and the dashboard reads those entries for running and past sessions; a todo whose linked session's run reached merged shows **Shipped**, as [Todo list](todo-list.md) says.
-- The sidebar's page list switches pages: **Pull requests**, **Tickets**, **Bots**, **Calendar**, **Todo**, **Sport**, and **Email**, each but **Pull requests** with its page's own list in a column at the page's left while it is open.
+- The sidebar's page list switches pages: **Pull requests**, **Bots**, **Todo**, and **Sport**, each but **Pull requests** and **Todo** with its page's own list in a column at the page's left while it is open.
   Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
-  **Tickets** shows only once Linear is connected; see [Linear tickets](linear-tickets.md).
-  **Email** shows only once Gmail is connected; see [Email](email.md).
-  **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](todo-list.md).
+  **Todo** opens your own todo list, with a tab per list and its categories under **Filter**; see [Todo list](todo-list.md).
   The sessions live in the workspace list under the page list; click one to leave a page for its pane, and each workspace counts the live sessions that wait on you.
   The command menu's **Go to sessions**, while a page shows, opens the panes, or with none open the selected workspace's live session started last, else its past session saved last.
   **Bots** lists your Bots, each with its routines; see [Bots](bots.md) and [Routines](routines.md).
-  **Calendar** opens a month of Google events, routine runs, and due todos and tickets; see [Calendar](calendar.md).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone, the row only as wide as its tabs; hover an icon for its name.
   The tabs never spill past the sidebar.
   **Pull requests** opens the Pull requests page, a table of your pull requests, with no list of its own at its left.
@@ -125,21 +117,39 @@
   One toast with a spinner and a running clock counts the run, such as `Rebasing 2 of 5 pull requests`, and names the branch rebasing now with its step, such as `me/fix: Pushing through the pre-push checks`; when the last one ends, it sums up the run, such as `Rebased 3 of 5 pull requests`, with how many already had their base, stopped at a conflict, failed, or were skipped.
   A conflict or a failure also toasts on its own as it happens.
   The button reads **Rebasing…** beside a spinner and waits while any rebase is queued or running.
-- The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
-  Any sort but **Manual** keeps your moves in their order and sorts within each move.
-  Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.
+- Tabs above the list show part of it: **Open** every section but **Recently merged**, **Your move**, **Approved**, and **Merged** that one section, and **All**, the default, every section.
+  A tab reads as picked only while the sections shown are exactly its own, so sections you switch one by one leave no tab picked.
+- **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section** lists the sections, **Repository** and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.
+  A repository or author you checked that lists nothing now, such as a repository you hid since, stays in its submenu with none, so you can uncheck it.
+  Each field you set adds a chip under the tabs, such as **Author is MaisonnatM** or **Repository is any of 2 repositories**, whose tooltip names them; click the value to change it, or its × to drop the field, and **Clear all** drops every field once two chips show.
+  After a × the focus moves to the next chip's ×, or the previous one's, or **Filter** when no chip is left, and after **Clear all** to **Filter**; the Todo and Notifications bars do the same.
+  The last section shown stays on.
+  The author, date, and search filters apply before stacks join, so a stack keeps only the pull requests that match.
+  While any filter or search is set, a repository with nothing left leaves the page, unless **Show empty sections** in **Display** is on; when nothing is left, a note names the search or the filters with a button that clears them and moves the focus to the list.
+  The filtered pull requests leave the table and ↓ and ↑; **Rebase N behind** and the **Pull requests** tab's count still cover them.
+  The browser keeps the filter across reloads.
+- The search field in the page header keeps the pull requests whose title, number, branch, author, or repository contain every word you type; Escape clears it.
+  The page forgets the search when you leave it.
+- **Display**, the sliders button beside **Filter**, holds **Grouping**, **Ordering**, **Show empty sections**, and **Repositories…**; it stays highlighted while you hide a repository.
+  **Grouping** lays the list out by **Repository**, the default, by **Section** with a table per repository under each section, by **Author**, most pull requests first, with a table per section under each author, or with **No grouping**, one table of every pull request, in section order.
+  Every grouping but **Repository** folds its own headings and keeps no drag; **Waiting on others** and **Recently merged** start folded there too.
+  **Ordering** orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
+  Any order but **Manual** keeps your moves in their order and sorts within each move.
+  Drag a pull request within its section to place it by hand, which switches the order to **Manual** and keeps the order the section showed until then.
   In **Manual**, a pull request you never placed comes first, most recently updated first.
   A stack moves as one, and its pull requests keep their order from the top of the stack.
   Drag a repository's name on the page to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
-  The app keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
-- **Repositories** at the top of the Pull requests page, beside the sort button, lists every repository the page covers, each with a switch that shows or hides it and buttons that move it up or down.
+  The app keeps the order across reloads, and **Reset the order** under **Ordering** restores the default.
+- **Repositories…** in **Display** lists every repository the page covers, each with a switch that shows or hides it and buttons that move it up or down.
   Its line under the title says that a hidden repository also leaves the tab's count, and that the browser keeps the choice.
-  While you hide any, the button reads **N hidden** and its tooltip **Repositories: N hidden**.
+  While you hide any, the **Display** button's tooltip reads **Display: N repositories hidden**.
   A hidden repository leaves the table, **Rebase N behind**, ↓ and ↑, and the **Pull requests** tab's count, and keeps its place in the order, so it comes back where it was.
   E still works on the details of a hidden repository's pull request.
   **Reset the order** leaves the hidden repositories hidden, and the browser keeps the choice across reloads.
-  When every repository is hidden, the page says "Every repository is hidden. Show them from Repositories." above a **Show all repositories** button.
+  When every repository is hidden, the page says "Every repository is hidden. Show them from Display, then Repositories." above a **Show all repositories** button.
+- **+** in the page header opens **New pull request**: pick a workspace, named by its repository and by its folder when the repository has several, say what should change, and **Start** opens a new session there that makes the change on a new branch and opens a pull request for it.
+  The session opens in the focused pane, and the New session page keeps its own draft.
 
 - The Pull requests page works from the keyboard, outside text fields, while its tab shows.
   ↓ and ↑ move to the next and previous row, and Enter shows the focused row's details.

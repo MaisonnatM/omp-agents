@@ -1,36 +1,32 @@
-/** What the Pull requests page's list and its details page share: the pull requests' state, their keys, and the list's repositories, sections, and rows. */
-import { IconArrowBottomTop, IconCloudSimpleDisconnected } from "central-icons";
+/** What the Pull requests page's list and its details page share: the pull requests' state, their keys, and the list's headings, tables, and rows. */
+import { IconCloudSimpleDisconnected } from "central-icons";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
-import { type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, repoName, samePullRequest } from "../../../src/shared/github";
+import { type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, samePullRequest } from "../../../src/shared/github";
 import { type AgentOn, agentOn, moveOf } from "../../../src/shared/moves";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
 	DEFAULT_ORDER,
-	PULL_REQUEST_SORTS,
 	type ListChange,
+	type MoveGroup,
 	type PullRequestOrder,
 	type SectionRow,
-	type PullRequestSection,
 	type PullRequestSort,
 	listedPullRequest,
 	moveAction,
 	movesSummary,
 	orderedRepos,
 	placedManual,
-	sectionFoldKey,
 	sectionsOfRepos,
 	rebaseOrder,
 	sectionTitles,
-	shownPullRequests,
 	withRepoMoved,
 	withRepoStepped,
 } from "../../pull-requests-model";
-import { useHiddenRepos, usePullRequestsFolds, usePullRequestsOrder } from "../../pull-requests-state";
+import { cardFoldKey, filteredList, groupedList, groupFoldKey, type ListGroup, type PullRequestDisplay, type PullRequestGrouping, shownPullRequests } from "../../pull-requests-filter";
+import { useHiddenRepos, usePullRequestsDisplay, usePullRequestsFilter, usePullRequestsFolds, usePullRequestsOrder } from "../../pull-requests-state";
 import { moveKey, stepTarget, type Where } from "../../order";
 import { folderName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
@@ -41,40 +37,38 @@ import { pullRequestsStore, writePullRequest } from "../../reads";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import { sectionId } from "../../section";
 import { useShortcuts } from "../../shortcuts";
-import { type DragItem, useDragOrder } from "../../use-drag-order";
+import { type DragItem, NO_DRAG, useDragOrder } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { useReveal } from "../fold";
 import { stepRows } from "../list-page";
 import { type RowBase, type RowProps, rowElement, rowId, sameSessions, sessionsByPullRequest } from "./pr-row";
 
-const SORTS = Object.keys(PULL_REQUEST_SORTS) as PullRequestSort[];
-
 /** Moves a focused heading or row one place; `false` at the edge. */
 type Move = (by: 1 | -1) => boolean;
 
-/** The fold keys of the repository and the section that list `pr`, or `null` when `repos` leaves it out; `sectionsOf` holds each repository's sections at the same index. */
-function placeOf(repos: readonly RepoPullRequests[], sectionsOf: readonly PullRequestSection[][], pr: PullRequest): { repo: string; section: string } | null {
-	for (const [at, repo] of repos.entries()) {
-		const section = sectionsOf[at]!.find(({ rows }) => rows.some(row => samePullRequest(row.pr, pr)));
-		if (!section) continue;
-		const key = repoKey(repo);
-		return { repo: key, section: sectionFoldKey(key, section.title) };
+/** The fold keys of the heading and the table that list `pr` under `grouping`, or `null` when `groups` leaves it out. */
+function foldsOf(grouping: PullRequestGrouping, groups: readonly ListGroup[], pr: PullRequest): string[] | null {
+	for (const group of groups) {
+		const card = group.cards.find(({ rows }) => rows.some(({ row }) => samePullRequest(row.pr, pr)));
+		if (!card) continue;
+		const key = groupFoldKey(grouping, group.key);
+		return [key, cardFoldKey(key, card.key)];
 	}
 	return null;
 }
 
 /**
- * Binds the keys of a screen of `pulls`, over the pull requests it shows in order, less those of the repositories and
- * sections `isFolded` folds. Mount it once per screen, since its keys are global. ↓ and ↑ move between those rows, or,
+ * Binds the keys of a screen of `pulls`, over the pull requests it shows in order, less those of the headings and
+ * tables `isFolded` folds. Mount it once per screen, since its keys are global. ↓ and ↑ move between those rows, or,
  * while the main area shows a pull request's details, show the next or previous one; on its changes page they step
  * through its files instead. O opens the pull request on GitHub, `.` opens a row's `⋯` menu, and E starts the quick
  * action that makes the move of the focused row's pull request, or the one the main area shows, the one its row's menu
  * would, even in a repository you hid. A key that has nothing to act on keeps its usual meaning.
  */
-export function usePullRequestKeys({ poll, repos, sectionsOf, agent, route, onActionsOpenChange }: PullRequests, isFolded: (key: string) => boolean): void {
+export function usePullRequestKeys({ poll, groups, display, agent, route, onActionsOpenChange }: PullRequests, isFolded: (key: string) => boolean): void {
 	const { start } = useDashboardActions();
 	const { target } = route;
-	const shown = useMemo(() => shownPullRequests(repos, sectionsOf, isFolded), [repos, sectionsOf, isFolded]);
+	const shown = useMemo(() => shownPullRequests(display.grouping, groups, isFolded), [display.grouping, groups, isFolded]);
 	const current = (): number =>
 		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowElement(pr)?.contains(document.activeElement) ?? false);
 	const step = (by: 1 | -1): boolean => {
@@ -138,33 +132,6 @@ function useMoveKeys(moves: ReadonlyMap<string, Move>): void {
 	useShortcuts({ moveUp: () => move(-1), moveDown: () => move(1) });
 }
 
-export function SortMenu({ order, onSort, onReset }: { order: PullRequestOrder; onSort: (sort: PullRequestSort) => void; onReset: () => void }) {
-	const [open, setOpen] = useState(false);
-	const label = `Sort: ${PULL_REQUEST_SORTS[order.sort]}`;
-	return (
-		<DropdownMenu open={open} onOpenChange={setOpen}>
-			<Tooltip content={label} forceOpen={open ? false : undefined}>
-				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={`${label}. Change the pull requests' order`} />}>
-					<IconArrowBottomTop />
-				</DropdownMenuTrigger>
-			</Tooltip>
-			<DropdownMenuContent align="end" className="w-52">
-				<MenuRadioGroup value={order.sort} onValueChange={(sort: PullRequestSort) => onSort(sort)}>
-					{SORTS.map(sort => (
-						<MenuRadioItem key={sort} value={sort} closeOnClick>
-							{PULL_REQUEST_SORTS[sort]}
-						</MenuRadioItem>
-					))}
-				</MenuRadioGroup>
-				<MenuSeparator />
-				<MenuItem disabled={JSON.stringify(order) === JSON.stringify(DEFAULT_ORDER)} onClick={onReset}>
-					Reset the order
-				</MenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
-
 /** The workspace a repository's heading names after it: a lone workspace whose folder is not the repository's name, or how many there are. */
 export function workspacesLabel({ repo, cwds }: RepoPullRequests): string | null {
 	if (cwds.length !== 1) return `${cwds.length} workspaces`;
@@ -194,34 +161,43 @@ export function UnmatchedTip({ unmatched }: { unmatched: string[] }) {
 	);
 }
 
-/** What moves a repository or section: a drag, or Alt+Shift+↑ and ↓. */
+/**
+ * What moves a heading, a table, or a row: a drag, and Alt+Shift+↑ and ↓ by its `data-move`. Only the grouping by
+ * repository keeps an order of its own, so under the others it is {@link NO_DRAG} with no id.
+ */
 interface Placed {
 	drag: DragItem;
-	/** What `data-move` names it by. */
-	moveId: string;
+	/** What `data-move` names it by; `undefined` where it does not move. */
+	moveId: string | undefined;
 }
 
-export interface SectionView extends Placed {
-	section: PullRequestSection;
+/** A table under a heading, with its fold. */
+export interface TableView extends Placed {
+	key: string;
+	title: string;
+	/** The section it lists, whose count **Your move** draws stronger; `null` for the one table of no grouping. */
+	section: MoveGroup | null;
 	/** The id of its list, which its fold button controls. */
 	listId: string;
 	open: boolean;
 	toggle: () => void;
-	/** Its moves summed up while folded, such as `2 in review · 1 CI running`; `null` while open or for a section of one move. */
+	/** Its moves summed up while folded, such as `2 in review · 1 CI running`; `null` while open, under a grouping other than by repository, or for a section of one move. */
 	summary: string | null;
 	rows: RowProps[];
 }
 
-export interface RepoView extends Placed {
-	repo: RepoPullRequests;
+/** A heading of the list, with its fold and its tables. */
+export interface GroupView extends Placed {
 	key: string;
-	/** `owner/repo`. */
-	name: string;
+	/** `null` under no grouping, whose one table has no heading. */
+	title: string | null;
+	/** The repository it lists under the grouping by repository. */
+	repo: RepoPullRequests | null;
 	/** The id of its body, which its fold button controls. */
 	bodyId: string;
 	open: boolean;
 	toggle: () => void;
-	sections: SectionView[];
+	tables: TableView[];
 }
 
 /** The pull requests of a workspace, read from GitHub, and what the list and the details page share. */
@@ -235,13 +211,13 @@ export interface PullRequests {
 	setOrder: (order: PullRequestOrder) => void;
 	onSort: (sort: PullRequestSort) => void;
 	onReset: () => void;
-	/** The repositories you did not hide, in the list's order, and the sections of each, at the same index. */
-	repos: RepoPullRequests[];
-	sectionsOf: PullRequestSection[][];
+	/** The list's headings and tables: what the tab, **Filter**, and the search keep, under **Display**'s grouping. */
+	groups: ListGroup[];
+	display: PullRequestDisplay;
 	/** Every repository in the list's order, those you hid too. */
 	everyRepo: RepoPullRequests[];
-	/** Every pull request's key in the order the list shows them now; placing one by hand starts the manual sort from it. */
-	shownOrder: string[];
+	/** Every pull request's key in the order the list shows them now, filtered ones too; placing one by hand starts the manual sort from it. */
+	shownOrder: () => string[];
 	/** What a list row of `row` takes, from functions every row shares, so a row's props change only with what it shows. */
 	rowBase: (row: SectionRow, cwd: string) => RowBase;
 	onQuickAction: RowBase["onQuickAction"];
@@ -258,6 +234,8 @@ interface PullRequestsProps {
 	past: PastSession[];
 	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
 	route: PullRequestsRoute;
+	/** What the search field holds; empty or left out matches every pull request, so the details page, which has no search, steps through the filtered list. */
+	query?: string;
 }
 
 /** What makes an item's drag: the arguments of `useDragOrder`'s function, which change with every drag and so are called in a pass of their own. */
@@ -267,20 +245,26 @@ interface Dropped {
 	onDrop: (dragged: string, where: Where) => void;
 }
 
+/** How an item of the layout moves: its drag's arguments and its move id, or neither. */
+interface Placement {
+	dropped: Dropped | null;
+	moveId: string | undefined;
+}
+
+const STILL: Placement = { dropped: null, moveId: undefined };
+
 /** A row's place in the list, which changes only with the pull request list, its order, and its folds. */
-interface RowLayout {
+interface RowLayout extends Placement {
 	row: SectionRow;
 	cwd: string;
-	moveId: string;
-	dropped: Dropped;
 	/** The units of the rows above and below it; a stack takes a drop as one, so the line shows above its top row or under its bottom one. */
 	above: string | null;
 	below: string | null;
 }
 
-type SectionLayout = Omit<SectionView, "drag" | "rows"> & { dropped: Dropped; rows: RowLayout[] };
+type TableLayout = Omit<TableView, "drag" | "rows"> & Placement & { rows: RowLayout[] };
 
-type RepoLayout = Omit<RepoView, "drag" | "sections"> & { dropped: Dropped; sections: SectionLayout[] };
+type GroupLayout = Omit<GroupView, "drag" | "tables"> & Placement & { tables: TableLayout[] };
 
 const NO_SESSIONS: RowProps["sessions"] = [];
 
@@ -302,13 +286,15 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
 }
 
 /** The pull requests of the sidebar's scope, with the state and the functions that the list and the details page share. */
-export function usePullRequests({ hosts, past, route }: PullRequestsProps): PullRequests {
+export function usePullRequests({ hosts, past, route, query = "" }: PullRequestsProps): PullRequests {
 	const targetKey = route.target ? prKey(route.target) : null;
 	const { open, start } = useDashboardActions();
 	const { starts: { quick }, pullRequestsScope: scope } = useDashboardStatus();
 	const poll = pullRequestsStore.use(scope);
 	const read = poll.read?.data ?? null;
 	const [hidden] = useHiddenRepos();
+	const [filter] = usePullRequestsFilter();
+	const [display] = usePullRequestsDisplay();
 	const [order, setOrder] = usePullRequestsOrder();
 	const agent = useMemo(() => agentOn(hosts), [hosts]);
 	const sessions = useSessionsByPullRequest(hosts, past);
@@ -346,7 +332,12 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 	);
 	const everyRepo = useMemo(() => (read ? orderedRepos(read.repos, order) : []), [read, order]);
 	const repos = useMemo(() => (hidden.size === 0 ? everyRepo : everyRepo.filter(repo => !hidden.has(repoKey(repo)))), [everyRepo, hidden]);
-	const sectionsOf = useMemo(() => sectionsOfRepos(repos, order, agent), [repos, order, agent]);
+	// Dates count back from when GitHub was read, so the list changes only with what it shows.
+	const now = poll.read?.at ?? 0;
+	const groups = useMemo(
+		() => groupedList(display.grouping, filteredList(repos, filter, query, order, agent, display.empty, now), order),
+		[display.grouping, display.empty, repos, filter, query, order, agent, now],
+	);
 	const behind = useMemo(
 		() =>
 			repos.flatMap((repo): RebaseJob[] => {
@@ -356,9 +347,10 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 			}),
 		[repos],
 	);
-	const shownOrder = useMemo(
-		() => (order.sort === "manual" && order.manual.length > 0 ? order.manual : sectionsOf.flatMap(sections => sections.flatMap(({ rows }) => rows.map(row => prKey(row.pr))))),
-		[order, sectionsOf],
+	// Every section's pull requests, the filtered ones too, so a manual sort started under a filter keeps their places; built only when you place one.
+	const shownOrder = useCallback(
+		() => (order.sort === "manual" && order.manual.length > 0 ? order.manual : sectionsOfRepos(repos, order, agent).flatMap(sections => sections.flatMap(({ rows }) => rows.map(row => prKey(row.pr))))),
+		[order, repos, agent],
 	);
 	return {
 		poll,
@@ -367,10 +359,10 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 		agent,
 		order,
 		setOrder,
-		onSort: sort => setOrder({ ...order, sort, manual: sort === "manual" ? shownOrder : order.manual }),
+		onSort: sort => setOrder({ ...order, sort, manual: sort === "manual" ? shownOrder() : order.manual }),
 		onReset: () => setOrder(DEFAULT_ORDER),
-		repos,
-		sectionsOf,
+		groups,
+		display,
 		everyRepo,
 		shownOrder,
 		rowBase,
@@ -384,103 +376,114 @@ export function usePullRequests({ hosts, past, route }: PullRequestsProps): Pull
 }
 
 /**
- * The list of `pulls`: its repositories, sections, and rows, with their folds and the keys that move through them.
- * Dragging or Alt+Shift+↑ and ↓ reorder its repositories, sections, and the pull requests in a section; a hidden
- * repository keeps its place. The browser keeps the order. Mount it once per screen, since its keys act on the rows it
- * lists.
+ * The list of `pulls`: its headings, tables, and rows, with their folds and the keys that move through them. Under the
+ * grouping by repository, dragging or Alt+Shift+↑ and ↓ reorder its repositories, sections, and the pull requests in a
+ * section; a hidden repository keeps its place, and the browser keeps the order. The other groupings keep that order,
+ * so nothing moves. Mount it once per screen, since its keys act on the rows it lists.
  */
-export function usePullRequestsList(pulls: PullRequests): RepoView[] {
-	const { route: { target }, order, setOrder, repos, sectionsOf, everyRepo, shownOrder, rowBase } = pulls;
+export function usePullRequestsList(pulls: PullRequests): GroupView[] {
+	const { route: { target }, display: { grouping }, order, setOrder, groups, everyRepo, shownOrder, rowBase } = pulls;
 	const targetKey = target ? prKey(target) : null;
 	const folds = usePullRequestsFolds();
 	const drag = useDragOrder();
-	const place = useMemo(() => (target ? placeOf(repos, sectionsOf, target) : null), [repos, sectionsOf, targetKey]);
-	const reveal = target && place ? { id: rowId(target), folds: [place.repo, place.section] } : null;
+	const place = useMemo(() => (target ? foldsOf(grouping, groups, target) : null), [grouping, groups, targetKey]);
+	const reveal = target && place ? { id: rowId(target), folds: place } : null;
 	useReveal(reveal, folds, { token: reveal?.id, block: "nearest", focus: false });
 	usePullRequestKeys(pulls, folds.isFolded);
 
 	const layout = useMemo(() => {
 		const moves = new Map<string, Move>();
-		const repoKeys = repos.map(repoKey);
+		const movable = grouping === "repository";
+		/** The move id `id`, which `step` moves a place, and the drag of `dropped`, under the grouping by repository; nothing moves under the others. */
+		const placed = (id: string, step: Move, dropped: Dropped): Placement => {
+			if (!movable) return STILL;
+			moves.set(id, step);
+			return { moveId: id, dropped };
+		};
+		const repoKeys = groups.map(({ key }) => key);
 		const everyKey = everyRepo.map(repoKey);
 		const moveRepo = (key: string, beside: string, where: Where): void => setOrder(withRepoMoved(order, everyKey, key, beside, where));
 		const moveSection = (title: string, beside: string, where: Where): void => setOrder({ ...order, sections: moveKey(sectionTitles(order), title, beside, where) });
 
-		const repoLayout = (repo: RepoPullRequests, at: number): RepoLayout => {
-			const key = repoKey(repo);
-			const moveId = `repo:${key}`;
-			moves.set(moveId, by => {
-				const next = withRepoStepped(order, everyKey, repoKeys, key, by);
-				if (next) setOrder(next);
-				return next !== null;
-			});
-			const sections = sectionsOf[at]!;
-			const titles = sections.map(({ title }) => title);
+		const groupLayout = (group: ListGroup): GroupLayout => {
+			const key = groupFoldKey(grouping, group.key);
+			const titles = group.cards.map(card => card.key);
 			return {
-				repo,
-				key,
-				name: repoName(repo),
+				key: group.key,
+				title: group.title,
+				repo: group.repo,
 				bodyId: sectionId("pull-requests", key),
 				open: !folds.isFolded(key),
 				toggle: () => folds.toggle(key),
-				dropped: { scope: "repos", key, onDrop: (dragged, where) => moveRepo(dragged, key, where) },
-				moveId,
-				sections: sections.map((section): SectionLayout => {
-					const foldKey = sectionFoldKey(key, section.title);
-					const sectionOpen = !folds.isFolded(foldKey);
-					const sectionMoveId = `section:${foldKey}`;
-					moves.set(sectionMoveId, by => {
-						const step = stepTarget(titles, section.title, by);
-						if (step) moveSection(section.title, step.target, step.where);
-						return step !== null;
-					});
-					const units = [...new Set(section.rows.map(({ unit }) => unit))];
-					const placeUnit = (unit: string, beside: string, where: Where): void =>
-						setOrder({ ...order, sort: "manual", manual: placedManual(shownOrder, repo, sections, section.title, unit, beside, where) });
+				...placed(
+					`repo:${group.key}`,
+					by => {
+						const next = withRepoStepped(order, everyKey, repoKeys, group.key, by);
+						if (next) setOrder(next);
+						return next !== null;
+					},
+					{ scope: "repos", key: group.key, onDrop: (dragged, where) => moveRepo(dragged, group.key, where) },
+				),
+				tables: group.cards.map((card): TableLayout => {
+					const foldKey = cardFoldKey(key, card.key);
+					const open = !folds.isFolded(foldKey);
 					return {
-						section,
-						listId: sectionId("pull-requests", key, section.title),
-						open: sectionOpen,
+						key: card.key,
+						title: card.title,
+						section: card.section,
+						listId: sectionId("pull-requests", foldKey),
+						open,
 						toggle: () => folds.toggle(foldKey),
-						summary: sectionOpen ? null : movesSummary(section),
-						dropped: { scope: `sections:${key}`, key: section.title, onDrop: (dragged, where) => moveSection(dragged, section.title, where) },
-						moveId: sectionMoveId,
-						rows: section.rows.map((row, at): RowLayout => {
-							const rowKey = prKey(row.pr);
-							const rowMoveId = `pull-request:${rowKey}`;
-							moves.set(rowMoveId, by => {
-								const step = stepTarget(units, row.unit, by);
-								if (step) placeUnit(row.unit, step.target, step.where);
+						summary: movable && !open && card.section !== null ? movesSummary({ title: card.section, rows: card.rows.map(({ row }) => row) }) : null,
+						...placed(
+							`section:${foldKey}`,
+							by => {
+								const step = stepTarget(titles, card.key, by);
+								if (step) moveSection(card.key, step.target, step.where);
 								return step !== null;
-							});
+							},
+							{ scope: `sections:${group.key}`, key: card.key, onDrop: (dragged, where) => moveSection(dragged, card.key, where) },
+						),
+						rows: card.rows.map(({ row, repo, section }, at): RowLayout => {
+							const placeUnit = (unit: string, beside: string, where: Where): void => {
+								const sections = group.cards.flatMap(each => (each.section === null ? [] : [{ title: each.section, rows: each.rows.map(item => item.row) }]));
+								setOrder({ ...order, sort: "manual", manual: placedManual(shownOrder(), repo, sections, section, unit, beside, where) });
+							};
 							return {
 								row,
 								cwd: repo.cwds[0]!,
-								moveId: rowMoveId,
-								dropped: { scope: `pull-requests:${foldKey}`, key: row.unit, onDrop: (dragged, where) => placeUnit(dragged, row.unit, where) },
-								above: section.rows[at - 1]?.unit ?? null,
-								below: section.rows[at + 1]?.unit ?? null,
+								...placed(
+									`pull-request:${prKey(row.pr)}`,
+									by => {
+										const step = stepTarget([...new Set(card.rows.map(item => item.row.unit))], row.unit, by);
+										if (step) placeUnit(row.unit, step.target, step.where);
+										return step !== null;
+									},
+									{ scope: `pull-requests:${foldKey}`, key: row.unit, onDrop: (dragged, where) => placeUnit(dragged, row.unit, where) },
+								),
+								above: card.rows[at - 1]?.row.unit ?? null,
+								below: card.rows[at + 1]?.row.unit ?? null,
 							};
 						}),
 					};
 				}),
 			};
 		};
-		return { repos: repos.map(repoLayout), moves };
-	}, [repos, sectionsOf, everyRepo, shownOrder, order, setOrder, folds]);
+		return { groups: groups.map(groupLayout), moves };
+	}, [grouping, groups, everyRepo, shownOrder, order, setOrder, folds]);
 	useMoveKeys(layout.moves);
 
 	// What changes with a drag, the roster, the target, a pending start, or an open menu: a cheap pass over the layout.
 	return useMemo(() => {
-		const place = ({ scope, key, onDrop }: Dropped): DragItem => drag(scope, key, onDrop);
-		return layout.repos.map(({ dropped, sections, ...repo }): RepoView => ({
-			...repo,
-			drag: place(dropped),
-			sections: sections.map(({ dropped, rows, ...section }): SectionView => ({
-				...section,
-				drag: place(dropped),
+		const dragOf = (dropped: Dropped | null): DragItem => (dropped ? drag(dropped.scope, dropped.key, dropped.onDrop) : NO_DRAG);
+		return layout.groups.map(({ dropped, tables, ...group }): GroupView => ({
+			...group,
+			drag: dragOf(dropped),
+			tables: tables.map(({ dropped, rows, ...table }): TableView => ({
+				...table,
+				drag: dragOf(dropped),
 				rows: rows.map(({ row, cwd, moveId, dropped, above, below }): RowProps => {
-					const item = place(dropped);
+					const item = dragOf(dropped);
 					const edge = item.dropAt === "before" ? above : below;
 					return { ...rowBase(row, cwd), drag: { ...item, dropAt: edge === row.unit ? null : item.dropAt }, moveId };
 				}),

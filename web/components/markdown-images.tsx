@@ -1,4 +1,7 @@
-/** `Openable`, an image of Markdown text that opens large, and `useMarkdownImages`, the viewer that steps through a text's images in the order it shows them. */
+/**
+ * `Openable`, an image of Markdown text that opens large; `useImageList`, the viewer that steps through a list of images;
+ * and `useMarkdownImages`, that viewer over a text's images in the order it shows them.
+ */
 import { createContext, type ReactNode, type RefObject, useCallback, useContext, useState } from "react";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
@@ -34,21 +37,22 @@ export function Openable({ src, alt, detail, title, className, children }: { src
 	);
 }
 
+/** One image of a list `useImageList` shows: `detail` is said under the viewer's title, such as the image's path. */
+export interface ListedImage {
+	src: string;
+	caption: string;
+	detail?: string;
+}
+
 interface ShownImages {
-	images: { src: string; caption: string; detail: string | undefined }[];
+	images: ListedImage[];
 	index: number;
 }
 
-/** The opener for the `Openable`s under `root`, and the viewer it shows: the one clicked, the others a step away in the order `root` shows them. */
-export function useMarkdownImages(root: RefObject<HTMLElement | null>): { open: (element: HTMLElement) => void; viewer: ReactNode } {
+/** `show` opens the viewer on `images[index]`, the others a step away; `viewer` is what to render, null while closed. */
+export function useImageList(): { show: (images: ListedImage[], index: number) => void; viewer: ReactNode } {
 	const [shown, setShown] = useState<ShownImages | null>(null);
-	const open = useCallback(
-		(element: HTMLElement) => {
-			const openers = [...root.current!.querySelectorAll<HTMLElement>("[data-markdown-image]")];
-			setShown({ images: openers.map(opener => ({ src: opener.dataset.markdownImage!, caption: opener.dataset.caption!, detail: opener.dataset.detail })), index: openers.indexOf(element) });
-		},
-		[root],
-	);
+	const show = useCallback((images: ListedImage[], index: number) => setShown({ images, index }), []);
 	const image = shown?.images[shown.index];
 	const viewer = shown && image && (
 		<ImageViewer
@@ -62,6 +66,22 @@ export function useMarkdownImages(root: RefObject<HTMLElement | null>): { open: 
 			onIndex={index => setShown({ ...shown, index })}
 			onClose={() => setShown(null)}
 		/>
+	);
+	return { show, viewer };
+}
+
+/** The opener for the `Openable`s under `root`, and the viewer it shows: the one clicked, the others a step away in the order `root` shows them. */
+export function useMarkdownImages(root: RefObject<HTMLElement | null>): { open: (element: HTMLElement) => void; viewer: ReactNode } {
+	const { show, viewer } = useImageList();
+	const open = useCallback(
+		(element: HTMLElement) => {
+			const openers = [...root.current!.querySelectorAll<HTMLElement>("[data-markdown-image]")];
+			show(
+				openers.map(opener => ({ src: opener.dataset.markdownImage!, caption: opener.dataset.caption!, detail: opener.dataset.detail })),
+				openers.indexOf(element),
+			);
+		},
+		[root, show],
 	);
 	return { open, viewer };
 }

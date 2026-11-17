@@ -173,9 +173,9 @@ describe("checkoutDir", () => {
 		expect(await git(pr, "rev-parse", "HEAD")).toBe(await git(main, "rev-parse", "old"));
 		expect((await git(pr, "rev-parse", "--abbrev-ref", "@{upstream}")).trim()).toBe("origin/pr-head");
 
-		const ticket = await checkoutDir(main, { kind: "work", name: "eng-7-fix" });
-		expect(await git(ticket, "rev-parse", "HEAD")).toBe(await git(main, "rev-parse", "main"));
-		await expect(git(ticket, "rev-parse", "--abbrev-ref", "@{upstream}")).rejects.toThrow();
+		const fresh = await checkoutDir(main, { kind: "work", name: "fix-login" });
+		expect(await git(fresh, "rev-parse", "HEAD")).toBe(await git(main, "rev-parse", "main"));
+		await expect(git(fresh, "rev-parse", "--abbrev-ref", "@{upstream}")).rejects.toThrow();
 	});
 
 	test("a work branch that origin may have fails when origin cannot be reached, creating no branch", async () => {

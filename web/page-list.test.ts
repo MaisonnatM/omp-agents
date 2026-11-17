@@ -3,14 +3,15 @@ import { COLUMN_MAX, listPageOf, listPlacement } from "./page-list";
 import type { Page } from "./routing";
 
 const BOTS: Page = { kind: "bots", target: null, adding: false };
-const TODO: Page = { kind: "todo", list: { kind: "all" }, open: null };
 
-test("only a tab's or Settings' own page has a list; the panes, New session, Notifications, the Pull requests page, and a page its row does not match have none", () => {
+test("only a tab's or Settings' own page has a list; the panes, New session, Notifications, the Pull requests and Todo pages, and a page its row does not match have none", () => {
 	expect(listPageOf(BOTS, "bots")).toBe(BOTS);
 	expect(listPageOf(null, null)).toBeNull();
 	expect(listPageOf({ kind: "new" } as Page, "new")).toBeNull();
 	expect(listPageOf({ kind: "notifications" }, "notifications")).toBeNull();
 	expect(listPageOf({ kind: "pull-requests", target: null }, "pull-requests")).toBeNull();
+	expect(listPageOf({ kind: "todo", list: "all", open: null }, "todo")).toBeNull();
+	expect(listPageOf({ kind: "sport", tab: "week", day: null } as Page, "sport")).not.toBeNull();
 	expect(listPageOf(BOTS, null)).toBeNull();
 });
 
@@ -25,10 +26,4 @@ test("a wide page area holds the column, capped at its widest", () => {
 test("a page area too narrow for the page beside the narrowest column nests the list instead of crushing the page", () => {
 	expect(listPlacement(listPageOf(BOTS, "bots")!, false, 600)).toEqual({ at: "sidebar" });
 	expect(listPlacement(listPageOf(BOTS, "bots")!, false, 800)).toEqual({ at: "column", max: 320 });
-});
-
-test("a page that splits its list from the open item keeps room for both before it takes a column", () => {
-	const todo = listPageOf(TODO, "todo")!;
-	expect(listPlacement(todo, false, 950)).toEqual({ at: "sidebar" });
-	expect(listPlacement(todo, false, 1100)).toEqual({ at: "column", max: 332 });
 });

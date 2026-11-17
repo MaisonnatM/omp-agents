@@ -1,7 +1,7 @@
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
-import { IconCheckmark1, IconChevronRight } from "central-icons";
+import { IconCheckmark1, IconChevronRightSmall } from "central-icons";
 
 import { cn } from "@/lib/utils"
 
@@ -178,7 +178,7 @@ function MenuSubmenuTrigger({
       {children}
       <span className="ml-auto flex min-w-0 items-center gap-1 pl-4 text-muted-foreground">
         {value !== undefined && <span className="truncate">{value}</span>}
-        <IconChevronRight />
+        <IconChevronRightSmall />
       </span>
     </MenuPrimitive.SubmenuTrigger>
   )
@@ -222,6 +222,26 @@ function MenuSwitchItem({
       >
         <span className="size-3 rounded-full bg-background shadow-xs transition-transform group-data-checked:translate-x-3 motion-reduce:transition-none" />
       </span>
+    </MenuPrimitive.CheckboxItem>
+  )
+}
+
+/** A row that picks one of several values, checked at its end while picked, as a filter's values are; it keeps the check's room, so trailing text stays aligned. */
+function MenuCheckItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.CheckboxItem>) {
+  return (
+    <MenuPrimitive.CheckboxItem
+      data-slot="menu-check-item"
+      className={cn(itemClassName, className)}
+      {...props}
+    >
+      {children}
+      <MenuPrimitive.CheckboxItemIndicator keepMounted className="ml-auto pl-4 data-unchecked:invisible">
+        <IconCheckmark1 />
+      </MenuPrimitive.CheckboxItemIndicator>
     </MenuPrimitive.CheckboxItem>
   )
 }
@@ -301,6 +321,7 @@ export {
   MenuSubmenuContent,
   MenuGroup,
   MenuGroupLabel,
+  MenuCheckItem,
   MenuSwitchItem,
   MenuRadioGroup,
   MenuRadioItem,

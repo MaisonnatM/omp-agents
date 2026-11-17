@@ -24,8 +24,8 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("B", "KeyB", { ctrl: true, shift: true })).toEqual(["detailsSidebar"]);
 	expect(pressOn(true, "B", "KeyB", { meta: true, shift: true })).toEqual(["detailsSidebar"]);
 	expect(press("n", "KeyN", { ctrl: true })).toEqual([]);
-	expect(press("O", "KeyO", { ctrl: true, shift: true })).toEqual(["newSession", "ticketsNew"]);
-	expect(pressOn(true, "O", "KeyO", { meta: true, shift: true })).toEqual(["newSession", "ticketsNew"]);
+	expect(press("O", "KeyO", { ctrl: true, shift: true })).toEqual(["newSession"]);
+	expect(pressOn(true, "O", "KeyO", { meta: true, shift: true })).toEqual(["newSession"]);
 	expect(pressOn(true, "O", "KeyO", { ctrl: true, shift: true })).toEqual([]);
 	expect(press("f", "KeyF", { ctrl: true })).toEqual(["find"]);
 	expect(pressOn(true, "f", "KeyF", { meta: true })).toEqual(["find"]);
@@ -57,9 +57,8 @@ test("browser-reserved chords stay the browser's, apart from the app's tab, sett
 		expect(pressOn(mac, ",", "Comma", mod)).toEqual(["settings"]);
 		expect(pressOn(mac, "W", "KeyW", { ...mod, shift: true })).toEqual([]);
 		expect(pressOn(mac, "T", "KeyT", { ...mod, shift: true })).toEqual(["reopenClosedTab"]);
-		expect(pressOn(mac, "l", "KeyL", mod)).toEqual(["copyTabUrl"]);
 		expect(pressOn(mac, "X", "KeyX", { ...mod, shift: true })).toEqual([]);
-		for (const [key, code] of [["n", "KeyN"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
 		expect(pressOn(mac, "K", "KeyK", { ...mod, shift: true })).toEqual(["copyPullRequestNumber"]);
@@ -128,7 +127,6 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 		{ id: "browserRestore", scope: "anywhere", key: 0 },
 		{ id: "todoClose", scope: "outside-fields", key: 0 },
 		{ id: "sportJournalClose", scope: "outside-fields", key: 0 },
-		{ id: "emailClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([{ id: "attachFiles", scope: "composer", key: 0 }]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere", key: 0 }]);
@@ -144,11 +142,11 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 	]);
 });
 
-test("↓ and ↑, or J and K, step through sessions, pull requests, todos, sport logs, conversations, and changed files, and ↑ also takes back a queued message", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "emailNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "emailPrevious", "previousChangedFile"]);
-	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "emailNext", "nextChangedFile"]);
-	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "emailPrevious", "previousChangedFile"]);
+test("↓ and ↑, or J and K, step through sessions, pull requests, todos, sport logs, and changed files, and ↑ also takes back a queued message", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "previousChangedFile"]);
+	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "nextChangedFile"]);
+	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "previousChangedFile"]);
 	expect(shortcutsFor(keyEvent("j", "KeyJ"), null, false).map(({ scope }) => scope)).not.toContain("anywhere");
 });
 
@@ -185,12 +183,12 @@ test("the Browser's preload hands over exactly the keys of the pick mode shortcu
 	expect(keys.toSorted()).toEqual([...PICK_MODE_KEYS].toSorted());
 });
 
-test("G then W or M goes to a page only right after a plain G, and P picks a todo's priority", () => {
+test("G then W goes to a page only right after a plain G, and P picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
-	// R alone switches the Browser's pick mode or replies on an open conversation, and a G before it changes nothing.
-	expect(after("g", "r")).toEqual(["browserPickRegion", "emailReply"]);
+	// R alone switches the Browser's pick mode, and a G before it changes nothing.
+	expect(after("g", "r")).toEqual(["browserPickRegion"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
-	expect(after("g", "m")).toEqual(["email"]);
+	expect(after("g", "m")).toEqual([]);
 	expect(pressOn(false, ",", "Comma", {}, "g")).toEqual([]);
 	expect(pressOn(false, ",", "Comma")).toEqual([]);
 	expect(after(null, "n")).toEqual([]);
@@ -286,7 +284,7 @@ test("a registration reads its handlers when the key is pressed, and removing it
 	const stack = createShortcutStack();
 	const calls: string[] = [];
 	let handlers: ShortcutHandlers = {};
-	stack.add(1, () => ({ newTicket: () => void calls.push("app") }));
+	stack.add(1, () => ({ todoNew: () => void calls.push("app") }));
 	const remove = stack.add(2, () => handlers);
 	expect(stack.size).toBe(2);
 	stack.dispatch(pressed("c", "KeyC"), true, null);
@@ -304,7 +302,7 @@ test("scope limits who runs: text fields keep their keys, chords work anywhere, 
 	const stack = createShortcutStack();
 	const calls: string[] = [];
 	stack.add(1, () => ({
-		newTicket: () => void calls.push("ticket"),
+		todoNew: () => void calls.push("todo"),
 		switcher: () => void calls.push("switcher"),
 		interrupt: () => void calls.push("interrupt"),
 	}));
@@ -318,7 +316,7 @@ test("scope limits who runs: text fields keep their keys, chords work anywhere, 
 test("a key something nearer already handled is left alone", () => {
 	const stack = createShortcutStack();
 	const calls: string[] = [];
-	stack.add(1, () => ({ newTicket: () => void calls.push("app") }));
+	stack.add(1, () => ({ todoNew: () => void calls.push("app") }));
 	const event = pressed("c", "KeyC");
 	event.preventDefault();
 	stack.dispatch(event, true, null);

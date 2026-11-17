@@ -3,7 +3,7 @@
 The **Browser** shows the app a live session runs, its dev server, in the right sidebar beside the conversation, so you can look at a change and point at what to fix next.
 It is in the [desktop app](desktop-app.md) only; the dashboard in a web browser has none.
 
-- The **Browser** tab, after **Tickets** in the [session details sidebar](session-details-sidebar.md), shows it for the live session or subagent the sidebar follows; a past session has none.
+- The **Browser** tab, after **PRs** in the [session details sidebar](session-details-sidebar.md), shows it for the live session or subagent the sidebar follows; a past session has none.
   The page stays loaded while you switch to another tab and back, and starts again when the sidebar follows another session.
   Drag the sidebar's edge to make the Browser wider or narrower, up to 960 pixels; with two or more panes side by side the sidebar hides, and with it the Browser.
 - The Browser opens on the address you last loaded for that session in the last 30 days, else on the first dev server the session runs.

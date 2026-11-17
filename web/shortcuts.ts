@@ -18,7 +18,6 @@ export type ShortcutId =
 	| "closeOtherTabs"
 	| "reopenClosedTab"
 	| "pinTab"
-	| "copyTabUrl"
 	| "newTab"
 	| "nextTab"
 	| "previousTab"
@@ -56,7 +55,6 @@ export type ShortcutId =
 	| "browserPickErase"
 	| "focusComposer"
 	| "pull-requests"
-	| "newTicket"
 	| "bots"
 	| "sessions"
 	| "todo"
@@ -108,7 +106,7 @@ export interface Chord {
 	shift?: true;
 }
 
-/** A chord, or G then a key, as GitHub, Gmail, and Linear go to a page. Both keys of a pair type text, so pairs work only outside text fields. */
+/** A chord, or G then a key, as GitHub and Gmail go to a page. Both keys of a pair type text, so pairs work only outside text fields. */
 export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
 
 /** Closes the header tab on screen, leaving its session running. */
@@ -200,7 +198,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: [{ chord: { key: "t", mod: true, shift: true }, scope: "anywhere" }],
 	},
 	{ id: "pinTab", category: "general", label: "Pin or unpin the header tab on screen", command: "Pin or unpin tab", keys: [{ chord: { key: "p", ctrl: true, shift: true }, scope: "anywhere" }] },
-	{ id: "copyTabUrl", category: "general", label: "Copy the dashboard address of the header tab on screen", command: "Copy tab URL", keys: [{ chord: { key: "l", mod: true }, scope: "anywhere" }] },
 	{
 		id: "nextTab",
 		category: "general",
@@ -332,7 +329,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: digitKeys({}, "outside-fields"),
 	},
 	...SIDEBAR_TABS.map(({ value }): Shortcut => ({ id: value, category: "general", ...(isWebModuleId(value) ? moduleOf({ kind: value }).shortcuts.goTo : TAB_GO_TO[value]) })),
-	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Calendar, and Email pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{

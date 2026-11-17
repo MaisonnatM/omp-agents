@@ -7,7 +7,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 
 ## `ui/input-message.tsx`
 
-- The text field is `PromptEditor` (`web/components/prompt-editor.tsx`), a contenteditable that shows each skill, command, file, ticket, pull request, todo, and session reference as a chip, instead of a `<textarea>`.
+- The text field is `PromptEditor` (`web/components/prompt-editor.tsx`), a contenteditable that shows each skill, command, file, pull request, todo, and session reference as a chip, instead of a `<textarea>`.
   Its height follows `minRows` and `maxRows` in CSS, so the JS autoresize is gone.
   `textareaProps` is `editorProps`, and `editorRef` exposes the caret and focus that callers read from the textarea before.
 - `editorProps.onKeyDown`: runs first, in the capture phase, and a key it prevents goes no further, not even to the editor.
@@ -109,7 +109,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/sidebar-group.tsx`: a collapsed group's body is `inert`, so its hidden rows leave the Tab order.
   `headerActions` is a prop, in place of the registry's detection of action children by type, and `SidebarGroupLabel` takes an `icon`.
 - `ui/scroll-area.tsx`: a `viewportRef` prop, which `SidebarContent` in `ui/sidebar.tsx` passes on.
-- `ui/badge.tsx`: `color` takes any CSS color beside a palette name, such as a Linear label's.
+- `ui/badge.tsx`: `color` takes any CSS color beside a palette name, such as a GitHub label's.
 - `lib/shape-context.tsx`: the rounded shape's `button` is `rounded-sm`, where the registry's is `rounded-lg`.
 - `ui/message-scroller.tsx`: the scroll button's default `variant` is `tertiary`, where the registry's is `secondary`.
 - `ui/tooltip.tsx`: `disabled` anchors hover to a non-focusable wrapper around a disabled child, `wrapperClassName` styles that wrapper, and the trigger ignores a focus that `isReturnedFocus` in `web/use-return-focus.ts` reports.
@@ -141,13 +141,3 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   The group's label keeps the transcript's words, **Working**, **Ran N tools**, and **Thought**, its cards are 40px tall with 6px between them, where affectUI's are 44px with 8px, so long groups stay compact, and the check and the error mark do not animate in.
 - `ui/thinking-state.tsx` comes from affectUI's Thinking State (Clean), restyled the same way, on `ui/collapsible.tsx`; each thinking block in an activity group draws with it.
   It keeps the 3×3 pixel mark, which ripples with the `bot-pulse` keyframe while the block streams, **Thinking** or **Thought**, the hover chevron, and the text as one step on a hairline trail; it drops the elapsed seconds, the step list, the cycling verbs, and the finished row, since a thinking block is one text with no timing or steps.
-
-## `kibo-ui/calendar/index.tsx`
-
-The registry file uses shadcn's `button`, `command`, and `popover`; the dashboard keeps Fluid's, so it imports those.
-
-- The month and year pickers' button is `variant="ghost"`, in the semibold month title's size, since Fluid's button had no `outline` when the calendar came in, and takes a `ChevronDown` as `trailingIcon`, since Fluid's button puts an icon among its children on a line of its own.
-- `CalendarBody`, `CalendarHeader`, `CalendarItem`, `Feature`, and `Status` are removed, along with the provider's `startDay` and the `date-fns` import.
-  `web/components/calendar/calendar-page.tsx` draws the month from its own entries, so it needs no generic feature list.
-- The month arrows have `aria-label`s, **Previous month** and **Next month**.
-- `CalendarDate` takes a `className`, as `CalendarDatePagination` does, so the Calendar page's row can wrap on a phone and drop its buttons under the month.

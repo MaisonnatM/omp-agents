@@ -15,7 +15,7 @@ afterEach(() => {
 
 const weekdays: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } };
 const standup = { id: "r1", botId: "scout", name: "Standup", schedules: [weekdays], triggers: [], task: { kind: "prompt", prompt: "Post the standup." }, enabled: false, createdAt: 1, scheduledAt: null, runs: [] };
-const relayMail = { id: "r2", botId: "relay", name: "Relay mail", schedules: [], triggers: [{ kind: "gmail" }], task: { kind: "command", command: "./relay.sh" }, enabled: true, createdAt: 1, scheduledAt: null, runs: [] };
+const relayBuilds = { id: "r2", botId: "relay", name: "Relay builds", schedules: [], triggers: [{ kind: "pull-request" }], task: { kind: "command", command: "./relay.sh" }, enabled: true, createdAt: 1, scheduledAt: null, runs: [] };
 const nightly = {
 	id: "r3",
 	botId: "scout",
@@ -28,7 +28,7 @@ const nightly = {
 	scheduledAt: null,
 	runs: [],
 };
-const relayBot = { id: "relay", kind: "pr-shepherd", name: "Relay", job: "## Role\nRelay the mail. Ask first.", cwd: "/tmp", model: null, skill: null, sessionId: null, createdAt: "2026-05-01T09:00:00.000Z" };
+const relayBot = { id: "relay", kind: "pr-shepherd", name: "Relay", job: "## Role\nRelay the build reports. Ask first.", cwd: "/tmp", model: null, skill: null, sessionId: null, createdAt: "2026-05-01T09:00:00.000Z" };
 const blankBot = { ...relayBot, id: "blank", kind: "routines", name: "Blank", job: "" };
 
 /**
@@ -44,7 +44,7 @@ function loadedBot({ routines = true, job = "Watch the build.\nAsk before mergin
 	const inbox = join(dir, "routine-inbox");
 	const botInbox = join(dir, "bot-inbox");
 	writeFileSync(bots, JSON.stringify({ bots: [{ id: "scout", name: "Scout", job, cwd: "/tmp", model: null, skill: null, sessionId: "s1", createdAt: "2026-05-01T09:00:00.000Z" }, ...others] }));
-	if (routines) writeFileSync(routinesFile, JSON.stringify({ routines: [relayMail, standup, nightly] }));
+	if (routines) writeFileSync(routinesFile, JSON.stringify({ routines: [relayBuilds, standup, nightly] }));
 	const flags = new Map<string, string>([
 		[BOT_FLAGS.bot, "scout"],
 		[BOT_FLAGS.bots, bots],
@@ -90,7 +90,7 @@ test("a fact the Bot remembers lands in its memory as a dated line, and the next
 			'{"id":"r3","name":"Nightly build","enabled":true,"schedules":[],"triggers":[{"kind":"pull-request"}]} command: bun install --frozen-lockfile && bun run build && bun test --coverage --reporter…',
 			"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create one, or to change one with its `id` and only the fields that change, and `delete_routine` to delete one.",
 			"The other Bots, one per line: its id, name, and kind, then its job's first sentence:",
-			'{"id":"relay","name":"Relay","kind":"pr-shepherd"} Relay the mail.',
+			'{"id":"relay","name":"Relay","kind":"pr-shepherd"} Relay the build reports.',
 			'{"id":"blank","name":"Blank","kind":"routines"} No job yet.',
 			"Call `message_bot` to hand another Bot work that is its job. A message whose last line starts with `# omp-agents Bot message, sent by another Bot, not the user:` comes from the Bot that line names, not the user, and your reply in this conversation does not reach it. Call `message_bot` with its id only when you have a result or a question to send back, and never answer a message that needs no answer, such as thanks or an acknowledgment.",
 		].join("\n"),
@@ -113,7 +113,7 @@ test("a session the dashboard named no routine files for still gets its name, jo
 	expect(prompt).toContain("Your job, and what you ask before doing:\nWatch the build.\nAsk before merging.\n");
 	expect(prompt).toContain(" The user prefers short answers.\nWhen the user tells you");
 	expect(prompt).toContain("cut at 80 characters:\nNone yet.\n");
-	await expect(bot.saveRoutine({ name: "Digest", triggers: [{ kind: "gmail" }], task: { kind: "prompt", prompt: "Sum up the mail." } })).rejects.toThrow("This session is not an omp-agents Bot, so it has no routines.");
+	await expect(bot.saveRoutine({ name: "Digest", triggers: [{ kind: "slack" }], task: { kind: "prompt", prompt: "Sum up Slack." } })).rejects.toThrow("This session is not an omp-agents Bot, so it has no routines.");
 	await expect(bot.deleteRoutine("r1")).rejects.toThrow("This session is not an omp-agents Bot, so it has no routines.");
 });
 
@@ -141,15 +141,15 @@ test("a memory past the cap reaches the prompt as its newest facts with a note t
 test("save_routine leaves the dashboard one request per call: a new routine of this Bot, enabled, then edits that keep every field they leave out", async () => {
 	const bot = loadedBot();
 	setSystemTime(new Date("2026-05-03T10:00:00.000Z"));
-	const created = await bot.saveRoutine({ name: "Mail digest", triggers: [{ kind: "gmail" }, { kind: "slack" }], task: { kind: "command", command: "./digest.sh" } });
+	const created = await bot.saveRoutine({ name: "Review digest", triggers: [{ kind: "pull-request" }, { kind: "slack" }], task: { kind: "command", command: "./digest.sh" } });
 	const [request] = bot.requests();
 	expect(request).toEqual({
 		botId: "scout",
-		change: { op: "save", routine: { id: expect.any(String), botId: "scout", name: "Mail digest", schedules: [], triggers: [{ kind: "gmail" }, { kind: "slack" }], task: { kind: "command", command: "./digest.sh" }, enabled: true } },
+		change: { op: "save", routine: { id: expect.any(String), botId: "scout", name: "Review digest", schedules: [], triggers: [{ kind: "pull-request" }, { kind: "slack" }], task: { kind: "command", command: "./digest.sh" }, enabled: true } },
 	});
 	const newId: string = request.change.routine.id;
 	expect(created.content[0]?.text).toBe(
-		`Created routine "Mail digest". The dashboard applies it, and while the dashboard is stopped the change waits for it.\n{"id":"${newId}","name":"Mail digest","enabled":true,"schedules":[],"triggers":[{"kind":"gmail"},{"kind":"slack"}]} command: ./digest.sh`,
+		`Created routine "Review digest". The dashboard applies it, and while the dashboard is stopped the change waits for it.\n{"id":"${newId}","name":"Review digest","enabled":true,"schedules":[],"triggers":[{"kind":"pull-request"},{"kind":"slack"}]} command: ./digest.sh`,
 	);
 
 	setSystemTime(new Date("2026-05-03T10:01:00.000Z"));
@@ -182,7 +182,7 @@ test("the routine tools refuse another Bot's routine, an id no routine has, a ne
 	await expect(bot.deleteRoutine("r2")).rejects.toThrow("None of your routines has id r2.");
 	await expect(bot.deleteRoutine("r9")).rejects.toThrow("None of your routines has id r9.");
 	await expect(bot.saveRoutine({ schedules: [weekdays], task: { kind: "prompt", prompt: "Hello." } })).rejects.toThrow("The routine is not valid: a new routine needs a name and a task");
-	await expect(bot.saveRoutine({ name: "Never", triggers: [{ kind: "gmail" }] })).rejects.toThrow("The routine is not valid: a new routine needs a name and a task");
+	await expect(bot.saveRoutine({ name: "Never", triggers: [{ kind: "slack" }] })).rejects.toThrow("The routine is not valid: a new routine needs a name and a task");
 	await expect(bot.saveRoutine({ name: "Never", schedules: [], triggers: [], task: { kind: "prompt", prompt: "Hello." } })).rejects.toThrow("The routine is not valid");
 	await expect(bot.saveRoutine({ id: "r3", triggers: [] })).rejects.toThrow("The routine is not valid");
 	expect(bot.requests()).toEqual([]);

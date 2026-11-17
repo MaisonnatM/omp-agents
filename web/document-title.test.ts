@@ -11,11 +11,6 @@ describe("documentTitle", () => {
 		expect(documentTitle({ kind: "new", cwd: "~/code", todoId: null }, null, null, null)).toBe("New session · omp agents");
 	});
 
-	test("a ticket's page names the ticket, and the list names the tickets", () => {
-		expect(documentTitle({ kind: "tickets", target: "ENG-2368" }, null, null, null)).toBe("ENG-2368 · omp agents");
-		expect(documentTitle({ kind: "tickets", target: null }, null, null, null)).toBe("Tickets · omp agents");
-	});
-
 	test("the Bots gallery names the Bots, and the New Bot form the new one", () => {
 		expect(documentTitle({ kind: "bots", target: null, adding: false }, null, null, null)).toBe("Bots · omp agents");
 		expect(documentTitle({ kind: "bots", target: null, adding: true }, null, null, null)).toBe("New Bot · omp agents");

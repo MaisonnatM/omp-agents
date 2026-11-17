@@ -24,8 +24,8 @@ export interface ChangesSession {
 	sessionId: string | null;
 	/** The session's directory, which the files' relative paths resolve against. */
 	cwd: string | null;
-	/** The session's pull requests and Linear issues, which selected images can be sent to and the sources leave out, and its arenas. */
-	facts: Pick<SessionFacts, "pullRequests" | "tickets" | "arenas"> | null;
+	/** The session's pull requests, which selected images can be sent to and the sources leave out, and its arenas. */
+	facts: Pick<SessionFacts, "pullRequests" | "arenas"> | null;
 }
 
 /** What the view's agents changed, took, and opened, each list empty until the server sends it. */
@@ -35,13 +35,10 @@ export interface Changes {
 	sources: AgentSource[];
 }
 
-/** `sources` without the session's own pull requests and Linear issues, at any of their pages, which the session details sidebar shows. */
+/** `sources` without the session's own pull requests, at any of their pages, which the session details sidebar shows. */
 function otherSources(sources: AgentSource[], facts: ChangesSession["facts"]): AgentSource[] {
-	if (!facts || (facts.pullRequests.length === 0 && facts.tickets.length === 0)) return sources;
-	const own = [
-		...facts.pullRequests.map(pr => `github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`),
-		...facts.tickets.map(id => `linear.app/[^/]+/issue/${id}`),
-	].map(page => new RegExp(`^${page.replaceAll(".", "\\.")}(?:/|$)`, "i"));
+	if (!facts || facts.pullRequests.length === 0) return sources;
+	const own = facts.pullRequests.map(pr => new RegExp(`^${`github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`.replaceAll(".", "\\.")}(?:/|$)`, "i"));
 	return sources.filter(({ url }) => {
 		const { hostname, pathname } = new URL(url);
 		return !own.some(page => page.test(`${hostname}${pathname}`));
@@ -114,7 +111,7 @@ export function ChangesSections({ view, session: { sessionId, cwd, facts }, chan
 			)}
 			{media.length > 0 && (
 				<OverviewSection title="Images" count={media.length} open={!closed.has("images")} onToggle={() => toggle("images")} fold="changes-card.images.fold">
-					<MediaStrip media={media} view={view} pullRequests={facts?.pullRequests ?? []} tickets={facts?.tickets ?? []} />
+					<MediaStrip media={media} view={view} pullRequests={facts?.pullRequests ?? []} />
 				</OverviewSection>
 			)}
 			{sources.length > 0 && (

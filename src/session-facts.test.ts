@@ -36,7 +36,6 @@ const worked = (owner: string, repo: string, number: number) => ({ kind: "pr", l
 const prompt = (text: string) => JSON.stringify({ type: "message", message: { role: "user", content: [{ type: "text", text }] } });
 const skillPrompt = (args: string) =>
 	JSON.stringify({ type: "custom_message", customType: "skill-prompt", attribution: "user", content: "[IMPORTANT: User invoked the \"ship\" skill.] ENG-1 #1", details: { name: "ship", args } });
-const linear = (id: string, tool: string, args: object) => toolCall(id, `mcp__linear_${tool}`, args);
 
 const scanOf = (lines: string[], prompts = true) => {
 	const scan = new SessionFactsScan(prompts);
@@ -154,43 +153,6 @@ describe("SessionFactsScan", () => {
 				...prCreated("s", 1),
 			]),
 		).toEqual([submitted("o", "r", 1), worked("o", "r", 2)]);
-	});
-
-	test("what names each Linear issue: work on it, a read, or the session's own prompt, but not a search's listing or a subagent's prompt", () => {
-		const device = (id: string, tool: string, args: object) => toolCall(id, "write", { path: `xd://mcp__linear_${tool}`, content: JSON.stringify(args) });
-		const answered = (toolCallId: string, text: string, isError = false) =>
-			JSON.stringify({ type: "message", message: { role: "toolResult", toolCallId, toolName: "write", isError, content: [{ type: "text", text }] } });
-		const lines = [
-			prompt("Do https://linear.app/acme/issue/ENG-7/some-title, see ENG-8"),
-			toolCall("a", "mcp__linear_list_issues", { query: "ENG-1" }),
-			toolCall("b", "mcp__linear_get_issue", { id: "eng-2" }),
-			toolCall("c", "mcp__linear_get_issue", { id: "c07eebf1-444b-449f-b31d-a43d2b62504a" }),
-			device("d", "save_comment", { issueId: "ENG-3", body: "Done" }),
-			device("e", "save_issue", { team: "ENG", title: "New" }),
-			answered("e", JSON.stringify({ id: "ENG-4", title: "New" })),
-			device("f", "save_issue", { team: "ENG", title: "Refused" }),
-			answered("f", JSON.stringify({ id: "ENG-5" }), true),
-			toolCall("g", "xd_mcp__linear_list_comments", { issueId: "ENG-2" }),
-			JSON.stringify({ type: "custom", customType: "omp-ship.state", data: { stage: "ticket", issue: "ENG-6" } }),
-			linear("h", "get_issue", { id: "ENG-8" }),
-			linear("i", "save_issue", { id: "ENG-2", title: "Renamed" }),
-		];
-		const evidence = (prompts: boolean) => [...scanOf(lines, prompts).tickets].map(([id, kinds]) => [id, [...kinds]]);
-		expect(evidence(true)).toEqual([
-			["ENG-7", ["worked", "named"]],
-			["ENG-8", ["named", "read"]],
-			["ENG-2", ["read", "worked"]],
-			["ENG-3", ["worked"]],
-			["ENG-4", ["worked"]],
-			["ENG-6", ["worked"]],
-		]);
-		expect(evidence(false)).toEqual([
-			["ENG-2", ["read", "worked"]],
-			["ENG-3", ["worked"]],
-			["ENG-4", ["worked"]],
-			["ENG-6", ["worked"]],
-			["ENG-8", ["read"]],
-		]);
 	});
 });
 
@@ -342,46 +304,6 @@ describe("SessionFactsIndex", () => {
 		expect(await index.changedPathsOf(session)).toEqual(["/repo/a.ts", "/repo/b.ts"]);
 		expect(await index.refresh(listed(2))).toBe(true);
 		expect(index.factsOf(session).ship).toEqual({ stage: "implement" });
-	});
-
-	test("lists the Linear issues the session and its subagents worked on, the session's own first, each once, and reports a new one on append", async () => {
-		const dir = sessionDir();
-		const session = join(dir, "2026-10-01T00-00-00-000Z_tickets.jsonl");
-		const comment = (id: string) => linear(`c-${id}`, "save_comment", { issueId: id, body: "Done" });
-		writeFileSync(session, `${comment("ENG-1")}\n`);
-		const child = join(dir, "2026-10-01T00-00-00-000Z_tickets");
-		mkdirSync(child, { recursive: true });
-		writeFileSync(join(child, "Sub.jsonl"), `${comment("ENG-2")}\n${comment("ENG-1")}\n`);
-		const index = new SessionFactsIndex(async () => null, NO_GIT);
-		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
-
-		expect(await index.refresh(listed(1))).toBe(true);
-		expect(index.factsOf(session).tickets).toEqual(["ENG-1", "ENG-2"]);
-		appendFileSync(session, `${comment("ENG-1")}\n`);
-		expect(await index.refresh(listed(2))).toBe(false);
-		appendFileSync(session, `${comment("ENG-3")}\n`);
-		expect(await index.refresh(listed(3))).toBe(true);
-		expect(index.factsOf(session).tickets).toEqual(["ENG-1", "ENG-3", "ENG-2"]);
-	});
-
-	test("links a Linear issue it only read, or that its own prompt or its branch names, once two of those agree; a subagent's prompt does not count", async () => {
-		const parent = realpathSync(sessionDir());
-		const main = await repoWithWorktrees(parent);
-		await git(main, "worktree", "add", "-q", "-b", "mma/eng-9-fix", join(parent, "app-eng-9"));
-		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
-		const read = (id: string) => linear(`get-${id}`, "get_issue", { id });
-		writeFileSync(session, `${[prompt("Pick up ENG-8 and ENG-9, with ENG-12"), read("ENG-8"), read("ENG-10"), read("ENG-11")].join("\n")}\n`);
-		const child = join(parent, "2026-10-01T00-00-00-000Z_s1", "Sub");
-		mkdirSync(child, { recursive: true });
-		writeFileSync(join(child, "sub.jsonl"), `${[prompt("Context: ENG-13 and ENG-10"), read("ENG-13"), read("ENG-12")].join("\n")}\n`);
-		const index = new SessionFactsIndex(async () => null, new CachedCheckouts());
-
-		expect(await index.refresh([{ path: session, cwd: join(parent, "app-eng-9"), modifiedAt: 1 }])).toBe(true);
-		expect(index.factsOf(session).tickets).toEqual(["ENG-8", "ENG-9", "ENG-12"]);
-		await git(join(parent, "app-eng-9"), "switch", "-q", "-c", "eng-11");
-		appendFileSync(session, `${bashCall("b", "bun test")}\n`);
-		expect(await index.refresh([{ path: session, cwd: join(parent, "app-eng-9"), modifiedAt: 2 }])).toBe(true);
-		expect(index.factsOf(session).tickets).toEqual(["ENG-8", "ENG-12", "ENG-11"]);
 	});
 
 	test("links a pr:// read only of a PR the session's own prompt names in its repository, and the PR its prompt links", async () => {

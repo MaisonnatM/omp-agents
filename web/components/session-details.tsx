@@ -1,6 +1,6 @@
-/** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, and once it has any its Linear issues and its artifacts; a Bot's details share its Tickets tab. */
-import { IconAiBotHead, IconBulletList, IconPlusLarge, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
-import { useMemo, useState } from "react";
+/** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, and once it has any its artifacts. */
+import { IconAiBotHead, IconBranch, IconBulletList, IconPlusSmall, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
+import { type ReactNode, useMemo, useState } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -10,24 +10,23 @@ import { isPhonePage } from "../api";
 import type { Artifact } from "../artifacts-model";
 import { revealDetailsTab } from "../details-tabs";
 import { useArtifacts, useShowConversation } from "../pane-store";
-import { PAGE_ICON } from "../page-icons";
 import type { ModelList } from "../reads";
 import { requestNewTerminal } from "../terminal-requests";
 import { ArtifactsPanel } from "./artifacts-panel";
 import { BROWSER_AVAILABLE, BrowserPanel } from "./browser-panel";
-import { type DetailsTab, DetailsSidebarFrame } from "./details-sidebar-frame";
+import { type DetailsTab, DetailsSidebarFrame, menuMatches } from "./details-sidebar-frame";
 import type { ChangesSession } from "./overview-changes";
 import { ViewConversation } from "./pane";
 import { SessionOverview } from "./session-overview";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
-import { SessionTicketsTab } from "./session-tickets-tab";
 import { StatusDot } from "./status-dot";
 import { agentLink, type SubagentLinksValue, useSubagentLinks } from "./subagent-links";
+import { SessionDiffsTab } from "./session-diffs-tab";
 
 /** The right sidebar's open tabs, kept across views; the key keeps its old name, and a single tab name stored before tabs could close opens that tab. */
 export const TAB_KEY = "omp-agents.plan-tab";
 
-/** What a session worked on, runs, and saved, which its **PRs**, **Browser**, **Tickets**, and **Artifacts** tabs show. */
+/** What a session worked on, runs, and saved, which its **PRs**, **Browser**, and **Artifacts** tabs show. */
 export interface SessionWork {
 	/** The session the tabs show; a change starts the PRs and Browser tabs afresh. */
 	scope: string;
@@ -35,8 +34,6 @@ export interface SessionWork {
 	working: boolean;
 	/** What the view's session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
-	/** The Linear issues the session and its subagents worked on, by identifier, the session's own first. */
-	tickets: string[];
 	hosts: RosterHost[];
 	/** The live session or subagent the sidebar belongs to, whose composer the Browser's picks go to; `null` for a past one. */
 	live: LiveView | null;
@@ -48,15 +45,22 @@ export interface SessionWork {
 	artifacts: Artifact[];
 }
 
-/** The **Tickets** tab once the session worked on any Linear issue; none before. */
-export const ticketsTabs = (tickets: string[], working: boolean): DetailsTab<"tickets">[] =>
-	tickets.length > 0
-		? [{ value: "tickets", icon: PAGE_ICON.tickets, name: "Tickets", control: "session-details.tab.tickets", count: tickets.length, scrollsItself: true, content: <SessionTicketsTab tickets={tickets} version={working} /> }]
-		: [];
-
-/** The **PRs** tab, the **Tickets** tab once the session worked on any, the **Browser** tab for a live session in the desktop app, and the **Artifacts** tab once the session saved any. */
-export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live, view, sessionId, artifacts }: SessionWork): DetailsTab<"pull-requests" | "browser" | "tickets" | "artifacts">[] {
+/** The **PRs** tab, the **Browser** tab for a live session in the desktop app, and the **Artifacts** tab once the session saved any. */
+export function sessionWorkTabs({ scope, working, pullRequests, hosts, live, view, sessionId, artifacts }: SessionWork): DetailsTab<"diffs" | "pull-requests" | "browser" | "artifacts">[] {
 	return [
+		...(sessionId !== null
+			? [
+					{
+						value: "diffs",
+						icon: IconBranch,
+						name: "Diffs",
+						control: "session-details.tab.diffs",
+						count: 0,
+						scrollsItself: true,
+						content: <SessionDiffsTab key={sessionId} sessionId={sessionId} working={working} />,
+					} as const,
+				]
+			: []),
 		{
 			value: "pull-requests",
 			icon: IconPullRequest,
@@ -66,7 +70,6 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 			scrollsItself: true,
 			content: <SessionPullRequestsTab key={scope} pullRequests={pullRequests} hosts={hosts} version={working} current={live?.instanceId ?? null} />,
 		},
-		...ticketsTabs(tickets, working),
 		...(BROWSER_AVAILABLE && live !== null && !isPhonePage()
 			? [
 					{
@@ -98,15 +101,16 @@ export function sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, 
 	];
 }
 
-/** The + menu's Subagents section: the live view's subagents, each a link to its own view; none while it has none. */
-function SubagentsMenuGroup({ links }: { links: SubagentLinksValue }) {
-	if (links.agents.length === 0) return null;
+/** The + menu's Subagents section: the live view's subagents whose name or activity holds `query`, each a link to its own view; none while none match. */
+function subagentsMenuGroup(links: SubagentLinksValue, query: string): ReactNode {
+	const agents = links.agents.filter(agent => menuMatches(query, agent.id, agent.activity));
+	if (agents.length === 0) return null;
 	return (
 		<>
 			<MenuSeparator />
 			<MenuGroup>
 				<MenuGroupLabel>Subagents</MenuGroupLabel>
-				{links.agents.map(agent => {
+				{agents.map(agent => {
 					const { href, onClick } = agentLink(links, agent.id);
 					return (
 						<MenuLinkItem key={agent.id} {...activityControl("details.menu.subagent")} href={href} onClick={onClick} className="items-start">
@@ -126,18 +130,21 @@ function SubagentsMenuGroup({ links }: { links: SubagentLinksValue }) {
 	);
 }
 
-/** The + menu's sections after the tabs, as Capy's: the live view's subagents, then **New terminal**, which a paired phone leaves out. */
-function SessionMenuSections({ links }: { links: SubagentLinksValue | null }) {
+/** The + menu's sections after the tabs that match `query`, as Capy's: the live view's subagents, then **New terminal**, which a paired phone leaves out; `null` when none match. */
+function sessionMenuSections(links: SubagentLinksValue | null, query: string): ReactNode {
+	const subagents = links && subagentsMenuGroup(links, query);
+	const terminal = !isPhonePage() && menuMatches(query, "New terminal", "Terminals");
+	if (!subagents && !terminal) return null;
 	return (
 		<>
-			{links && <SubagentsMenuGroup links={links} />}
-			{!isPhonePage() && (
+			{subagents}
+			{terminal && (
 				<>
 					<MenuSeparator />
 					<MenuGroup>
 						<MenuGroupLabel>Terminals</MenuGroupLabel>
 						<MenuItem {...activityControl("details.menu.new-terminal")} onClick={requestNewTerminal}>
-							<IconPlusLarge aria-hidden="true" />
+							<IconPlusSmall aria-hidden="true" />
 							New terminal
 						</MenuItem>
 					</MenuGroup>
@@ -161,14 +168,14 @@ function SubagentConversation({ view, host, lastHost, models, workspaces }: Suba
 	return <ViewConversation view={view} focused={false} host={host} lastHost={lastHost} session={null} models={models} workspaces={workspaces} header={false} />;
 }
 
-interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts" | "pullRequests" | "tickets"> {
-	/** The session's directory, which relative file paths in pull requests and issues resolve against. */
+interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts" | "pullRequests"> {
+	/** The session's directory, which relative file paths in pull requests resolve against. */
 	cwd: string | null;
 	/** The live view's roster row, whose subagents the **Overview** tab lists; `null` for a past or ended one. */
 	host: RosterHost | null;
 	/** The live view's last roster row, which the **Subagent** tab's conversation reads once the session ended. */
 	lastHost: RosterHost | null;
-	/** The view's roster row, an ended session's last one, or its past entry: the pull requests, Linear issues, arenas, and directory the tabs show. */
+	/** The view's roster row, an ended session's last one, or its past entry: the pull requests, arenas, and directory the tabs show. */
 	row: RosterHost | PastSession | null;
 	/** The session's model list, which the **Subagent** tab's composer offers. */
 	models: ModelList;
@@ -178,7 +185,7 @@ interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "arti
 
 const SUBAGENT_TAB = "subagent";
 
-/** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, and its Linear issues and its artifacts when it has any. */
+/** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, and its artifacts when it has any. */
 export function SessionDetails({ view, sessionId, working, cwd, hosts, host, lastHost, row, models, workspaces }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(each => each.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const artifacts = useArtifacts(view);
@@ -198,7 +205,6 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 		[opened],
 	);
 	const pullRequests = row?.pullRequests ?? [];
-	const tickets = row?.tickets ?? [];
 	// The row's directory, unlike `cwd`, outlives an ended live session, whose changed files still resolve against it.
 	const session = useMemo<ChangesSession>(() => ({ sessionId, cwd: row?.cwd ?? null, facts: row }), [sessionId, row]);
 	const tabs = [
@@ -224,7 +230,7 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 					} as const,
 				]
 			: []),
-		...sessionWorkTabs({ scope, working, pullRequests, tickets, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
+		...sessionWorkTabs({ scope, working, pullRequests, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
 	];
-	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} menuSections={<SessionMenuSections links={links} />} />;
+	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} menuSections={query => sessionMenuSections(links, query)} />;
 }

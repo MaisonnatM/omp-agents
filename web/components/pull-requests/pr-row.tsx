@@ -419,9 +419,10 @@ export interface RowBase {
 }
 
 export interface RowProps extends RowBase {
+	/** `NO_DRAG` where the rows keep the list's order, as under a grouping other than by repository. */
 	drag: DragItem;
-	/** What the move shortcuts name the row by. */
-	moveId: string;
+	/** What the move shortcuts name the row by; `undefined` where it does not move. */
+	moveId: string | undefined;
 }
 
 const sameStack = (a: StackPlace | null, b: StackPlace | null): boolean =>

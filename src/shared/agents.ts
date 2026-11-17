@@ -18,8 +18,7 @@ export function isAgentModelOverride(value: unknown): value is AgentModelOverrid
 export type AgentModelPreview =
 	| { kind: "resolved"; selector: string; thinking?: string }
 	| { kind: "inherited" }
-	| { kind: "unresolved"; warning?: string }
-	| { kind: "source-session" };
+	| { kind: "unresolved"; warning?: string };
 
 export interface AgentDefinitionPreview {
 	name: string;
@@ -31,8 +30,6 @@ export interface AgentDefinitionPreview {
 	tools: string[] | null;
 	readOnly: boolean;
 	disabled: boolean;
-	/** Bundled seance takes its model from another session and cannot run in isolation. */
-	seance: boolean;
 	definition: string[];
 	user?: AgentModelOverride;
 	workspace?: AgentModelOverride;

@@ -1,4 +1,4 @@
-import { IconArrowBoxLeft, IconArrowRotateClockwise, IconCircleCheck, IconExclamationCircle, IconKey1, IconPlusLarge, IconSquareArrowTopRight } from "central-icons";
+import { IconArrowBoxLeft, IconArrowRotateClockwise, IconCircleCheck, IconExclamationCircle, IconKey1, IconPlusSmall, IconSquareArrowTopRight } from "central-icons";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -217,7 +217,7 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 				<MoreActionsMenu name={provider.name} disabled={starting}>
 					{(connected ? provider.methods : others).map(method => (
 						<MenuItem key={method.id} onClick={() => start.run(method.id)}>
-							{method.id === ANTHROPIC_API_KEY_METHOD ? <IconKey1 /> : <IconPlusLarge />}
+							{method.id === ANTHROPIC_API_KEY_METHOD ? <IconKey1 /> : <IconPlusSmall />}
 							{method.id === ANTHROPIC_API_KEY_METHOD ? (provider.accounts.some(account => account.kind === "api_key") ? "Replace API key" : "Add API key") : method.id === first!.id ? verb : `${verb} with ${method.name}`}
 						</MenuItem>
 					))}

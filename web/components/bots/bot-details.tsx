@@ -1,5 +1,5 @@
-/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Restart conversation and Delete; its Routines tab; and its conversation's Tickets tab once it worked on any. */
-import { IconArrowRotateCounterClockwise, IconPlusLarge, IconRepeat, IconTrashCan } from "central-icons";
+/** `BotDetails`, the right sidebar on a Bot's page: its Details tab with its look and name, both editable in place, where it works, its job, memory, and its conversation's token usage, then Restart conversation and Delete; and its Routines tab. */
+import { IconArrowRotateCounterClockwise, IconPlusSmall, IconRepeat, IconTrashCan } from "central-icons";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { type Routine, runsHere } from "../../../src/routines";
 import { type Bot, BOT_KIND_INFO, type BotLook, type BotSpec, MAX_JOB_LENGTH } from "../../../src/shared/bots";
@@ -20,7 +20,6 @@ import { useDashboardActions } from "../dashboard-context";
 import { DetailsEmpty, DetailsSidebarFrame } from "../details-sidebar-frame";
 import { MemoryList } from "../memory-list";
 import { LoadNote } from "../sheet-details";
-import { ticketsTabs } from "../session-details";
 import { TEXT_AREA } from "../form-field";
 import { RunDot } from "../routines/routine-marks";
 import { compact, dollars, full, percent } from "../settings/analytics-format";
@@ -205,13 +204,13 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 					All routines
 				</a>
 				{connected ? (
-					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={IconPlusLarge}>
+					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={IconPlusSmall}>
 						<a href={hashForBotRoutine(bot.id, { kind: "new" })} aria-current={open.kind === "new" ? "page" : undefined}>
 							New routine
 						</a>
 					</Button>
 				) : (
-					<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} disabled>
+					<Button variant="ghost" size="compact" leadingIcon={IconPlusSmall} disabled>
 						New routine
 					</Button>
 				)}
@@ -350,7 +349,6 @@ export function BotDetails({ open: { bot, host, routines, routine, status }, ses
 						</div>
 					),
 				},
-				...ticketsTabs(session?.tickets ?? [], host?.status === "working"),
 			]}
 		/>
 	);

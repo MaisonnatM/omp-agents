@@ -101,6 +101,15 @@ describe("UserTodosFile", () => {
 		expect(existsSync(`${path}.invalid`)).toBe(false);
 	});
 
+	test("a Linear issue link saved before the dashboard dropped Linear reads as none, and the todo keeps its other links", () => {
+		const path = todosPath();
+		const session = { kind: "session", sessionId: "s1" } as const;
+		const links = [{ kind: "ticket", identifier: "ENG-1" }, session];
+		writeTodos(path, JSON.stringify({ todos: [{ id: "a", text: "a", children: [], links }] }));
+		expect(new UserTodosFile(path).value.todos.map(todo => todo.links)).toEqual([[session]]);
+		expect(existsSync(`${path}.invalid`)).toBe(false);
+	});
+
 	test("a file that is not a todo list moves aside instead of being written over", () => {
 		const path = todosPath();
 		writeTodos(path, '{"todos": [{"id": "a", "text": "kept"}]}');

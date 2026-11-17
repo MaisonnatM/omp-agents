@@ -61,8 +61,3 @@ export function inbox<T extends object>(dir: string): Inbox<T> {
 }
 
 export const reply = (text: string, isError = false) => ({ content: [{ type: "text" as const, text }], isError });
-
-/** A tool's `raw` parameters without the empty strings a model often sends for a parameter it means to leave out. */
-export function withoutEmpty(raw: unknown): unknown {
-	return typeof raw === "object" && raw !== null ? Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== "")) : raw;
-}

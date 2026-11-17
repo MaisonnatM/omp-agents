@@ -27,7 +27,7 @@ const REVIEW_FIELDS = `author { login ${AVATAR} }
 	viewerLatestReview { state }`;
 
 const PR_FIELDS = `... on PullRequest {
-	number title isDraft state reviewDecision mergeable viewerCanUpdateBranch headRefName baseRefName updatedAt mergedAt additions deletions
+	number title isDraft state reviewDecision mergeable viewerCanUpdateBranch headRefName baseRefName createdAt updatedAt mergedAt additions deletions
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
@@ -176,6 +176,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 		role,
 		stackedOn: defaultBranch !== undefined && head.base !== defaultBranch ? head.base : null,
 		behind: state !== "merged" && node.viewerCanUpdateBranch === true,
+		createdAt: Date.parse(str(node.createdAt) ?? "") || updatedAt,
 		updatedAt,
 		conversations: totalOf(node.comments) + totalOf(node.reviewThreads),
 	};
@@ -399,19 +400,19 @@ export async function readBehindBy(pr: PullRequest, base: string, head: string):
 	}
 }
 
-const titles = createCache<Pick<PullRequestDetail, "title">>();
+const titles = createCache<Pick<PullRequestDetail, "title" | "state">>();
 
-/** A linked PR's title only, without reading its timeline, checks, or files. */
-export function loadPullRequestTitle(pr: PullRequest): Promise<Pick<PullRequestDetail, "title">> {
+/** A linked PR's title and state only, without reading its timeline, checks, or files. */
+export function loadPullRequestTitle(pr: PullRequest): Promise<Pick<PullRequestDetail, "title" | "state">> {
 	return titles.get(prKey(pr), async () => {
 		const data = dataOf(await ghGraphql(
-			"query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { title } } }",
+			"query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { title state isDraft } } }",
 			{ owner: pr.owner, repo: pr.repo, number: pr.number },
 		));
 		const node = isObject(data.repository) ? data.repository.pullRequest : null;
 		const title = isObject(node) ? str(node.title) : undefined;
-		if (!title) throw new Error(`Cannot read the title of ${prKey(pr)}`);
-		return { title };
+		if (!isObject(node) || !title) throw new Error(`Cannot read the title of ${prKey(pr)}`);
+		return { title, state: stateOf(node) };
 	});
 }
 

@@ -15,7 +15,7 @@ export interface ProcessRoutesEnv {
 	changeSettings(settings: ProcessSettings): ProcessSettings;
 }
 
-/** The live sessions' processes, the stop of one, the start of a session's dev server, and the idle stop's setting. */
+/** The live sessions' processes, the stop of one, the start of a session's dev server, and the idle stops' settings. */
 export function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): Routes {
 	return {
 		"/api/session-processes": { GET: get(() => answer(() => env.list())) },
@@ -34,7 +34,7 @@ export function processRoutes({ get, write }: RouteKit, env: ProcessRoutesEnv): 
 		"/api/process-settings": {
 			GET: get(() => answer(async () => env.settings())),
 			PUT: write(
-				(body) => checked(parseProcessSettings(body), "Expected { stopIdleAfterMinutes } of null, 15, 30, 60, or 120"),
+				(body) => checked(parseProcessSettings(body), "Expected { stopIdleAfterMinutes, stopIdleSessionsAfterHours }: minutes of null, 15, 30, 60, or 120, and hours of null, 4, 12, 24, or 72"),
 				async (settings) => env.changeSettings(settings),
 			),
 		},

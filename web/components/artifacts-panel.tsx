@@ -17,7 +17,7 @@ import { activityControl } from "../activity";
 import { useArtifactVersion } from "../artifact-links";
 import { pickArtifact, showArtifact, useArtifactPick } from "../artifact-requests";
 import { type Artifact, type ArtifactVersion, pickedVersion } from "../artifacts-model";
-import { formatBytes, mailTime } from "../labels";
+import { formatBytes, listTime } from "../labels";
 import { useCopy } from "../use-copy";
 import { ARTIFACT_KIND, ArtifactView } from "./artifact-view";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "./segmented-tabs";
@@ -132,14 +132,14 @@ function ArtifactBody({ view, sessionId, artifact, version, source, onSource }: 
 						{kind.label} · {formatBytes(save.bytes)} ·
 					</span>{" "}
 					<time dateTime={new Date(save.savedAt).toISOString()} title={new Date(save.savedAt).toLocaleString()} className="whitespace-nowrap">
-						saved {mailTime(save.savedAt)}
+						saved {listTime(save.savedAt)}
 					</time>
 				</p>
 				<div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
 					<span className="text-xs text-muted-foreground">Version</span>
 					<RadioGroup aria-label="Versions" value={version.number} onValueChange={number => pick(artifact.versions.find(each => each.number === number)!)} className="flex w-fit shrink-0 flex-wrap gap-0.5">
 						{artifact.versions.map(each => (
-							<Tooltip key={each.number} content={`Version ${each.number}${each.save.note ? ` · ${each.save.note}` : ""} · saved ${mailTime(each.save.savedAt)}`}>
+							<Tooltip key={each.number} content={`Version ${each.number}${each.save.note ? ` · ${each.save.note}` : ""} · saved ${listTime(each.save.savedAt)}`}>
 								<Radio.Root {...activityControl("artifacts.version")} value={each.number} aria-label={`Version ${each.number}`} className={VERSION_PILL}>
 									{each.number}
 								</Radio.Root>

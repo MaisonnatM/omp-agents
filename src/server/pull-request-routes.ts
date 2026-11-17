@@ -1,4 +1,5 @@
 import { readFavicon } from "../favicon";
+import { readLinkPreview } from "../link-preview";
 import { readGithubMedia } from "../github-media";
 import { errorText } from "../json";
 import { loadPullRequestDetail, loadPullRequestTitle } from "../pull-requests";
@@ -72,6 +73,8 @@ export function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequ
 	const githubMedia = media((params) => readGithubMedia(params.get("url")));
 	/** The icons of the sites the Overview tab's sources name; the proxy asks public HTTPS hosts only. */
 	const favicon = media((params) => readFavicon(params.get("host")));
+	/** What the page a link points at says about itself, for the link preview card. */
+	const linkPreview = get((params) => readLinkPreview(params.get("url")));
 
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
@@ -191,6 +194,7 @@ export function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequ
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
 		"/api/github-media": { GET: githubMedia },
 		"/api/favicon": { GET: favicon },
+		"/api/link-preview": { GET: linkPreview },
 		"/api/pull-request/attachment": { PUT: pullRequestAttach },
 		"/api/pull-request/checkout": { PUT: pullRequestCheckout },
 		"/api/pull-request/rebase": { PUT: pullRequestRebase },

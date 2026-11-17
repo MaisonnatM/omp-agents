@@ -126,7 +126,7 @@ describe("shownViews", () => {
 	});
 
 	test("shows no pane under a page or a session link, which opens another session over them, but a Bot's page shows its conversation", () => {
-		expect(shownViews({ cover: { kind: "page", page: { kind: "calendar" } }, layout }, null)).toEqual([]);
+		expect(shownViews({ cover: { kind: "page", page: { kind: "todo", list: "all", open: null } }, layout }, null)).toEqual([]);
 		expect(shownViews({ cover: { kind: "session", sessionId: "s-c" }, layout }, null)).toEqual([]);
 		expect(shownViews({ cover: { kind: "page", page: { kind: "bots", target: "bot", routine: null } }, layout }, a)).toEqual([a]);
 	});

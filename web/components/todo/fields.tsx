@@ -1,5 +1,5 @@
 /** A todo's status, priority, assignee, due day, and Workspace as pickers, as an icon on its row or a labeled button in its details. */
-import { IconAiBotHead, IconCalendarClock, IconCircleDashed, IconFolder1, IconUser } from "central-icons";
+import { IconAiBotHead, IconCalendarClock, IconCircleDashed, IconDotGrid1x3Horizontal, IconExclamationCircle, IconFolder1, IconSpeedHigh, IconSpeedLow, IconSpeedMiddle, IconUser } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { Workspace } from "../../../src/shared/workspaces";
 import {
@@ -13,30 +13,42 @@ import {
 	type UserTodoChange,
 	type UserTodoLeaf,
 } from "../../../src/user-todos-shared";
+import { badgeColors } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { folderName } from "../../labels";
-import { PRIORITY_LABEL } from "../../tickets-model";
-import { dueLabel, TODO_STATUS } from "../../todo-views";
+import { ASSIGNEE_LABELS, categoryColor, dueLabel, PRIORITY_LABEL, TODO_STATUS } from "../../todo-views";
 import { type Choice, DuePicker, FieldPicker } from "../field-picker";
-import { PRIORITY_ICON, STATUS_ICON } from "../tickets/ticket-row";
+
+export const PRIORITY_ICON: Record<TodoPriority, [IconComponent, string]> = {
+	0: [IconDotGrid1x3Horizontal, "text-muted-foreground"],
+	1: [IconExclamationCircle, "text-orange-500 dark:text-orange-400"],
+	2: [IconSpeedHigh, "text-foreground"],
+	3: [IconSpeedMiddle, "text-foreground"],
+	4: [IconSpeedLow, "text-foreground"],
+};
 
 export function StatusIcon({ status, className }: { status: TodoStatus; className?: string }) {
-	const [Icon, color] = STATUS_ICON[TODO_STATUS[status].kind];
+	const [Icon, color] = TODO_STATUS[status].icon;
 	return <Icon aria-hidden className={cn("size-4 shrink-0", color, className)} />;
 }
 
-function PriorityIcon({ priority }: { priority: TodoPriority }) {
+export function PriorityIcon({ priority }: { priority: TodoPriority }) {
 	const [Icon, color] = PRIORITY_ICON[priority];
 	return <Icon aria-hidden className={cn("size-4 shrink-0", color)} />;
 }
 
-const ASSIGNEE: Record<TodoAssignee | "none", { label: string; icon: IconComponent }> = {
+/** A category's color as a dot, gray for none. */
+export function CategoryDot({ categoryId }: { categoryId: string | null }) {
+	return <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: categoryId === null ? "var(--muted-foreground)" : badgeColors[categoryColor(categoryId)] }} />;
+}
+
+export const ASSIGNEE: Record<TodoAssignee | "none", { label: string; icon: IconComponent }> = {
 	none: { label: "No assignee", icon: IconCircleDashed },
-	user: { label: "You", icon: IconUser },
-	agent: { label: "Agent", icon: IconAiBotHead },
+	user: { label: ASSIGNEE_LABELS.user, icon: IconUser },
+	agent: { label: ASSIGNEE_LABELS.agent, icon: IconAiBotHead },
 };
 
-function AssigneeIcon({ assignee }: { assignee: TodoAssignee | null }) {
+export function AssigneeIcon({ assignee }: { assignee: TodoAssignee | null }) {
 	const { icon: Icon } = ASSIGNEE[assignee ?? "none"];
 	return <Icon aria-hidden className={cn("size-4 shrink-0", assignee === null && "text-muted-foreground")} />;
 }

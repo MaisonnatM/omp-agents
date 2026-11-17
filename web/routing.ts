@@ -1,22 +1,21 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
 import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage, IconWidgets } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
+import { oneOf } from "../src/json";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { decodeSegment } from "./hash-segment";
 import { PAGE_ICON } from "./page-icons";
 import { isModulePage, isWebModuleId, MODULE_LIST, type ModulePage, moduleOf, modulePage, type WebModuleId } from "./modules";
 
-/** A sidebar tab's row: its label, its icon, its `place` among the tabs, lowest first, and the integration it waits on. */
+/** A sidebar tab's row: its label, its icon, and its `place` among the tabs, lowest first. */
 export interface SidebarTabRow {
 	value: SidebarTab;
 	label: string;
 	icon: IconComponent;
 	place: number;
-	integration?: McpIntegrationId;
 }
 
 /** The core's tabs, which the modules' tabs join by `place`. */
@@ -24,12 +23,11 @@ const CORE_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: 10 },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: 30 },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: 50 },
-] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number; integration?: McpIntegrationId }[];
+] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number }[];
 
 /**
- * The sidebar's tabs, in order, each a row of its page list. A tab with an `integration` shows, and its
- * shortcut applies, only while omp holds a sign-in to that service, even one the service refuses, which the page then
- * offers to reconnect. Settings is no tab: the row after them and the header's button open it.
+ * The sidebar's tabs, in order, each a row of its page list. Settings is no tab: the row after them and the header's
+ * button open it.
  */
 export const SIDEBAR_TABS: readonly SidebarTabRow[] = [...CORE_TABS, ...MODULE_LIST.map(({ id, tab }) => ({ value: id, ...tab }))].sort((a, b) => a.place - b.place);
 
@@ -68,7 +66,7 @@ export const SETTINGS_GROUP_LABEL = Object.fromEntries(SETTINGS_GROUPS.map(group
 export const SETTINGS_SECTIONS = [
 	{ value: "analytics", label: "Analytics", icon: IconChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
 	{ value: "activity", label: "Activity", icon: IconCursorClick, group: "usage", keywords: ["features", "used", "time"] },
-	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes"] },
+	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes", "idle sessions"] },
 	{ value: "keyboard", label: "Keyboard", icon: IconKeyboard, group: "general", keywords: ["shortcuts", "keys", "hotkeys", "keybindings"] },
 	{ value: "modules", label: "Modules", icon: IconWidgets, group: "general", keywords: [...MODULE_LIST.map(({ tab }) => tab.label.toLowerCase()), "turn off", "enable", "disable", "add", "new"] },
 	{ value: "workspaces", label: "Workspaces", icon: IconFolders, group: "general", keywords: ["directories", "folders", "hide"] },
@@ -77,7 +75,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "storage", label: "Storage", icon: IconStorage, group: "general", keywords: ["disk", "space", "gc", "cleanup", "archive", "compress", "sandboxes"] },
 	{ value: "whats-new", label: "What's new", icon: IconSparklesTwo, group: "general", keywords: ["changelog", "update", "release notes"] },
 	{ value: "providers", label: "Providers", icon: IconKey1, group: "connections", keywords: ["login", "sign in", "accounts", "api key", "quota"] },
-	{ value: "integrations", label: "Integrations", icon: IconPlugin1, group: "connections", keywords: ["linear", "slack", "github", "gmail", "calendar", "connect"] },
+	{ value: "integrations", label: "Integrations", icon: IconPlugin1, group: "connections", keywords: ["slack", "github", "connect"] },
 	{ value: "mcp-servers", label: "MCP servers", icon: IconBlocks, group: "connections", keywords: ["mcp", "tools"] },
 	{ value: "source-control", label: "Source control", icon: IconMerged, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
 	{ value: "models", label: "Models", icon: IconDirection1, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
@@ -110,8 +108,12 @@ export interface SettingsRoute {
 	section: SettingsSection;
 }
 
-/** Which todos the Todo page lists: every one, one category's, due ones, those waiting on you, those agents added, or the archive. */
-export type TodoListView = { kind: "all" } | { kind: "category"; id: string } | { kind: "today" } | { kind: "needs" } | { kind: "agents" } | { kind: "archive" };
+/** Which todos the Todo page lists, in the order its tabs show them: every one, due ones, those waiting on you, those agents added, or the archive. */
+export const TODO_VIEWS = ["all", "today", "needs", "agents", "archive"] as const;
+
+export type TodoListView = (typeof TODO_VIEWS)[number];
+
+const isTodoView = oneOf(TODO_VIEWS);
 
 /** The Todo page, listing `list`, with todo `open` beside it when it is non-null and in the list. */
 export interface TodoRoute {
@@ -183,9 +185,6 @@ type PageOf<K extends CorePage["kind"]> = Extract<CorePage, { kind: K }>;
 const decodeCwd = (rest: string | null): string | null => (rest === null ? null : decodeSegment(rest));
 const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : encodeURIComponent(cwd));
 
-/** The Todo page's lists that are not a category, by the hash segment that names them. Category ids are random, so none reads as one. */
-const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents: { kind: "agents" }, archive: { kind: "archive" } } as const satisfies Record<string, TodoListView>;
-
 /**
  * Each page by its kind, which is its hash's first segment, reading what follows the next `/` (`null` without one) and
  * what follows a `?` after it.
@@ -199,7 +198,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   `#pull-requests/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
  *   at that encoded path. Any other `#pull-requests/…` shows the tab alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
- *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
+ *   today, waiting on you, added by agents, or in the archive, and `?open=<id>` opens that todo; any other segment, such as an old
+ *   `#todo/<category id>`, lists every todo.
  * - `#bots` opens the gallery of every Bot, `#bots/new` the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines` the card of that
  *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
@@ -218,13 +218,7 @@ const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchPa
 		const files = match[4] ? { path: match[5] ? decodeSegment(match[5]) : null } : null;
 		return { kind: "pull-requests", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
 	},
-	todo: (rest, query) => {
-		const open = query.get("open") || null;
-		if (!rest) return { kind: "todo", list: { kind: "all" }, open };
-		const named = Object.hasOwn(TODO_LISTS, rest) ? TODO_LISTS[rest as keyof typeof TODO_LISTS] : null;
-		const id = named ? null : decodeSegment(rest);
-		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }), open };
-	},
+	todo: (rest, query) => ({ kind: "todo", list: isTodoView(rest) ? rest : "all", open: query.get("open") || null }),
 	bots: rest => {
 		if (rest === "new") return { kind: "bots", target: null, adding: true };
 		const [target, routines, routine, ...more] = (rest ?? "").split("/").map(decodeSegment);
@@ -250,7 +244,7 @@ function restOfPage(page: CorePage): string | null {
 			return page.files.path === null ? `${pr}/files` : `${pr}/files/${encodeURIComponent(page.files.path)}`;
 		}
 		case "todo":
-			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
+			return page.list === "all" ? null : page.list;
 		case "bots":
 			if (page.target === null) return page.adding ? "new" : null;
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/${restOfBotRoutine(page.routine)}`;
@@ -296,14 +290,11 @@ export function hashForPage(page: Page): string {
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
-/** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
-export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);
-/** Todo `id` opened in the list that holds it now: its category's, or **Archive** once put away; `null` for a todo deleted for good. */
+/** Todo `id` opened in every todo's list, or in **Archive** once put away; `null` for a todo deleted for good. */
 export function hashForTodoId({ todos, archive }: UserTodoList, id: string): string | null {
 	const holds = (todo: UserTodo): boolean => todo.id === id || todo.children.some(child => child.id === id);
-	const open = todos.find(holds);
-	if (open) return hashForOpenTodo(id, open.categoryId);
-	return archive.some(holds) ? hashForTodo({ kind: "archive" }, id) : null;
+	if (todos.some(holds)) return hashForTodo("all", id);
+	return archive.some(holds) ? hashForTodo("archive", id) : null;
 }
 export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
 export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
@@ -372,7 +363,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `todo`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
 function viewFromPane(pane: string): View | null {
 	if (pane.startsWith(PAST_PREFIX)) {
 		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));
@@ -470,8 +461,8 @@ export function swapView(layout: Layout, from: View, to: View): Layout {
 
 /**
  * The layout once start `op` answers with live session `instanceId`, `null` to leave it: a resumed session takes the
- * pane of the past session it continues, a new session opens alone, a fork opens in the focused pane, and a quick
- * action's session runs in the background.
+ * pane of the past session it continues, a new session opens alone, a fork and a new pull request open in the focused
+ * pane, and a quick action's session runs in the background.
  */
 export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string): Layout | null {
 	const live: LiveView = { kind: "live", instanceId, agentId: null };
@@ -481,6 +472,7 @@ export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string
 		case "new":
 			return { panes: [live], focus: 0, maximized: false };
 		case "fork":
+		case "pull-request-new":
 			return openView(layout, live, "replace");
 		case "quick":
 		case "resume-all":

@@ -9,7 +9,7 @@ import { useStoredState } from "./stored-state";
 const TAB_PAGE: Record<Exclude<SidebarTab, WebModuleId>, CorePage> = {
 	"pull-requests": { kind: "pull-requests", target: null },
 	bots: { kind: "bots", target: null, adding: false },
-	todo: { kind: "todo", list: { kind: "all" }, open: null },
+	todo: { kind: "todo", list: "all", open: null },
 };
 
 /** The settings section the header's Settings button, ⌘,, and the sidebar keep: the open page's, else the last one open, which this browser remembers, else Analytics. */
@@ -25,7 +25,7 @@ export function useSettingsRoute(page: Page | null): SettingsRoute {
 
 interface SidebarTabInput {
 	page: Page | null;
-	/** The tabs that neither show nor apply, since they are signed out or turned off; a page of one selects no row. */
+	/** The tabs that neither show nor apply, since their module is turned off; a page of one selects no row. */
 	absentTabs: ReadonlySet<SidebarTab>;
 	layout: Layout;
 	/** The session the Sessions tab opens when no pane shows one; `null` for none. */
@@ -50,7 +50,7 @@ export function useSidebarTab({ page, absentTabs, layout, latestSession, latestB
 	latest.current = { layout, latestSession, latestBot };
 	const showTab = useCallback(
 		(next: SidebarTab | "sessions"): void => {
-			const bot = latest.current.latestBot;
+			const { latestBot: bot } = latest.current;
 			if (next === "bots" && bot !== null) return navigate({ kind: "bots", target: bot, routine: null });
 			if (next !== "sessions") return navigate(isWebModuleId(next) ? moduleHome(next) : TAB_PAGE[next]);
 			const { layout: panes, latestSession: session } = latest.current;

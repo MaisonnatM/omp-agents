@@ -1,4 +1,4 @@
-import { IconArrowRotateClockwise, IconBlocks, IconExclamationCircle, IconPackage, IconPlusLarge } from "central-icons";
+import { IconArrowRotateClockwise, IconBlocks, IconExclamationCircle, IconPackage, IconPlusSmall } from "central-icons";
 import { useEffect, useId, useReducer, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -506,7 +506,7 @@ export function ExtensionsTab({ cwd, active, onSaved }: { cwd: string | null; ac
 						>
 							Refresh
 						</Button>
-						<Button size="compact" variant="secondary" leadingIcon={IconPlusLarge} disabled={busy} onClick={() => setInstall({ entry: null })}>
+						<Button size="compact" variant="secondary" leadingIcon={IconPlusSmall} disabled={busy} onClick={() => setInstall({ entry: null })}>
 							Install package
 						</Button>
 						<Button size="compact" variant="outline" render={<a href="#get-started" />}>

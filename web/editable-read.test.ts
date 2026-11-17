@@ -37,9 +37,9 @@ describe("editable read", () => {
 	});
 
 	test("a refused edit is undone and named, the edits after it still show, and the next edit clears the refusal", () => {
-		const refusedFirst = run([read({ title: "old", state: "todo" }, 0), edited(1, { title: "new" }), edited(2, { state: "done" }), refused(1, "Linear is down")]);
+		const refusedFirst = run([read({ title: "old", state: "todo" }, 0), edited(1, { title: "new" }), edited(2, { state: "done" }), refused(1, "GitHub is down")]);
 		expect(shownOf(refusedFirst)).toEqual({ title: "old", state: "done" });
-		expect(refusedFirst.saveError).toBe("Linear is down");
+		expect(refusedFirst.saveError).toBe("GitHub is down");
 		const again = run([edited(3, { title: "newer" })], refusedFirst);
 		expect(again.saveError).toBeNull();
 		expect(shownOf(again)).toEqual({ title: "newer", state: "done" });
@@ -107,7 +107,7 @@ await act(async () => {
 // The first write answers before the read sent while it was in flight, and before the second write.
 await act(async () => writes[0].resolve({ title: "new", state: "todo" }));
 await answerRead({ title: "old", state: "todo" });
-await act(async () => writes[1].reject(new Error("Linear is down")));
+await act(async () => writes[1].reject(new Error("GitHub is down")));
 console.log(JSON.stringify({ writes: writes.length, sameReload: resource.reload === firstReload, seen: seen.map(state => JSON.parse(state)) }));
 `;
 
@@ -122,7 +122,7 @@ test("useEditableRead keeps later edits over an earlier answer, ignores a stale 
 			{ data: null, saveError: null },
 			{ data: { title: "old", state: "todo" }, saveError: null },
 			{ data: { title: "new", state: "done" }, saveError: null },
-			{ data: { title: "new", state: "todo" }, saveError: "Linear is down" },
+			{ data: { title: "new", state: "todo" }, saveError: "GitHub is down" },
 		],
 	});
 });

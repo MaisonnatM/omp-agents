@@ -12,8 +12,8 @@ const kit: RouteKit = {
 };
 const OTHERS: Routes = {
 	"/api/todo": { GET: handler, PUT: handler },
-	"/api/tickets": { GET: handler },
-	"/api/ticket/new": { PUT: handler },
+	"/api/pull-requests": { GET: handler },
+	"/api/pull-request": { PUT: handler },
 };
 const store = { rows: () => [], lastUsed: () => [{ kind: "view" as const, key: "home", at: 1 }] };
 const server = { timeout: () => {} };
@@ -26,7 +26,7 @@ describe("activityRoutes", () => {
 	test("lists every other route that takes a PUT, and only those, as server actions", async () => {
 		const answer = (await (await read("")).json()) as ActivityRead;
 		expect(answer.range).toBe("30d");
-		expect(answer.serverActions).toEqual(["/api/todo", "/api/ticket/new"]);
+		expect(answer.serverActions).toEqual(["/api/todo", "/api/pull-request"]);
 		expect(answer.lastUsed).toEqual([{ kind: "view", key: "home", at: 1 }]);
 	});
 

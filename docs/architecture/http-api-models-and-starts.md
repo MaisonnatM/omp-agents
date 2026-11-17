@@ -27,13 +27,13 @@ A `start` of kind `new` carries a `skill`, `null` for none: the draft sends the 
 Once the server knows the directory omp runs in, worktree included, `withPinnedSkill` puts `/skill:<skill> ` before the first prompt, so omp's RPC prompt invokes the skill with the prompt as its arguments.
 A directory without that skill, or a prompt that starts with `/`, keeps the prompt as typed.
 
-A `start` of kind `new` carries a `subject`, `null` for none: a quick action sends the pull request or Linear issue it works on, and one on a todo sends no subject and names the todo in `todoId` instead.
-`LiveSessions` keeps it by instance id, and `rows()` puts it first among the session's `pullRequests` or `tickets` until the session's tool calls name it, so the roster links the session to its subject from the start, before omp writes the session file.
+A `start` of kind `new` carries a `subject`, `null` for none: a quick action sends the pull request it works on, and one on a todo sends no subject and names the todo in `todoId` instead.
+`LiveSessions` keeps it by instance id, and `rows()` puts it first among the session's `pullRequests` until the session's tool calls name it, so the roster links the session to its subject from the start, before omp writes the session file.
 The link goes when the session ends.
 
 An explicit task reserves one owner per canonical repository before checkout creation or omp spawn.
-The identity comes from `taskId`, a ticket or pull-request `subject`, `todoId`, a Linear issue or pull request URL leading the prompt, or the argument of a leading `/ship`, `/ticket`, `/review`, or `/fix-pr` (`taskIdentity` in `src/task-claims.ts`); a ticket-like word elsewhere, such as `S3` or `ENG-1` in prose, does not identify a task.
-`LiveSessions.reserveTask` also matches a running session that predates claims through the tickets and pull requests its transcript names, with the same `ticketTask` and `pullRequestTask` identities.
+The identity comes from `taskId`, a pull-request `subject`, `todoId`, a pull request URL leading the prompt, or the argument of a leading `/ship`, `/review`, or `/fix-pr` (`taskIdentity` in `src/task-claims.ts`); a word elsewhere in the prompt, such as `#12` in prose, does not identify a task.
+`LiveSessions.reserveTask` also matches a running session that predates claims through the pull requests its transcript names, with the same `pullRequestTask` identity.
 Another start for that identity fails with the owning session link, dashboard port, and directory rather than spawning or steering it.
 The failed `StartResult` also carries that session as `owner` (`TaskOwner`: its `~`-shortened directory, plus its instance id and name when this dashboard runs it, `here`, else the port of the dashboard that does), which a quick action's note on the page turns into **Open session** and **End it and start again** for a session here; bots, routines, and scheduled sends read only `error`.
 Set a distinct nonblank `taskId` only for intentional independent work; unrelated task identities remain concurrent.
@@ -45,10 +45,9 @@ One helper in `src/server/start.ts` owns the claim for `new` and `resume`: it re
 A `start` of kind `new` carries a `branch`, `null` for the directory as it is.
 For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`.
 For a new branch, it runs `git check-ref-format --branch` and then `git worktree add -b <branch> <dir> <base>`.
-A quick action that changes a pull request's branch, or works on a Linear issue, sends a `work` branch: the pull request's head or Linear's branch name (`branch` in each action's rule).
+A quick action that changes a pull request's branch sends a `work` branch: the pull request's head (`branch` in each action's rule).
 The server treats it as an existing branch when a local branch has the name; otherwise `git ls-remote --exit-code --heads origin` decides: origin's branch is fetched and `git worktree add --track -b` follows it, and a name origin lacks starts from origin's default branch, fetched, with `--no-track`; a repository without origin starts from the main worktree's branch.
 An origin that cannot be reached fails the start, so a pull request's branch never restarts from the default branch.
-A `work` branch from a directory outside any git checkout starts the session in that directory, since a Linear issue names no repository.
 `<dir>` is `worktreeDir` in `src/shared/git.ts`, beside the main worktree.
 The server refuses a `<dir>` that already exists, because `git worktree add -b` creates the branch before it checks the path.
 A branch that git refuses answers the `start` with git's reason, and no omp spawns.

@@ -5,7 +5,7 @@ import type { Page } from "./routing";
 
 export const APP_NAME = "omp agents";
 
-/** What page `page` is called: its own name, or what it shows, such as a pull request or a ticket. The tab title and a header tab both read it. */
+/** What page `page` is called: its own name, or what it shows, such as a pull request. The tab title and a header tab both read it. */
 export function pageTitle(page: Page): string {
 	if (isModulePage(page)) return moduleOf(page).title(page);
 	switch (page.kind) {

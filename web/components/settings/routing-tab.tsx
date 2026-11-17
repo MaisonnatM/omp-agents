@@ -1,4 +1,4 @@
-import { IconCheckmark1, IconCrossMedium, IconPlusLarge } from "central-icons";
+import { IconCheckmark1, IconCrossMedium, IconPlusSmall } from "central-icons";
 import { type ReactNode, useState } from "react";
 import { type ModelChain, type ModelProfileEdit, type ModelProfileSummary, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
@@ -92,7 +92,7 @@ function ChainEditor({ chain, catalog, onChange }: { chain: string[]; catalog: C
 						</Button>
 					</div>
 				) : (
-					<Button variant="ghost" size="compact" leadingIcon={IconPlusLarge} onClick={() => setAdding(true)}>
+					<Button variant="ghost" size="compact" leadingIcon={IconPlusSmall} onClick={() => setAdding(true)}>
 						Add fallback
 					</Button>
 				)
@@ -234,7 +234,7 @@ function ProviderPicker({ providers, onPick }: { providers: string[]; onPick: (p
 	return (
 		<CommandPicker
 			trigger="Add provider"
-			icon={IconPlusLarge}
+			icon={IconPlusSmall}
 			chevron={false}
 			disabled={providers.length === 0}
 			search={{ label: "Search providers" }}
@@ -320,7 +320,7 @@ function ProfilesSection({ profiles, editing }: { profiles: ModelProfileSummary[
 			meta="Running sessions keep their model; new sessions use the profile."
 			actions={
 				naming === null && (
-					<Button variant="tertiary" size="compact" leadingIcon={IconPlusLarge} disabled={busy} onClick={() => setNaming("")}>
+					<Button variant="tertiary" size="compact" leadingIcon={IconPlusSmall} disabled={busy} onClick={() => setNaming("")}>
 						Save current as…
 					</Button>
 				)

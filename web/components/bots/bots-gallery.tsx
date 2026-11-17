@@ -1,12 +1,12 @@
 /** `BotsGallery`, the `#bots` page: each Bot as a card with its face, name, job's first sentence, and how it stands, under Pinned, its section, or Other Bots once any Bot is pinned or in one, then a card that makes a new one. */
-import { IconPlusLarge } from "central-icons";
+import { IconPlusSmall } from "central-icons";
 import { useState } from "react";
 import type { Routine } from "../../../src/routines";
 import { jobLine } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups, botRoutines, botSections, botsGrouped, botStatus, type BotRow } from "../../bots-model";
-import { mailTime } from "../../labels";
+import { listTime } from "../../labels";
 import { hashForBots, hashForNewBot } from "../../routing";
 import { PageFrame } from "../list-page";
 import { BotAvatar } from "./bot-avatar";
@@ -46,7 +46,7 @@ function BotCard({ row: { bot, host, unread, at }, routineCount, sections, onNam
 					)}
 					<span aria-hidden>·</span>
 					<time dateTime={new Date(at).toISOString()} className="shrink-0 tabular-nums">
-						{mailTime(at)}
+						{listTime(at)}
 					</time>
 				</span>
 			</a>
@@ -59,7 +59,7 @@ function NewBotCard() {
 		<li>
 			<a href={hashForNewBot()} className={cn(CARD, "h-full justify-center border-dashed text-muted-foreground hover:bg-accent/50 hover:text-foreground")}>
 				<span className="flex size-16 items-center justify-center rounded-full border border-dashed border-current">
-					<IconPlusLarge className="size-6" />
+					<IconPlusSmall className="size-6" />
 				</span>
 				<span className="font-medium">New Bot</span>
 				<span className="text-sm text-pretty">Start from a job, or write your own.</span>
@@ -86,7 +86,7 @@ export function BotsGallery({ rows, routines }: BotsGalleryProps) {
 			title="Bots"
 			meta="Teammates with one conversation you come back to, a job, and a memory"
 			actions={
-				<Button asChild size="compact" leadingIcon={IconPlusLarge}>
+				<Button asChild size="compact" leadingIcon={IconPlusSmall}>
 					<a href={hashForNewBot()}>New Bot</a>
 				</Button>
 			}

@@ -3,8 +3,8 @@
 - The sidebar's foot shows how much quota is left on each plan account, one full-width row with a bar per account.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the button that hides the sidebar; under it a row holds the omp mark and the command menu button.
-- Under it the page list shows **New session**, then **Notifications** with its unread count, then **Pull requests**, **Tickets**, **Bots**, **Sessions**, **Calendar**, **Todo**, **Sport**, and **Email** in the order Settings › Preferences gives them, and **Settings**.
-  A row opens its page, and the open page's row stays highlighted while that page's own list, such as the Bots, the Todo categories, or the Settings sections, shows in a column at the page's left, as in Linear's inbox.
+- Under it the page list shows **New session**, then **Notifications** with its unread count, then **Pull requests**, **Bots**, **Sessions**, **Todo**, and **Sport** in the order Settings › Preferences gives them, and **Settings**.
+  A row opens its page, and the open page's row stays highlighted while that page's own list, such as the Bots or the Settings sections, shows in a column at the page's left.
   Drag the column's right edge to widen or narrow it, or double-click the edge to reset it; every page's list keeps that width in this browser.
   On a phone, where the sidebar floats over the page, that list shows under the page's row instead, and a page whose row you hid in Preferences shows its list after the last row.
   **Bots** lists your Bots and opens their conversations, which stay out of the roster.
@@ -14,11 +14,13 @@
   So does a finished turn of a session waiting on its subagents, until they stop.
 - The header's tabs run across the top right of the sidebar: Back and Forward, your tabs, and a + that opens a new tab.
   A tab works as in Capy: opening a page or a session, from the sidebar or anywhere else, shows it in the tab on screen, and a session another tab already shows switches to that tab; only the + or Cmd+T adds a tab, on New session.
+  Back and Forward, Cmd+[ and Cmd+], and the mouse's back and forward buttons move through what the tab on screen showed, as Capy's do: each tab keeps its own history, so switching tabs leaves it as it was, and it stays across reloads.
+  A page that picks what it opens, such as Bots opening its latest Bot, or a click into another pane, changes the entry on screen rather than adding one.
   Cmd+1 through Cmd+9 go to the first through ninth tab, and Ctrl+Tab and Ctrl+Shift+Tab, or Cmd+Alt+→ and Cmd+Alt+←, to the next and previous one.
   The × on a tab, a middle-click, or Cmd+W closes it, closing the one on screen shows its neighbor, and closing the last one leaves a new tab on New session; Cmd+Alt+W closes every tab but the pinned ones and the one on screen.
-  Cmd+Shift+T reopens the last closed tab where it was, on the page it showed, and pressed again brings back the one closed before; a closed session that another tab shows by then switches to that tab instead.
-  Right-click a tab for **Pin tab** or **Unpin tab**, **New tab**, **Duplicate tab**, **Copy URL**, **Close tab**, **Close other tabs**, and **Close tabs to the right**, as in Capy; Ctrl+Shift+P pins or unpins the tab on screen, and Cmd+L copies its URL.
-  **Duplicate tab** opens what the tab shows in a new tab right after it, or right after the pinned tabs for a pinned one; a duplicated session shows in both tabs, and opening it from another tab goes to the first of them.
+  Cmd+Shift+T reopens the last closed tab where it was, on the page it showed and with its Back and Forward, and pressed again brings back the one closed before; a closed session that another tab shows by then switches to that tab instead.
+  Right-click a tab for **Pin tab** or **Unpin tab**, **New tab**, **Duplicate tab**, **Copy URL**, **Close tab**, **Close other tabs**, and **Close tabs to the right**, as in Capy; Ctrl+Shift+P pins or unpins the tab on screen.
+  **Duplicate tab** opens what the tab shows, with its Back and Forward, in a new tab right after it, or right after the pinned tabs for a pinned one; a duplicated session shows in both tabs, and opening it from another tab goes to the first of them.
   **Close tabs to the right** keeps the pinned tabs, and when it closes the tab on screen it shows the one you right-clicked.
   Pinned tabs sit first and show only their icon, and the ×, a middle-click, and Cmd+W leave them open until you unpin them.
   Drag a tab from anywhere on it to move it among the pinned or the other tabs, or focus it and press Alt+Shift+← or →; this browser keeps the tabs, their order, which are pinned, and the last 20 closed across reloads.
@@ -130,5 +132,8 @@
 - The idle stop ends a job once its session has been idle, waiting on you or done with its turn, for the time **Stop idle processes** in [Settings](settings.md) names, 30 minutes by default, counted from when the session was last busy or from the job's start if that is later.
   A shared service stops once every live session of its project has been idle that long.
   Only the server that runs unattended work, the first one started, stops processes.
+- The idle session stop stops a session's omp once the session has been idle, with no subagent still running, for the time **Stop idle sessions** in [Settings](settings.md) names, 12 hours by default.
+  The session then shows under Past with its worktree kept, and **Resume** picks it back up; it is not **End session**.
+  It stops only sessions the dashboard started, and leaves terminal sessions, private sessions, and Bots' conversations running.
 - When a session ends or its omp exits, the server stops the services it owned and the jobs it left running.
   A session started from the dashboard also has the rest of its processes ended when it ends, as before.

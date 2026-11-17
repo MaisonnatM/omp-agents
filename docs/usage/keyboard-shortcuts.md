@@ -13,9 +13,9 @@ Alt is Option on macOS.
 | Alt+M | Composer | Dictate a prompt, or stop dictating |
 | Cmd+/ | Composer | Attach files to the prompt |
 | Cmd+K | Anywhere | Open the command menu |
-| Cmd+[ / Cmd+] | Anywhere | Go back or forward, as the Back and Forward buttons at the start of the header's tabs do |
+| Cmd+[ / Cmd+] | Anywhere | Go back or forward in the header tab on screen, as its Back and Forward buttons and the mouse's back and forward buttons do |
 | Alt+Shift+← / Alt+Shift+→ | A focused header tab | Move the tab left or right |
-| Cmd+Shift+O / S | Anywhere / outside text fields | Start a new session; on the tickets page, Cmd+Shift+O creates a Linear ticket |
+| Cmd+Shift+O / S | Anywhere / outside text fields | Start a new session |
 | Cmd+F | Anywhere | Find text in the focused session's conversation, or in the pull request the Pull requests page shows |
 | Cmd+Shift+F | Anywhere | Put the cursor in the sidebar's session search |
 | Cmd+T | Anywhere | Open a new header tab on the new-session draft |
@@ -23,7 +23,6 @@ Alt is Option on macOS.
 | Cmd+Alt+W | Anywhere | Close every header tab but the pinned ones and the one on screen |
 | Cmd+Shift+T | Anywhere | Reopen the last closed header tab, where it was |
 | Ctrl+Shift+P | Anywhere | Pin or unpin the header tab on screen |
-| Cmd+L | Anywhere | Copy the URL of the header tab on screen |
 | Ctrl+Tab / Ctrl+Shift+Tab | Anywhere | Go to the next or previous header tab |
 | Cmd+Alt+→ / Cmd+Alt+← | Anywhere | Go to the next or previous header tab |
 | Cmd+1 … Cmd+9 | Anywhere | Go to the first … ninth header tab |
@@ -47,8 +46,6 @@ Alt is Option on macOS.
 | V / R / D / E | Browser while picking, outside text fields, the app in it too | Switch to Select, Region, Draw, or Erase |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
-| C | Outside text fields, except on the Todo, Calendar, and Email pages | Create a Linear ticket, when connected |
-| G then M | Outside text fields | Go to your email, when connected |
 | Cmd+, | Anywhere | Open or close Settings |
 | G then W | Outside text fields | Choose the sidebar's workspace |
 | ↓ / J | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
@@ -66,13 +63,6 @@ Alt is Option on macOS.
 | Shift+D | Todo page, outside text fields | Change the focused or open todo's due day |
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
-| C | Calendar page, outside text fields | Add an event |
-| ↓ / ↑ or J / K | Email page, outside text fields | Focus the next or previous conversation, or open it while one is open |
-| Esc | Email page, outside text fields | Close the open conversation |
-| O | Email page, outside text fields | Open the focused or open conversation in Gmail |
-| R / A | Email page, outside text fields | Reply, or reply to all, to the open conversation's last message |
-| # | Email page, outside text fields | Move the open conversation to Gmail's Trash |
-| C | Email page, outside text fields | Write a new mail |
 | ← / → | Sport page's week, outside text fields | Open the day before or after |
 | ← / → | Sport page's demo dialog, outside text fields | Show the workout's previous or next demo |
 | ↓ / ↑ or J / K | Sport page's journal, outside text fields | Focus the next or previous session, or open it while one is open |
@@ -82,12 +72,12 @@ Alt is Option on macOS.
 | ↓ / ↑ or J / K | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - **Settings › Keyboard** lists the keyboard shortcuts; press `?` outside a text field to open it, and `?` there goes back to the panes.
-  It lists them in sections by category: General, Sessions, Pull requests, Todo, Email, Calendar, Sport, and Changes.
+  It lists them in sections by category: General, Sessions, Pull requests, Todo, Sport, and Changes.
   Its first line states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **Archive session**, the composer's paperclip, Stop, and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, the Sport demo dialog's **Précédent** and **Suivant**, the Calendar page's **New event**, and an Email conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **Archive session**, the composer's paperclip, Stop, and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, and the Sport demo dialog's **Précédent** and **Suivant**.
 - Cmd+1 through Cmd+9 go to the first through ninth header tab, even while typing, as in Capy; a number with no tab is left to the window.
   Alt+1 through Alt+9 (Option on macOS) open the first through ninth session of the sidebar's list, in the order it shows them, in the focused pane.
-  The sidebar's page list takes no number keys: each tab keeps its command in the command menu, and Email keeps G then M.
+  The sidebar's page list takes no number keys: each tab keeps its command in the command menu.
   Off macOS, Ctrl+Shift+F is also the session search's key, which takes it first while the sidebar shows.
   Cmd with N, R, D, Q, P, S, Tab, or 0 is left to the window, whose menu takes Cmd+R, Cmd+Q, and Cmd+0, and Cmd+Shift+W to close it; see [Desktop app](desktop-app.md).
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
@@ -97,10 +87,10 @@ Alt is Option on macOS.
   ↑ moves the last queued message back only while the composer is empty, as ↑ edits your last message in Slack.
   On a focused queued row, Cmd+Enter sends it now, Enter or F2 edits it, and Delete removes it.
   With a draft, ↑ moves the caret as usual.
-- Cmd+K opens the command menu, which searches every running and past session, in every workspace, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
-  What you type also searches your todos, closed ones too, the Linear tickets assigned to you once Linear is connected, the open pull requests of the sidebar's workspace, and the sections of Settings, each under its own heading; each must hold every word typed, in any order.
+- Cmd+K opens the command menu, which searches every running and past session, in every workspace, by title, directory, or pull request, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
+  What you type also searches your todos, closed ones too, the open pull requests of the sidebar's workspace, and the sections of Settings, each under its own heading; each must hold every word typed, in any order.
   With nothing typed they list only under **Suggestions**, once you use one often enough.
-  A todo opens beside its list on the Todo page, a ticket opens its details, and a pull request opens its details on the Pull requests page; Cmd+Enter opens a ticket in Linear and a pull request on GitHub.
+  A todo opens beside its list on the Todo page, and a pull request opens its details on the Pull requests page; Cmd+Enter opens a pull request on GitHub.
   **In conversations**, under those, lists the sessions whose prompts or replies hold every word typed, up to 30, the latest active first, each by the latest such message and how many match; tool output and thinking are not searched.
   Enter opens the session scrolled to that message, and Cmd+Enter opens it in a split.
   The search button in the sidebar header opens it too.
@@ -116,18 +106,16 @@ Alt is Option on macOS.
   Whatever you type also offers **Create todo**, last, which adds it at the end of **All**, with no category.
   You stay on the page you were on.
   The title can end with a due day or a `#category`, as in [Todo list](todo-list.md).
-  With Linear connected, it also offers **Create ticket**, which opens the new-ticket dialog with what you typed as the title; see [Linear tickets](linear-tickets.md).
   Cmd+Alt+↑ and Cmd+Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then the ones waiting on subagents, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   ↓ and ↑, or J and K, do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
-- Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does; on the tickets page it opens the new-issue dialog instead.
+- Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does.
   S outside a text field does it too; on the Todo page, S changes a focused or open todo's status instead.
   Cmd+T opens a new header tab on the new-session draft, as the + after the tabs does.
   Cmd+W closes the header tab on screen and leaves its session running; it does nothing when the page has no header tab, or when the tab on screen is pinned.
   Cmd+Alt+W closes every header tab but the pinned ones and the one on screen, and Ctrl+Tab and Ctrl+Shift+Tab, or Cmd+Alt+→ and Cmd+Alt+←, go to the next or previous one, wrapping around.
   Cmd+Shift+T reopens the last closed header tab at its place, on the page it showed, as in Capy; pressed again it reopens the one closed before, up to the last 20.
   Ctrl+Shift+P pins or unpins the header tab on screen, with Ctrl on macOS too as in Capy, so it stays apart from Cmd+Shift+P in the command menu.
-  Cmd+L copies the URL of the header tab on screen, as **Copy URL** in a tab's menu does; Capy's other key for it, Cmd+Shift+C, stays the command menu's Copy path.
   **Archive session** in a session's header ends it; **Resume** continues it from the past sessions.
   `/` or Cmd+I puts the cursor in the focused pane's composer.
 - Inside the command menu, Cmd+Shift+P pins or unpins the highlighted session.
@@ -137,9 +125,9 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in the app.
-- **Go to pull requests** in the command menu opens the Pull requests page, and **Go to tickets** opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo, Calendar, and Email pages, where it adds a todo, an event, or a new mail.
-  **Go to sessions** goes back from the Pull requests page, the todo list, the calendar, the email, a Bot, Settings, or the new-session draft to the panes.
-  The **Todo** and **Calendar** buttons in the header open those pages, and G then M the **Email** page when connected to Gmail.
+- **Go to pull requests** in the command menu opens the Pull requests page; C on the Todo page adds a todo.
+  **Go to sessions** goes back from the Pull requests page, the todo list, a Bot, Settings, or the new-session draft to the panes.
+  The **Todo** and **Sport** buttons in the header open those pages.
   Cmd+, opens Settings, as the header's gear button does, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.

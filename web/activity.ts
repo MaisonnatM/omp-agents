@@ -205,19 +205,14 @@ type PageViewKey =
 /**
  * Every view but the settings sections, which {@link ViewKey} adds: the panes by how many there are and of what kind, and
  * each page by its kind and whether it shows one item, never an id or a path; each tab's views come in the sidebar's order.
- * `tab` is the sidebar tab a view goes with, so Settings › Activity sets apart a view whose tab's service omp is not signed in to.
  */
-export const VIEWS: readonly { key: PageViewKey; label: string; tab?: SidebarTab }[] = [
+export const VIEWS: readonly { key: PageViewKey; label: string }[] = [
 	{ key: "home", label: "Home" },
 	{ key: "get-started", label: "Get started" },
 	{ key: "session", label: "A session" },
 	{ key: "past", label: "A past session" },
 	{ key: "split", label: "Split panes" },
-	...SIDEBAR_TABS.flatMap(({ value, integration }): readonly { key: PageViewKey; label: string; tab?: SidebarTab }[] => {
-		if (!isWebModuleId(value)) return TAB_VIEWS[value];
-		const { views } = moduleOf({ kind: value });
-		return integration ? views.map(view => ({ ...view, tab: value })) : views;
-	}),
+	...SIDEBAR_TABS.flatMap(({ value }): readonly { key: PageViewKey; label: string }[] => (isWebModuleId(value) ? moduleOf({ kind: value }).views : TAB_VIEWS[value])),
 	{ key: "notifications", label: "Notifications" },
 	{ key: "scheduled", label: "Scheduled sends" },
 	{ key: "scheduled/item", label: "A scheduled send" },

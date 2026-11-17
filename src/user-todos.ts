@@ -92,8 +92,6 @@ function sameLink(a: UserTodoLink, b: UserTodoLink): boolean {
 			return b.kind === "session" && a.sessionId === b.sessionId;
 		case "pull-request":
 			return b.kind === "pull-request" && a.owner === b.owner && a.repo === b.repo && a.number === b.number;
-		case "ticket":
-			return b.kind === "ticket" && a.identifier === b.identifier;
 		default: {
 			const never: never = a;
 			return never;

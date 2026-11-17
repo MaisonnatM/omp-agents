@@ -58,8 +58,6 @@ export function scheduleWords(schedule: Schedule): string {
 export const TRIGGER_WORDS: Record<TriggerKind, string> = {
 	slack: "When a Slack message waits on you",
 	"pull-request": "When a pull request waits on you",
-	event: "Before a calendar event starts",
-	gmail: "When unread mail comes in",
 };
 
 /** What starts `routine`: its schedules in the order they were saved, then its triggers, each in its own words. */

@@ -50,7 +50,6 @@ import type {
 	McpCredentialsModule,
 	McpOAuthDiscoveryModule,
 	McpOAuthFlowModule,
-	McpRpcModule,
 } from "./module-types/mcp";
 import type {
 	HindsightBankModule,
@@ -84,7 +83,6 @@ import type {
 	LaunchClientModule,
 	LaunchPathsModule,
 	OvnfsClientModule,
-	OvnfsDaemonModule,
 	OvnfsTaskModule,
 	PsDataModule,
 	PsTableModule,
@@ -373,7 +371,6 @@ export const agentPluginRoots = await load<AgentPluginRootsModule>(join(srcDir, 
 export const configFiles = await load<ConfigFilesModule>(join(srcDir, "config.ts"), { findConfigFile: "function", getConfigDirPaths: "function" });
 export const configSources = await load<ConfigFileSourcesModule>(join(srcDir, "utils", "config-file-sources.ts"), { configFileSources: "function" });
 export const markit = await load<MarkitModule>(join(srcDir, "utils", "markit.ts"), { convertBufferWithMarkit: "function" });
-export const mcpRpc = await load<McpRpcModule>(join(srcDir, "mcp", "json-rpc.ts"), { callMCP: "function" });
 export const mcpConfig = await load<McpConfigModule>(join(srcDir, "mcp", "config.ts"), { loadAllMCPConfigs: "function" });
 export const mcpClient = await load<McpClientModule>(join(srcDir, "mcp", "client.ts"), {
 	connectToServer: "function",
@@ -423,8 +420,7 @@ export const isolationOwnership = await load<IsolationOwnershipModule>(join(srcD
 });
 export const worktreeCli = await load<WorktreeCliModule>(join(srcDir, "cli", "worktree-cli.ts"), { stopRetainedMount: "function" });
 export const ovnfsTask = await load<OvnfsTaskModule>(join(srcDir, "task", "ovnfs.ts"), { OVNFS_CHECKOUT_FILE: "string" });
-export const ovnfsDaemon = await load<OvnfsDaemonModule>(join(srcDir, "ovnfs", "daemon.ts"), { runningDaemon: "function", forgetDaemon: "function" });
-export const ovnfsClient = await load<OvnfsClientModule>(join(srcDir, "ovnfs", "client.ts"), { callSocket: "function", OvnfsError: "function" });
+export const ovnfsClient = await load<OvnfsClientModule>(join(srcDir, "ovnfs", "client.ts"), { callSocket: "function", OvnfsError: "function", PROTOCOL_VERSION: "number" });
 export const psData = await load<PsDataModule>(join(srcDir, "cli", "ps-data.ts"), { collectReports: "function", scopeClient: "function" });
 export const psTable = await load<PsTableModule>(join(dirname(packageDir), "pi-tui", "src", "apps", "ps-data.ts"), { TERMINAL_STATES: "object" });
 export const launchPaths = await load<LaunchPathsModule>(join(srcDir, "launch", "paths.ts"), { canonicalProjectDir: "function" });

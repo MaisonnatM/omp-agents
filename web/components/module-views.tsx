@@ -10,15 +10,9 @@ import type { RosterHost } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { SectionTarget } from "../section";
-import { CalendarNav } from "./calendar/calendar-nav";
-import { CalendarPage } from "./calendar/calendar-page";
 import { useDashboardActions } from "./dashboard-context";
-import { EmailNav } from "./email/email-nav";
-import { EmailPage } from "./email/email-page";
 import { SportNav } from "./sport/nav";
 import { SportPage } from "./sport/page";
-import { TicketsNav } from "./tickets/tickets-nav";
-import { TicketsPage } from "./tickets/tickets-page";
 
 /** The core's data a module's page reads but does not own. */
 export interface CoreData {
@@ -28,8 +22,6 @@ export interface CoreData {
 	bots: Bot[] | null;
 	/** The todo list, `null` until the server sends it. */
 	todos: UserTodoList | null;
-	/** Linear answers and the sidebar shows Tickets, so a page may show tickets. */
-	ticketsShown: boolean;
 	/** The sessions are listed, so `cwd` names the workspace a new session starts in. */
 	listed: boolean;
 	/** The directory a new session starts in, which the sidebar's workspace decides. */
@@ -58,27 +50,27 @@ type PageProps<I extends WebModuleId> = { route: ModuleRoutes[I]; core: CoreData
 
 interface ModuleViews<I extends WebModuleId> {
 	Page: ComponentType<PageProps<I>>;
-	/** The module's list in the page column, for the route its page shows. */
-	Nav: ComponentType<NavProps<ModuleRoutes[I]>>;
+	/** The module's list in the page column, for the route its page shows; none for a module whose page `listsItself`. */
+	Nav?: ComponentType<NavProps<ModuleRoutes[I]>>;
 }
 
 const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
-	tickets: { Page: TicketsPage, Nav: TicketsNav },
-	calendar: { Page: CalendarPage, Nav: CalendarNav },
 	sport: { Page: SportPage, Nav: SportNav },
-	email: { Page: EmailPage, Nav: EmailNav },
 };
+
+/** Any module's page as {@link ModulePageView} draws it: a stored module's gets its state, any other's none. */
+type AnyPageProps = { route: ModulePage; core: CoreData } & Partial<StoredPageProps<ModuleValues[StoredModuleId], ModuleChanges[StoredModuleId]>>;
 
 /** Module `page.kind`'s page, given the stored modules' states and the core's data. */
 export function ModulePageView({ page, states, disabled, core }: { page: ModulePage; states: ModuleStates; disabled: boolean; core: CoreData }) {
 	const { changeModule } = useDashboardActions();
-	const { Page } = MODULE_VIEWS[page.kind] as ModuleViews<WebModuleId>;
+	const Page = MODULE_VIEWS[page.kind].Page as ComponentType<AnyPageProps>;
 	const stored = page.kind in states ? { state: states[page.kind as StoredModuleId], disabled, onChange: (change: ModuleChanges[StoredModuleId]) => changeModule(page.kind as StoredModuleId, change) } : {};
 	return <Page route={page} core={core} {...stored} />;
 }
 
-/** Module `page.kind`'s list in the page column. */
+/** Module `page.kind`'s list in the page column, if it has one. */
 export function ModuleNavView({ page, section, onSection }: { page: ModulePage } & Omit<NavProps<unknown>, "route">) {
 	const { Nav } = MODULE_VIEWS[page.kind] as ModuleViews<WebModuleId>;
-	return <Nav route={page} section={section} onSection={onSection} />;
+	return Nav ? <Nav route={page} section={section} onSection={onSection} /> : null;
 }

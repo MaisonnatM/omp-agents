@@ -18,7 +18,7 @@ const newestFirst = (a: SavedSession, b: SavedSession): number => b.modifiedAt -
 
 /** Whether two answers of `factsOf` are the same facts: each field keeps its identity until it changes. */
 const sameFacts = (a: SessionFacts, b: SessionFacts): boolean =>
-	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.arenas === b.arenas && a.worktree === b.worktree && a.branch === b.branch && a.workspace === b.workspace;
+	a.pullRequests === b.pullRequests && a.ship === b.ship && a.arenas === b.arenas && a.worktree === b.worktree && a.branch === b.branch && a.workspace === b.workspace;
 
 /** A past-list row and what it was built from. */
 interface PastRow {
@@ -63,7 +63,7 @@ export class SessionFiles {
 	readonly savedOf = (sessionId: string): SavedSession | null => this.#byId.get(sessionId) ?? null;
 
 	/**
-	 * What the index knows of session `sessionId`: its pull requests, Linear issues, /ship stage, worktree, branch, and workspace.
+	 * What the index knows of session `sessionId`: its pull requests, /ship stage, worktree, branch, and workspace.
 	 * `cwd` is the directory a live session runs in now, which names its workspace; its file's directory when omitted.
 	 */
 	readonly factsOf = (sessionId: string, cwd?: string): SessionFacts => this.facts.factsOf(this.pathOf(sessionId), cwd);
@@ -191,7 +191,7 @@ export class SessionFiles {
 		this.#byId = new Map(files.map(file => [file.id, file]));
 	}
 
-	/** Read the transcripts for what they link to; whether any session's pull requests, Linear issues, /ship stage, or headless mark changed. The first read covers every transcript. */
+	/** Read the transcripts for what they link to; whether any session's pull requests, /ship stage, or headless mark changed. The first read covers every transcript. */
 	refreshFacts(): Promise<boolean> {
 		return this.facts.refresh(this.#files);
 	}

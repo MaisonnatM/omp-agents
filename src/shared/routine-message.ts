@@ -2,8 +2,8 @@
  * What a routine run sends into its Bot's conversation: the prompt, or the command report, then one stamp line that
  * carries the run as JSON, so every reader of the conversation tells the message from one the user wrote.
  */
-import { isNonEmpty, isObject, isSafeInteger, parseAll } from "../json";
-import { COMMAND_TIME_LIMIT, type CommandRun, parseCommandRun, parseTriggerEvent, type RoutineTask, type TriggerEvent } from "../routines";
+import { isNonEmpty, isObject, isSafeInteger } from "../json";
+import { COMMAND_TIME_LIMIT, type CommandRun, parseCommandRun, parseTriggeredBy, type RoutineTask, type TriggerEvent } from "../routines";
 import { type BotId, parseBotId } from "./bots";
 import { readStamped, stampedText } from "./stamp";
 
@@ -95,7 +95,7 @@ function messageOf(body: string, stamp: unknown): RoutineMessage | null {
 	if (!isObject(stamp) || !isObject(stamp.routine)) return null;
 	const botId = parseBotId(stamp.botId);
 	const { id, name } = stamp.routine;
-	const triggeredBy = parseAll(stamp.triggeredBy, parseTriggerEvent);
+	const triggeredBy = parseTriggeredBy(stamp.triggeredBy);
 	if (!botId || !isNonEmpty(id) || !isNonEmpty(name) || !isSafeInteger(stamp.at) || !triggeredBy) return null;
 	const head = { botId, routine: { id, name }, at: stamp.at, triggeredBy };
 	if (!("command" in stamp)) return "end" in stamp ? null : { ...head, sent: { kind: "prompt", prompt: body } };

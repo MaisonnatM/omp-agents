@@ -20,8 +20,6 @@ export const PORTABLE_PREFERENCES = [
 	"omp-agents.pr-diff-layout",
 	"omp-agents.pr-diff-wrap",
 	"omp-agents.pr-diff-whitespace",
-	"omp-agents.calendar-routines",
-	"omp-agents.todo-hidden-categories",
 ] as const;
 
 const PORTABLE: ReadonlySet<string> = new Set(PORTABLE_PREFERENCES);
@@ -37,11 +35,11 @@ export type PagePreferences = Readonly<Record<string, string>>;
  */
 export type PreferenceChange = { op: "set"; key: string; value: string | null } | { op: "seed"; values: PagePreferences };
 
-/** `value` as preferences: `null` unless it is an object of strings under portable keys only. */
+/** `value` as preferences: `null` unless it is an object of strings; a key that is not portable, such as one an older version kept, drops. */
 export function parsePagePreferences(value: unknown): PagePreferences | null {
 	if (!isObject(value) || Array.isArray(value)) return null;
 	const entries = Object.entries(value);
-	return entries.every((entry): entry is [string, string] => isPortablePreference(entry[0]) && typeof entry[1] === "string") ? Object.fromEntries(entries) : null;
+	return entries.every((entry): entry is [string, string] => typeof entry[1] === "string") ? Object.fromEntries(entries.filter(([key]) => isPortablePreference(key))) : null;
 }
 
 /** `values` after `change`, or `values` itself when it changes nothing; `null` until a page seeds them or sets one. */

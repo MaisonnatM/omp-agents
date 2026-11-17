@@ -1,12 +1,12 @@
 # Preferences
 
 The page's choices that describe the user rather than the machine follow the user through [Settings sync](settings-sync.md), so the server keeps them, and each page keeps its localStorage as the copy it paints from first.
-`PORTABLE_PREFERENCES` in `src/shared/preferences.ts` names them by localStorage key: the theme, **Show tool calls** and **Show thinking**, the sidebar tabs, the pinned skill, session notifications with their finished-turn, sound, and focused-sound choices, the default merge method, the Code tab's layout, wrap, and whitespace choices, whether the Calendar shows routines, and the categories hidden on the Todo page.
-Every other key stays on its machine: widths, splits, open panels, folds, drafts, caches, the command palette's frecency, the last merge method, team, and calendar, and the pull requests already seen.
+`PORTABLE_PREFERENCES` in `src/shared/preferences.ts` names them by localStorage key: the theme, **Show tool calls** and **Show thinking**, the sidebar tabs, the pinned skill, session notifications with their finished-turn, sound, and focused-sound choices, the default merge method, and the Code tab's layout, wrap, and whitespace choices.
+Every other key stays on its machine: widths, splits, open panels, folds, drafts, caches, the command palette's frecency, the last merge method and team, and the pull requests already seen.
 
-`src/server/preferences-file.ts` keeps them in `preferences.json` beside the access token, as `{ values }`, each value the raw string the page stores, and moves a file that holds anything else, a key this version does not carry included, to `preferences.json.invalid`.
+`src/server/preferences-file.ts` keeps them in `preferences.json` beside the access token, as `{ values }`, each value the raw string the page stores, drops a key this version does not carry, such as one an older version kept, and moves a file that holds anything else to `preferences.json.invalid`.
 No file means no page has handed the server its preferences yet, and the server sends `values: null`.
-A `preference` socket message carries a `PreferenceChange`, checked in `src/server/wire.ts`, which refuses a key outside the list and a value that is not a string.
+A `preference` socket message carries a `PreferenceChange`, checked in `src/server/wire.ts`, which refuses a `set` of a key outside the list and a value that is not a string, and drops a key outside the list from a `seed`.
 `set` stores one key's string, or removes the key with `null`, which the page sends for a value back at its default.
 `seed` hands the server every portable key the page holds, and `applyPreference` takes it only while the server holds none, so the first page to connect after an upgrade wins and a later seed changes nothing.
 Every socket hears the preferences after each change as a `preferences` message on the roster topic, also sent when a socket opens; a change that changes nothing sends them back to its own socket alone.

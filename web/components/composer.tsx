@@ -55,7 +55,7 @@ export function EmptyConversation({ title, children }: { title: string; children
 			<ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
 				{[
 					["/", "commands and skills"],
-					["@", "files, todos, tickets, PRs, sessions"],
+					["@", "files, todos, PRs, sessions"],
 				].map(([key, label]) => (
 					<li key={key} className="flex items-center gap-1.5">
 						<Kbd className="text-foreground">{key}</Kbd>

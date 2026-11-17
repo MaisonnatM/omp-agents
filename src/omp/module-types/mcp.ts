@@ -1,20 +1,6 @@
 /** omp's MCP client, config, and sign-ins (pi-coding-agent src/mcp). */
 import type { AuthStorage } from "./models";
 
-/** Subset of omp's `JsonRpcResponse` (src/mcp/types.ts). */
-export interface McpResponse {
-	result?: unknown;
-	error?: { code: number; message: string };
-}
-export interface McpRpcModule {
-	/** JSON-RPC 2.0 over HTTP, reading a JSON or `text/event-stream` answer; `onHttpError` maps a non-2xx response to the error thrown. */
-	callMCP(
-		url: string,
-		method: string,
-		params: Record<string, unknown>,
-		options: { headers?: Record<string, string>; signal?: AbortSignal; onHttpError?: (response: Response, body: string) => Error },
-	): Promise<McpResponse>;
-}
 /** Subset of omp's `MCPServerConfig` (src/mcp/types.ts) this app reads and writes back. Extra fields on a parsed server are kept by spreading it. */
 export interface McpServerConfig {
 	type?: string;

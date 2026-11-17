@@ -31,8 +31,8 @@ Open `#new/%2Ftmp` to start one in `/tmp`, use a prompt such as `Reply with just
 
 ## Isolated state
 
-A smoke server reads and writes the user's own state: `calendars.json`, `token`, and the rest under `~/.config/omp-agents`, and the settings sync's repository under the data directory.
-When a check changes that state, such as hiding a calendar, start the server with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (`src/paths.ts`), each a fresh `mktemp -d`.
+A smoke server reads and writes the user's own state: `todos.json`, `token`, and the rest under `~/.config/omp-agents`, and the settings sync's repository under the data directory.
+When a check changes that state, such as adding a todo, start the server with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (`src/paths.ts`), each a fresh `mktemp -d`.
 Its token is then in `$XDG_CONFIG_HOME/omp-agents/token`.
 The omp sessions it starts still use the user's omp directory, so they still run with the user's models and sign-ins.
 Each session's socket lives under `$XDG_CONFIG_HOME/omp-agents/sessions/<port>/`, and the server refuses a socket path past 103 bytes (`MAX_SOCKET_PATH_BYTES` in `src/keeper-link.ts`), so a smoke that starts sessions needs a short `XDG_CONFIG_HOME` such as `mktemp -d /tmp/oa-c.XXXX`; under macOS's default `$TMPDIR`, starting a session fails with "The session socket path is too long".
@@ -82,11 +82,9 @@ Besides a live session's own hash, the routes are:
 
 - `#past/<session id>`, `#session/<session id>`;
 - `#pull-requests`, `#pull-requests/<owner>/<repo>/<number>`, `#pull-requests/<owner>/<repo>/<number>/files`, `#pull-requests/<owner>/<repo>/<number>/files/<encoded path>`;
-- `#tickets`, `#tickets/<identifier>`;
-- `#email`, `#email/new`, `#email/<account>/<thread id>`;
 - `#sport`, `#sport?day=<YYYY-MM-DD>`, `#sport/journal`, `#sport/journal?open=<log id>`, `#sport/progress`;
-- `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;
-- `#calendar`, `#notifications`, `#bots`, `#bots/new`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
+- `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, each with `?open=<todo id>` to open a todo;
+- `#notifications`, `#bots`, `#bots/new`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
 - `#get-started`, which always opens Get started's setup dialog over the home, even after local dismissal;
 - `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `keyboard`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `phone`, `storage`, `models`, `agents`, `omp`, `omp-memory`, `files`, `extensions`, `workflows`, `decisions`, or `worktrees`.

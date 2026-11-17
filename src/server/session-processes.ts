@@ -1,14 +1,15 @@
 /**
  * What each live session runs besides omp: its jobs, the process groups under its omp, and its services, the daemons
  * omp's project broker runs for it. The watch lists them, stops one on request, stops the ones every session they serve
- * left idle for the setting's minutes, and stops what a session that left the roster leaves behind. Every stop of a
- * session's processes goes through it; `docs/architecture/session-processes.md` says what counts and why.
+ * left idle for the setting's minutes, stops what a session that left the roster leaves behind, and ends a session left
+ * idle for the setting's hours. Every stop of a session's processes goes through it; `docs/architecture/session-processes.md`
+ * says what counts and why.
  */
 import type { DaemonReport, DaemonScope } from "../omp/module-types/processes";
 import { run } from "../proc";
 import { cwdsArgv, cwdsIn, descendants, LISTENERS_ARGV, listeningPortsIn, parseCwds, parseListeners, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
 import { SerialLane } from "../serial-lane";
-import type { LiveSessionProcesses, SessionProcess, SessionProcesses } from "../shared/processes";
+import type { LiveSessionProcesses, ProcessSettings, SessionProcess, SessionProcesses } from "../shared/processes";
 import type { HostStatus } from "../shared/sessions";
 import { errorText } from "../json";
 
@@ -27,6 +28,10 @@ export interface WatchedSession {
 	pid: number;
 	cwd: string;
 	status: HostStatus;
+	/** Its main agent only waits on a subagent that still runs, which the idle session stop counts as busy. */
+	awaitsSubagents: boolean;
+	/** The idle session stop may end it: a session this server started that is neither private nor a Bot's conversation. */
+	stopsWhenIdle: boolean;
 }
 
 export interface SessionProcessWatchDeps {
@@ -47,10 +52,14 @@ export interface SessionProcessWatchDeps {
 	/** Stops each process that still runs under the start time it is listed with. */
 	stopProcesses(processes: Processes): Promise<void>;
 	sessions(): WatchedSession[];
+	/** Ends live session `instanceId` as a Bot's idle stop does: its omp stops, its worktree stays, and it becomes a past session. */
+	endSession(instanceId: string): Promise<void>;
+	/** When omp last wrote live session `instanceId`'s file, which starts its idle clock when this server first sees it settled; `null` with no file. */
+	lastWrittenAt(instanceId: string): number | null;
 	now(): number;
 	/** This server holds the owner lock, so it stops processes no one asked it to. */
 	owner(): boolean;
-	stopIdleAfterMinutes(): number | null;
+	settings(): ProcessSettings;
 }
 
 type Target = { kind: "job"; members: Processes } | { kind: "service"; scope: DaemonScope; name: string; daemonId: string };
@@ -89,6 +98,8 @@ export class SessionProcessWatch {
 	readonly #lane = new SerialLane();
 	/** Since when each live session has been idle; now while it is anything else. */
 	readonly #idleSince = new Map<string, number>();
+	/** Since when each live session has been idle with no running subagent it waits on; now while it is anything else. */
+	readonly #settledSince = new Map<string, number>();
 	/** Each live session, and each gone one whose omp still ran at the last sample, by instance id. */
 	#seen = new Map<string, Seen>();
 	/** {@link SessionProcessWatchDeps.appOf} by directory, which a running server keeps. */
@@ -144,10 +155,15 @@ export class SessionProcessWatch {
 		const portsOf = (rows: ProcessRow[]): number[] => [...new Set(rows.flatMap(row => listeners?.get(row.pid) ?? []))].sort((a, b) => a - b);
 		const now = this.#deps.now();
 		const owner = this.#deps.owner();
-		const timeout = this.#deps.stopIdleAfterMinutes();
+		const { stopIdleAfterMinutes: timeout, stopIdleSessionsAfterHours: sessionTimeout } = this.#deps.settings();
 		const live = new Set(sessions.map(session => session.instanceId));
-		for (const id of this.#idleSince.keys()) if (!live.has(id)) this.#idleSince.delete(id);
-		for (const session of sessions) this.#idleSince.set(session.instanceId, session.status === "idle" ? (this.#idleSince.get(session.instanceId) ?? now) : now);
+		for (const clock of [this.#idleSince, this.#settledSince]) for (const id of clock.keys()) if (!live.has(id)) clock.delete(id);
+		for (const { instanceId, status, awaitsSubagents } of sessions) {
+			this.#idleSince.set(instanceId, status === "idle" ? (this.#idleSince.get(instanceId) ?? now) : now);
+			// A server that restarted first sees a long-idle session settled since its file was last written, not since now.
+			const settled = status === "idle" && !awaitsSubagents;
+			this.#settledSince.set(instanceId, settled ? (this.#settledSince.get(instanceId) ?? Math.min(now, this.#deps.lastWrittenAt(instanceId) ?? now)) : now);
+		}
 
 		const previous = this.#seen;
 		this.#seen = new Map();
@@ -215,7 +231,9 @@ export class SessionProcessWatch {
 		}
 		if (owner) {
 			const stops = [...due.values(), ...orphans, ...left.flatMap((seen): Target[] => (seen.jobs.size > 0 ? [{ kind: "job", members: seen.jobs }] : []))];
-			for (const result of await Promise.allSettled(stops.map(target => this.#stopTarget(target)))) {
+			const idle = sessionTimeout === null ? [] : sessions.filter(session => session.stopsWhenIdle && this.#settledSince.get(session.instanceId)! + sessionTimeout * 3_600_000 <= now);
+			const stopping = [...stops.map(target => this.#stopTarget(target)), ...idle.map(session => this.#deps.endSession(session.instanceId))];
+			for (const result of await Promise.allSettled(stopping)) {
 				if (result.status === "rejected") console.error(`omp-agents: stopping a session's process failed: ${errorText(result.reason)}`);
 			}
 		}

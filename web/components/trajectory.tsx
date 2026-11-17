@@ -1,4 +1,4 @@
-import { IconChevronRight } from "central-icons";
+import { IconChevronDownSmall } from "central-icons";
 import { useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { addUsage, NO_USAGE, type Turn, type TurnStep } from "../../src/shared/trajectory";
@@ -17,7 +17,7 @@ const titleOf = (turn: Turn): { title: string; skill: string | null } => {
 	return prompt ? { title: firstLine(prompt.body.text), skill: prompt.skill } : { title: "Before the first prompt", skill: null };
 };
 function Chevron({ open }: { open: boolean }) {
-	return <IconChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-150", open && "rotate-90")} />;
+	return <IconChevronDownSmall className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-150", !open && "-rotate-90")} />;
 }
 
 function SkillChip({ skill }: { skill: string | null }) {

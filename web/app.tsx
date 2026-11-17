@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
@@ -16,7 +15,7 @@ import {
 	MentionListsContext,
 	UserTodosContext,
 } from "./components/dashboard-context";
-import { DesktopLinkPreview } from "./components/desktop-link-preview";
+import { LinkPreviewCard } from "./components/link-preview-card";
 import { FileDialog } from "./components/file-dialog";
 import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
@@ -34,18 +33,17 @@ import { firstSessionFact } from "./get-started-model";
 import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
 import { SidebarFoot } from "./components/sidebar-status";
 import { subjectOf } from "./components/subject";
-import { NewTicketDialog } from "./components/tickets/new-ticket";
 import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
 import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
-import { integrationsStore, UNREAD } from "./reads";
+import { UNREAD } from "./reads";
 import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { revealDetailsTab } from "./details-tabs";
-import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView, type TodoListView } from "./routing";
+import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
@@ -59,8 +57,6 @@ import { useSessionLists } from "./use-session-lists";
 import { useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
-
-const ALL_TODOS: TodoListView = { kind: "all" };
 
 /**
  * The dashboard: the socket's state, sliced into what each part reads, and the parts. Each hook it calls owns one
@@ -86,10 +82,7 @@ export function App() {
 	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
 	const goalHost = goalEditor ? state.hosts.find(host => host.instanceId === goalEditor.instanceId) : null;
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
-	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
 	const { absent: absentTabs, shown: tabs } = useSidebarTabs();
-	/** Linear answers and the sidebar shows Tickets: the new-ticket shortcut, the palette's tickets, a todo's ticket, and the Calendar's due days apply. */
-	const ticketsCallable = linear !== null && callable(linear.connection) && !absentTabs.has("tickets");
 	const settings = useSettingsRoute(page);
 	const botList = useMemo(() => (state.bots === null ? null : botRows(state.bots, state.hosts, state.botLasts)), [state.bots, state.hosts, state.botLasts]);
 	const latestBot = botList?.[0]?.bot.id ?? null;
@@ -151,7 +144,7 @@ export function App() {
 	const switchWorkspace = useCallback(
 		(cwd: string | null): void => {
 			pickWorkspace(cwd);
-			// A page such as the tickets stays; only the panes follow the sidebar into the workspace.
+			// A page such as the pull requests stays; only the panes follow the sidebar into the workspace.
 			const { page, hosts, shownWorkspace } = latest.current;
 			const next = page ? null : workspaceSession(cwd, hosts, shownWorkspace);
 			if (next) open(next, "replace");
@@ -178,7 +171,7 @@ export function App() {
 		[workspaces, pickWorkspace, navigate],
 	);
 
-	const { setOpenedFile, setNewTicket, dispatchPalette } = overlays;
+	const { setOpenedFile, dispatchPalette } = overlays;
 	// The command menu's **Open pull request** acts on the focused pane's session while the panes show and that session's branch can take a pull request, as `offeredPrompt` says.
 	const openPullRequest = useOpenPullRequest(page ? null : focused.view, focused.host, request);
 	const focusedGoal = page === null && focused.view?.kind === "live" && focused.view.agentId === null && focused.host?.source === "dashboard" && focused.host.goal.kind !== "off" && focused.host.control.phase === "live" && !focused.host.control.readOnly ? focused.host : null;
@@ -190,13 +183,11 @@ export function App() {
 		listed: sessions.listed,
 		view: focused.view,
 		absentTabs,
-		ticketsCallable,
 		hasDetails: detailsView !== null || openBot !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
 		setGoal: focusedGoal ? () => editGoal(focusedGoal.instanceId, "objective") : null,
 		palette: overlays.palette,
 		dispatchPalette,
-		setNewTicket,
 		openNewSession,
 		open,
 		show,
@@ -210,28 +201,22 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, end: endHost, openFile: setOpenedFile, openNewTicket: setNewTicket, editGoal, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, endHost, setOpenedFile, setNewTicket, editGoal, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, end: endHost, openFile: setOpenedFile, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, endHost, setOpenedFile, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
 	const quick = startOf(state.starts, "quick");
+	const pullRequestNew = startOf(state.starts, "pull-request-new");
 	const resumeAll = startOf(state.starts, "resume-all");
 	const refused = refusedStart(state.starts);
 	// The scope whose pull requests `useWorkspaceScope` polls, so the `@` menu reads the entry the page keeps current.
 	const status = useMemo(
-		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope, scope: windowScope, merges: state.merges, reviewDrafts: state.reviewDrafts }),
-		[state.connected, fork, resume, quick, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
+		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, pullRequestNew, resumeAll }, ending: state.ending, pullRequestsScope, scope: windowScope, merges: state.merges, reviewDrafts: state.reviewDrafts }),
+		[state.connected, fork, resume, quick, pullRequestNew, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 
-	const routedTodoList = page?.kind === "todo" ? page.list : null;
-	const categories = state.userTodos?.categories;
-	/** The list the Todo page shows; a category another window removed shows every todo. */
-	const todoView = useMemo(
-		(): TodoListView => (routedTodoList === null || (routedTodoList.kind === "category" && !categories?.some(({ id }) => id === routedTodoList.id)) ? ALL_TODOS : routedTodoList),
-		[routedTodoList, categories],
-	);
 	const listPage = listPageOf(page, row);
 	const pageArea = useRef<HTMLDivElement>(null);
 	const pageAreaWidth = useWidth(pageArea);
@@ -241,15 +226,12 @@ export function App() {
 			listPage && (
 				<PageList
 					page={listPage}
-					todoSessions={{ hosts: state.hosts, past: state.past }}
 					botList={botList}
-					userTodos={state.userTodos}
-					todoView={todoView}
 					sectionTarget={sectionTarget}
 					onSectionTarget={setSectionTarget}
 				/>
 			),
-		[listPage, state.hosts, state.past, botList, state.userTodos, todoView, sectionTarget],
+		[listPage, botList, sectionTarget],
 	);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const unreadNotices = useMemo(() => state.notices.filter(notice => !notice.read).length, [state.notices]);
@@ -321,8 +303,6 @@ export function App() {
 																	scope={scope}
 																	defaultWorkspace={defaultWorkspace}
 																	sectionTarget={sectionTarget}
-																	todoView={todoView}
-																	ticketsCallable={ticketsCallable}
 																	maximized={maximized}
 																	hasDetails={detailsView !== null}
 																	rightOpen={sidebars.panels.right.open}
@@ -387,7 +367,6 @@ export function App() {
 									onClose={() => show(layout)}
 								/>
 								{overlays.openedFile !== null && <FileDialog key={textFileUrl(overlays.openedFile)} target={overlays.openedFile} onClose={() => setOpenedFile(null)} />}
-								{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
 								{goalEditor && editedGoal && editedGoal.goal.kind !== "off" && (
 									<GoalDialog
 										key={goalEditor.instanceId}
@@ -412,11 +391,9 @@ export function App() {
 									unavailable={unavailable}
 									todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 									todos={mentionLists.todos}
-									ticketsCallable={ticketsCallable}
-									onCreateTicket={setNewTicket}
 								/>
 							</SidebarProvider>
-							<DesktopLinkPreview />
+							<LinkPreviewCard />
 						</div>
 					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>

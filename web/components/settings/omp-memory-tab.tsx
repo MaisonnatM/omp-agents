@@ -2,7 +2,7 @@
  * Settings › omp memory: the backend omp remembers with and Auto-learn, what a new session in the workspace gets, and
  * the store itself in its own shape, files in a rail like Files' and rows in a panel filtered by kind, each edited or forgotten in place.
  */
-import { IconArchive, IconChevronRight, IconCrossMedium, IconLock, IconMagnifyingGlass, IconPencil, IconTrashCan } from "central-icons";
+import { IconArchive, IconChevronDownSmall, IconCrossMedium, IconLock, IconMagnifyingGlass, IconPencil, IconTrashCan } from "central-icons";
 import { type ReactNode, useId, useState } from "react";
 import type { AgentSettingOption, AgentSettingRow, AgentSettings } from "../../../src/shared/agent-settings";
 import { everyWord } from "../../../src/shared/every-word";
@@ -149,7 +149,7 @@ function SessionPreview({ preview }: { preview: OmpMemory["preview"] }) {
 	return (
 		<Collapsible open={open} onOpenChange={setOpen} className="rounded-md border border-border">
 			<CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
-				<IconChevronRight className={cn("size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-90")} />
+				<IconChevronDownSmall className={cn("size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none", !open && "-rotate-90")} />
 				<span className="font-medium">What a new session gets</span>
 				<span className="text-xs text-muted-foreground tabular-nums">about {Math.ceil(preview.text.length / 4).toLocaleString()} tokens</span>
 			</CollapsibleTrigger>

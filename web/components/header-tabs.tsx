@@ -1,5 +1,5 @@
 /** `HeaderTabs`, the row across the top of the page and the details sidebar: Back and Forward, the tabs you browse in, pinned ones first, and a + that opens a new one. */
-import { IconBubbleText, IconCalendarClock, IconChainLink1, IconCrossMedium, IconEditBig, IconHome, IconPin, IconPlusLarge, IconSparklesTwo, IconSquareBehindSquare2, IconUnpin } from "central-icons";
+import { IconBubbleText, IconCalendarClock, IconChainLink1, IconCrossMedium, IconEditBig, IconHome, IconPin, IconPlusSmall, IconSparklesTwo, IconSquareBehindSquare2, IconUnpin } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useRef } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
@@ -9,6 +9,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl, record } from "../activity";
 import { pageTitle, viewTitle } from "../document-title";
+import { showInPlace, windowPushed } from "../header-tab-history";
 import {
 	closeHeaderTab,
 	closeOtherHeaderTabs,
@@ -153,7 +154,7 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClo
 					<MenuShortcut>{shortcutLabels("pinTab")[0]}</MenuShortcut>
 				</MenuItem>
 				<MenuItem onClick={onNewTab}>
-					<IconPlusLarge />
+					<IconPlusSmall />
 					New tab
 					<MenuShortcut>{shortcutLabels("newTab")[0]}</MenuShortcut>
 				</MenuItem>
@@ -164,7 +165,6 @@ function HeaderTabItem({ tab, target, label, lead, active, drag, onSelect, onClo
 				<MenuItem onClick={onCopyUrl}>
 					<IconChainLink1 />
 					Copy URL
-					<MenuShortcut>{shortcutLabels("copyTabUrl")[0]}</MenuShortcut>
 				</MenuItem>
 				<MenuSeparator />
 				{!pinned && (
@@ -196,20 +196,21 @@ interface HeaderTabsProps {
 }
 
 /**
- * The row of header tabs, kept in this browser, working as Capy's desktop tabs do: going to a page shows it in the tab on screen,
- * a session another tab shows focuses that tab, and only + or ⌘T opens a new tab. ⌘1 to ⌘9 go to the tab of that place, and ⌃⇥
+ * The row of header tabs, kept in this browser, working as Capy's desktop tabs do: going to a page shows it in the tab on screen, in its own Back and
+ * Forward history, a session another tab shows focuses that tab, and only + or ⌘T opens a new tab. ⌘1 to ⌘9 go to the tab of that place, and ⌃⇥
  * and ⌃⇧⇥ to the next and previous. Drag one, or press Alt+Shift+← or → on it, to reorder; its × or a middle-click closes it,
  * closing the one on screen shows its neighbour, closing the last leaves a new one, and ⌥⌘W closes all but the pinned ones and the one on screen.
  * ⇧⌘T reopens the last closed tab where it was. Pin or Unpin in a tab's menu, or ⌃⇧P on the one on screen, moves it among the pinned
- * tabs, which sit first, show only their icon, and stay open until unpinned. The menu also duplicates a tab, copies its address, as ⌘L does
- * for the one on screen, and closes the tabs to its right.
+ * tabs, which sit first, show only their icon, and stay open until unpinned. The menu also duplicates a tab, copies its address, and closes the
+ * tabs to its right.
  */
 export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps) {
 	const { openNewSession } = useDashboardActions();
 	const [row, setRow] = useStoredState(HEADER_TABS_KEY, decodeHeaderTabs, encodeHeaderTabs);
 	const clipboard = useClipboard();
 	useEffect(() => {
-		setRow(current => visitHeaderTab(current, address, false, crypto.randomUUID()));
+		const visit = windowPushed() ? "push" : "replace";
+		setRow(current => visitHeaderTab(current, address, visit, crypto.randomUUID()));
 	}, [address, setRow]);
 	const { tabs } = row;
 	const activeId = tabs[row.active]?.id ?? null;
@@ -242,18 +243,18 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 	};
 	const select = (index: number): void => {
 		setRow(current => ({ ...current, active: index }));
-		location.hash = tabs[index]?.hash ?? "";
+		showInPlace(tabs[index]?.hash ?? "");
 	};
 	/** Opens a new tab on the new-session page, as + does. */
 	const openTab = (): void => {
-		setRow(current => visitHeaderTab(current, NEW_TAB_HASH, true, crypto.randomUUID()));
+		setRow(current => visitHeaderTab(current, NEW_TAB_HASH, "new-tab", crypto.randomUUID()));
 		openNewSession();
 	};
 	/** Applies a change that may move the screen elsewhere, as closing the tab on screen does. */
 	const apply = (change: { row: typeof row; go: string | null } | null): boolean => {
 		if (change === null) return false;
 		setRow(change.row);
-		if (change.go !== null) location.hash = change.go;
+		if (change.go !== null) showInPlace(change.go);
 		return true;
 	};
 	const close = (id: string): void => {
@@ -276,11 +277,6 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 		pinTab: () => {
 			if (activeId === null) return false;
 			togglePin(activeId);
-		},
-		copyTabUrl: () => {
-			const active = tabs[row.active];
-			if (!active) return false;
-			copyUrl(active);
 		},
 		selectTab: index => {
 			if (index >= tabs.length) return false;
@@ -337,7 +333,7 @@ export function HeaderTabs({ className, address, hosts, past }: HeaderTabsProps)
 			</nav>
 			<Tooltip content="New tab" shortcut={shortcutLabels("newTab")} side="bottom">
 				<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="New tab" onClick={openTab}>
-					<IconPlusLarge />
+					<IconPlusSmall />
 				</Button>
 			</Tooltip>
 		</div>

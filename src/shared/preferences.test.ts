@@ -27,10 +27,10 @@ describe("applyPreference", () => {
 });
 
 describe("parsePagePreferences", () => {
-	test("takes strings under portable keys, and refuses another key, a value that is not a string, or a list", () => {
+	test("takes strings under portable keys, drops another key, and refuses a value that is not a string, or a list", () => {
 		expect(parsePagePreferences({ "omp-agents.theme": "dark", "omp-agents.sidebar-tabs": "[]" })).toEqual({ "omp-agents.theme": "dark", "omp-agents.sidebar-tabs": "[]" });
 		expect(parsePagePreferences({})).toEqual({});
-		expect(parsePagePreferences({ "omp-agents.theme": "dark", "omp-agents.split-columns": "0.4" })).toBeNull();
+		expect(parsePagePreferences({ "omp-agents.theme": "dark", "omp-agents.split-columns": "0.4" })).toEqual({ "omp-agents.theme": "dark" });
 		expect(parsePagePreferences({ "omp-agents.theme": null })).toBeNull();
 		expect(parsePagePreferences(["dark"])).toBeNull();
 		expect(parsePagePreferences(null)).toBeNull();

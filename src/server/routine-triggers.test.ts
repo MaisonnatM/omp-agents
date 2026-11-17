@@ -1,11 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { TriggerEvent } from "../routines";
-import { EVENT_LEAD_MS } from "../shared/notices";
 import type { PullRequestList, PullRequestSummary } from "../shared/github";
 import type { AgentOn } from "../shared/moves";
 import type { SlackFound } from "../slack-messages";
-import type { MailThread } from "../shared/gmail";
-import { eventSightings, gmailSightings, pullRequestSightings, type Seen, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
+import { pullRequestSightings, type Seen, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
 
 const person = { login: "ada", avatarUrl: null };
 const pr: PullRequestSummary = {
@@ -29,6 +27,7 @@ const pr: PullRequestSummary = {
 	unresolved: { count: 0, exact: true, bots: 0 },
 	conversations: 0,
 	viewerApproved: false,
+	createdAt: 0,
 	updatedAt: 1,
 };
 
@@ -105,28 +104,5 @@ describe("TriggerWatch", () => {
 		expect(news(watch, slackSightings([dm("slack:D1:1", "Hi"), dm("slack:D2:1", "Lunch?")]))).toEqual([]);
 		expect(news(watch, pullRequestSightings(list([{ ...pr, checks: "failing" }]), idle)).map(({ title }) => title)).toEqual(["acme/app#4 has failing checks"]);
 		expect(news(watch, slackSightings([dm("slack:D1:2", "Still there?"), dm("slack:D2:1", "Lunch?")])).map(({ kind }) => kind)).toEqual(["slack"]);
-	});
-
-	test("unread mail is news once per new message; mail read, already there, or of an account that failed is not", () => {
-		const mail = (id: string, at: number, unread: boolean, account = "gmail"): MailThread => ({ account, id, from: "Bo", subject: id === "t2" ? "" : "Lunch", snippet: "Free at noon?", at, unread, count: 1, url: `https://mail.test/${id}` });
-		const watch = new TriggerWatch();
-		const inbox = (threads: MailThread[], failed: string[] = []) => news(watch, gmailSightings({ accounts: ["gmail", "gmail-2"].map(account => ({ account, error: failed.includes(account) ? "Gmail answered 500" : null })), threads }));
-		expect(inbox([mail("t1", 1, true), mail("t9", 1, true, "gmail-2")])).toEqual([]);
-		expect(inbox([mail("t1", 1, true), mail("t2", 5, true), mail("t3", 5, false), mail("t9", 1, true, "gmail-2")])).toEqual([
-			{ kind: "gmail", title: "Bo wrote: (no subject)", detail: "Free at noon?", url: "https://mail.test/t2" },
-		]);
-		expect(inbox([mail("t1", 9, true)], ["gmail-2"]).map(({ url }) => url)).toEqual(["https://mail.test/t1"]);
-		expect(inbox([mail("t1", 9, true), mail("t9", 1, true, "gmail-2")])).toEqual([]);
-	});
-
-	test("a calendar event is news once, as it comes within the lead, and again when it moves", () => {
-		const now = Date.parse("2026-10-05T09:00:00Z");
-		const standup = { ref: "local/1", title: "Standup", start: now + EVENT_LEAD_MS + 60_000, end: now + EVENT_LEAD_MS + 20 * 60_000, calendar: null, color: null, url: null, sessionId: null };
-		const watch = new TriggerWatch();
-		const seen = (event: typeof standup, at: number) => news(watch, eventSightings([{ scope: "event:local", events: [event] }], at));
-		expect(seen(standup, now)).toEqual([]);
-		expect(seen(standup, now + 60_000).map(({ title }) => title)).toEqual([`Standup starts at ${new Date(standup.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`]);
-		expect(seen(standup, now + 120_000)).toEqual([]);
-		expect(seen({ ...standup, start: standup.start + 60_000 }, now + 180_000)).toHaveLength(1);
 	});
 });

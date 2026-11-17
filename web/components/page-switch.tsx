@@ -7,7 +7,7 @@ import type { DashboardState } from "../dashboard-state";
 import { isModulePage } from "../modules";
 import { useModulesOff } from "../modules-off";
 import type { SplitAxis } from "../pane-navigation";
-import type { Layout, Page, TodoListView } from "../routing";
+import type { Layout, Page } from "../routing";
 import { hashForNewSession } from "../routing";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
@@ -63,9 +63,6 @@ interface PageSwitchProps extends PageState {
 	defaultWorkspace: string;
 	/** The page section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
-	todoView: TodoListView;
-	/** Linear answers and Tickets is signed in: a module's page shows tickets and a todo can become a ticket. */
-	ticketsCallable: boolean;
 	maximized: boolean;
 	/** The right sidebar shows the focused session's details. */
 	hasDetails: boolean;
@@ -102,8 +99,6 @@ export const PageSwitch = memo(function PageSwitch({
 	scope,
 	defaultWorkspace,
 	sectionTarget,
-	todoView,
-	ticketsCallable,
 	maximized,
 	hasDetails,
 	rightOpen,
@@ -118,7 +113,7 @@ export const PageSwitch = memo(function PageSwitch({
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	if (page && isModulePage(page)) {
 		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
-		const core = { routines, bots, todos: userTodos, ticketsShown: ticketsCallable, listed, cwd: defaultWorkspace, hosts: visible.hosts, section: sectionTarget };
+		const core = { routines, bots, todos: userTodos, listed, cwd: defaultWorkspace, hosts: visible.hosts, section: sectionTarget };
 		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
 	}
 	switch (page?.kind) {
@@ -169,7 +164,7 @@ export const PageSwitch = memo(function PageSwitch({
 			return (
 				<TodoPage
 					list={userTodos}
-					view={todoView}
+					view={page.list}
 					openId={page.open}
 					hosts={hosts}
 					past={past}
@@ -177,7 +172,6 @@ export const PageSwitch = memo(function PageSwitch({
 					onChange={changeTodo}
 					newSessionCwd={defaultWorkspace}
 					workspaces={workspaces}
-					linearConnected={ticketsCallable}
 				/>
 			);
 

@@ -58,8 +58,20 @@ No `package.json`, no script, a service that ended, and an error from the broker
 Each live session has an idle clock: the time of the last sample that saw it anything but `idle`, so a session that waits on an answer counts as busy.
 A process's idle stop time is the setting's minutes after the latest of its own start and the idle clocks of the sessions it serves, and there is none while one of them is busy.
 A job and an owned service serve their session, and a shared service every live session of its project, so the shared browser stops only once all of them have been idle that long.
-`ProcessSettingsFile` in `src/server/process-settings-file.ts` keeps the setting in `processes.json` beside the access token, as `{ stopIdleAfterMinutes }`, one of `null` for off, 15, 30, 60, and 120, 30 by default, and moves a file that holds anything else to `processes.json.invalid`.
+`ProcessSettingsFile` in `src/server/process-settings-file.ts` keeps the setting in `processes.json` beside the access token, as `{ stopIdleAfterMinutes, stopIdleSessionsAfterHours }`.
+The minutes are one of `null` for off, 15, 30, 60, and 120, 30 by default, and the hours one of `null` for off, 4, 12, 24, and 72, 12 by default.
+A file without the hours, saved before [the idle session stop](#the-idle-session-stop) existed, takes their default; a file that holds anything else moves to `processes.json.invalid`.
 It is a shared `ReducerFile` and each sample reads it again, so a choice saved on any server reaches the one that stops processes.
+
+## The idle session stop
+
+Each live session also has a settled clock: the time of the last sample that saw it anything but `idle`, or `idle` while it waits on a running subagent (`awaitsSubagents` in `src/shared/sessions.ts`).
+A server that first sees a session settled starts the clock at the last write of its session file, if that is earlier, so a restart of the dashboard does not put a long-idle session's stop off by a day.
+Once the setting's hours have passed on that clock, the watch ends the session through `DashboardSession.end`, as a Bot's idle stop does: the keeper stops omp and the processes under it, and the exit reports as ended.
+The session then leaves the roster and shows under Past with its worktree kept, and **Resume** continues it; nothing of **End session** runs, so no worktree is removed and no auto-continue is cancelled.
+A bare signal to omp would report as an exit that was no end, and put the session under Interrupted instead.
+Only a session this server started stops so: a terminal session runs in your terminal, a private session's end deletes it, and a Bot's conversation has its own idle stop ([Bots](bots.md)).
+See [the decision](../decisions/2026-11-16-an-idle-session-stops-its-omp-and-keeps-its-worktree.md).
 
 ## Sessions that leave the roster
 
@@ -70,6 +82,6 @@ The keeper already stops a dashboard session's jobs when it ends; stopping them 
 
 ## One server stops
 
-Only the server that holds the owner lock stops idle processes and what a gone session left, as with the rest of the unattended work; see [One server runs the unattended work](routines.md#one-server-runs-the-unattended-work).
+Only the server that holds the owner lock stops idle processes, ends idle sessions, and stops what a gone session left, as with the rest of the unattended work; see [One server runs the unattended work](routines.md#one-server-runs-the-unattended-work).
 Another server samples only when a page asks, lists no stop time, and still stops a process when you press **Stop**.
 A server lists omp's registry of terminal sessions again only while a page listens, so with no page open a terminal session that ended stays on the roster, and its cleanup waits, until a page opens.

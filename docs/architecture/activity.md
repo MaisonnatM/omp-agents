@@ -8,7 +8,7 @@ A key never holds a title, a path, a session id, or anything the user typed; the
 
 `web/activity.ts` holds the recorder, which `web/use-dashboard.ts` installs once per page load under a fresh client id from `crypto.randomUUID()`.
 
-- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, `pull-requests/files`, or `email/new`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
+- A **view** is `viewOf(cover, layout)`, a key of `VIEWS` in `web/activity.ts` or `settings/<section>`: a page's kind, `<kind>/item` when it opens one item, or `pull-requests/files`; with no page, `home` for no panes, `session` or `past` for one, and `split` for more.
   `viewOf` returns a `ViewKey`, so a view missing from `VIEWS` is a type error, and the hook records it whenever it changes.
 - A **command** is a shortcut that took its key, recorded in `dispatch` in `web/shortcuts.ts` with `via: "keyboard"`, or a palette command, recorded in `web/components/command-palette/command-palette.tsx` with `via: "palette"`.
   Its key is the shortcut id in kebab case, `newSession` as `new-session`, so both channels share one key.
@@ -34,7 +34,6 @@ A page load resends what an earlier one left under that load's own client id and
 ## Storage
 
 `src/server/activity-store.ts` keeps the events in `activity.db` in the dashboard's data directory, a SQLite table keyed by client id and sequence, so a batch sent twice is stored once.
-Opening the store once renames the old Inbox page's `inbox` views and commands to their `email` keys, in a transaction that sets SQLite's `user_version` to 1, so it never runs again and rows a later page stores under `inbox` keep their keys.
 Only the server holding `server.lock` stores events; another server, such as a smoke server on your state, acknowledges a batch and drops it.
 That server prunes rows older than 400 days at start and once a day.
 Deleting `activity.db` while the server is stopped clears the history; settings sync never carries it.
@@ -47,9 +46,7 @@ Each page load's time between two events counts toward the view it showed, up to
 A visit starts after 30 minutes without use or on a new local day.
 `lastUsed` is each feature's latest row whatever the range, which the store's `lastUsed()` answers in SQL, so a feature unused in the range still shows when it was last used.
 `web/activity-report.ts` builds the inventory from `VIEWS`, `SETTINGS_SECTIONS`, `SHORTCUTS`, `CONTROLS`, `ACTION_MESSAGES`, and the server's `PUT` routes.
-It splits it into used, rarely used (once or twice), never used, and not set up, and lists the 20 most used.
-A feature is not set up while its tab is one `useSidebarTabs` reports signed out, which is every integration tab until the integrations answer.
-The Tickets views, the ticket commands, and the `/api/ticket` routes go with the Tickets tab; the Email views, the Email commands, and the `/api/gmail/` routes go with the Email tab.
+It splits it into used, rarely used (once or twice), and never used, and lists the 20 most used.
 
 ## Coverage
 
@@ -62,7 +59,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Composer | action | `prompt` (sent, steered, or queued), `edit-prompt` |
 | Composer's directory, branch, and context ring | control, command, action | `composer.directory`, `composer.branch`, `composer.context-ring`; command `directory`; actions `context`, `set-auto-compaction`, or `prompt` (`/move`) |
 | Rows above the composer | control, action | `composer-queue.send-now`, `composer-queue.edit`, `composer-queue.remove`, `composer-suggestions.pick`, `composer-suggestions.send-all`; actions `dequeue`, `promote`, `prompt`, `schedule`, `answer` |
-| Overview tab (Files, Images, and Sources sections, FileChangesDialog) | control, action | `changes-card.files.fold`, `changes-card.images.fold`, `changes-card.sources.fold`, `changes-card.review`, `changes-card.file`, `changes-card.image.select`, `changes-card.image.clear`, `changes-card.image.to-pull-request`, `changes-card.image.to-ticket`, `changes-card.source`, ids kept from the card the sections first lived in so recorded use stays counted; sending images is a `PUT` |
+| Overview tab (Files, Images, and Sources sections, FileChangesDialog) | control, action | `changes-card.files.fold`, `changes-card.images.fold`, `changes-card.sources.fold`, `changes-card.review`, `changes-card.file`, `changes-card.image.select`, `changes-card.image.clear`, `changes-card.image.to-pull-request`, `changes-card.source`, ids kept from the card the sections first lived in so recorded use stays counted; sending images is a `PUT` |
 | `/`, `$`, and `@` menus | control | `completion.pick` (a click; picking by keyboard records nothing) |
 | Model and thinking switch | control, command, action | `composer.model`, `composer.advisor`, `composer.extra-usage`; command `model`; actions `set-model`, `set-thinking`, `set-fast`, `set-advisor` |
 | Session goal | control, action | `header.goal`; action `goal` from the pill, dialog, or composer |
@@ -74,7 +71,7 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Trajectory | control | `trajectory.toggle`, `trajectory.turn`, `trajectory.step` |
 | Scroll-to-bottom arrow | control | `transcript.scroll-to-bottom` |
 | Left sidebar | view, command, control | each page row's page view; page and toggle shortcuts; `sidebar.left.toggle`, `sidebar.workspace`, `sidebar.command-menu`, which opens the command palette as command `switcher` does; untagged roster rows open a session, which records its view |
-| Right sidebar (session details, a Bot's details, Images) | control | `sidebar.right.toggle`, `session-details.tab.overview`, `session-details.tab.subagent`, `session-details.tab.pull-requests`, `session-details.tab.browser`, `session-details.tab.tickets`, the last of which a Bot's details share, and `session-details.tab.artifacts`; images use the `media-viewer.*` controls |
+| Right sidebar (session details, a Bot's details, Images) | control | `sidebar.right.toggle`, `session-details.tab.overview`, `session-details.tab.subagent`, `session-details.tab.diffs`, `session-details.tab.pull-requests`, `session-details.tab.browser`, and `session-details.tab.artifacts`; images use the `media-viewer.*` controls |
 | Right sidebar's tab row | control, command | `details.tab.add`, the + that opens the menu of tabs, whose rows record the tab's own control, as the tab itself does; `details.tab.close`, a tab's ×; a middle-click, or Delete or Backspace on a focused tab, closes it and records nothing; ⇧⌘G and ⇧⌘L record their shortcut's command key |
 | Right sidebar's + menu sections | control | `details.menu.subagent`, a subagent's row, which also records the view it opens; `details.menu.new-terminal`, **New terminal** |
 | Browser, the right sidebar's tab | control | `browser.back`, `browser.forward`, `browser.reload`, `browser.server`, `browser.start-server`, `browser.stop-server`, `browser.select-element`, `browser.screenshot`, `browser.review-visuals`, `browser.screen-size`, `browser.rotate`, `browser.pick.select`, `browser.pick.region`, `browser.pick.draw`, `browser.pick.erase`, `browser.annotation.attach`, `browser.open-in-browser`, `browser.tab`; an address loaded with Enter, a pick in the app, the screen size picked in its menu, the marks drawn, and the comment typed beside them are not observed |
@@ -90,26 +87,22 @@ A view key is what `viewOf` returns, a command key is the shortcut or palette co
 | Command palette | command | the command each item runs |
 | Keyboard shortcuts | command, control, view | each shortcut's command key; `settings/keyboard`; `shortcuts.open`, the sidebar's Keyboard shortcuts link, before 2026-11-13 |
 | Header tabs | view, control, command | a tab's click records the view or page it opens; `header.tab.close`, the ×, a middle-click, or **Close tab** in a tab's menu; `header.tab.move`, a drag or Alt+Shift+← or → that reorders the tabs; `header.tab.pin`, **Pin tab** or **Unpin tab** in a tab's menu; commands `reopen-closed-tab` and `pin-tab`, their keys; `header.back` and `header.forward`, Back and Forward at the start of the header's tabs, which go back and forward as commands `back` and `forward` do |
-| Pages: Notifications | view, control | `notifications`; `notices.filter`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags; `notices.open` and `header.settings` before 2026-11-13 |
+| Pages: Notifications | view, control | `notifications`; `notices.view`, `notices.filter`, `notices.filter.source`, `notices.filter.received`, `notices.filter.clear`, `notices.display`, `notices.display.grouping`, `notices.search`, `notices.read-all`, `notices.item`, `notices.update`, `notices.clear`; the `notice` message is not an action, so these need the tags; `notices.open` and `header.settings` before 2026-11-13 |
 | Settings › What's new | view | `settings/whats-new`; `header.whats-new` before 2026-11-13 |
 | System notifications and Dock badge | presence, action | clicking one brings the window to the foreground (presence); their switches and sound in Settings › Preferences are action `preference` |
 | Pages: New session | view, control | `new`; a starter's pick is `composer-suggestions.pick`, `composer.starter` before 2026-11-04 |
 | Pages: Get started dialog, its automatic vacant-home opening, and its bubble | view, command, control, action | explicit view `get-started` (automatic home remains `home`); command `get-started`; `get-started.next`, `get-started.back`, `get-started.skip`, `get-started.step`, `get-started.dismiss`, `get-started.close`, `get-started.bubble`, `get-started.refresh`, `get-started.install-kit`, `get-started.open-kit`, `get-started.copy-command`, `get-started.install-gh`, `get-started.suggestion`; the terminal choice is `put /api/readiness/terminal-sessions` and a provider sign-in is the same `PUT` as in Settings, while the integrations link records its Settings view |
-| Pages: Pull requests | view, control | `pull-requests`; `pull-requests.repositories`, `pull-requests.repository.toggle`, `pull-requests.repository.move`, `pull-requests.repositories.show-all`; Rebase N behind is a `PUT` |
-| Pages: Tickets | view | `tickets`, `tickets/item` |
-| Pages: Todo | view | `todo`, `todo/item` |
-| Pages: Calendar | view, control | `calendar`; `calendar.routines.toggle` |
-| Pages: Email | view | `email`, `email/new`, `email/item` |
+| Pages: Pull requests | view, control | `pull-requests`; `pull-requests.view`, `pull-requests.filter`, `pull-requests.filter.section`, `pull-requests.filter.repository`, `pull-requests.filter.author`, `pull-requests.filter.created`, `pull-requests.filter.updated`, `pull-requests.filter.clear`, `pull-requests.display`, `pull-requests.display.grouping`, `pull-requests.display.empty`, `pull-requests.search`, `pull-requests.new`, `pull-requests.new.start`, `pull-requests.repositories`, `pull-requests.repository.toggle`, `pull-requests.repository.move`, `pull-requests.repositories.show-all`; Rebase N behind is a `PUT` |
+| Pages: Todo | view, control | `todo`, `todo/item`; `todo.view`, `todo.filter`, `todo.filter.category`, `todo.filter.priority`, `todo.filter.assignee`, `todo.filter.link`, `todo.filter.due`, `todo.filter.created`, `todo.filter.clear`, `todo.display`, `todo.display.grouping`, `todo.categories`, `todo.category.rename`, `todo.category.delete`, `todo.category.add` |
 | Pages: Sport | view, control, action | `sport`, `sport/journal`, `sport/journal/item`, `sport/progress`; `sport.tab.week`, `sport.tab.journal`, `sport.tab.progress`, `sport.week.step`, `sport.log.open`, `sport.log.free` for the header's and a rest day's **Séance libre**, `sport.log.save`, `sport.demo.open`, `sport.demo.play`, `sport.demo.step` for the demo dialog's **Précédent** and **Suivant**, `sport.day.edit` for the day's **Modifier…**, `sport.journal.edit`, `sport.journal.remove`, `sport.weigh.open`, `sport.weigh.save`, `sport.progress.card`, `sport.progress.range`; `module-change` |
 | Pages: Sport's routine timer | control, action | `sport.timer.open` for a routine's **Lancer**, `sport.timer.pause`, `sport.timer.step` for the timer's previous and next step, `sport.timer.sound`, `sport.timer.close` for the done screen's **Fermer**; each item it ticks is a `module-change` |
 | Pages: Bots | view, control, action | `bots`, `bots/new`, `bots/item`, `bots/routines`, `bots/routine`; `bots.delete`, `bots.details`, `bots.job.revert`, `bots.job.template`, `bots.kind`, `bots.look`, `bots.routine.delete`, `bots.routine.new`, `bots.routine.run`, `bots.tab.details`, `bots.tab.routines`; `bot`, `routine` |
 | Pages: Settings | view | `settings/<section>` |
 | Settings › Analytics' context-source table | view | `settings/analytics` |
-| Settings › Integrations' Google account lines | view, action | `settings/integrations`; Add account and Remove are `PUT`s |
 | Settings › Providers' account lines | view, action | `settings/providers`; each up or down arrow is `put /api/providers/account-order`, and Sign out is `put /api/providers/sign-out` |
 | Settings › Workflows | view, action | `settings/workflows`; saving a workflow's skill is the `PUT` that Settings › Files saves with |
 | Settings › Worktrees | view, action | `settings/worktrees`; each queued removal's preview and removal are `PUT`s |
-| Settings › Preferences | view, action | `settings/preferences`; each change to a preference that follows you, the theme, transcript, sidebar tabs, notifications, pinned skill, default merge method, diff, and calendar routine choices, is action `preference`, wherever you change it; Stop idle processes is a `PUT` |
+| Settings › Preferences | view, action | `settings/preferences`; each change to a preference that follows you, the theme, transcript, sidebar tabs, notifications, pinned skill, default merge method, and diff choices, is action `preference`, wherever you change it; Stop idle processes is a `PUT` |
 | Settings › Sync | view, action | `settings/sync`; Sync and its switches are `PUT`s |
 | ListSplit | not observed | dragging the line is not a click |
 | Shared primitives | not applicable | tags go on the component that owns a control, not on the primitive |

@@ -18,7 +18,7 @@ export interface PaletteView {
 }
 
 export const PALETTE_VIEWS: Record<PaletteViewId, PaletteView> = {
-	root: { title: "omp agents", icon: IconCmd, placeholder: "Search sessions, todos, tickets, pull requests, and commands…", suggestions: 5 },
+	root: { title: "omp agents", icon: IconCmd, placeholder: "Search sessions, todos, pull requests, and commands…", suggestions: 5 },
 	workspaces: { title: "Choose workspace", icon: IconFolder1, placeholder: "Search workspaces…", suggestions: 0 },
 	createTodo: { title: "Create todo", icon: IconTodos, placeholder: "Todo title, optionally ending in a due day or #category", suggestions: 0 },
 };
@@ -54,12 +54,12 @@ export type Accessory =
 	| { kind: "text"; text: string };
 
 /** The section an item belongs to; **Suggestions** borrows items from the others. */
-export type HomeSection = "running" | "past" | "todos" | "tickets" | "pullRequests" | "conversations" | "commands" | "workspaces" | "settings" | "createTodo" | "fallback";
+export type HomeSection = "running" | "past" | "todos" | "pullRequests" | "conversations" | "commands" | "workspaces" | "settings" | "createTodo" | "fallback";
 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `todo:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `settings:<section>`, `fallback:create-todo`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `todo:<id>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `settings:<section>`, `fallback:create-todo`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -68,7 +68,7 @@ export interface PaletteItem {
 	keywords: readonly string[];
 	icon: IconComponent;
 	accessories: readonly Accessory[];
-	/** The type label at the row's end: `Session`, `Todo`, `Ticket`, `PR`, `Command`, `Workspace`, `Settings`. */
+	/** The type label at the row's end: `Session`, `Todo`, `PR`, `Command`, `Workspace`, `Settings`. */
 	kind: string;
 	/** Every action, as the action panel groups them. The first group's first action runs on Enter, so it is never empty. */
 	actions: readonly [ActionGroup, ...ActionGroup[]];
@@ -242,7 +242,6 @@ const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }
 	running: { heading: "Running", listing: "browsed" },
 	past: { heading: "Past", listing: "browsed" },
 	todos: { heading: "Todos", listing: "searched" },
-	tickets: { heading: "Tickets", listing: "searched" },
 	pullRequests: { heading: "Pull requests", listing: "searched" },
 	conversations: { heading: "In conversations", listing: "found" },
 	commands: { heading: "Commands", listing: "browsed" },

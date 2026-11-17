@@ -1,15 +1,13 @@
-/** The todos, Linear tickets, pull requests, and conversation matches the command palette searches, each opening where the dashboard shows it. */
+/** The todos, pull requests, and conversation matches the command palette searches, each opening where the dashboard shows it. */
 import { IconAiBotHead, IconLayoutColumn, IconUser, IconWindowApp } from "central-icons";
 import { prKey, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { ConversationHit, PastSession, RosterHost, View } from "../src/shared/sessions";
-import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo } from "../src/user-todos-shared";
 import type { Accessory, PaletteItem } from "./command-palette";
 import { hostLabel, pastLabel } from "./labels";
 import { PAGE_ICON } from "./page-icons";
 import { listedPullRequests } from "./pull-requests-model";
-import { hashForOpenTodo, hashForPullRequests, type OpenMode } from "./routing";
-import { hashForTickets } from "./tickets-model";
+import { hashForPullRequests, hashForTodo, type OpenMode } from "./routing";
 import { type SessionEntry, viewOf } from "./session-actions";
 import { workspaceCwd } from "./sessions";
 import { TODO_STATUS } from "./todo-views";
@@ -17,14 +15,12 @@ import { TODO_STATUS } from "./todo-views";
 export interface PaletteRecords {
 	/** The todo list's top-level todos, each with its own. */
 	todos: readonly UserTodo[];
-	/** The Linear issues assigned to you. */
-	tickets: readonly Ticket[];
 	/** The open pull requests of the sidebar's workspace. */
 	pullRequestRepos: readonly RepoPullRequests[];
 }
 
-/** One palette item for every todo, closed ones too, ticket, and pull request; a todo under another names its parent below its title. */
-export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords): PaletteItem[] {
+/** One palette item for every todo, closed ones too, and pull request; a todo under another names its parent below its title. */
+export function recordItems({ todos, pullRequestRepos }: PaletteRecords): PaletteItem[] {
 	const todoItems = todos.flatMap(todo =>
 		[todo, ...todo.children].map(
 			(leaf): PaletteItem => ({
@@ -36,27 +32,9 @@ export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords
 				icon: PAGE_ICON.todo,
 				accessories: [{ kind: "text", text: TODO_STATUS[leaf.status].label }],
 				kind: "Todo",
-				actions: [[{ id: "open", title: "Open todo", icon: PAGE_ICON.todo, run: { kind: "link", href: hashForOpenTodo(leaf.id, todo.categoryId) } }]],
+				actions: [[{ id: "open", title: "Open todo", icon: PAGE_ICON.todo, run: { kind: "link", href: hashForTodo("all", leaf.id) } }]],
 			}),
 		),
-	);
-	const ticketItems = tickets.map(
-		(ticket): PaletteItem => ({
-			id: `ticket:${ticket.id}`,
-			section: "tickets",
-			title: ticket.title,
-			subtitle: ticket.id,
-			keywords: [],
-			icon: PAGE_ICON.tickets,
-			accessories: [{ kind: "text", text: ticket.status }],
-			kind: "Ticket",
-			actions: [
-				[
-					{ id: "open", title: "Open ticket", icon: PAGE_ICON.tickets, run: { kind: "link", href: hashForTickets(ticket.id) } },
-					{ id: "linear", title: "Open in Linear", icon: PAGE_ICON.tickets, run: { kind: "link", href: ticket.url, external: true } },
-				],
-			],
-		}),
 	);
 	const pullRequestItems = listedPullRequests(pullRequestRepos).map((pr): PaletteItem => {
 		const icon = PAGE_ICON["pull-requests"];
@@ -77,7 +55,7 @@ export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords
 			],
 		};
 	});
-	return [...todoItems, ...ticketItems, ...pullRequestItems];
+	return [...todoItems, ...pullRequestItems];
 }
 
 /** Open `view`, whose session counts in workspace `workspace`, in the focused pane or a split, scrolled to message `messageId`. */

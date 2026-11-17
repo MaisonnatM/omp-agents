@@ -3,6 +3,16 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-17
+
+- The Todo page has no list on its left anymore; All, Today, Needs you, From agents, and Archive are tabs in the bar above the list, as on the Pull requests page.
+- Filter on the Todo page has a Category choice, which shows the todos of the categories you check, or those in no category; checking one alone shows that category as its old list did, and new todos join it.
+- Display › Categories… on the Todo page adds, renames, and deletes categories, where the left list did before.
+- The color checkboxes that hid a category from the Todo lists are gone; use Filter › Category instead, and an old link to a category opens All.
+- A Markdown artifact draws its `mermaid` diagrams and `chart` blocks as pictures, as a reply in the conversation does, instead of showing their source.
+- The stack menu on a pull request lists the session's other pull requests by number and title, with an icon that says whether each is open, a draft, merged, or closed.
+- Images in the Artifacts tab open when you click them: a screenshot inside an HTML page, or an SVG, fills the window, where you can zoom and step to the page's other images with the arrow keys.
+
 ## 2026-11-16
 
 - The dashboard takes affectUI's Clean look in light and dark: the Inter font, softer grays, near-black buttons, and new shadows and corner radii.
@@ -20,18 +30,48 @@ The dashboard shows the same lines in Settings › What's new.
 - A yes-or-no question from a session shows as a card with No and Yes buttons, each with its number key.
 - A tool approval names the tool and shows what it will run, with a Once or This session choice and Deny and Allow buttons.
 - Notifications gathers unread notices in one card that says how many are new, or All caught up.
+- omp-agents starts again on omp 18.21.0, which removed the piece the sandbox cleanup used to find a running ovnfs file system; the cleanup now asks `ovnfs status` itself, still without ever starting it. The weekly model replays run again too.
+- Settings › Agents no longer has a special case for omp's seance agent, which omp 18.21.0 removed.
+- Settings › Workspaces has a Filter workspaces field that narrows the Workspaces and Hidden lists by folder name or path as you type.
+- Every + button, on New session, New tab, New Bot, New routine, and Add, uses the smaller plus-small icon.
+- The app opens again after the update that removed Gmail and Google Calendar; it stayed blank while its saved Integrations answer still listed them.
+- The Email, Linear tickets, and Calendar pages are gone from the sidebar, along with everything that used Gmail, Google Calendar, or Linear.
+- Sessions no longer have a Tickets tab, the New ticket shortcut is gone, and todos no longer link to or create Linear tickets.
+- Routines can no longer start from a new email or a calendar event, and agents can no longer add reminders for you to see.
+- Settings › Integrations no longer offers Linear, Gmail, or Google Calendar. Your saved events and Google account list stay on disk, unused.
+- Resting the pointer on a link to another site shows a card with its whole address in place of the address at the bottom left of the window; for a link outside an agent's text, the card also shows the site and the page's title and description.
+- Behind the scenes: site icons and link cards share one safe way to read public web pages, and a site's icon now shows even when its home page is large. Emails show `&nbsp;` and `&apos;` as the characters they stand for.
+- Linear tickets has the Pull requests header: a search, All, Active, Todo, and Backlog tabs, a Filter by status, priority, label, project, team, and dates, and a Display menu to group by status, priority, project, or nothing.
+- Todo has Filter and Display above its list: filter by priority, assignee, link, due date, and creation date, and group by status, priority, assignee, or nothing.
+- Notifications has a search, All and Unread tabs, a Filter by source and date in place of the source buttons, and a Display menu to group by new and earlier, source, or nothing.
+- The session sidebar has a Diffs tab: a row per changed file, and a click shows that file's diff, with Previous and Next to step through them.
+- The session sidebar's + menu starts with a search field that narrows its tabs, subagents, and New terminal as you type.
 - Down chevrons, on menus, pickers, and folding rows, use the smaller chevron-down-small icon.
+- Fold chevrons, on sidebar sections and other folding rows, also use chevron-down-small, turned to point right while folded.
+- Right chevrons, on menu items, breadcrumbs, and folded rows, use the smaller chevron-right-small icon.
+- Left and up chevrons, on calendars, find bars, and lists, use the smaller chevron-left-small and chevron-up-small icons.
+- A session left idle for 12 hours now stops on its own and moves to Past, keeping its worktree, so Resume picks it back up where it was. A session still waiting on a subagent is not idle.
+- Settings › Preferences has a new Stop idle sessions choice: Off, or after 4 hours, 12 hours, 24 hours, or 3 days. Sessions started in a terminal, private sessions, and Bots' conversations keep running.
+- The Tickets tab and page are now called Linear tickets, and so are their groups in the command menu and Settings › Keyboard.
+- The Linear tickets page no longer shows a list at its left, so the issues take the whole page.
+- The Linear tickets tab reopens the last issue you had open, or the list when you have opened none yet.
 - Modules show the logo of the service they use, in the sidebar, the tabs, the command palette, and Settings › Modules: Linear for Tickets, Google Calendar for Calendar, and Gmail for Email.
 - Cmd+Shift+T reopens the last tab you closed in the header, in its old place and on the page it showed.
 - Right-click a header tab to Pin tab, Unpin tab, open a New tab, Close tab, or Close other tabs, and Ctrl+Shift+P pins or unpins the tab on screen.
 - Pinned tabs sit first and show only their icon, and stay open until you unpin them, even after a reload.
-- A header tab's right-click menu also has Duplicate tab, which opens the same page in a new tab right after it, Copy URL, and Close tabs to the right, which keeps pinned tabs.
-- Cmd+L copies the address of the header tab on screen.
+- A header tab's right-click menu also has Duplicate tab, which opens the same page in a new tab right after it, Copy URL, which copies the tab's address and has no key, so Cmd+L stays the browser's, and Close tabs to the right, which keeps pinned tabs.
+- Each header tab keeps its own Back and Forward, as in Capy: the buttons, Cmd+[ and Cmd+], and the mouse's back and forward buttons go through what the tab on screen showed, and switching tabs no longer mixes them up.
+- A tab's Back and Forward stay after a reload, after pinning it, and after Cmd+Shift+T brings it back, and Duplicate tab gives the copy the same Back and Forward.
+- The Pull requests page has tabs above the list, Open, Your move, Approved, Merged, and All, that show only those sections, and the page remembers your pick.
+- Filter, beside the tabs, filters the Pull requests page by section, repository, author, and when a pull request was created or last updated, and each filter shows as a chip under the tabs that you can change or remove.
+- The Pull requests page has a search in its header that finds pull requests by title, number, branch, author, or repository.
+- Display, beside Filter, groups the Pull requests page by repository, section, or author, or not at all, and holds the order, Show empty sections, and Repositories.
+- The + in the Pull requests page's header starts a session that makes the change you describe in a repository you pick and opens a pull request for it.
 - The Pull requests page no longer has a Board view, so it always shows the list.
 - The Pull requests page no longer shows a list at its left, so the table takes the whole page.
-- Repositories, at the top of the Pull requests page, hides or shows each repository and moves it up or down.
+- Repositories, under Display on the Pull requests page, hides or shows each repository and moves it up or down.
 - A hidden repository also leaves the Pull requests tab's count, and Reset the order keeps it hidden.
-- While you hide any repository, the Repositories button says how many, and a page with every repository hidden offers Show all repositories.
+- While you hide any repository, the Display button's tooltip says how many, and a page with every repository hidden offers Show all repositories.
 - In Settings, the up and down arrows that move a sidebar tab, an account, or a list entry keep focus at the top or bottom of the list, and their tooltip says why they do nothing there.
 - Behind the scenes: the Pull requests page and Settings › Preferences share one list of switches and arrows.
 - Settings has a search field above its sections: type a name or a related word, such as git, to list only the matching sections, and press Enter to open the first one.

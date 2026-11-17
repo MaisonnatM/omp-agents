@@ -1,18 +1,18 @@
 # Todo list
 
 - The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session, in place of the panes; a top-level todo can name the workspace it is about.
-  The sidebar then lists **All**, **Today**, **Needs you**, **From agents**, and **Archive**, then your categories, each with how many top-level todos are open in it.
-  With a workspace picked at the top of the sidebar, every list, the archive too, and every count holds only the todos that name that workspace; **All workspaces** holds every todo.
-  Each category has a color checkbox, and its todos carry a badge of that color.
-  Click one to show its todos alone; `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, and `#todo/<category id>` address them.
-  Uncheck a category to keep its todos out of **All**, **Today**, **Needs you**, and **From agents**, and out of their counts; its own list still shows them, and the app keeps the choice, on every machine through Settings › Sync.
-  **All** lists every todo in one list, each top-level todo with its category's badge; a category's own list shows no badges.
+  The page has no list column; the bar above the list starts with a tab per list, **All**, **Today**, **Needs you**, **From agents**, and **Archive**, and the page's header counts the open top-level todos of the one picked.
+  `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` address them; any other `#todo/` address, such as an old link to a category, lists every todo.
+  With a workspace picked at the top of the sidebar, every list, the archive too, and the count hold only the todos that name that workspace; **All workspaces** holds every todo.
+  **All** lists every todo in one list, each top-level todo with its category's badge, in that category's color.
   **Today** lists the todos due today or before, or with a todo under them that is, earliest due first; **Add a todo due today** there adds one due today.
   **Needs you** lists open todos whose latest linked session has a question open or is idle, wherever that session ran.
   **From agents** lists the todos that an agent added; see [Todos from agents](#todos-from-agents).
-- The **+** beside **Categories** adds a category; type its name and press Enter, and the page opens it.
-  A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.
-- **Add a todo** at the end of a list's **Todo** group, or C outside a text field, starts a new todo in that list's category, in the sidebar's selected workspace, or in none under **All workspaces**; type its title and press Enter.
+- **Filter** › **Category** keeps the todos of the categories you check, in every list; **No category** keeps the todos in none, and each choice counts the list's todos in it.
+  It shows once you have a category, and with one category checked alone the rows drop their category badges, and an empty one says it holds no todo yet.
+- **Display** › **Categories…** lists your categories, each with its color.
+  Its pencil renames a category, its trash can deletes it, keeping its todos in no category, and **New category** adds one; type the name and press Enter, and **Filter** then shows that category alone.
+- **Add a todo** at the end of a list's **Todo** group, or C outside a text field, starts a new todo in the category **Filter** keeps alone, else in none, in the sidebar's selected workspace, or in none under **All workspaces**; type its title and press Enter.
   The **+** in a group's header starts one of that group's status instead.
   Enter then starts the next todo below it, of the same status, and Enter on an empty one, Esc, or a click elsewhere stops.
 - A new todo's title, here or in the command menu's **Create todo**, can end with a due day: `today`, `tomorrow`, a weekday such as `fri` or `friday`, or a `YYYY-MM-DD` date.
@@ -24,14 +24,16 @@
   Tab while typing a todo moves it under the todo above it, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
   Tab does nothing on a todo that holds todos of its own, since they would end up three deep, nor on one with links, which a todo under another cannot hold.
   The **+** that shows on hover adds a todo under that one.
-- A todo has a status, as a Linear issue does: **Backlog**, **Todo**, **In Progress**, **Done**, or **Canceled**; a new todo is **Todo**, and Done and Canceled close it.
-  It also has a priority on Linear's scale: none, **Urgent**, **High**, **Medium**, or **Low**.
+- A todo has a status: **Backlog**, **Todo**, **In Progress**, **Done**, or **Canceled**; a new todo is **Todo**, and Done and Canceled close it.
+  It also has a priority: none, **Urgent**, **High**, **Medium**, or **Low**.
   It can be assigned to **You** or to an **Agent**, or to no one, as a new todo is; assigning an agent only records who should do it, and starts no session and changes no status.
 - Every list but **Archive** groups its top-level todos by status, **In Progress**, **Todo**, **Backlog**, **Done**, then **Canceled**, each under a header with the status's icon, its name, and how many todos it holds; click a header to fold or unfold its group.
   **Done** and **Canceled** start folded, the app keeps what you fold, and a search unfolds every group.
+  **Display**, at the end of the bar above the list, groups them by **Priority**, Urgent first, by **Assignee**, **You**, **Agent**, then no one, or not at all with **No grouping**, and the app keeps that choice in this browser; each grouping keeps its own folds.
+  Outside the grouping by status, **Add a todo** at the end of the list adds a **Todo** todo last, and todos cannot be dragged or moved.
   A group with no todo hides, except **Todo** in a list you can add to.
   Within a group, todos keep the list's own order: the one you set, or the earliest due day for **Today**.
-- Drag a todo by its row to move it among the todos of its status beside it, top-level ones in **All** and a category, and a todo under another among its parent's.
+- Under the grouping by status, drag a todo by its row to move it among the todos of its status beside it, top-level ones in **All** and **From agents**, and a todo under another among its parent's.
   A dragged todo keeps its category; change it from the open todo.
   Alt+Shift+↑ and Alt+Shift+↓ move the focused todo one place the same way.
   **Today** sorts by due day and **Archive** by when it was cleared, so neither moves todos.
@@ -44,23 +46,27 @@
   An open top-level todo linked to a session shows a work-state dot in the list and a pill in the open todo, instead of repeating the session's name: **Agent working**, **Needs you**, **In review**, **Shipped**, **Session ended**, or **Session unavailable**.
   Hover the dot for its state; the dot and the pill open the latest linked session, and do not change the todo's status or category.
   A todo that holds others shows how many of them are done, as in `2/3`, right after its title.
-  The page's header counts the open top-level todos, and **Clear done** moves every Done and Canceled todo it lists to **Archive** at once, a closed todo under an open one as a todo of its own.
+  The page's header counts the open top-level todos, and **Clear done** moves every Done and Canceled todo to **Archive** at once, those of the category **Filter** keeps alone if it keeps one, a closed todo under an open one as a todo of its own.
   The server does the same by itself for a todo closed over 24 hours ago, when it starts and every minute after.
 - **Archive** lists the cleared todos, latest first, with the day each was closed.
   Hover one to put it back last in the list, in its category if that still exists, or to delete it for good, or right-click it for **Open**, **Put back in the list**, and **Delete for good**; **Empty** deletes them all, after you confirm.
   The todo keys step through its rows as through any list's, and Enter opens the focused one.
-- Click a todo to open its details on the right of the list, as in Linear, and double-click it to rename it in the list.
-  Arriving at a list, from the **Todo** tab or a list in the sidebar, opens the todo on its top row.
+- Click a todo to open its details on the right of the list, and double-click it to rename it in the list.
+  Arriving at a list, from the **Todo** tab or one of the bar's tabs, opens the todo on its top row.
   Closing it leaves the list with nothing open, and that side then says how to open one.
   Drag the line between the list and the details, or focus it and use the left and right arrow keys, to size the list; double-click it to reset, and the app keeps the width.
   A page too narrow for both shows the open todo in place of the list, and its **×** goes back to the list.
   The open todo's bar names its category, its parent for a todo under another, and its status; its ↑ and ↓ open the todo above and below in the list, and **×** closes it.
-  The address names the open todo, as `#todo/<category id>?open=<todo id>`, so a reload or a link returns to it.
+  The address names the open todo, as `#todo?open=<todo id>`, or with the list's name, as `#todo/today?open=<todo id>`, so a reload or a link returns to it.
   A search keeps the open todo on the right even when it hides its row.
   An empty title, or Backspace in an empty one, deletes the todo, and so does the **×** that shows on hover; deleting a todo deletes the todos under it.
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
 - Right-click a todo, or focus it and press the context-menu key or Shift+F10, for **Open**, **Rename**, **Add a todo under it** on a top-level todo, and **Delete**.
 - The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
+  **Filter**, in the bar above every list, keeps the top-level todos of the checked categories, the checked priorities, the checked assignees, or with a link of a checked kind (**Session** or **Pull request**, among those the list's todos carry), those due within a day, 3, 7, 14, or 30 days, overdue ones and those with an open todo under them due by then too, and those added within the last day to the last month.
+  **Link** shows only while the list's todos carry a link.
+  Each filter that leaves something out shows as a chip under the bar, such as `Due is within 7 days`, whose × removes it, with **Clear all** once there are two; the app keeps them in this browser, while the search starts empty.
+  When the search or the filters leave nothing, the list says so with a button that clears them, and focus moves to the list.
   Outside a text field, ↓ and ↑ focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
   While a todo is open, ↓ and ↑ open the next and previous one instead, and Esc closes it.
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
@@ -80,8 +86,8 @@
   A card then shows its latest linked session's work state and, when that live session has a question open, its title and **Reply in session**, which opens that session.
   For an open todo, the card's **Work on it** and **Plan it** start a session on it at once, and **Start session** opens the draft; with no linked session, only those buttons show.
   At the bottom, it shows the day it was added and the session that added it.
-- A top-level todo shows what it links to: a session, a pull request, or a Linear issue, as an icon in the list and a chip under **Links** in the open todo, each opening it here.
-  Each shows the icon of the sidebar tab it opens: **Sessions**, **Pull requests**, or **Tickets**.
+- A top-level todo shows what it links to: a session or a pull request, as an icon in the list and a chip under **Links** in the open todo, each opening it here.
+  Each shows the icon of the sidebar tab it opens: **Sessions** or **Pull requests**.
   A running session shows its status dot; an open todo's **×** on a chip unlinks it.
 - An open top-level todo's **Work on it** and **Plan it** start a session at once, in the todo's workspace, else the sidebar's, through the pinned skill when one is pinned, and link it to the todo.
   **Work on it** does what the todo asks from its title, notes, and open sub-todos, in a git worktree on a new branch when it changes code, then commits and reports without pushing.
@@ -90,10 +96,6 @@
   When another session already works on the todo, the card names it and offers **Open session** and **End it and start again**, as on [the Pull requests page](pull-requests.md).
 - An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the todo's workspace, else the sidebar's, to edit the prompt or pick another directory first; `#new/<cwd>?todo=<id>` addresses it, and its directory wins over the todo's.
   A session started from a todo links to it once omp starts, which moves a **Backlog** or **Todo** todo to **In Progress**, and its agent marks the todo **Done** once it finishes the work; see [Todos from agents](#todos-from-agents).
-- With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.
-  It reports success only once the server's todo list holds the link.
-  When the issue opened but the todo did not take the link, it names the issue and offers **Link** for it instead of opening another.
-- The list icon on a ticket adds a todo of no category, last in the list, that links to it.
 - The server keeps the list in `todos.json` beside its access token, so every window of the app shows the same list, and a change in one shows in the others at once.
   A `todos.json` from before categories, notes, due days, links, the archive, statuses, priorities, or assignees still loads, with none of them; a todo checked then reads as **Done**, an unchecked one as **Todo**, both with no priority.
   A `todos.json` that the server cannot read as a todo list is moved to `todos.json.invalid` rather than written over.

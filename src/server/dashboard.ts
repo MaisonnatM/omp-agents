@@ -6,15 +6,12 @@
  * No constructor calls either; nothing follows the registry, watches a directory, or publishes before {@link Dashboard.start}.
  */
 import { randomUUID } from "node:crypto";
-import { rmSync } from "node:fs";
+import { statSync } from "node:fs";
 import { join } from "node:path";
 import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
 import { fullyAwake } from "../full-wake";
-import { GmailAccounts, GmailClient } from "../gmail";
-import { accountClients, createGoogleAccounts } from "../google-accounts";
-import { GoogleCalendarClient, GoogleCalendars } from "../google-calendar";
 import { loadPullRequests, mergedPullRequests, repoOf } from "../pull-requests";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
@@ -22,14 +19,13 @@ import type { LiveSession } from "../live-session";
 import { startDictation } from "../omp/dictation";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
-import { findMcpServers } from "../omp/mcp";
 import { ompDaemons, startOwnedService } from "../omp/daemons";
 import { ompSandboxes } from "../omp/isolation";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, calendarsFile, directoryOf, displayPath, endedWorktreesFile, eventInboxDir, googleAccountsFile, HOME, interruptedFile, localEventsFile, machineFile, mergesFile, noticesFile, oldGoogleFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, signInInboxDir, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, directoryOf, displayPath, endedWorktreesFile, HOME, interruptedFile, machineFile, mergesFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { moduleInboxes, moduleJoins, openModules } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
@@ -43,9 +39,8 @@ import { SettingsSync, syncStores, thisMachine } from "../settings-sync";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchedKinds } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
-import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
-import type { StartRequest, StartResult, View } from "../shared/sessions";
+import { awaitsSubagents, type StartRequest, type StartResult, type View } from "../shared/sessions";
 import { inAppData } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
@@ -56,22 +51,18 @@ import { BotInbox } from "./bot-inbox";
 import { Bots, startingRoutine } from "./bots";
 import { BotsFile } from "./bots-file";
 import { Broadcasts } from "./broadcasts";
-import { CalendarsFile } from "./calendars-file";
 import { EndInbox } from "./end-inbox";
 import type { Guards } from "./http";
 import { InterruptedSessions } from "./interrupted";
 import { IsolationSweep } from "./isolation-sweep";
 import { ListRegistry } from "./list-registry";
-import { GoogleAccountsFile } from "./google-accounts-file";
-import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops, repeat } from "./loops";
 import { MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, SIGN_IN_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
 import { PinsFile } from "./pins-file";
-import { SignInInbox } from "./sign-in-inbox";
 import { PrivateSessions } from "./private-sessions";
 import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
@@ -81,7 +72,7 @@ import { readAppOf, readCwds, readListeningPorts, SessionProcessWatch, stopProce
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
-import { eventSightings, gmailSightings, pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
+import { pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
 import { RoutineInbox } from "./routine-inbox";
 import { ShepherdInbox } from "./shepherd-inbox";
 import { unapprovedChange } from "../pull-request-approval";
@@ -106,7 +97,6 @@ import { Dictation } from "./dictation";
 import { createClientHandler } from "./socket";
 import { botExtension, designerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
-import { EventInbox } from "./event-inbox";
 import { TodoInbox } from "./todo-inbox";
 import type { JsonInboxDir } from "./json-inbox";
 import { UserTodosFile } from "./user-todos-file";
@@ -118,8 +108,6 @@ import { adoptOldWorkspaces, WorkspacesFile } from "./workspaces-file";
 /** What the dashboard publishes through once the server listens. */
 type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
 
-/** The hidden calendars of an account that hid none. */
-const NO_HIDDEN: ReadonlySet<string> = new Set();
 /** How often the merge queue looks at the pull requests it waits on: checks take minutes, and a click shows its first step at once. */
 const MERGE_QUEUE_TICK_MS = 15_000;
 
@@ -160,18 +148,13 @@ export class Dashboard {
 	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
-	readonly #calendars = new CalendarsFile(calendarsFile);
-	readonly #googleAccounts = createGoogleAccounts(new GoogleAccountsFile(googleAccountsFile));
-	readonly #integrations: Integrations = createIntegrations(this.#googleAccounts);
-	readonly #localEvents = new LocalEventsFile(localEventsFile);
+	readonly #integrations: Integrations = createIntegrations();
 	/** The terminal panel's shells, which the server's `/ws/terminal` upgrades open and attach to. */
 	readonly terminals = new Terminals();
 	/** Aborts as the dashboard stops, which stops every routine command still running. */
 	readonly #stopping = new AbortController();
 	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the file inboxes. */
 	readonly #ownerLock: OwnerLock;
-	readonly #google: GoogleCalendars;
-	readonly #gmail = new GmailAccounts(accountClients("gmail", (fetch, account) => new GmailClient(fetch, account)));
 	readonly #sessions: LiveSessions;
 	readonly #views: Views;
 	readonly #notices: Notices;
@@ -182,7 +165,7 @@ export class Dashboard {
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
-	/** What each live session runs besides omp, which it stops on request, when idle, and once the session left. */
+	/** What each live session runs besides omp, which it stops on request, when idle, and once the session left; it also ends sessions left idle for hours. */
 	readonly #processWatch: SessionProcessWatch;
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
 	readonly #reattached = Promise.withResolvers<void>();
@@ -223,7 +206,7 @@ export class Dashboard {
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
 		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
 		const stores = syncStores(
-			{ sourceControl: this.#sourceControl, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, calendars: this.#calendars, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile) },
+			{ sourceControl: this.#sourceControl, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile) },
 			HOME,
 			list => {
 				// Every Bot memory is read again, since a sync may have rewritten them.
@@ -240,10 +223,6 @@ export class Dashboard {
 		const pins = this.#pins;
 		const interrupted = this.#interrupted;
 		const ownerLock = (this.#ownerLock = new OwnerLock(serverLockFile, port));
-		// The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
-		rmSync(oldGoogleFile, { force: true });
-		const calendars = this.#calendars;
-		this.#google = new GoogleCalendars(accountClients("google-calendar", (fetch, account) => new GoogleCalendarClient(fetch, account, () => calendars.value.get(account) ?? NO_HIDDEN)));
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const { placement } = files.facts;
 		const { factsOf } = files;
@@ -287,32 +266,11 @@ export class Dashboard {
 					return usage.plans;
 				},
 				creditRuns: () => readCreditRuns(Date.now()),
-				localEvents: () => {
-					const events = this.#localEvents.value.flatMap(({ id, title, when, sessionId }) =>
-						when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null, sessionId }],
-					);
-					this.#triggerWatch.learn(eventSightings([{ scope: "event:local", events }], Date.now()));
-					return events;
-				},
-				googleEvents: async (from, to) => {
-					const accounts = (await this.#google.byAccount(new Date(from), new Date(to))).map(read => ({
-						account: read.account,
-						events:
-							"error" in read
-								? null
-								: read.events.flatMap(({ account, calendarId, eventId, title, calendar, color, url, when }) =>
-										when.allDay ? [] : [{ ref: `google/${account}/${calendarId}/${eventId}`, title, start: when.start, end: when.end, calendar, color, url, sessionId: null }],
-									),
-					}));
-					this.#triggerWatch.learn(eventSightings(accounts.flatMap(({ account, events }) => (events ? [{ scope: `event:google/${account}`, events }] : [])), Date.now()));
-					return accounts;
-				},
 				stoppedSessions: () =>
 					interrupted.midTurn().map(sessionId => {
 						const saved = files.savedOf(sessionId);
 						return { sessionId, title: saved?.title ?? null, cwdDisplay: saved ? displayPath(saved.cwd) : null };
 					}),
-				signedOut: () => this.#googleAccounts.signedOut(),
 				now: Date.now,
 			},
 			() => this.#broadcasts.pushList("notices"),
@@ -378,16 +336,6 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		const eventInbox = new EventInbox(eventInboxDir, () => this.#localEvents.value, change => this.#localEvents.apply(change), { active: () => ownerLock.held });
-		const signInInbox = new SignInInbox(
-			signInInboxDir,
-			{
-				report: async ({ account, at }) => {
-					if (await this.#googleAccounts.reportSignedOut(account, at)) await notices.check(SIGN_IN_KINDS);
-				},
-			},
-			{ active: () => ownerLock.held },
-		);
 		const routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
 		const botInbox = new BotInbox(
 			botInboxDir,
@@ -425,12 +373,31 @@ export class Dashboard {
 			readCwds,
 			appOf: readAppOf,
 			stopProcesses,
-			sessions: () => sessions.rows(factsOf),
+			sessions: () => {
+				const botConversations = new Set(this.#bots.list.flatMap(bot => bot.sessionId ?? []));
+				return sessions.rows(factsOf).map(row => ({
+					instanceId: row.instanceId,
+					sessionId: row.sessionId,
+					pid: row.pid,
+					cwd: row.cwd,
+					status: row.status,
+					awaitsSubagents: awaitsSubagents(row),
+					// A Bot ends its own idle conversation, and a private session's end deletes it.
+					stopsWhenIdle: row.source === "dashboard" && !row.private && !botConversations.has(row.sessionId),
+				}));
+			},
+			endSession: async instanceId => {
+				await sessions.started(instanceId)?.end();
+			},
+			lastWrittenAt: instanceId => {
+				const path = sessions.get(instanceId)?.transcriptPath(null, files.pathOf);
+				return path ? (statSync(path, { throwIfNoEntry: false })?.mtimeMs ?? null) : null;
+			},
 			now: Date.now,
 			owner: () => ownerLock.held,
-			stopIdleAfterMinutes: () => {
+			settings: () => {
 				this.#processSettings.reload();
-				return this.#processSettings.value.stopIdleAfterMinutes;
+				return this.#processSettings.value;
 			},
 		});
 		const startSession = (this.#startSession = request => worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null));
@@ -537,7 +504,7 @@ export class Dashboard {
 			},
 			{ active: () => ownerLock.held },
 		);
-		this.#inboxes = [todoInbox, eventInbox, signInInbox, routineInbox, botInbox, shepherdInbox, ...modulesInboxes];
+		this.#inboxes = [todoInbox, routineInbox, botInbox, shepherdInbox, ...modulesInboxes];
 		// Private sessions' files poke the views that follow them, but no format lists them, so they never show as past sessions.
 		this.#loops = new Loops([...SESSION_FORMATS, { root: privateSessionsDir, createRoot: true }], {
 			onRegistryTick: async () => {
@@ -557,7 +524,7 @@ export class Dashboard {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
 				broadcasts.pushList("scheduled");
-				await notices.check([...EVENT_KINDS, ...STOPPED_KINDS, ...SIGN_IN_KINDS]);
+				await notices.check(STOPPED_KINDS);
 				this.#fireTriggers();
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
@@ -574,7 +541,7 @@ export class Dashboard {
 				const watched = ownerLock.held ? watchedKinds(routines.value) : [];
 				const kinds = broadcasts.listening() ? ACTIVITY_KINDS : ACTIVITY_KINDS.filter(kind => watched.includes(kind));
 				this.#activityFresh = kinds.length === ACTIVITY_KINDS.length;
-				await Promise.all([kinds.length > 0 && notices.check(kinds), watched.includes("gmail") && this.#readMail()]);
+				if (kinds.length > 0) await notices.check(kinds);
 				this.#fireTriggers();
 			},
 			onPullTick: async () => {
@@ -662,16 +629,9 @@ export class Dashboard {
 				},
 			},
 			integrations: this.#integrations,
-			calendar: {
-				google: this.#google,
-				setCalendarShown: (account, id, shown) => this.#calendars.apply(account, id, shown),
-				localEvents: this.#localEvents,
-			},
-			gmail: this.#gmail,
 			files: { worktrees: this.#worktrees, terminals: this.terminals, fileDirsOf: files.fileDirsOf },
 			artifacts: { sessionFileOf: id => sessions.fileOf(id, files.pathOf) },
 			storage: this.#isolationSweep,
-			todos: { list: () => this.#todos.value, change: change => void this.#lists.apply("user-todos", change) },
 			pullRequests: {
 				changeMergeQueue: async change => {
 					const merged = await this.#mergeQueue.apply(change);
@@ -736,8 +696,6 @@ export class Dashboard {
 		this.#endInbox.watch();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
 		await this.#notices.check(STOPPED_KINDS);
-		const [calendarServer] = await findMcpServers(MCP_SERVICES["google-calendar"].host);
-		if (calendarServer) this.#calendars.adopt(calendarServer.name);
 		await this.#listRegistry();
 		if (this.#ownerLock.held) {
 			this.#clearOldDone();
@@ -932,7 +890,6 @@ export class Dashboard {
 			this.#bots.reload();
 			this.#migrateRoutines();
 			this.#todos.reload();
-			this.#localEvents.reload();
 			this.#broadcasts.pushList("routines");
 			this.#broadcasts.pushList("bots");
 			this.#broadcasts.pushList("user-todos");
@@ -967,12 +924,6 @@ export class Dashboard {
 		this.#activityFresh = true;
 		await this.#notices.check(ACTIVITY_KINDS);
 		this.#fireTriggers();
-	}
-
-	/** Reads the Gmail inboxes for the routines' Gmail triggers; when every account fails, the watch keeps what it knew. */
-	async #readMail(): Promise<void> {
-		const answer = await this.#gmail.inbox().catch(() => null);
-		if (answer) this.#triggerWatch.learn(gmailSightings(answer));
 	}
 
 	/** The session list changed: views may now find their file, and the past list is out of date. */

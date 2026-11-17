@@ -1,5 +1,5 @@
 /** `FolderRows`: a folder tree's rows in the look of affectUI's tree view, each folder a button that opens and closes it, which the changes explorer and the settings file rails share; `useFolders` keeps which folders are open. */
-import { IconChevronRight, IconFolder1, IconFolderOpen } from "central-icons";
+import { IconChevronRightSmall, IconFolder1, IconFolderOpen } from "central-icons";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { foldersAbove, type TreeDir } from "../changes-model";
 
@@ -75,7 +75,7 @@ export function FolderRows<T extends { path: string }>({
 							onClick={() => folders.toggle(child.path)}
 						>
 							<span aria-hidden className="grid size-4 shrink-0 place-items-center text-muted-foreground/60 transition-transform duration-200 ease-out group-hover/folder:text-muted-foreground group-aria-expanded/folder:rotate-90 motion-reduce:transition-none">
-								<IconChevronRight className="size-3" />
+								<IconChevronRightSmall className="size-3" />
 							</span>
 							<Folder className="mr-1 size-4 shrink-0" />
 							<span className="truncate">{child.name}</span>
