@@ -14,7 +14,7 @@ Object.assign(globalThis, { window: globalThis, document, HTMLIFrameElement: cla
 const { createRoot } = await import("react-dom/client");
 const { useOpenLatest } = await import("./use-open-latest.ts");
 const { hashForTodo } = await import("./routing.ts");
-const hashForAll = id => hashForTodo({ kind: "all" }, id);
+const hashForAll = id => hashForTodo("all", id);
 
 const older = "a1";
 const newer = "q1";

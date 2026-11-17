@@ -1,7 +1,7 @@
-/** What the Todo page's list keeps and how it groups it: **Filter**, by priority, assignee, link, due day, and creation, and **Display**'s grouping. */
+/** What the Todo page's list keeps and how it groups it: **Filter**, by category, priority, assignee, link, due day, and creation, and **Display**'s grouping. */
 import { isObject, isTexts, oneOf, parseJson } from "../src/json";
 import { addDays } from "../src/shared/days";
-import { TODO_ASSIGNEES, TODO_PRIORITIES, type TodoAssignee, type TodoPriority, type TodoStatus, type UserTodo, type UserTodoLeaf, type UserTodoLink } from "../src/user-todos-shared";
+import { TODO_ASSIGNEES, TODO_PRIORITIES, type TodoAssignee, type TodoPriority, type TodoStatus, type UserTodo, type UserTodoCategory, type UserTodoLeaf, type UserTodoLink } from "../src/user-todos-shared";
 import { type DayRange, type FilterOption, type GroupingDisplay, groupingDisplay, isDayRange, withinLast } from "./list-filter";
 import { ASSIGNEE_LABELS, earliestDue, PRIORITY_LABEL, PRIORITY_ORDER, STATUS_GROUPS } from "./todo-views";
 
@@ -16,8 +16,13 @@ type PriorityKey = `${TodoPriority}`;
 
 const isPriorityKey = oneOf(TODO_PRIORITIES.map((priority): PriorityKey => `${priority}`));
 
-/** What **Filter** keeps; an empty set keeps every priority, assignee, or link, and `null` any day. */
+/** The Category key of a todo in no category; a category's id is a UUID, so none reads as it. */
+export const NO_CATEGORY = "none";
+
+/** What **Filter** keeps; an empty set keeps every category, priority, assignee, or link, and `null` any day. */
 export interface TodoFilter {
+	/** Category ids, and {@link NO_CATEGORY} for the todos in none. */
+	categories: ReadonlySet<string>;
 	priorities: ReadonlySet<PriorityKey>;
 	assignees: ReadonlySet<TodoAssignee>;
 	links: ReadonlySet<LinkKind>;
@@ -27,11 +32,11 @@ export interface TodoFilter {
 	created: DayRange | null;
 }
 
-export const NO_FILTER: TodoFilter = { priorities: new Set(), assignees: new Set(), links: new Set(), due: null, created: null };
+export const NO_FILTER: TodoFilter = { categories: new Set(), priorities: new Set(), assignees: new Set(), links: new Set(), due: null, created: null };
 
 /** Whether `filter` leaves anything out. */
-export const filters = ({ priorities, assignees, links, due, created }: TodoFilter): boolean =>
-	priorities.size > 0 || assignees.size > 0 || links.size > 0 || due !== null || created !== null;
+export const filters = ({ categories, priorities, assignees, links, due, created }: TodoFilter): boolean =>
+	categories.size > 0 || priorities.size > 0 || assignees.size > 0 || links.size > 0 || due !== null || created !== null;
 
 const isAssignee = oneOf(TODO_ASSIGNEES);
 const isLinkKind = oneOf(LINK_KINDS);
@@ -40,8 +45,9 @@ const isLinkKind = oneOf(LINK_KINDS);
 export function decodeFilter(raw: string | null): TodoFilter {
 	const stored = parseJson(raw ?? "null");
 	if (!isObject(stored)) return NO_FILTER;
-	const { priorities, assignees, links, due, created } = stored;
+	const { categories, priorities, assignees, links, due, created } = stored;
 	return {
+		categories: new Set(isTexts(categories) ? categories.filter(key => key !== "") : []),
 		priorities: new Set(isTexts(priorities) ? priorities.filter(isPriorityKey) : []),
 		assignees: new Set(isTexts(assignees) ? assignees.filter(isAssignee) : []),
 		links: new Set(isTexts(links) ? links.filter(isLinkKind) : []),
@@ -50,8 +56,33 @@ export function decodeFilter(raw: string | null): TodoFilter {
 	};
 }
 
-export const encodeFilter = ({ priorities, assignees, links, due, created }: TodoFilter): string =>
-	JSON.stringify({ priorities: [...priorities], assignees: [...assignees], links: [...links], due, created });
+export const encodeFilter = ({ categories, priorities, assignees, links, due, created }: TodoFilter): string =>
+	JSON.stringify({ categories: [...categories], priorities: [...priorities], assignees: [...assignees], links: [...links], due, created });
+
+/**
+ * `filter` keeping only the categories `categories` holds, and No category only while there is one, so a category
+ * deleted in another window leaves nothing out rather than emptying the list.
+ */
+export function withLiveCategories(filter: TodoFilter, categories: readonly UserTodoCategory[]): TodoFilter {
+	const live = [...filter.categories].filter(key => (key === NO_CATEGORY ? categories.length > 0 : categories.some(({ id }) => id === key)));
+	return live.length === filter.categories.size ? filter : { ...filter, categories: new Set(live) };
+}
+
+/** The one category `filter` keeps, which a todo added to the list joins; `null` while it keeps every category, several, or No category. */
+export function soleCategory({ categories }: TodoFilter): string | null {
+	const [only] = categories;
+	return categories.size === 1 && only !== NO_CATEGORY ? only! : null;
+}
+
+/** The categories **Filter** offers, No category first, each with how many of `todos` it holds; none while there is no category. */
+export function categoryOptions(todos: readonly UserTodo[], categories: readonly UserTodoCategory[]): FilterOption<string>[] {
+	if (categories.length === 0) return [];
+	const count = (id: string | null): number => todos.filter(todo => todo.categoryId === id).length;
+	return [{ key: NO_CATEGORY, label: "No category", count: count(null) }, ...categories.map(({ id, name }) => ({ key: id, label: name, count: count(id) }))];
+}
+
+/** Whether a top-level todo in category `categoryId`, `null` for none, passes the Category filter `categories`. */
+export const keepsCategory = (categories: ReadonlySet<string>, categoryId: string | null): boolean => categories.size === 0 || categories.has(categoryId ?? NO_CATEGORY);
 
 export const PRIORITY_OPTIONS: readonly FilterOption<PriorityKey>[] = PRIORITY_ORDER.map((priority): FilterOption<PriorityKey> => ({ key: `${priority}`, label: PRIORITY_LABEL[priority] }));
 
@@ -65,11 +96,12 @@ export function linkOptions(todos: readonly UserTodo[], checked: ReadonlySet<Lin
 }
 
 /**
- * Whether top-level `todo` passes `filter` on `day`, at `now` in ms: its own priority and assignee, a link of a kind
- * checked, its earliest open due day within the next `due` days or past, and its creation within the last `created`
- * days; a todo from before creation times were kept passes no **Created**.
+ * Whether top-level `todo` passes `filter` on `day`, at `now` in ms: its category, its own priority and assignee, a
+ * link of a kind checked, its earliest open due day within the next `due` days or past, and its creation within the
+ * last `created` days; a todo from before creation times were kept passes no **Created**.
  */
-export function keepsTodo(todo: UserTodo, { priorities, assignees, links, due, created }: TodoFilter, day: string, now: number): boolean {
+export function keepsTodo(todo: UserTodo, { categories, priorities, assignees, links, due, created }: TodoFilter, day: string, now: number): boolean {
+	if (!keepsCategory(categories, todo.categoryId)) return false;
 	if (priorities.size > 0 && !priorities.has(`${todo.priority}`)) return false;
 	if (assignees.size > 0 && (todo.assignee === null || !assignees.has(todo.assignee))) return false;
 	if (links.size > 0 && !todo.links.some(link => links.has(link.kind))) return false;

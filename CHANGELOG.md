@@ -5,6 +5,10 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-17
 
+- The Todo page has no list on its left anymore; All, Today, Needs you, From agents, and Archive are tabs in the bar above the list, as on the Pull requests page.
+- Filter on the Todo page has a Category choice, which shows the todos of the categories you check, or those in no category; checking one alone shows that category as its old list did, and new todos join it.
+- Display › Categories… on the Todo page adds, renames, and deletes categories, where the left list did before.
+- The color checkboxes that hid a category from the Todo lists are gone; use Filter › Category instead, and an old link to a category opens All.
 - A Markdown artifact draws its `mermaid` diagrams and `chart` blocks as pictures, as a reply in the conversation does, instead of showing their source.
 - The stack menu on a pull request lists the session's other pull requests by number and title, with an icon that says whether each is open, a draft, merged, or closed.
 - Images in the Artifacts tab open when you click them: a screenshot inside an HTML page, or an SVG, fills the window, where you can zoom and step to the page's other images with the arrow keys.

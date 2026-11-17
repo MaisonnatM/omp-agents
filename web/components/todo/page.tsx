@@ -11,10 +11,9 @@ import { ALL_WORKSPACES, folderName } from "../../labels";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
 import { sectionId } from "../../section";
-import { groupFoldKey, groupTodos, keepsTodo, NO_FILTER, filters, type TodoGroup } from "../../todo-filter";
+import { groupFoldKey, groupTodos, keepsTodo, NO_FILTER, filters, soleCategory, type TodoGroup, withLiveCategories } from "../../todo-filter";
 import { useTodoDisplay, useTodoFilter } from "../../todo-state";
-import { inScope, LIST_KINDS, lastOf, placeIn, PRIORITY_LABEL, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf, leftIn } from "../../todo-views";
-import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
+import { inScope, LIST_KINDS, lastOf, placeIn, PRIORITY_LABEL, type Section, TODO_STATUS, type TodoEntry, todoMatcher, todosOf, leftIn } from "../../todo-views";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
 import { type OpenPicker, useTodoKeys } from "../../use-todo-keys";
@@ -152,32 +151,34 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const [picker, setPicker] = useState<OpenPicker | null>(null);
 	const listRef = useRef<HTMLElement>(null);
 	const day = localDay();
-	const kind = LIST_KINDS[view.kind];
+	const kind = LIST_KINDS[view];
 	const frozen = disabled || kind.readOnly;
 	const canAdd = !disabled && kind.add !== null;
 	const sessions: KnownSessions = { hosts, past };
-	const [hidden] = useHiddenTodoCategories();
-	const [filter, setFilter] = useTodoFilter();
+	const [stored, setFilter] = useTodoFilter();
 	const [display, setDisplay] = useTodoDisplay();
+	// A category deleted since, here or in another window, leaves nothing out; the next change stores the filter without it.
+	const filter = withLiveCategories(stored, list.categories);
 	const filtering = filters(filter);
 	// Archive lists by when a todo was cleared, with no groups.
 	const grouping = kind.readOnly ? null : display.grouping;
 	const byStatus = grouping === "status";
-	const spanning = todosOf(list, view, day, sessions, hidden);
+	const spanning = todosOf(list, view, day, sessions);
 	const listed = inScope(spanning, scope);
 	const now = Date.now();
 	const kept = filtering ? listed.filter(todo => keepsTodo(todo, filter, day, now)) : listed;
-	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: kept.filter(todoMatcher(query)) };
+	const sole = soleCategory(filter);
+	const section: Section = { categoryId: sole, todos: kept.filter(todoMatcher(query)) };
 	// Looked up before the search and the sidebar's scope narrow the list, so neither takes the open todo off screen.
 	const open = openId === null ? null : (placeIn([spanning], openId)?.entry ?? null);
-	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd, workspace });
+	const editing = useTodoEditing({ list, kind, day, frozen, categories: filter.categories, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd, workspace });
 	// Todos move only among those of their status, so only the grouping by status lets you drag them.
 	const canMove = kind.canMove && byStatus;
 	const drag = useTodoDrag(canMove && !frozen, onChange);
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
-	const title = titleOf(list, view);
-	const left = leftIn(list, view, day, sessions, hidden, scope);
+	const title = kind.title;
+	const left = leftIn(list, view, day, sessions, scope);
 	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
 	const search = query.trim();
 	const unmatched = section.todos.length === 0 && listed.length > 0 && (search !== "" || filtering);
@@ -232,7 +233,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 			section={section}
 			entry={entry}
 			siblings={siblings}
-			category={entry.parent === null && view.kind !== "category" ? list.categories.find(({ id }) => id === entry.todo.categoryId) : undefined}
+			category={entry.parent === null && sole === null ? list.categories.find(({ id }) => id === entry.todo.categoryId) : undefined}
 			workspace={entry.parent === null && workspace === null ? (entry.todo.workspace ?? undefined) : undefined}
 			day={day}
 			sessions={sessions}
@@ -303,7 +304,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 					)}
 					{!kind.readOnly && anyClosed && !disabled && (
 						<Tooltip content="Move Done and Canceled todos to Archive">
-							<Button variant="ghost" size="compact" leadingIcon={IconSquareX} onClick={() => onChange({ op: "clear-done", categoryId: view.kind === "category" ? view.id : null })}>
+							<Button variant="ghost" size="compact" leadingIcon={IconSquareX} onClick={() => onChange({ op: "clear-done", categoryId: sole })}>
 								Clear done
 							</Button>
 						</Tooltip>
@@ -313,12 +314,23 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 		>
 			<ListSplit
 				widthKey="omp-agents.todo-list-width"
+				defaultWidth={480}
 				resizeLabel="Resize the todo list"
 				detailLabel="Open todo"
 				empty={{ icon: IconTodos, title: "No todo open", hint: `Click a todo, or focus one with ${shortcutKeys("todoNext")} and press Enter.` }}
 				list={
 					<section ref={listRef} tabIndex={-1} aria-label={title} className="outline-none focus-visible:ring-2 focus-visible:ring-ring mx-auto w-full max-w-3xl space-y-2 px-3 py-2">
-						<TodoViewBar todos={listed} filter={filter} onFilter={setFilter} display={kind.readOnly ? null : display} onDisplay={setDisplay} />
+						<TodoViewBar
+							view={view}
+							todos={listed}
+							categories={list.categories}
+							filter={filter}
+							onFilter={setFilter}
+							display={kind.readOnly ? null : display}
+							onDisplay={setDisplay}
+							disabled={disabled}
+							onChange={onChange}
+						/>
 						{kind.readOnly ? (
 							<ul aria-label="Archived todos" className="flex flex-col gap-0.5">
 								{section.todos.map(todo => (

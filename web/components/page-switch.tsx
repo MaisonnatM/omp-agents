@@ -7,7 +7,7 @@ import type { DashboardState } from "../dashboard-state";
 import { isModulePage } from "../modules";
 import { useModulesOff } from "../modules-off";
 import type { SplitAxis } from "../pane-navigation";
-import type { Layout, Page, TodoListView } from "../routing";
+import type { Layout, Page } from "../routing";
 import { hashForNewSession } from "../routing";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
@@ -63,7 +63,6 @@ interface PageSwitchProps extends PageState {
 	defaultWorkspace: string;
 	/** The page section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
-	todoView: TodoListView;
 	maximized: boolean;
 	/** The right sidebar shows the focused session's details. */
 	hasDetails: boolean;
@@ -100,7 +99,6 @@ export const PageSwitch = memo(function PageSwitch({
 	scope,
 	defaultWorkspace,
 	sectionTarget,
-	todoView,
 	maximized,
 	hasDetails,
 	rightOpen,
@@ -166,7 +164,7 @@ export const PageSwitch = memo(function PageSwitch({
 			return (
 				<TodoPage
 					list={userTodos}
-					view={todoView}
+					view={page.list}
 					openId={page.open}
 					hosts={hosts}
 					past={past}

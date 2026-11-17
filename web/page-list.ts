@@ -3,8 +3,8 @@ import { isModulePage, moduleOf } from "./modules";
 import type { Page } from "./routing";
 import type { NavRow } from "./sidebar-tabs";
 
-/** The rows with no list of their own: the Pull requests page lists its repositories itself, and New session and Notifications have none. */
-const NO_LIST = ["new", "notifications", "pull-requests"] as const satisfies readonly NavRow[];
+/** The rows with no list of their own: the Pull requests and Todo pages list their views in the bar above their lists, and New session and Notifications have none. */
+const NO_LIST = ["new", "notifications", "pull-requests", "todo"] as const satisfies readonly NavRow[];
 
 /** A page whose sidebar row holds a list of its own: every other tab's page and Settings; the Sessions panes have the roster instead. */
 export type ListPage = Extract<Page, { kind: Exclude<NavRow, (typeof NO_LIST)[number]> }>;
@@ -19,9 +19,8 @@ export const COLUMN_DEFAULT = 256;
 
 /** Narrowest the page beside the column gets, in px: the sidebar's own floor for a pane. */
 const PAGE_MIN = 480;
-/** Narrowest a page that splits its list from its open item gets, the width at which `ListSplit` shows both side by side. */
+/** Narrowest a module page that splits its list from its open item gets, the width at which `ListSplit` shows both side by side. */
 const SPLIT_PAGE_MIN = 768;
-const SPLIT_PAGES: Partial<Record<ListPage["kind"], true>> = { todo: true };
 
 /** The page `row` lists, `null` when the row has no list of its own or `page` is not its page. */
 export function listPageOf(page: Page | null, row: NavRow | null): ListPage | null {
@@ -34,7 +33,7 @@ export function listPageOf(page: Page | null, row: NavRow | null): ListPage | nu
  * to what leaves the page its floor.
  */
 export function listPlacement(page: ListPage, floating: boolean, room: number): { at: "sidebar" } | { at: "column"; max: number } {
-	const split = isModulePage(page) ? moduleOf(page).split : SPLIT_PAGES[page.kind];
+	const split = isModulePage(page) && moduleOf(page).split;
 	const max = Math.min(COLUMN_MAX, room - (split ? SPLIT_PAGE_MIN : PAGE_MIN));
 	return floating || max < COLUMN_MIN ? { at: "sidebar" } : { at: "column", max };
 }

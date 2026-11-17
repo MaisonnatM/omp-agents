@@ -83,7 +83,7 @@ Besides a live session's own hash, the routes are:
 - `#past/<session id>`, `#session/<session id>`;
 - `#pull-requests`, `#pull-requests/<owner>/<repo>/<number>`, `#pull-requests/<owner>/<repo>/<number>/files`, `#pull-requests/<owner>/<repo>/<number>/files/<encoded path>`;
 - `#sport`, `#sport?day=<YYYY-MM-DD>`, `#sport/journal`, `#sport/journal?open=<log id>`, `#sport/progress`;
-- `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`, each with `?open=<todo id>` to open a todo;
+- `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, each with `?open=<todo id>` to open a todo;
 - `#notifications`, `#bots`, `#bots/new`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
 - `#get-started`, which always opens Get started's setup dialog over the home, even after local dismissal;

@@ -82,16 +82,18 @@ interface ListSplitProps {
 	list: ReactNode;
 	/** The open item, `null` with none open. */
 	detail: ReactElement | null;
+	/** The list's width until the user drags it, in px. */
+	defaultWidth?: number;
 }
 
 /**
  * The list on the left and the open item on the right, split by a line you drag to size the list.
  * A page too narrow for both shows the list, or the open item in its place.
  */
-export function ListSplit({ widthKey, resizeLabel, detailLabel, empty, list, detail }: ListSplitProps) {
+export function ListSplit({ widthKey, resizeLabel, detailLabel, empty, list, detail, defaultWidth = DEFAULT_WIDTH }: ListSplitProps) {
 	const [width, setWidth] = useStoredState(widthKey, raw => {
 		const stored = Number(raw);
-		return stored >= MIN_LIST && stored <= MAX_LIST ? stored : DEFAULT_WIDTH;
+		return stored >= MIN_LIST && stored <= MAX_LIST ? stored : defaultWidth;
 	});
 	const events = useDragSeparator({
 		value: width,
@@ -101,7 +103,7 @@ export function ListSplit({ widthKey, resizeLabel, detailLabel, empty, list, det
 		shiftSteps: 4,
 		min: MIN_LIST,
 		max: MAX_LIST,
-		reset: DEFAULT_WIDTH,
+		reset: defaultWidth,
 		size: element => (element.parentElement as HTMLElement).clientWidth,
 		clamp: (next, element) => clampWidth(next, (element.parentElement as HTMLElement).clientWidth),
 		read: (event, start) => clampWidth(start.value + event.clientX - start.coordinate, start.size),

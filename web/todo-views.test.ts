@@ -45,19 +45,19 @@ describe("inScope", () => {
 	};
 	const sessions = { hosts: [], past: [] };
 	const scope = (workspace: string | null): WindowScope => ({ workspace });
-	const ids = (view: Parameters<typeof todosOf>[1], scope: WindowScope) => inScope(todosOf(list, view, "2026-10-30", sessions, new Set()), scope).map(({ id }) => id);
+	const ids = (view: Parameters<typeof todosOf>[1], scope: WindowScope) => inScope(todosOf(list, view, "2026-10-30", sessions), scope).map(({ id }) => id);
 
 	test("a selected workspace keeps only the todos naming it, in every list and the archive", () => {
-		expect(ids({ kind: "all" }, scope("/code/yampa"))).toEqual(["yampa"]);
-		expect(ids({ kind: "category", id: "work" }, scope("/code/omp-agents"))).toEqual(["agents"]);
-		expect(ids({ kind: "archive" }, scope("/code/yampa"))).toEqual(["old-yampa"]);
-		expect(leftIn(list, { kind: "all" }, "2026-10-30", sessions, new Set(), scope("/code/yampa"))).toBe(1);
-		expect(leftIn(list, { kind: "archive" }, "2026-10-30", sessions, new Set(), scope("/code/yampa"))).toBe(1);
+		expect(ids("all", scope("/code/yampa"))).toEqual(["yampa"]);
+		expect(ids("all", scope("/code/omp-agents"))).toEqual(["agents"]);
+		expect(ids("archive", scope("/code/yampa"))).toEqual(["old-yampa"]);
+		expect(leftIn(list, "all", "2026-10-30", sessions, scope("/code/yampa"))).toBe(1);
+		expect(leftIn(list, "archive", "2026-10-30", sessions, scope("/code/yampa"))).toBe(1);
 	});
 
 	test("All workspaces shows every todo, those naming no workspace included", () => {
-		expect(ids({ kind: "all" }, scope(null))).toEqual(["yampa", "agents", "none", "life", "garden"]);
-		expect(ids({ kind: "archive" }, scope(null))).toEqual(["old-yampa", "old-none", "old-life"]);
-		expect(leftIn(list, { kind: "all" }, "2026-10-30", sessions, new Set(), scope(null))).toBe(5);
+		expect(ids("all", scope(null))).toEqual(["yampa", "agents", "none", "life", "garden"]);
+		expect(ids("archive", scope(null))).toEqual(["old-yampa", "old-none", "old-life"]);
+		expect(leftIn(list, "all", "2026-10-30", sessions, scope(null))).toBe(5);
 	});
 });

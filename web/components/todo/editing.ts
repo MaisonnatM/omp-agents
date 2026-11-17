@@ -4,6 +4,7 @@ import { applyUserTodo } from "../../../src/user-todos";
 import type { TodoStatus, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../../src/user-todos-shared";
 import { hashForNewSession } from "../../routing";
 import { quickAddTodo } from "../../todo-quick-add";
+import { keepsCategory } from "../../todo-filter";
 import { type ListKind, lastOf, restoreOf, type Section, todoCwd } from "../../todo-views";
 import { offerUndo } from "../toaster";
 import type { TodoKey } from "./input";
@@ -36,6 +37,8 @@ interface TodoEditingOptions {
 	day: string;
 	/** The list cannot be changed here: the server is out of reach, or the list is the archive. */
 	frozen: boolean;
+	/** The categories **Filter** keeps; a todo added in another leaves the list. */
+	categories: ReadonlySet<string>;
 	onChange: (change: UserTodoChange) => void;
 	/** Todo `id` was deleted. */
 	onRemoved: (id: string) => void;
@@ -69,7 +72,7 @@ export interface TodoEditing {
 }
 
 /** The page's typing: which title or new todo has the input, what its keys do, and deleting with **Undo**. */
-export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, newSessionCwd, workspace }: TodoEditingOptions): TodoEditing {
+export function useTodoEditing({ list, kind, day, frozen, categories, onChange, onRemoved, newSessionCwd, workspace }: TodoEditingOptions): TodoEditing {
 	const [editing, setEditing] = useState<Editing>(NOT_EDITING);
 
 	/** Deletes todo `id` with the todos under it, and offers **Undo**, which puts it back where it was. */
@@ -96,7 +99,7 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, n
 		const change = quickAddTodo(text, list.categories, day, { parentId, afterId, categoryId, workspace, status, due: dueToday ? day : null });
 		if (!change) return null;
 		onChange(change);
-		const leaves = change.categoryId !== categoryId || (dueToday && change.due !== null && change.due > day);
+		const leaves = (parentId === null && !keepsCategory(categories, change.categoryId)) || (dueToday && change.due !== null && change.due > day);
 		return { change, afterId: leaves ? afterId : change.id };
 	};
 

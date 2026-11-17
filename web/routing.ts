@@ -3,6 +3,7 @@ import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrai
 import type { IconComponent } from "@/lib/icon-context";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
+import { oneOf } from "../src/json";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { decodeSegment } from "./hash-segment";
@@ -107,8 +108,12 @@ export interface SettingsRoute {
 	section: SettingsSection;
 }
 
-/** Which todos the Todo page lists: every one, one category's, due ones, those waiting on you, those agents added, or the archive. */
-export type TodoListView = { kind: "all" } | { kind: "category"; id: string } | { kind: "today" } | { kind: "needs" } | { kind: "agents" } | { kind: "archive" };
+/** Which todos the Todo page lists, in the order its tabs show them: every one, due ones, those waiting on you, those agents added, or the archive. */
+export const TODO_VIEWS = ["all", "today", "needs", "agents", "archive"] as const;
+
+export type TodoListView = (typeof TODO_VIEWS)[number];
+
+const isTodoView = oneOf(TODO_VIEWS);
 
 /** The Todo page, listing `list`, with todo `open` beside it when it is non-null and in the list. */
 export interface TodoRoute {
@@ -180,9 +185,6 @@ type PageOf<K extends CorePage["kind"]> = Extract<CorePage, { kind: K }>;
 const decodeCwd = (rest: string | null): string | null => (rest === null ? null : decodeSegment(rest));
 const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : encodeURIComponent(cwd));
 
-/** The Todo page's lists that are not a category, by the hash segment that names them. Category ids are random, so none reads as one. */
-const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents: { kind: "agents" }, archive: { kind: "archive" } } as const satisfies Record<string, TodoListView>;
-
 /**
  * Each page by its kind, which is its hash's first segment, reading what follows the next `/` (`null` without one) and
  * what follows a `?` after it.
@@ -196,7 +198,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   `#pull-requests/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
  *   at that encoded path. Any other `#pull-requests/…` shows the tab alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
- *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
+ *   today, waiting on you, added by agents, or in the archive, and `?open=<id>` opens that todo; any other segment, such as an old
+ *   `#todo/<category id>`, lists every todo.
  * - `#bots` opens the gallery of every Bot, `#bots/new` the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines` the card of that
  *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
@@ -215,13 +218,7 @@ const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchPa
 		const files = match[4] ? { path: match[5] ? decodeSegment(match[5]) : null } : null;
 		return { kind: "pull-requests", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
 	},
-	todo: (rest, query) => {
-		const open = query.get("open") || null;
-		if (!rest) return { kind: "todo", list: { kind: "all" }, open };
-		const named = Object.hasOwn(TODO_LISTS, rest) ? TODO_LISTS[rest as keyof typeof TODO_LISTS] : null;
-		const id = named ? null : decodeSegment(rest);
-		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }), open };
-	},
+	todo: (rest, query) => ({ kind: "todo", list: isTodoView(rest) ? rest : "all", open: query.get("open") || null }),
 	bots: rest => {
 		if (rest === "new") return { kind: "bots", target: null, adding: true };
 		const [target, routines, routine, ...more] = (rest ?? "").split("/").map(decodeSegment);
@@ -247,7 +244,7 @@ function restOfPage(page: CorePage): string | null {
 			return page.files.path === null ? `${pr}/files` : `${pr}/files/${encodeURIComponent(page.files.path)}`;
 		}
 		case "todo":
-			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
+			return page.list === "all" ? null : page.list;
 		case "bots":
 			if (page.target === null) return page.adding ? "new" : null;
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/${restOfBotRoutine(page.routine)}`;
@@ -293,14 +290,11 @@ export function hashForPage(page: Page): string {
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
-/** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
-export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);
-/** Todo `id` opened in the list that holds it now: its category's, or **Archive** once put away; `null` for a todo deleted for good. */
+/** Todo `id` opened in every todo's list, or in **Archive** once put away; `null` for a todo deleted for good. */
 export function hashForTodoId({ todos, archive }: UserTodoList, id: string): string | null {
 	const holds = (todo: UserTodo): boolean => todo.id === id || todo.children.some(child => child.id === id);
-	const open = todos.find(holds);
-	if (open) return hashForOpenTodo(id, open.categoryId);
-	return archive.some(holds) ? hashForTodo({ kind: "archive" }, id) : null;
+	if (todos.some(holds)) return hashForTodo("all", id);
+	return archive.some(holds) ? hashForTodo("archive", id) : null;
 }
 export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
 export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });

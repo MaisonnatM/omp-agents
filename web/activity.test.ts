@@ -13,8 +13,8 @@ describe("viewOf", () => {
 		expect(pageView({ kind: "pull-requests", target: null })).toBe("pull-requests");
 		expect(pageView({ kind: "pull-requests", target: pr, files: null } as Page)).toBe("pull-requests/item");
 		expect(pageView({ kind: "pull-requests", target: pr, files: { path: null } } as Page)).toBe("pull-requests/files");
-		expect(pageView({ kind: "todo", list: { kind: "all" }, open: null })).toBe("todo");
-		expect(pageView({ kind: "todo", list: { kind: "today" }, open: "t1" })).toBe("todo/item");
+		expect(pageView({ kind: "todo", list: "all", open: null })).toBe("todo");
+		expect(pageView({ kind: "todo", list: "today", open: "t1" })).toBe("todo/item");
 		expect(pageView({ kind: "bots", target: null, adding: false })).toBe("bots");
 		expect(pageView({ kind: "bots", target: null, adding: true })).toBe("bots/new");
 		expect(pageView({ kind: "bots", target: "b1", routine: null })).toBe("bots/item");

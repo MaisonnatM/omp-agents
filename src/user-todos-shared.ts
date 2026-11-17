@@ -56,7 +56,7 @@ export interface UserTodo extends UserTodoLeaf {
 	addedBy: string | null;
 }
 
-/** A category of the Todo page, which the sidebar lists to show its todos alone. */
+/** A category of the Todo page, which **Filter** shows alone and a todo's details pick. */
 export interface UserTodoCategory {
 	id: string;
 	name: string;
