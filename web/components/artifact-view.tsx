@@ -1,10 +1,12 @@
 /** `ArtifactView`: one artifact version drawn as its kind draws, or as its source; and the kind table the card and the Artifacts tab share. */
 import { IconCode, IconFileText, IconImages1 } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import type { ReactNode } from "react";
-import type { ArtifactKind } from "../../src/shared/artifacts";
+import { type ReactNode, useEffect, useRef } from "react";
+import { type ArtifactKind, parseArtifactImages } from "../../src/shared/artifacts";
+import { activityControl } from "../activity";
 import type { Loaded } from "../artifact-links";
 import { CodeText } from "./file-text";
+import { useImageList } from "./markdown-images";
 import { MessageMarkdown } from "./message-markdown";
 import { LoadNote } from "./sheet-details";
 
@@ -24,24 +26,44 @@ export const ARTIFACT_KIND: Record<ArtifactKind, { label: string; icon: IconComp
 /**
  * The page from its capability address, never `srcdoc` or a blob address, which would run under the dashboard's origin.
  * Without `allow-same-origin` it gets an opaque origin, so its scripts cannot reach the dashboard or its token.
+ * `&frame=1` adds the server's image bridge, whose message about a clicked inline image opens the page's images large.
  */
 function HtmlFrame({ url, title }: RenderedProps) {
+	const frame = useRef<HTMLIFrameElement>(null);
+	const { show, viewer } = useImageList();
+	useEffect(() => {
+		const onMessage = (event: MessageEvent) => {
+			if (event.source !== frame.current?.contentWindow) return;
+			const clicked = parseArtifactImages(event.data);
+			if (clicked) show(clicked.images, clicked.index);
+		};
+		window.addEventListener("message", onMessage);
+		return () => window.removeEventListener("message", onMessage);
+	}, [show]);
 	return (
-		<iframe
-			key={url}
-			src={url}
-			title={title}
-			sandbox="allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"
-			referrerPolicy="no-referrer"
-			className="size-full border-0 bg-white"
-		/>
+		<>
+			<iframe
+				ref={frame}
+				key={url}
+				src={`${url}&frame=1`}
+				title={title}
+				sandbox="allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"
+				referrerPolicy="no-referrer"
+				className="size-full border-0 bg-white"
+			/>
+			{viewer}
+		</>
 	);
 }
 
 function SvgImage({ url, title }: RenderedProps) {
+	const { show, viewer } = useImageList();
 	return (
 		<div className="flex size-full items-center justify-center overflow-auto p-4">
-			<img src={url} alt={title} className="size-full object-contain" />
+			<button {...activityControl("media-viewer.open")} type="button" aria-label={`Open ${title}`} onClick={() => show([{ src: url, caption: title }], 0)} className="size-full cursor-zoom-in rounded-md">
+				<img src={url} alt={title} className="size-full object-contain" />
+			</button>
+			{viewer}
 		</div>
 	);
 }

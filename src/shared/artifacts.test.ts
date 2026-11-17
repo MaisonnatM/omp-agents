@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ARTIFACT_KINDS, parseArtifactSave, parseVersionName, versionName } from "./artifacts";
+import { ARTIFACT_IMAGES_MESSAGE, ARTIFACT_KINDS, parseArtifactImages, parseArtifactSave, parseVersionName, versionName } from "./artifacts";
 
 const save = { file: "pages/index.html", kind: "html", title: "Page", note: null, sha256: "a".repeat(64), bytes: 12, savedAt: 1_700_000_000_000 };
 
@@ -25,5 +25,12 @@ describe("artifact boundaries", () => {
 	});
 	test("refuses unbounded and malformed version names", () => {
 		for (const raw of ["", `${save.sha256}.pdf`, `${save.sha256}.html/../x`, `${save.sha256}.html.extra`, `${"A".repeat(64)}.html`, `${"a".repeat(63)}.html`]) expect(parseVersionName(raw)).toBeNull();
+	});
+	test("a frame's image message opens only inline images, with a caption for each", () => {
+		const png = "data:image/png;base64,AAAA";
+		const message = { type: ARTIFACT_IMAGES_MESSAGE, images: [{ src: png, alt: " Hero " }, { src: png, alt: "" }], index: 1 };
+		expect(parseArtifactImages(message)).toEqual({ images: [{ src: png, caption: "Hero" }, { src: png, caption: "Image" }], index: 1 });
+		for (const bad of [{ ...message, type: "other" }, { ...message, index: 2 }, { ...message, index: -1 }, { ...message, images: [{ src: "https://attacker.example/x.png" }] }, { ...message, images: [{ src: "/api/media?path=/etc/hosts" }] }, null])
+			expect(parseArtifactImages(bad)).toBeNull();
 	});
 });

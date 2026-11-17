@@ -40,6 +40,8 @@ SVG has no scripts or network sources, and Markdown is served as plain text for 
 Every kind sends `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `Cache-Control: private, max-age=31536000, immutable`.
 A malformed session or version returns 400 before any capability check.
 A missing or wrong capability returns 403, even when the request carries a bearer token.
+With `&frame=1`, which only the Artifacts tab's frame sends, the route appends `IMAGE_BRIDGE` to an HTML version: a click on an inline `data:image/` image that no link or button holds and no handler cancelled posts the page's inline images and the clicked one's place to the parent as `ARTIFACT_IMAGES_MESSAGE`.
+The capability does not cover `frame`, so the same link serves the saved bytes untouched to **Download** and **Open in browser**.
 
 ## Page
 
