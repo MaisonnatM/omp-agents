@@ -4,6 +4,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useMemo } from "react";
 import { type ChangedFile, editHunks, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals } from "../../src/shared/transcript";
 import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { shortPaths } from "../changes-model";
 import { age, readTime } from "../labels";
@@ -78,12 +79,14 @@ function Change({ path, change }: { path: string; change: FileChange }) {
 interface FileLook {
 	icon: IconComponent;
 	label: string;
+	/** The tint of the file's mark, as affectUI's change summary tints its trend marks: green for new, red for deleted, gray for edited. */
+	mark: string;
 }
 
 const FILE_LOOK: Record<FileStatus, FileLook> = {
-	created: { icon: IconPageAdd, label: "New file" },
-	edited: { icon: IconFileEdit, label: "Edited" },
-	deleted: { icon: IconPageCross, label: "Deleted" },
+	created: { icon: IconPageAdd, label: "New file", mark: "bg-diff-addition/10 text-diff-addition-foreground" },
+	edited: { icon: IconFileEdit, label: "Edited", mark: "bg-muted text-muted-foreground" },
+	deleted: { icon: IconPageCross, label: "Deleted", mark: "bg-diff-deletion/10 text-diff-deletion-foreground" },
 };
 
 /** A changed file's look and what happened to it: its kind, how often, and when last. */
@@ -119,8 +122,9 @@ export function FileChangesDialog({ file, onClose }: { file: ChangedFile; onClos
 }
 
 /**
- * The changed files in first-touch order, each by its type's icon and its name, with the folders that tell it from
- * another file of the same name; the tooltip holds the whole path and what happened to it.
+ * The changed files in first-touch order, in the look of affectUI's change summary: each a row under a hairline, its
+ * type's icon in a mark tinted by what happened to it, its name with the folders that tell it from another file of the
+ * same name, and its line counts; the tooltip holds the whole path and what happened to it.
  */
 export function ChangedFileList({ files, onOpen }: { files: ChangedFile[]; onOpen: (path: string) => void }) {
 	const labels = shortPaths(files.map(file => file.path));
@@ -128,22 +132,25 @@ export function ChangedFileList({ files, onOpen }: { files: ChangedFile[]; onOpe
 		<ul aria-label="Files changed" className="px-1 py-1">
 			{files.map((file, index) => {
 				const { name, dir } = labels[index]!;
-				const { status, summary } = factsOf(file);
+				const { status, look, summary } = factsOf(file);
 				const Icon = iconOf(name);
 				return (
-					<li key={file.path}>
+					// The rows rise in one after another, from the thirteenth on together, as the change summary's do.
+					<li key={file.path} className="border-t border-border/60 first:border-t-0 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-500 motion-safe:fill-mode-both" style={{ animationDelay: `${120 + Math.min(index, 12) * 70}ms` }}>
 						<Tooltip content={`${file.path} · ${summary}`} side="left">
 							<button
 								{...activityControl("changes-card.file")}
 								type="button"
 								aria-haspopup="dialog"
 								onClick={() => onOpen(file.path)}
-								className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+								className="flex h-8 w-full min-w-0 items-center gap-2.5 rounded-md px-2 text-left text-[13px] outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 							>
-								<Icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-								<span className="min-w-0 truncate">
+								<span aria-hidden className={cn("grid size-5 shrink-0 place-items-center rounded-[5px]", look.mark)}>
+									<Icon className="size-3" />
+								</span>
+								<span className="min-w-0 flex-1 truncate">
 									{dir && <span className="text-muted-foreground">{dir}</span>}
-									<span className={status === "deleted" ? "text-muted-foreground line-through" : "text-foreground"}>{name}</span>
+									<span className={status === "deleted" ? "text-muted-foreground line-through" : "font-medium text-foreground"}>{name}</span>
 								</span>
 								<LineCounts {...lineTotals(file.changes)} />
 							</button>

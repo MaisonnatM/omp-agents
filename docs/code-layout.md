@@ -27,7 +27,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   The session title in either header, which a click turns into a field that renames the session, is `SessionTitle` in `web/components/session-title.tsx`.
   Which split a plain click brings back, and each split's sizes, live in `web/pane-navigation.ts`, which `web/dashboard-state.ts` runs for every pane change.
 - Desktop link address at the bottom left: `DesktopLinkPreview` in `web/components/desktop-link-preview.tsx`, mounted by `web/app.tsx`.
-- Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx` and tool calls and thinking as `ActivityGroup`, on shadcn's `Trace` from `web/components/ui/trace.tsx`.
+- Transcript: `web/components/transcript.tsx`, with message bubbles from `web/components/ui/chat-message.tsx` and tool calls and thinking as `ActivityGroup`, on `ToolCallGroup` and `ToolCallCard` from `web/components/ui/tool-call-card.tsx` and `ThinkingState` from `web/components/ui/thinking-state.tsx`.
   A message's code block is `CodeBlock` from `web/components/ui/code-block.tsx`, which `web/components/message-markdown.tsx` renders for each fence.
   In a session's conversation, a `mermaid` or `chart` fence is `SessionVisual` from `web/components/session-visual.tsx` instead, through the `SESSION_AGENT_PRESET` and `SESSION_PROMPT_PRESET` that `MessageRow` passes, and its chart is shadcn's `web/components/ui/chart.tsx`.
   The turn minimap on its left edge is `TranscriptMinimap` in `web/components/transcript-minimap.tsx`, with its turns from the `outline` of the `transcriptModel` in `web/transcript-view.ts` that `Transcript` builds.
@@ -94,7 +94,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - The desktop app's own pages while no dashboard shows, **Starting omp agents…**, the error page with the server's output and **Retry**, and **Install omp to get started**: `notice`, `showError`, and `showOmpMissing` in `desktop/main.ts`, which `showServerEvent` there picks from what `ServerSupervisor` in `desktop/server-supervisor.ts` reports.
 - Pages, each routed by `web/routing.ts`:
   - Get started: `web/components/get-started.tsx`, the step-by-step setup dialog and its bottom-right bubble under the toasts, mounted in `web/app.tsx` and open at `#get-started` and on a vacant home's first run, with each step's body in `web/components/get-started-steps.tsx`, the Tools and workflows step in `web/components/get-started-tools.tsx`, and its facts and surface choice in `web/get-started-model.ts`.
-  - The empty home, with **New session** and **Get started**: `EmptyHome` in `web/components/empty-home.tsx`, which `PageSwitch` draws.
+  - The empty home, with **New session**, **Get started**, and the **Running now** pill of live sessions: `EmptyHome` in `web/components/empty-home.tsx`, which `PageSwitch` draws, with the pill from `web/components/ui/running-now.tsx`.
   - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, which docks the composer at the page's bottom with a new session's directory and branch pickers above it, draws `RetroGrid` from `web/components/dithercn/retro-grid.tsx` behind a new session, and shows a private draft's `PrivateFacts` from `web/components/new-session-modes.tsx` under the composer.
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button and the **Repositories** popover at its top, and one pull request in `pr-page.tsx` beside it.
   - Tickets: `web/components/tickets/tickets-page.tsx`.
@@ -121,8 +121,11 @@ Start a UI change here, then read that file's entry under [Page](#page).
     Settings › Storage, with allocated usage, native cleanup previews, phase progress, and global cleanup rules: `StorageTab` in `web/components/settings/storage-tab.tsx`, with phase presentation and the sequential run driver in `web/storage.ts`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry and some from shadcn's, with the shadcn utilities they need in `web/shadcn.css`; change them only as `web/components/ui/PATCHES.md` describes.
-- Colors, the font, text sizes, the `phone` breakpoint, the `surface-glass` and `inset-panel` utilities, and the `revealed` variant, for what shows only on hover or focus: the tokens in `web/globals.css`, whose surfaces, `--background`, `--card`, `--popover`, `--secondary`, `--muted`, `--accent`, `--border`, `--input`, the `--sidebar` set, `--hover`, and `--active`, put the window and the sidebar on `--sidebar` and the page in inset panels on `--background`.
-  Its other tokens are T3 Code's light and dark values for every token the two apps share, with the system font stack, T3's `text-2xs` (11px) and `text-3xs` (10px), and `phone`, 45rem, the 720 px under which the sidebars float; the `--surface-*`, `--shadow-*`, `--selected`, `--tint`, and `--focus-ring` tokens stay Fluid's, since T3 has none of them.
+- Colors, the font, text sizes, the `phone` breakpoint, the `surface-glass` and `inset-panel` utilities, and the `revealed` variant, for what shows only on hover or focus: the tokens in `web/globals.css`, which put the window and the sidebar on `--sidebar` and the page in inset panels on `--background`.
+  Each color, radius, shadow, and font token points at affectUI's Clean look, the `--aui-*` light and dark values in `web/affectui-tokens.css`, with Inter from `@fontsource-variable/inter`.
+  `--sidebar`, `--muted`, `--secondary`, `--accent`, `--sidebar-accent`, and the dark `--surface-3` to `--surface-8` are affectUI's surface under its `--aui-subtle` wash, written as opaque hex so a sticky header hides what scrolls under it.
+  A status's base token, such as `--destructive`, is affectUI's palette hue for fills and tints, and its `-foreground` is affectUI's text grade of it.
+  T3's `text-2xs` (11px) and `text-3xs` (10px) stay, and `phone`, 45rem, is the 720 px under which the sidebars float.
 
 ## Server
 

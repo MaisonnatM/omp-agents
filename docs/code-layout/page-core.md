@@ -16,7 +16,7 @@
   `web/get-started-model.ts` holds what it decides without React: `Observation` and `observation()`, `firstSessionFact`, which reads the roster into the first-session fact `web/app.tsx` passes it, and `getStartedSurface`, which picks the dialog, the bubble, or nothing.
   It derives completion from the providers, terminal-session, starter-kit, and source-control reads and the existing global session/integration stores; only dismissal, the closed dialog, and the step on screen are stored locally, never portable completion ticks.
   `#get-started` and the command menu always open the dialog over the home or panes `PageSwitch` draws.
-- `web/components/empty-home.tsx`: `EmptyHome`, the neutral home `PageSwitch` draws when no session or page shows, with New session / Get started and any registry error.
+- `web/components/empty-home.tsx`: `EmptyHome`, the neutral home `PageSwitch` draws when no session or page shows, with New session / Get started, any registry error, and, while sessions are live, the **Running now** pill from `web/components/ui/running-now.tsx`, whose rows `runningTasks` builds from the live sessions.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request, a Linear issue, or a todo, which runs in the background.

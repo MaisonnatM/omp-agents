@@ -8,7 +8,7 @@ import type { DashboardState } from "../dashboard-state";
 import { DAY_FORMAT, providerOrg } from "../labels";
 import { useHoverPopover } from "../use-hover-popover";
 import { useMinute } from "../use-minute";
-import { GaugeCell, GaugeTile, TONE_CLASS, type Tone } from "./gauge-tile";
+import { GaugeBar, GaugeCell, GaugeTile, TONE_CLASS, type Tone } from "./gauge-tile";
 import { dollars } from "./settings/analytics-format";
 import { OrgIcon } from "./org-icon";
 
@@ -83,6 +83,9 @@ const percentLeft = (window: PlanWindow): number => Math.round(window.remaining 
 const windowTone = (window: PlanWindow): Tone => (window.exhausted ? "out" : window.remaining < LOW ? "low" : "ok");
 const extraTone = (extra: ExtraUsage): Tone => (extra.exhausted ? "out" : (shareLeft(extra.used, extra.limit) ?? 1) < LOW ? "low" : "ok");
 const leftLabel = (window: PlanWindow): string => (window.exhausted ? "used up" : `${percentLeft(window)}% left`);
+/** The open window with the least left, which the tile shows and the card leads with. */
+const tightestWindow = (windows: readonly PlanWindow[]): PlanWindow | undefined => windows.filter(window => !window.exhausted).sort((a, b) => a.remaining - b.remaining)[0];
+const PILL_CLASS: Record<Exclude<Tone, "ok">, string> = { out: "bg-destructive/10 text-destructive-foreground", low: "bg-warning-surface text-warning-foreground" };
 
 const resetCreditCount = (count: number): string => (count === 1 ? "1 reset credit" : `${count} reset credits`);
 
@@ -124,7 +127,7 @@ export function planGauge(plan: PlanUsage, tag: string | undefined): PlanGauge {
 		const caption = face.caption === plan.name || face.caption === plan.account ? null : face.caption;
 		return { ...face, label: [plan.name, plan.account, caption, ...says].filter(Boolean).join(", "), detail: { kind: "card" } };
 	};
-	const open = plan.windows.filter(window => !window.exhausted).sort((a, b) => a.remaining - b.remaining)[0];
+	const open = tightestWindow(plan.windows);
 	const usedUp = plan.windows.filter(window => window.exhausted).length;
 	if (open) {
 		const percent = percentLeft(open);
@@ -151,54 +154,71 @@ export function planGauge(plan: PlanUsage, tag: string | undefined): PlanGauge {
 	return named({ left: null, value: null, tone: "ok" }, `${caption}: omp usage reports no balance.`);
 }
 
-/** The share of a window left, as a bar that empties as the window is used. */
-function Meter({ window }: { window: PlanWindow }) {
-	return (
-		<span aria-hidden className="relative col-span-2 block h-1.5 overflow-hidden rounded-full bg-foreground/12">
-			<span className={cn("absolute inset-y-0 left-0", TONE_CLASS[windowTone(window)].bar)} style={{ width: `${percentLeft(window)}%` }} />
-		</span>
-	);
-}
-
-/** The card a plan's tile opens: every window with its bar and reset, the spend past the plan, and the reset credits. */
+/** The card a plan's tile opens, in the look of affectUI's usage meter: the tightest window as a figure, then every window with its bar and reset, the spend past the plan, and the reset credits. */
 export function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
+	const tightest = tightestWindow(plan.windows);
+	const usedUp = plan.windows.filter(window => window.exhausted).length;
+	const state: Tone = usedUp > 0 ? "out" : tightest ? windowTone(tightest) : "ok";
 	return (
 		<>
-			<div className="border-b border-border px-3 py-2">
-				<p className="flex items-center gap-2 text-sm font-medium">
-					<OrgIcon org={providerOrg(plan.provider)} fallback={null} />
-					{plan.name}
-				</p>
-				{plan.account && <p className="text-xs text-muted-foreground">{plan.account}</p>}
-			</div>
-			{(plan.windows.length > 0 || plan.extra) && (
-				<div className="flex flex-col gap-3 px-3 py-2.5">
-					{plan.windows.map(window => (
-						<div key={window.id} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-xs">
-							<span className="truncate">{window.title}</span>
-							<span className={cn("tabular-nums", TONE_CLASS[windowTone(window)].text)}>
-								{leftLabel(window)}
-								{window.usd && <span className="text-muted-foreground"> · {spendLabel(window.usd)} spent</span>}
+			<div className="flex flex-col gap-4 p-4">
+				<header className="min-w-0">
+					<h3 className="flex items-center gap-2 text-sm font-medium">
+						<OrgIcon org={providerOrg(plan.provider)} fallback={null} />
+						<span className="truncate">{plan.name}</span>
+					</h3>
+					{plan.account && <p className="truncate text-xs text-muted-foreground">{plan.account}</p>}
+				</header>
+				{plan.windows.length > 0 && (
+					<div className="flex items-center justify-between gap-2">
+						<p className="flex min-w-0 items-baseline gap-2">
+							<strong className={cn("text-2xl font-medium tracking-tight tabular-nums", !tightest && TONE_CLASS.out.text)}>{tightest ? `${percentLeft(tightest)}%` : "Used up"}</strong>
+							{tightest && <span className="truncate text-xs text-muted-foreground">left of {tightest.title}</span>}
+						</p>
+						{tightest && state !== "ok" && (
+							<span className={cn("inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-px text-xs", PILL_CLASS[state])}>
+								<span aria-hidden className="size-1.5 rounded-full bg-current" />
+								{usedUp > 0 ? `${usedUp} used up` : "Running low"}
 							</span>
-							<Meter window={window} />
-							{window.resetsAt !== null && (
-								<span className="col-span-2 tabular-nums text-muted-foreground">
-									Resets in {untilLabel(window.resetsAt, now)} · {RESET_FORMAT.format(window.resetsAt)}
+						)}
+					</div>
+				)}
+				{(plan.windows.length > 0 || plan.extra) && (
+					<ul aria-label="Plan limits" className="flex flex-col gap-3 border-t border-border pt-3.5">
+						{plan.windows.map(window => (
+							<li key={window.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1.5 text-xs">
+								<span className="truncate text-muted-foreground">{window.title}</span>
+								<span className={cn("tabular-nums", TONE_CLASS[windowTone(window)].text)}>
+									{leftLabel(window)}
+									{window.usd && <span className="text-muted-foreground"> · {spendLabel(window.usd)} spent</span>}
 								</span>
-							)}
-						</div>
-					))}
-					{plan.extra && (
-						<div className="flex items-center justify-between gap-3 text-xs">
-							<span className="truncate">{plan.extra.title}</span>
-							<span className={cn("tabular-nums", TONE_CLASS[extraTone(plan.extra)].text)}>
-								{spendLabel(plan.extra)} spent{plan.extra.exhausted ? ", used up" : ""}
-							</span>
-						</div>
-					)}
-				</div>
-			)}
-			{plan.resetCredits && <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">✦ {creditsLine(plan.resetCredits)}</p>}
+								<span className="col-span-2">
+									<GaugeBar fill={window.remaining} tone={windowTone(window)} />
+								</span>
+								{window.resetsAt !== null && (
+									<span className="col-span-2 tabular-nums text-muted-foreground">
+										Resets in {untilLabel(window.resetsAt, now)} · {RESET_FORMAT.format(window.resetsAt)}
+									</span>
+								)}
+							</li>
+						))}
+						{plan.extra && (
+							<li className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1.5 text-xs">
+								<span className="truncate text-muted-foreground">{plan.extra.title}</span>
+								<span className={cn("tabular-nums", TONE_CLASS[extraTone(plan.extra)].text)}>
+									{spendLabel(plan.extra)} spent{plan.extra.exhausted ? ", used up" : ""}
+								</span>
+								{plan.extra.limit !== null && (
+									<span className="col-span-2">
+										<GaugeBar fill={shareLeft(plan.extra.used, plan.extra.limit)} tone={extraTone(plan.extra)} />
+									</span>
+								)}
+							</li>
+						)}
+					</ul>
+				)}
+			</div>
+			{plan.resetCredits && <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">✦ {creditsLine(plan.resetCredits)}</p>}
 		</>
 	);
 }

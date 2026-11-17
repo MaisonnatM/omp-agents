@@ -1,4 +1,4 @@
-import { IconArrowBoxLeft, IconArrowRotateClockwise, IconCircleCheck, IconExclamationCircle, IconKey1, IconLoadingCircle, IconPlusLarge, IconSquareArrowTopRight } from "central-icons";
+import { IconArrowBoxLeft, IconArrowRotateClockwise, IconCircleCheck, IconExclamationCircle, IconKey1, IconPlusLarge, IconSquareArrowTopRight } from "central-icons";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { OrderButton } from "../order-button";
 import { LoadNote } from "../sheet-details";
 import { Callout, IntegrationList, MetaDot } from "../integrations/integration-row";
 import { Confirm } from "../integrations/mcp-connection-controls";
+import { Spinner } from "../spinner";
 import { Section } from "./editor";
 import { ProviderLogo } from "./provider-logos";
 
@@ -110,9 +111,8 @@ function LoginCallout({ login }: { login: ProviderLogin }) {
 		<div className="space-y-3">
 			<Callout
 				tone="info"
-				icon={apiKey && prompt ? IconKey1 : IconLoadingCircle}
+				icon={apiKey && prompt ? IconKey1 : Spinner}
 				role="status"
-				spin={!apiKey || !prompt}
 				action={
 					<div className="flex items-center gap-2">
 						<Button variant="ghost" size="compact" onClick={() => void cancelLogin()}>

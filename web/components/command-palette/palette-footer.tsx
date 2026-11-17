@@ -41,7 +41,7 @@ export function PaletteFooter({ icon: Icon, title, primary, onPrimary, children 
 					<>
 						<FooterButton onClick={onPrimary}>
 							{primary}
-							<Kbd>{chordLabel(ENTER)}</Kbd>
+							<Kbd size="sm">{chordLabel(ENTER)}</Kbd>
 						</FooterButton>
 						<span aria-hidden className="mx-1 h-4 w-px bg-border" />
 					</>

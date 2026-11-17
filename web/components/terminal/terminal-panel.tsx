@@ -1,5 +1,5 @@
 /** `TerminalPanel`: the resizable panel under the panes holding the terminal tabs, and its shown/height state. */
-import { IconChevronDownSmall, IconCrossMedium, IconLoader, IconPlusLarge } from "central-icons";
+import { IconChevronDownSmall, IconCrossMedium, IconPlusLarge } from "central-icons";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TerminalInfo } from "../../../src/shared/terminals";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { folderName } from "../../labels";
 import { useStoredState } from "../../stored-state";
 import { onNewTerminalRequest } from "../../terminal-requests";
 import { Separator, useDragSeparator } from "../drag-separator";
+import { Spinner } from "../spinner";
 import { LOADING_TABS, readTerminalTabs, type TerminalTabs } from "./terminal-inventory";
 import { closeEndsShell, newTab, nextTabState, type Tab, type TabEvent, tabTerminal } from "./terminal-tab";
 import type { TerminalHandle } from "./terminal-view";
@@ -172,7 +173,7 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 										onClick={() => close(tab)}
 										className="mr-1 rounded-sm p-0.5 opacity-60 outline-none hover:bg-foreground/10 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
 									>
-										{closing ? <IconLoader className="size-3 animate-spin" /> : <IconCrossMedium className="size-3" />}
+										{closing ? <Spinner className="size-3" /> : <IconCrossMedium className="size-3" />}
 									</button>
 								</Tooltip>
 							</div>

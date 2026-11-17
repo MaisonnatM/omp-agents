@@ -8,6 +8,7 @@ import type { YourMove } from "../../src/shared/moves";
 import type { Notice } from "../../src/shared/notices";
 import type { ClientMsg } from "../../src/shared/protocol";
 import { Button } from "@/components/ui/button";
+import { DecisionInbox } from "@/components/ui/decision-inbox";
 import { PageFrame } from "./list-page";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -272,7 +273,7 @@ function NoticeAction({ id, action, send, onDone }: { id: string; action: Action
 	}
 }
 
-function NoticeRow({ notice, send }: { notice: Notice; send: Send }) {
+function NoticeRow({ notice, send, className }: { notice: Notice; send: Send; className?: string }) {
 	const { connected } = useDashboardStatus();
 	const { headline, preview, failed, busy, link, face, action } = presentNotice(notice, Date.now());
 	const read = () => {
@@ -284,7 +285,7 @@ function NoticeRow({ notice, send }: { notice: Notice; send: Send }) {
 		if (action.kind === "quick") follow(link);
 	};
 	return (
-		<li className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/70 has-[>a:focus-visible]:bg-muted/70">
+		<li className={cn("group relative flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/70 has-[>a:focus-visible]:bg-muted/70", className)}>
 			{link ? (
 				<a
 					{...activityControl("notices.item")}
@@ -392,7 +393,9 @@ export function NotificationsPage({ notices }: { notices: Notice[] }) {
 					</div>
 				) : (
 					<>
-						{section("New", shownUnread)}
+						<DecisionInbox title={shownUnread.length === 0 ? "All caught up" : `${shownUnread.length} new`} waiting={shownUnread.length > 0} className="mt-2">
+							{shownUnread.length > 0 && shownUnread.map(notice => <NoticeRow key={notice.id} notice={notice} send={send} className="rounded-none px-4" />)}
+						</DecisionInbox>
 						{section("Earlier", shown.filter(notice => notice.read))}
 					</>
 				)}

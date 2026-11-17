@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "@xterm/xterm/css/xterm.css";
 @import "./shadcn.css";
+@import "./affectui-tokens.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -30,90 +31,94 @@
   }
 }
 
-/* The surface tokens, from --background to --active, are Capy's: the window and the sidebar sit on --sidebar, the work on --background, in inset panels with --border hairlines.
-   The rest are T3 Code's (apps/web/src/index.css), so its pull request panel and this one draw from one palette.
-   Their color-mix()es name palette colors where T3's name other tokens: Bun's CSS build keeps one color-mix() override per rule and serves the rest their first color. */
+/* The app's tokens wear affectUI's Clean look (`web/affectui-tokens.css`), so the ported affectUI components and the rest of the page draw from one palette.
+   The window and the sidebar sit on --sidebar, the work on --background, in inset panels with --border hairlines.
+   A status's base token is its palette hue, for fills and tints; its -foreground is affectUI's text grade of it.
+   The hex values below are affectUI tokens composited where a fill must be opaque, such as a sticky header on bg-muted:
+   --sidebar and --muted are --aui-surface under one --aui-subtle wash, --accent under two, --sidebar-accent is --sidebar under two.
+   They stay literal because Bun's CSS build keeps one color-mix() override per rule and serves the rest their first color. */
 :root {
   color-scheme: light;
-  --radius: 0.5rem;
+  --radius: var(--aui-radius-lg);
   --page-header-height: 3rem;
   /* How far past a header's own padding its content starts on a phone, where the floating Sessions sidebar's toggle sits over its left corner. */
   --sidebar-toggle-clearance: 2.25rem;
   /* The desktop window's title bar over the top row, which `startDesktopTitleBar` in `web/desktop-title-bar.ts` marks; none in a browser. */
   --title-bar-height: 0px;
-  --background: #ffffff;
-  --foreground: #1c1c1e;
-  --card: #ffffff;
-  --card-foreground: #1c1c1e;
-  --popover: #ffffff;
-  --popover-foreground: #1c1c1e;
-  --primary: #2f5be8;
-  --primary-foreground: var(--color-white);
+  --background: var(--aui-surface);
+  --foreground: var(--aui-ink);
+  --card: var(--aui-surface);
+  --card-foreground: var(--aui-ink);
+  --popover: var(--aui-overlay);
+  --popover-foreground: var(--aui-ink);
+  --primary: var(--aui-primary);
+  --primary-foreground: var(--aui-on-primary);
   --dither-ink: var(--primary);
   --dither-paper: var(--background);
   --dither-cell: 3px;
   --dither-bloom: 0.6;
-  --secondary: #f2f2f3;
-  --secondary-foreground: #1c1c1e;
-  --muted: #f2f2f3;
-  --muted-foreground: #6b6b70;
-  --accent: #efeff1;
-  --accent-foreground: #1c1c1e;
-  --destructive: var(--color-red-500);
-  --destructive-foreground: var(--color-red-700);
-  --success: #22a547;
-  --success-foreground: var(--color-emerald-700);
+  --secondary: var(--muted);
+  --secondary-foreground: var(--aui-ink);
+  --muted: #f7f7f7;
+  --muted-foreground: var(--aui-muted);
+  --accent: #f0f0f0;
+  --accent-foreground: var(--aui-ink);
+  --destructive: var(--aui-red);
+  --destructive-foreground: var(--aui-danger);
+  --success: var(--aui-green);
+  --success-foreground: var(--aui-success);
   --diff-addition: var(--success);
   --diff-deletion: var(--destructive);
-  --diff-addition-foreground: var(--color-emerald-600);
-  --diff-deletion-foreground: var(--color-red-600);
-  --warning: var(--color-amber-500);
-  --warning-foreground: var(--color-amber-700);
-  --warning-surface: color-mix(in srgb, var(--color-amber-500) 8%, transparent);
-  --border: #e7e7e9;
-  --input: #dededf;
-  --ring: var(--primary);
-  --sidebar: #f5f5f6;
+  --diff-addition-foreground: var(--aui-success);
+  --diff-deletion-foreground: var(--aui-danger);
+  --warning: var(--aui-orange);
+  --warning-foreground: var(--aui-warning);
+  --warning-surface: var(--aui-warning-soft);
+  --border: var(--aui-border);
+  --input: var(--aui-border-strong);
+  --ring: var(--aui-focus);
+  --sidebar: #f7f7f7;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: #e9e9eb;
+  --sidebar-accent: #e8e8e8;
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: transparent;
   --sidebar-ring: var(--ring);
   --glass-blur: 12px;
   --glass-opacity: 80%;
   --glass-saturation: 1.14;
-  --surface-1: #FAFAFA;
-  --surface-2: #FCFCFC;
-  --surface-3: #FFFFFF;
-  --surface-4: #FFFFFF;
-  --surface-5: #FFFFFF;
-  --surface-6: #FFFFFF;
-  --surface-7: #FFFFFF;
-  --surface-8: #FFFFFF;
-  --shadow-color: rgb(0 0 0 / 0.06);
-  --shadow-1: 0 0 0 1px var(--shadow-color);
-  --shadow-2: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color);
-  --shadow-3: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color);
-  --shadow-4: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color);
-  --shadow-5: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color);
-  --shadow-6: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color);
-  --shadow-7: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color), 0 48px 48px -24px var(--shadow-color);
-  --shadow-8: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color), 0 48px 48px -24px var(--shadow-color), 0 96px 96px -48px var(--shadow-color);
-  --hover: rgb(0 0 0 / 0.045);
-  --active: rgb(0 0 0 / 0.075);
-  --selected: #D4D4D4;
-  --destructive-light: #FEF2F2;
+  --surface-1: var(--aui-surface);
+  --surface-2: var(--aui-overlay);
+  --surface-3: var(--aui-overlay);
+  --surface-4: var(--aui-overlay);
+  --surface-5: var(--aui-overlay);
+  --surface-6: var(--aui-overlay);
+  --surface-7: var(--aui-overlay);
+  --surface-8: var(--aui-overlay);
+  /* affectUI has two depths: what rests on the page lifts like a card, what floats over it like a popover. */
+  --shadow-color: rgb(0 0 0 / 0.05);
+  --shadow-1: var(--aui-shadow-card);
+  --shadow-2: var(--aui-shadow-card);
+  --shadow-3: var(--aui-shadow-card);
+  --shadow-4: var(--aui-shadow-popover);
+  --shadow-5: var(--aui-shadow-popover);
+  --shadow-6: var(--aui-shadow-popover);
+  --shadow-7: var(--aui-shadow-popover);
+  --shadow-8: var(--aui-shadow-popover);
+  --hover: var(--aui-subtle);
+  --active: rgb(0 0 0 / 0.06);
+  --selected: var(--aui-border-strong);
+  --destructive-light: var(--aui-danger-soft);
   --overlay: 0 0 0;
-  --focus-ring: #6B97FF;
-  --tint: rgb(0 0 0 / 0.08);
+  --focus-ring: var(--aui-focus);
+  --tint: var(--aui-border);
   --tint-hover: rgb(0 0 0 / 0.065);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --chart-1: var(--aui-blue);
+  --chart-2: var(--aui-green);
+  --chart-3: var(--aui-amber);
+  --chart-4: var(--aui-purple);
+  --chart-5: var(--aui-red);
 }
 
 /* In the desktop app on macOS the top row is the window's title bar, its buttons over the row's left end. */
@@ -123,43 +128,20 @@
 
 .dark {
   color-scheme: dark;
-  --background: #141414;
-  --foreground: #e8e8e8;
-  --card: #1a1a1a;
-  --card-foreground: #e8e8e8;
-  --popover: #1c1c1c;
-  --popover-foreground: #e8e8e8;
-  --primary: #4f5ff5;
   --dither-bloom: 1;
-  --secondary: #1f1f1f;
-  --secondary-foreground: #e8e8e8;
-  --muted: #1c1c1c;
-  --muted-foreground: #8a8a8a;
-  --accent: #222222;
-  --accent-foreground: #e8e8e8;
-  --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
-  --destructive-foreground: var(--color-red-400);
-  --success: #34c759;
-  --success-foreground: var(--color-emerald-400);
-  --diff-addition-foreground: var(--color-emerald-400);
-  --diff-deletion-foreground: var(--color-red-400);
-  --warning-foreground: var(--color-amber-400);
-  --warning-surface: color-mix(in srgb, var(--color-amber-500) 16%, transparent);
-  --border: rgb(255 255 255 / 0.07);
-  --input: rgb(255 255 255 / 0.1);
-  --sidebar: #0b0b0b;
-  --sidebar-accent: #1c1c1c;
+  --muted: #252527;
+  --accent: #2e2e30;
+  --sidebar: #252527;
+  --sidebar-accent: #363638;
   --sidebar-border: transparent;
   --glass-blur: 16px;
   --glass-saturation: 1.08;
-  --surface-1: #171717;
-  --surface-2: #1E1E1E;
-  --surface-3: #252525;
-  --surface-4: #2C2C2C;
-  --surface-5: #333333;
-  --surface-6: #3A3A3A;
-  --surface-7: #414141;
-  --surface-8: #484848;
+  --surface-3: #28282b;
+  --surface-4: #313133;
+  --surface-5: #39393b;
+  --surface-6: #414143;
+  --surface-7: #49494a;
+  --surface-8: #505051;
   --dm-hi-base: rgba(255,255,255,0.01);
   --dm-hi-mid: rgba(255,255,255,0.02);
   --dm-hi-high: rgba(255,255,255,0.04);
@@ -168,30 +150,14 @@
   --dm-ring-mid: rgba(255,255,255,0.04);
   --dm-ring-high: rgba(255,255,255,0.06);
   --dm-drop: rgba(0,0,0,0.18);
-  --shadow-1: inset 0 0 0 1px var(--dm-ring-base);
-  --shadow-2: inset 0 1px 0 0 var(--dm-hi-base), inset 0 0 0 1px var(--dm-ring-base), 0 1px 1px -0.5px var(--dm-drop);
-  --shadow-3: inset 0 1px 0 0 var(--dm-hi-mid), inset 0 0 0 1px var(--dm-ring-base), 0 0 0 1px rgba(0,0,0,0.12), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop);
-  --shadow-4: inset 0 1px 0 0 var(--dm-hi-mid), inset 0 0 0 1px var(--dm-ring-mid), 0 0 0 1px rgba(0,0,0,0.14), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop);
-  --shadow-5: inset 0 1px 0 0 var(--dm-hi-high), inset 0 0 0 1px var(--dm-ring-mid), 0 0 0 1px rgba(0,0,0,0.16), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop);
-  --shadow-6: inset 0 1px 0 0 var(--dm-hi-high), inset 0 0 0 1px var(--dm-ring-high), 0 0 0 1px rgba(0,0,0,0.18), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop);
-  --shadow-7: inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high), 0 0 0 1px rgba(0,0,0,0.20), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop), 0 48px 48px -24px var(--dm-drop);
-  --shadow-8: inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high), 0 0 0 1px rgba(0,0,0,0.22), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop), 0 48px 48px -24px var(--dm-drop), 0 96px 96px -48px var(--dm-drop);
-  --hover: rgb(255 255 255 / 0.05);
-  --active: rgb(255 255 255 / 0.09);
-  --selected: #525252;
-  --destructive-light: #450A0A;
+  --active: rgb(255 255 255 / 0.08);
   --overlay: 255 255 255;
-  --tint: rgb(255 255 255 / 0.25);
-  --tint-hover: rgb(255 255 255 / 0.2);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  --tint-hover: rgb(255 255 255 / 0.11);
 }
 
 @theme inline {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-sans: var(--aui-font);
+  --font-mono: var(--aui-font-mono);
   --container-conversation: 48rem;
   /* A phone's width, under which the sidebars float: their least width plus the session pane's, `PHONE_MAX_WIDTH` in `web/components/sidebar-panel.tsx`. */
   --breakpoint-phone: 45rem;
@@ -200,12 +166,12 @@
   --text-3xs: 0.625rem;
   --text-3xs--line-height: calc(0.875 / 0.625);
   --color-zinc-25: oklch(99.2% 0 0);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  /* The inset page and details panels, a step between lg and xl. */
-  --radius-panel: calc(var(--radius) + 2px);
+  --radius-sm: var(--aui-radius-sm);
+  --radius-md: var(--aui-radius);
+  --radius-lg: var(--aui-radius-lg);
+  --radius-xl: calc(var(--aui-radius-lg) + 4px);
+  /* The inset page and details panels: affectUI's card radius. */
+  --radius-panel: var(--aui-radius-lg);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -380,6 +346,12 @@
     transform: translateX(300%);
   }
 }
+/* A `Skeleton`'s sheen, sweeping across it then resting; outside @theme for the same reason. */
+@keyframes skeleton-sweep {
+  60%, 100% {
+    translate: 100% 0;
+  }
+}
 
 /* The conversation column. */
 @utility conversation-lane {
@@ -446,7 +418,7 @@
 }
   .shimmer-text {
     color: transparent;
-    background: linear-gradient(90deg, #a3a3a3 0%, #a3a3a3 35%, #525252 50%, #a3a3a3 65%, #a3a3a3 100%);
+    background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--muted-foreground) 35%, var(--foreground) 50%, var(--muted-foreground) 65%, var(--muted-foreground) 100%);
     background-size: 300% 100%;
     background-clip: text;
     -webkit-background-clip: text;

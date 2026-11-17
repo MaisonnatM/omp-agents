@@ -481,7 +481,7 @@ function AccessoryView({ accessory }: { accessory: Accessory }) {
 			return (
 				<span className="flex shrink-0 gap-1">
 					{accessory.labels.map(label => (
-						<Kbd key={label} className="h-5 min-w-5 text-[11px]">
+						<Kbd key={label} size="sm">
 							{label}
 						</Kbd>
 					))}

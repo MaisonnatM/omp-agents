@@ -1,6 +1,6 @@
-/** `FolderRows`: a folder tree's rows, each folder a button that opens and closes it, which the changes explorer and the settings file rails share; `useFolders` keeps which folders are open. */
-import { IconChevronDownSmall, IconChevronRight, IconFolder1 } from "central-icons";
-import { Fragment, type ReactNode, useState } from "react";
+/** `FolderRows`: a folder tree's rows in the look of affectUI's tree view, each folder a button that opens and closes it, which the changes explorer and the settings file rails share; `useFolders` keeps which folders are open. */
+import { IconChevronRight, IconFolder1, IconFolderOpen } from "central-icons";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { foldersAbove, type TreeDir } from "../changes-model";
 
 /** Which folders of a tree are closed, and the toggle that opens or closes one. */
@@ -38,10 +38,16 @@ export function useFolders<T extends { path: string }>(tree: TreeDir<T>, open: s
 	};
 }
 
-/** How far a folder's row at `depth` sits from the tree's edge, in pixels. */
-const indentOf = (depth: number): number => depth * 12 + 4;
+/** How far a folder's row at `depth` sits from the tree's edge, in pixels: 16 a level, as affectUI's tree view indents. */
+const indentOf = (depth: number): number => depth * 16 + 6;
 
-/** `dir`'s folders, then its files, as `<li>` rows at `depth`; a folder's rows follow it unless `folders` says it is closed. The rows take the list's font size. */
+/** The chevron's box, which a file row's indent clears and an open folder's guide runs under. */
+const CHEVRON = 16;
+
+/**
+ * `dir`'s folders, then its files, as `<li>` rows at `depth`; an open folder's rows follow it in a list of their own,
+ * with a thin guide under its chevron that darkens while one of them is the current file. The rows take the list's font size.
+ */
 export function FolderRows<T extends { path: string }>({
 	dir,
 	depth,
@@ -58,28 +64,35 @@ export function FolderRows<T extends { path: string }>({
 		<>
 			{dir.dirs.map(child => {
 				const shut = folders.isShut(child.path);
-				const Chevron = shut ? IconChevronRight : IconChevronDownSmall;
+				const Folder = shut ? IconFolder1 : IconFolderOpen;
 				return (
-					<Fragment key={child.path}>
-						<li>
-							<button
-								type="button"
-								aria-expanded={!shut}
-								className="flex w-full items-center gap-1 rounded-md py-0.5 pr-1 text-left text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-								style={{ paddingLeft: indentOf(depth) }}
-								onClick={() => folders.toggle(child.path)}
+					<li key={child.path}>
+						<button
+							type="button"
+							aria-expanded={!shut}
+							className="group/folder flex h-7 w-full items-center gap-1 rounded-md pr-1.5 text-left text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+							style={{ paddingLeft: indentOf(depth) }}
+							onClick={() => folders.toggle(child.path)}
+						>
+							<span aria-hidden className="grid size-4 shrink-0 place-items-center text-muted-foreground/60 transition-transform duration-200 ease-out group-hover/folder:text-muted-foreground group-aria-expanded/folder:rotate-90 motion-reduce:transition-none">
+								<IconChevronRight className="size-3" />
+							</span>
+							<Folder className="mr-1 size-4 shrink-0" />
+							<span className="truncate">{child.name}</span>
+						</button>
+						{!shut && (
+							<ul
+								className="relative before:pointer-events-none before:absolute before:inset-y-0.5 before:left-[var(--guide)] before:w-px before:bg-border before:transition-colors has-[>li>[aria-current]]:before:bg-foreground/20"
+								style={{ "--guide": `${indentOf(depth) + CHEVRON / 2 - 0.5}px` } as CSSProperties}
 							>
-								<Chevron aria-hidden className="size-3 shrink-0" />
-								<IconFolder1 className="size-3.5 shrink-0" />
-								<span className="truncate">{child.name}</span>
-							</button>
-						</li>
-						{!shut && <FolderRows dir={child} depth={depth + 1} folders={folders} file={file} />}
-					</Fragment>
+								<FolderRows dir={child} depth={depth + 1} folders={folders} file={file} />
+							</ul>
+						)}
+					</li>
 				);
 			})}
 			{dir.files.map(entry => (
-				<li key={entry.path}>{file(entry, indentOf(depth) + 16)}</li>
+				<li key={entry.path}>{file(entry, indentOf(depth) + CHEVRON + 4)}</li>
 			))}
 		</>
 	);

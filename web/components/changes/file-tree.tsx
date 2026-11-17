@@ -68,12 +68,12 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 			ref: current ? (row: HTMLElement | null) => void (openRow.current = row) : undefined,
 			title: `${file.path}: ${statusLabel(file)}`,
 			"aria-current": current ? ("page" as const) : undefined,
-			className: cn("flex w-full items-center gap-1.5 rounded-md py-0.5 pr-1 text-left hover:bg-muted", current && "bg-muted font-medium"),
+			className: cn("flex h-7 w-full items-center gap-2 rounded-md pr-1.5 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset", current && "bg-muted font-medium"),
 			style: { paddingLeft: indent },
 		};
 		const body = (
 			<>
-				<IconFileText className="size-3.5 shrink-0 text-muted-foreground" />
+				<IconFileText className={cn("size-4 shrink-0", current ? "text-foreground" : "text-muted-foreground")} />
 				<span className={cn("min-w-0 flex-1 truncate", file.status === "deleted" && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
 				{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
 				<LineCounts added={file.added} removed={file.removed} />
@@ -102,7 +102,7 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 		);
 	};
 	return (
-		<ul className="text-xs">
+		<ul className="text-[13px]">
 			<FolderRows dir={tree} depth={0} folders={folders} file={fileRow} />
 		</ul>
 	);

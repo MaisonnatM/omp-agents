@@ -3,7 +3,7 @@
  * status labels, the Connect button and Reconnect and Sign out items, the callout that says where the connection stands,
  * the sign-out question, and the tool list.
  */
-import { IconArrowBoxLeft, IconArrowRotateClockwise, IconChevronRight, IconExclamationCircle, IconLoadingCircle, IconSquareArrowTopRight, IconWifiNoSignal } from "central-icons";
+import { IconArrowBoxLeft, IconArrowRotateClockwise, IconChevronRight, IconExclamationCircle, IconSquareArrowTopRight, IconWifiNoSignal } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useId, useState } from "react";
 import type { McpRemoteStatus, McpTool } from "../../../src/shared/mcp-status";
@@ -13,6 +13,7 @@ import { MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { useAction } from "../../use-action";
 import type { SignInControls } from "../../use-sign-in";
+import { Spinner } from "../spinner";
 import { Callout } from "./integration-row";
 
 export interface StatusLabel {
@@ -48,7 +49,7 @@ export const ConnectButton = ({ signIn }: { signIn: SignInControls }) => (
 export const Reconnecting = ({ signIn }: { signIn: SignInControls }) =>
 	signIn.starting && (
 		<span role="status" aria-busy className="flex items-center gap-1.5 text-xs text-muted-foreground">
-			<IconLoadingCircle className="size-3.5 animate-spin" />
+			<Spinner className="size-3.5" />
 			Reconnecting…
 		</span>
 	);
@@ -137,9 +138,8 @@ export function ConnectionCallout({ approveOn, signIn, question, error, refused,
 		return (
 			<Callout
 				tone="info"
-				icon={IconLoadingCircle}
+				icon={Spinner}
 				role="status"
-				spin
 				action={
 					<Button variant="ghost" size="compact" leadingIcon={IconSquareArrowTopRight} render={<a href={signIn.waitingUrl} target="_blank" rel="noreferrer" />}>
 						Open sign-in page

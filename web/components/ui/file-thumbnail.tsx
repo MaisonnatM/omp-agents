@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useShape } from "@/lib/shape-context";
+import { Spinner } from "@/components/spinner";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs" with { type: "file" };
 
 // ─── Lazy pdfjs loader ────────────────────────────────────────────────────
@@ -164,17 +165,11 @@ function FileThumbnail({ file, size, radius, className }: FileThumbnailProps) {
           )}
         </div>
       ) : isPending ? (
-        // Circular spinner while we wait for the preview to be ready.
+        // The dashboard's Spinner while we wait for the preview to be ready.
         // Used for both images (brief URL-creation gap) and PDFs (longer
-        // pdfjs render). The thin ring is mostly subtle (border-border)
-        // with one quadrant accented (border-t-muted-foreground) so the
-        // `animate-spin` rotation reads as a moving arc.
+        // pdfjs render).
         <div className="absolute inset-0 flex items-center justify-center">
-          <div
-            className="w-6 h-6 rounded-full border-2 border-border border-t-muted-foreground animate-spin"
-            aria-label="Loading preview"
-            role="status"
-          />
+          <Spinner label="Loading preview" className="size-5 text-muted-foreground" />
         </div>
       ) : (
         // Generic document glyph, labeled with the file's extension, for files

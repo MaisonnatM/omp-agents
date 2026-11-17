@@ -18,14 +18,15 @@ const render = (entries: ActivityItem[], { expanded = false, hideThinking = fals
 test("a running group stays open and marks each line with its tool's status", () => {
 	const html = render([tool("a", "ok"), tool("b", "error"), tool("c", "running")]);
 	expect(html).toContain("Working");
-	expect(html.match(/data-status="\w+"/g)).toEqual(['data-status="running"', 'data-status="error"', 'data-status="running"']);
+	expect(html.match(/data-status="\w+"/g)).toEqual(['data-status="ok"', 'data-status="error"', 'data-status="running"']);
 	expect(html).toContain("summary a");
 });
 
 test("a finished group counts its failures and opens only when tools are expanded", () => {
 	const finished = [tool("a", "ok"), tool("b", "error")];
 	const closed = render(finished);
-	expect(closed).toContain("Ran 2 tools, 1 failed");
+	expect(closed).toContain("Ran 2 tools");
+	expect(closed).toContain("· 1 failed");
 	expect(closed).not.toContain("summary a");
 	expect(render(finished, { expanded: true })).toContain("summary a");
 });

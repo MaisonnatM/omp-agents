@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { dateLabel } from "../labels";
+import { Kbd } from "./kbd";
 
 /** A field's button in a side column: the row's width, its value in the text's color, and room for wrapped labels. */
 const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
@@ -122,7 +123,7 @@ export function FieldPicker({ field, current, trigger, look = "field", className
 											<span className="truncate">{choice.label}</span>
 											{choice.detail && <span className="flex-1 truncate text-muted-foreground">{choice.detail}</span>}
 											<IconCheckmark1 className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
-											{firstKey !== undefined && <kbd className="text-xs text-muted-foreground tabular-nums">{firstKey + index}</kbd>}
+											{firstKey !== undefined && <Kbd size="sm">{firstKey + index}</Kbd>}
 										</CommandItem>
 									))}
 								</CommandGroup>

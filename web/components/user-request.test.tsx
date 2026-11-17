@@ -41,3 +41,38 @@ test("a free-text question of the form shows a text field it can send blank, wit
 	expect(only).toContain("Send");
 	expect(only).not.toContain("Question 1 of");
 });
+
+const renderStep = (request: UserRequest) => renderToStaticMarkup(<UserRequestCard request={request} queued={0} onAnswer={async () => {}} shortcuts={false} />);
+
+test("a confirm is an approval card with No and Yes buttons and the keys that answer them", () => {
+	const html = renderStep({ id: "c", title: "Remove worktree?", deadline: null, kind: "confirm", message: "Line one\n\nLine two" });
+	expect(html).toContain("Remove worktree?");
+	expect(html).toContain("Line one\n\nLine two");
+	expect(html).toMatch(/>No<kbd[^>]*>2<\/kbd>/);
+	expect(html).toMatch(/>Yes<kbd[^>]*>1<\/kbd>/);
+	expect(html).not.toContain('role="radio"');
+});
+
+test("omp's tool approval names the tool, its reason and details, and offers its allow choices as scopes with Once first picked", () => {
+	const html = renderStep({
+		id: "a",
+		title: "Allow tool: bash\nReason: outside the workspace\nCommand: rm -rf dist",
+		deadline: null,
+		kind: "select",
+		checked: [],
+		options: [option("Approve"), option("Approve bash for this session"), option("Deny")],
+	});
+	expect(html).toContain(">bash</strong>");
+	expect(html).toContain(">outside the workspace</p>");
+	expect(html).toContain("Command: rm -rf dist</pre>");
+	expect(html).toMatch(/role="radio" aria-checked="true"[^>]*>Once</);
+	expect(html).toMatch(/role="radio" aria-checked="false"[^>]*>This session</);
+	expect(html).toMatch(/>Deny<kbd[^>]*>3<\/kbd>/);
+	expect(html).toMatch(/>Allow<kbd[^>]*>1<\/kbd>/);
+});
+
+test("a select that is not a tool approval stays a question", () => {
+	const html = renderStep({ id: "s", title: "Allow tool: bash", deadline: null, kind: "select", checked: [], options: [option("Yes"), option("No")] });
+	expect(html).not.toContain("wants to use");
+	expect(html).toContain('role="radio"');
+});

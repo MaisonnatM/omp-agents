@@ -4,6 +4,7 @@ import { type WorktreeBlockerCode, type WorktreeEntry, type WorktreeInventory, t
 import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { readWorktreeMetrics, readWorktrees } from "../../api";
 import { errorText } from "../../../src/json";
@@ -391,9 +392,10 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 
 function Pending() {
 	return (
-		<span className="inline-block h-3 w-12 rounded bg-muted motion-safe:animate-pulse">
+		<>
+			<Skeleton width={48} className="inline-block align-middle" />
 			<span className="sr-only">Measuring</span>
-		</span>
+		</>
 	);
 }
 

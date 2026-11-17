@@ -5,6 +5,21 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-16
 
+- The dashboard takes affectUI's Clean look in light and dark: the Inter font, softer grays, near-black buttons, and new shadows and corner radii.
+- Tool calls in a conversation show as small cards with the tool's icon, name, summary, and status, and the group line shows the last tools' icons and how many failed.
+- Thinking shows a small grid of dots with Thought, or a shimmering Thinking while it streams, over the text.
+- The context ring's menu opens on a card with the tokens used, a grid filled to the share used, and when auto-compaction starts.
+- A plan's usage card leads with the share left of its tightest window, then lists each limit with its bar and reset time.
+- Settings › omp memory lists memories in a card with a chip per kind, groups them by kind, searches behind a magnifier, and edits, forgets, or retires from icon buttons on each row.
+- The empty home shows a Running now pill while sessions are live, which lists them with what each is doing and which need you.
+- The model menu shows each model's logo on a small tile and an icon before each row, and Settings › Models shows each fallback as a card with its order and provider.
+- Shortcut keys, segmented tabs, toasts, loading bars, and spinners have a softer look, and a toast that stays open closes with a round ×.
+- The Overview's Files list shows each file's icon on a tinted square, green for new and red for deleted, with its line counts at the right.
+- Folder trees, in the changes dialog and Settings › Files, open with a turning chevron and show a guide line under each open folder.
+- A subagent's file diff highlights only the words that changed between a removed line and the added line that replaces it.
+- A yes-or-no question from a session shows as a card with No and Yes buttons, each with its number key.
+- A tool approval names the tool and shows what it will run, with a Once or This session choice and Deny and Allow buttons.
+- Notifications gathers unread notices in one card that says how many are new, or All caught up.
 - Down chevrons, on menus, pickers, and folding rows, use the smaller chevron-down-small icon.
 - Modules show the logo of the service they use, in the sidebar, the tabs, the command palette, and Settings › Modules: Linear for Tickets, Google Calendar for Calendar, and Gmail for Email.
 - Cmd+Shift+T reopens the last tab you closed in the header, in its old place and on the page it showed.
@@ -148,70 +163,3 @@ The dashboard shows the same lines in Settings › What's new.
 
 - The Browser's new Screen size menu shows the app as an iPhone, an iPad, or a laptop sees it, with a touch screen and Safari's user agent on the phone and tablet, so you can test its responsive layout; its Rotate turns the phone or tablet sideways, a size too big for the Browser shrinks to fit, and the session keeps its pick for 30 days.
 - A Browser picture taken at a screen size keeps that size's own width and its chip names the size, such as Mobile, 390×844.
-
-## 2026-11-10
-
-- A Claude Code session you renamed now lists under that name in the past sessions, and its transcript no longer shows Unread line warnings for Claude Code's own title and agent-name records.
-- In Settings, Source control, a pull that cannot reach its remote now says why, such as a repository that cannot be read, where it used to say only "and the repository exists." A failed settings sync says the same.
-- The server no longer stops when re-reading the session files fails right after a session exits, or when the search for a terminal session's subagent transcript fails.
-- Get started no longer waits without end on a GitHub sign-in check that hangs: the check gives up after 20 seconds.
-- Saving or removing an Anthropic API key in Settings no longer loosens the permissions of omp's models file, and no longer replaces a linked models file with a plain copy.
-- The usage check no longer copies your browsers' cookie files every minute to read the Anthropic Console balance unless an API key is saved, the only case that shows that balance.
-- A draft that starts with blanks before ! or $ is now treated like one that starts with the command: the note under the composer shows instead of Enter doing nothing, and Send later refuses it.
-- In Settings, Activity, the Tickets page's Cmd+N command now sits under the commands that are not set up while Linear is not connected, with the other ticket commands, instead of under never used.
-- The keyboard shortcuts guide now lists dictation, the number keys that answer a question, and the Sport timer's keys, and names the four pages where C does something other than create a ticket.
-- In a new mail or a reply, a pasted list of recipients that ends with a comma or a semicolon now adds the people in it, instead of being marked invalid.
-- In Settings, Extensions, an install or update no longer restarts its progress check each time the page redraws, and searching for "null" no longer lists every package that has no source.
-- Settings, Phone access no longer shows a cancelled-read error when you come back to the section.
-- In a Bot's details, a routine's "Ran 5m ago" now counts up each minute, as the routines card does.
-- The Settings guide now lists Phone access among its twenty sections.
-- Sport: saving an edit to a logged session no longer erases the loads of exercises the dialog does not list, such as those of a workout the plan no longer has on that day.
-- Sport: with no plan, the Plan suivi chart now says the plan has not started, where it drew one empty week.
-- Notes: deleting or moving another note from its right-click menu no longer closes the note you have open.
-- The starter kit's ship gate, land gate, and worktree guard now see a git or gh command written after then, do, else, {, or !, which slipped past them.
-- Linux: the arm64 AppImage can now update itself, since each release publishes its update feed too.
-- Linux: Retry in the packaged app no longer strips the session bus and runtime directory settings from the server it restarts, and the app menu no longer shows Open at Login, which did nothing there.
-- The README no longer says quitting the app stops your sessions: they keep running and show live again at the next launch.
-- Tab no longer lands on the hidden rows of a collapsed sidebar group, such as past sessions.
-- A note or a reminder a Personal session left while the dashboard was closed no longer lands in Work at the next launch.
-- Removing the last Anthropic API key no longer deletes a setting or a comment that follows the dashboard's entry in models.yml.
-- What's new no longer shows stray asterisks and backticks around names in some entries.
-- The README and guides now give the keys the app uses: Cmd+Shift+Backspace stops a turn, Enter queues a message to a terminal session's subagent and Cmd+Enter steers it, and Todo and Calendar open from the header without a tab number.
-- The starter kit's instructions no longer point agents at a pr skill, a Skill tool, and a browser tool address that do not exist.
-- Behind the scenes: removed unused imports, a prop no row read, an option no caller passed, an unused queue member, a dead build setting, and lines that could never run; declared two editor packages the page already used; merged two test files that shared a name, so both are type-checked; the starter kit's tests now load omp's own schema library; and corrected file lists, names, counts, and descriptions across the docs.
-- Ship no longer stops on a missing review checkbox: recording the stage after the interface or thermo-nuclear review ticks that review's box in the pull request description, or adds it when the description has none.
-- Recording live or a fix while the pull request is still a draft now says what to do next, such as running gh pr ready, instead of failing.
-- A chrome-devtools page tool called without a pageId, such as a screenshot, now runs on the first page instead of failing; close_page and select_page still need one.
-- Cmd+F now finds text in the open conversation, or in the pull request the Pull requests page shows: every match is highlighted, the bar counts them, and Enter and Shift+Enter step through them.
-- The sidebar's session search moved to Cmd+Shift+F.
-- Fixed: a screenshot or file an agent names by its bare name, such as inline-rows.png, now opens when the agent had looked at it in another folder, instead of saying the file could not be loaded.
-- A reply that lists pages to review now has a Review visuals eye button under it, beside its copy button, in place of the card that listed the pages. It shows the Browser and opens that reply's pages as tabs, so you no longer go looking for the button in the Browser's toolbar.
-- Session rows in the sidebar line up again: each age shows its largest unit, such as 3h, in a fixed column, so the workspace chips sit at the same place on every row.
-- Long agent replies read more easily: their text keeps the conversation's full width with more space between paragraphs and bullets, and bullets that open with a bold word line up as a two-column table, keys on the left. A narrow conversation keeps the key inline.
-- Clicking a subagent opens it in the same pane as its session again, so a split stays as it is instead of gaining a pane. Cmd-click opens it in a split beside its session.
-- In the composer, type $ to pick a skill or command, and @ to mention a file or anything else. Typing / no longer opens the list. A price such as $5 stays plain text.
-- Skills, files, tickets and other references in a prompt show as an icon and a label in their own color, without a badge around them. A command or skill reads as its name, such as Poteto Mode, with the text it runs in its tooltip.
-- Long agent replies read more easily: their text keeps a narrower line length with more space between paragraphs and bullets, and bullets that open with a bold word line up as a two-column table, keys on the left. A narrow conversation keeps the key inline.
-- Clicking a subagent now opens it in a split beside its session, at full height, instead of in place of the session. Cmd-click opens it in place, as a click did before.
-- The sidebar marks the sessions of a split with a two-column icon, and highlights a session while one of its subagents is open.
-- Hovering a suggested prompt under the composer now shows its keys: send, edit, and mark. Its pencil button puts the prompt in the composer so you can edit it before sending.
-- Get started's fourth step is now Tools and workflows: connect GitHub, Linear, Slack, Google Calendar, and Gmail right there, see whether pstack is loaded, and find what still needs you under Action needed, with Go to Starter kit when pstack is missing.
-- Installing the omp Starter Kit on a new computer now makes the pstack skills work, such as arena and technical writing, which ship plans with. Before, omp skipped all of them, so ship stopped at its plan step.
-- The omp Starter Kit now brings the two poteto helpers that ship and poteto mode hand work to, one on Claude and one on Codex.
-- Behind the scenes: the starter kit's agent rules now include the newer ship steps, the rule to set pull request descriptions with the checked tool, and the rule to retake pull request screenshots after each push.
-- Code in a pull request's Code tab, the changes view, and messages is a size larger and colored like a code editor: types, functions, properties, tags, and comments each get their own color, in light and dark mode.
-- A pull request's ⋯ menu, and its row's right-click menu, offer Explain this PR and Ask a question. Each opens a new session in the pull request's repository with a draft that names it: Explain asks for a walk through its purpose, changes, and risks, and Ask leaves room for your question. Neither changes code.
-- A pull request's Summary and Timeline are easier to read: descriptions and comments are larger, section titles stand out, and the timeline's names, dates, and file paths are a size larger, with collapsed comment groups less faded.
-- New Bot offers three more templates for a Routines Bot: Memory curator keeps each repository's project memory up to date, Bot coach proposes how to improve your other Bots, and Review requests drafts the reviews teammates ask you for. Each one sets up its own routine in its first conversation.
-- The model menu has an Extra usage switch. On, a full Claude allowance stays on Claude instead of moving to a fallback such as Cursor. Off puts the fallback list back. It applies to every session.
-- Fixed: Connect in Integrations failed, such as with "Google Calendar has no server to sign in to", when the service's server was turned off. Connect now turns it back on. It skips the sign-in page while the old sign-in still works.
-- A link to an agent's test server, such as one in its reply or listed under Review visuals, now opens signed in, in an omp agents window of its own, instead of a page saying to open the app.
-- The Todos card is back on the right of the conversation, with its todos, subagents, files, images, and sources in view, instead of a line you click open. In a narrow conversation it sits above the messages.
-- Click a file chip above a prompt you sent, such as Pasted text.txt, to read the text it carried. The Copy button copies it.
-- Hover or focus the speech bubble count on a pull request, in the sidebar, the table, or the board, to read its five latest comments and reviews without opening it. The card leaves out what the Comments filter hides and says how many it left out.
-- When an agent sets two or more subagents on the same task, the Todos card's Subagents section shows them side by side in an Arena box.
-- Once the agent picks, the runner it kept says Base, and the others say Graft, with what it took, or Not used.
-- The agent records its arena with the new arena tool: install the updated omp Starter Kit to get it.
-- Todo moved from the sidebar's tab bar to the top right of the header, between Calendar and Sport. Email now sits after Sport. A saved tab order moves Todo there too.
-- Behind the scenes: agents now follow the code when an instruction disagrees with it, and say so.
-- Behind the scenes: the starter kit's maintainer setup now tells agents to save a pasted secret right away.

@@ -1,4 +1,4 @@
-import { IconCircleBanSign, IconCircleCheck, IconRecord, IconCircleX, IconLoadingCircle } from "central-icons";
+import { IconCircleBanSign, IconCircleCheck, IconRecord, IconCircleX } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { useState } from "react";
 import type { CheckRunState, PullRequestCheck } from "../../../../src/shared/github";
@@ -7,10 +7,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { type ChecksPresentation, presentChecks } from "../../../pull-request-checks";
+import { Spinner } from "../../spinner";
 
 const CHECK_RUN: Record<CheckRunState, { Icon: IconComponent; color: string; label: string }> = {
 	failing: { Icon: IconCircleX, color: "text-destructive", label: "Failed" },
-	pending: { Icon: IconLoadingCircle, color: "text-amber-500 motion-safe:animate-spin", label: "Running" },
+	pending: { Icon: Spinner, color: "text-amber-500", label: "Running" },
 	passing: { Icon: IconCircleCheck, color: "text-emerald-600 dark:text-emerald-300/90", label: "Passed" },
 	skipped: { Icon: IconCircleBanSign, color: "text-muted-foreground/70", label: "Skipped" },
 };

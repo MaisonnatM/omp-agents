@@ -1,6 +1,8 @@
-import { type ReactNode, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { type Question, type QuestionAnswer, QuestionCard } from "@/components/question-card";
+import { ApprovalCard, KeyHint } from "@/components/ui/approval-card";
 import { Button } from "@/components/ui/button";
+import { PermissionRequest } from "@/components/ui/permission-request";
 import { cn } from "@/lib/utils";
 import type { AskReply, UserAnswer, UserRequest } from "../../src/shared/sessions";
 import { errorText } from "../../src/json";
@@ -62,6 +64,42 @@ function answerOf(request: StepRequest, answer: QuestionAnswer): UserAnswer | nu
 	}
 }
 
+/**
+ * An omp tool approval, which reaches a host without an approval dialog as a select: the prompt `requestApproval` in
+ * omp's `tools/approval.ts` writes, `Allow tool: <name>` then optional `Origin:` and `Reason:` lines and the call's
+ * details, and the choices `approvalChoiceLabels` lists, ending in Deny. Any other select is a plain question.
+ */
+interface ToolApproval {
+	tool: string;
+	origin?: string;
+	reason?: string;
+	details: string[];
+	/** omp's option index of Deny, the last; every option before it allows. */
+	deny: number;
+}
+
+function toolApprovalOf(request: StepRequest): ToolApproval | null {
+	if (request.kind !== "select") return null;
+	const [first = "", ...details] = request.title.split("\n");
+	const tool = /^Allow tool: (.+)$/.exec(first)?.[1];
+	const deny = request.options.length - 1;
+	if (tool === undefined || deny < 1 || request.options[deny]?.label !== "Deny") return null;
+	const header = (key: string): string | undefined => (details[0]?.startsWith(key) ? details.shift()?.slice(key.length) : undefined);
+	const origin = header("Origin: ");
+	const reason = header("Reason: ");
+	return { tool, origin, reason, details, deny };
+}
+
+/** An allow choice as a pill: omp's once and session choices by how long they last, a grant by its own label. */
+function scopeLabel(label: string): string {
+	if (label === "Approve" || label === "Approve Once") return "Once";
+	if (/^Approve .+ for this session$/.test(label)) return "This session";
+	return shownLabel(label);
+}
+
+/** The key that picks an option, while it has one. */
+const keyOf = (index: number): string => (index < 9 ? String(index + 1) : "");
+
 interface UserRequestCardProps {
 	request: UserRequest;
 	/** How many more questions wait behind this one. */
@@ -122,6 +160,9 @@ function StepCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps
 	const { sent, reply } = useReply(onAnswer);
 	const [picked, setPicked] = useState<number | null>(null);
 	const question = questionOf(request);
+	const approval = toolApprovalOf(request);
+	// Allowing defaults to this call only, so a broader grant is always a deliberate pick.
+	const [scope, setScope] = useState(() => (request.kind === "select" ? Math.max(0, request.options.findIndex(option => scopeLabel(option.label) === "Once")) : 0));
 	const choose = (choice: QuestionAnswer): void => {
 		if (choice.kind === "option") setPicked(choice.index);
 		const answer = answerOf(request, choice);
@@ -137,22 +178,60 @@ function StepCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps
 				}
 			: {},
 	);
+	const cancelOnEscape = (event: KeyboardEvent): void => {
+		if (event.key !== "Escape") return;
+		event.preventDefault();
+		reply({ kind: "cancel" });
+	};
+	const header = <CardHeader status={statusOf(request, queued)} sent={sent} onDismiss={() => reply({ kind: "cancel" })} />;
+	const shared = { onKeyDown: cancelOnEscape, "aria-busy": sent || undefined, className: cn("mb-3", sent && "pointer-events-none opacity-60") };
 
+	if (approval && request.kind === "select") {
+		return (
+			<PermissionRequest
+				{...shared}
+				tool={approval.tool}
+				sub={approval.origin}
+				reason={approval.reason}
+				details={approval.details}
+				label={header}
+				scopes={request.options.slice(0, approval.deny).map((option, index) => ({ label: scopeLabel(option.label), hint: keyOf(index) }))}
+				scope={scope}
+				onScope={setScope}
+				denyHint={keyOf(approval.deny)}
+				onAllow={() => choose({ kind: "option", index: scope })}
+				onDeny={() => choose({ kind: "option", index: approval.deny })}
+			/>
+		);
+	}
+	if (request.kind === "confirm") {
+		return (
+			<ApprovalCard
+				{...shared}
+				title={request.title}
+				description={request.message || undefined}
+				label={header}
+				actions={[1, 0].map(index => (
+					<Button key={index} variant={index === 0 ? "primary" : "ghost"} onClick={() => choose({ kind: "option", index })} className={cn("pr-2", index !== 0 && "text-foreground")}>
+						<span className="inline-flex items-center gap-2">
+							{CONFIRM_ROWS[index]?.title}
+							<KeyHint>{keyOf(index)}</KeyHint>
+						</span>
+					</Button>
+				))}
+			/>
+		);
+	}
 	return (
 		<QuestionCard
+			{...shared}
 			question={question}
 			// A select's checked rows come from omp; any other request shows the row picked here.
 			checked={request.kind === "select" ? request.checked : picked === null ? [] : [picked]}
 			defaultText={request.kind === "text" ? request.prefill : undefined}
 			onAnswer={choose}
-			onKeyDown={event => {
-				if (event.key !== "Escape") return;
-				event.preventDefault();
-				reply({ kind: "cancel" });
-			}}
-			header={<CardHeader status={statusOf(request, queued)} sent={sent} onDismiss={() => reply({ kind: "cancel" })} />}
-			aria-busy={sent || undefined}
-			className={cn("mb-3 max-w-none", sent && "pointer-events-none opacity-60")}
+			header={header}
+			className={cn(shared.className, "max-w-none")}
 		/>
 	);
 }

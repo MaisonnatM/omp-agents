@@ -98,7 +98,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   Its unused React namespace import is removed.
 - `ui/empty.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/empty.json`).
   It imports `cn` from `@/lib/utils`, `EmptyContent` is removed, since nothing uses it, and `EmptyTitle` drops the registry's `cn-font-heading` hook, which this app's CSS does not define.
-- `ui/collapsible.tsx`, `ui/trace.tsx`, and `ui/code-block.tsx` come from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/<name>.json`).
+- `ui/collapsible.tsx` and `ui/code-block.tsx` come from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/<name>.json`).
   They import `cn` from `@/lib/utils` and each other from `@/components/ui/`.
   `CodeBlockCopyButton` is Fluid's `Button` at `icon-compact`, since Fluid's has no `icon-xs`, and `ui/code-block.tsx` drops `"use client"`.
   `CodeBlockLine` drops the `supports-[content:counter(line)_/_'']` alt text for line numbers, since Bun's CSS parser rejects `content: counter(line) / ''` and fails the page build; the dashboard shows no line numbers.
@@ -120,6 +120,27 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/tabs.tsx`: `TabsList` scrolls sideways with a hidden scrollbar, and a `TabItem`'s badge is the app's `CountPill` from `web/components/count-pill.tsx`.
 - `ui/file-thumbnail.tsx`: a text file shows its first 400 characters as its thumbnail.
 - `ui/chat-message.tsx`: `onOpenImage` turns each image above the bubble into a button.
+- `ui/running-now.tsx` comes from affectUI's Running Now (Clean), restyled with the app's tokens and Tailwind in place of its injected CSS, on the app's `Popover`, with `central-icons`.
+  It drops the paused state and Pause/Resume, which omp sessions lack, and the Open all footer, the value swap animation, the live region, and the arrow-key row moves; adds a finished count to the pill; and takes the English words in place of the labels object.
+- `ui/context-window.tsx` comes from affectUI's Context Window (Clean), restyled with the app's tokens and Tailwind in place of its injected CSS.
+  It keeps the head, the figure with its percentage tag, the field of cells, and the caption, for one part: the tokens omp reports, with no per-part breakdown, items, Remove, Compact button, model tag, or action, since the context ring menu below it holds those actions.
+  The used cells pulse while compaction runs, in place of the shimmer, the numbers do not roll, and the caption adds the share at which omp compacts on its own.
+- `ui/inline-diff.ts` comes from affectUI's Inline Diff, cut to its word diff, `diffWords`, which splits code at identifiers, whitespace, and single punctuation marks where affectUI's splits prose at words.
+  `FileDiff` in `web/components/file-diff.tsx` marks the words each changed line changes with it, in the component's tinted, struck-through `del` and tinted `ins` look; the suggestion card, Accept and Reject, the review summary, and the panel are dropped, since no dashboard screen offers an edit to accept.
+- `ui/skeleton.tsx` comes from affectUI's Skeleton (Clean), restyled with the app's `muted` fill and Tailwind in place of its injected CSS; its sheen is the `skeleton-sweep` keyframe in `web/globals.css`.
+  It keeps `Skeleton` with `width` and `line` at affectUI's 12px bar height, and drops `height`, `radius`, and `Loading`, since the screens that measure only stand in for a line of text and already name what they wait on for screen readers.
+- `ui/tooltip.tsx`: a shortcut's keys are the dashboard's `Kbd` (`web/components/kbd.tsx`) at `sm`, tinted from the tooltip's inverted text color, in place of the registry's outlined chip.
+- `ui/file-thumbnail.tsx`: a pending preview draws the dashboard's `Spinner`, labelled **Loading preview**, in place of the registry's spinning ring.
+- `ui/approval-card.tsx` comes from affectUI's Approval Card (Clean), restyled with the app's tokens and Tailwind in place of its injected CSS, with `central-icons`; the answer card draws an omp `confirm` request with it.
+  It keeps the tray, its label row, the card's icon tile, title, and description, and the foot of buttons with their key hints, which the caller passes; it drops the risk badge, the details list, the countdown, the always-allow checkbox, Edit, and the resolve animation, since a confirm carries none of them. The hints are the number keys that answer anywhere in the pane, in place of Esc and ⌘↵, which the composer holds.
+- `ui/permission-request.tsx` comes from affectUI's Permission Request (Clean), restyled the same way, on the app's `Button`; the answer card draws omp's tool approval with it, which reaches the dashboard as a select whose title starts `Allow tool:`.
+  It keeps the head, the barred reason, the details section, the segmented scopes, and Deny and Allow; it drops the avatar's initials for a shield tile, the risk tag, the per-item preview rows, and the resolved state, and its hints are the number keys.
+- `ui/decision-inbox.tsx` comes from affectUI's Decision Inbox (Clean), cut to its card: a head with an amber or green glyph and a title over hairline-divided rows, which the Notifications page fills with its unread notices. It drops the answer and fold machinery, since each notice keeps its own action.
+- `ui/tool-call-card.tsx` comes from affectUI's Tool Call Card (Clean), restyled with the app's tokens and Tailwind in place of its injected CSS, on `ui/collapsible.tsx`, with `central-icons` and the dashboard's `Spinner`; the transcript's activity groups draw their tool calls with it.
+  It keeps the card's icon, mono name, summary, and running, done, or **Failed** status, and `ToolCallGroup`'s stacked icon tiles, label, failed count, and chevron; it drops the card's own fold with its arguments, result, error, copy button, and Retry, and the timers, since omp's transcript item carries only a tool's name, summary, status, and images.
+  The group's label keeps the transcript's words, **Working**, **Ran N tools**, and **Thought**, its cards are 40px tall with 6px between them, where affectUI's are 44px with 8px, so long groups stay compact, and the check and the error mark do not animate in.
+- `ui/thinking-state.tsx` comes from affectUI's Thinking State (Clean), restyled the same way, on `ui/collapsible.tsx`; each thinking block in an activity group draws with it.
+  It keeps the 3×3 pixel mark, which ripples with the `bot-pulse` keyframe while the block streams, **Thinking** or **Thought**, the hover chevron, and the text as one step on a hairline trail; it drops the elapsed seconds, the step list, the cycling verbs, and the finished row, since a thinking block is one text with no timing or steps.
 
 ## `kibo-ui/calendar/index.tsx`
 
