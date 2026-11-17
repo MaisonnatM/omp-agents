@@ -49,3 +49,27 @@ export function parseVersionName(raw: string): { sha256: Sha256; kind: ArtifactK
 	const [sha256, kind, ...extra] = raw.split(".");
 	return sha256 && SHA256.test(sha256) && isKind(kind) && extra.length === 0 ? { sha256: sha256 as Sha256, kind } : null;
 }
+
+/** The `postMessage` type the Artifacts tab's frame of an HTML artifact sends when one of its inline images is clicked. */
+export const ARTIFACT_IMAGES_MESSAGE = "omp-artifact-images";
+
+/** The inline images of an HTML artifact, in page order, and the clicked one's place among them. */
+export interface ArtifactImages {
+	images: { src: string; caption: string }[];
+	index: number;
+}
+
+/**
+ * A frame's message as `ArtifactImages`, or null. The page is the agent's, so only `data:image/` sources pass: the
+ * dashboard, whose `img-src` allows them, never loads an address the page chose.
+ */
+export function parseArtifactImages(data: unknown): ArtifactImages | null {
+	if (!isObject(data) || data.type !== ARTIFACT_IMAGES_MESSAGE || !Array.isArray(data.images)) return null;
+	const images: ArtifactImages["images"] = [];
+	for (const image of data.images as unknown[]) {
+		if (!isObject(image) || typeof image.src !== "string" || !image.src.startsWith("data:image/")) return null;
+		images.push({ src: image.src, caption: typeof image.alt === "string" && image.alt.trim() ? image.alt.trim() : "Image" });
+	}
+	const { index } = data;
+	return isSafeInteger(index) && index >= 0 && index < images.length ? { images, index } : null;
+}

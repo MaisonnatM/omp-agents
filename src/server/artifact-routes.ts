@@ -2,7 +2,7 @@
 import { isAbsolute, join } from "node:path";
 import type { BunFile } from "bun";
 import { readSessionHeader } from "../omp/sessions";
-import { ARTIFACT_VERSIONS_DIR, type ArtifactKind, parseVersionName, type Sha256, type VersionName, versionName } from "../shared/artifacts";
+import { ARTIFACT_IMAGES_MESSAGE, ARTIFACT_VERSIONS_DIR, type ArtifactKind, parseVersionName, type Sha256, type VersionName, versionName } from "../shared/artifacts";
 import { artifactsDir } from "../subagents";
 import { answer, fail } from "./http";
 import type { RouteKit, Routes } from "./route-kit";
@@ -17,23 +17,37 @@ const SERVED: Record<ArtifactKind, { type: string; policy: string }> = {
 	markdown: { type: "text/plain; charset=utf-8", policy: "sandbox; default-src 'none'" },
 };
 
+/**
+ * Appended to an HTML version the Artifacts tab frames, never to a download or a browser open: a click on an inline image
+ * that no link, button, or handler of the page claims asks the dashboard to show the page's inline images large.
+ */
+const IMAGE_BRIDGE = `<style>img[src^="data:image/"]:not(a img, button img){cursor:zoom-in}</style><script>
+addEventListener("click", event => {
+	const image = event.target instanceof Element ? event.target.closest("img") : null;
+	if (event.defaultPrevented || event.button !== 0 || !image || image.closest("a, button") || !image.src.startsWith("data:image/")) return;
+	const images = [...document.images].filter(each => each.src.startsWith("data:image/"));
+	parent.postMessage({ type: "${ARTIFACT_IMAGES_MESSAGE}", images: images.map(each => ({ src: each.src, alt: each.alt })), index: images.indexOf(image) }, "*");
+});
+</script>`;
+
 /** How many session files a version is looked for in: the linked session's, then its fork parents', which also ends a parent link that loops. */
 const MAX_FORK_DEPTH = 8;
 
 /** Only a session file has an artifacts directory beside it, so a parent link naming anything else ends the walk. */
 const isSessionFile = (path: string | null): path is string => path?.endsWith(".jsonl") ?? false;
 
-/** One version of one session's artifact, as a link's query names it. */
+/** One version of one session's artifact, as a link's query names it; `framed` when the Artifacts tab frames it (`&frame=1`). */
 interface VersionRef {
 	session: string;
 	sha256: Sha256;
 	kind: ArtifactKind;
+	framed: boolean;
 }
 
 function parseRef(params: URLSearchParams): VersionRef | null {
 	const session = params.get("session");
 	const version = parseVersionName(params.get("version") ?? "");
-	return session && version ? { session, ...version } : null;
+	return session && version ? { session, ...version, framed: params.get("frame") === "1" } : null;
 }
 
 /**
@@ -65,7 +79,8 @@ export function artifactRoutes(kit: RouteKit, env: ArtifactRoutesEnv): Routes {
 			const file = await versionFile(env, ref.session, versionName(ref));
 			if (!file) return fail(404, notFound);
 			const served = SERVED[ref.kind];
-			return new Response(file, { headers: {
+			const body = ref.framed && ref.kind === "html" ? (await file.text()) + IMAGE_BRIDGE : file;
+			return new Response(body, { headers: {
 				"content-type": served.type,
 				"content-security-policy": served.policy,
 				"x-content-type-options": "nosniff",

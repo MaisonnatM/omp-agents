@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ARTIFACT_KINDS } from "../shared/artifacts";
+import { ARTIFACT_IMAGES_MESSAGE, ARTIFACT_KINDS } from "../shared/artifacts";
 import { artifactRoutes } from "./artifact-routes";
 import { guardsFor } from "./http";
 import { routeKit } from "./route-kit";
@@ -63,6 +63,15 @@ describe("artifact routes", () => {
 			expect(response.headers.get("referrer-policy")).toBe("no-referrer");
 			expect(response.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
 		}
+	});
+	test("only the framed HTML gets the image bridge; downloads, browser opens, and other kinds get the saved bytes", async () => {
+		copy("main", `${sha}.html`, "<p>page</p>");
+		copy("main", `${sha}.svg`, "<svg/>");
+		const framed = await (await request(`${await link("main", `${sha}.html`)}&frame=1`)).text();
+		expect(framed.startsWith("<p>page</p>")).toBe(true);
+		expect(framed).toContain(`type: "${ARTIFACT_IMAGES_MESSAGE}"`);
+		expect(await (await request(await link("main", `${sha}.html`))).text()).toBe("<p>page</p>");
+		expect(await (await request(`${await link("main", `${sha}.svg`)}&frame=1`)).text()).toBe("<svg/>");
 	});
 	test("wrong, missing, another session's, and another version's caps fail", async () => {
 		const url = await link("main", `${sha}.html`);

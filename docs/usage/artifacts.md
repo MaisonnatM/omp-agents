@@ -20,6 +20,7 @@ Each save keeps a version, so you can step back through what the agent changed.
 - **Rendered** shows the version as it looks, and **Source** shows its text with line wrapping and colors.
   An HTML page runs in a sealed frame: its scripts and forms work, but it cannot reach the dashboard, your sign-in, or other sessions.
   An SVG shows as an image, without its scripts, and Markdown shows formatted as the conversation formats messages.
+  A click on an image inside an HTML page, or on an SVG, opens it over the whole window, where you can zoom and step through the page's other images with ← and →.
 - In a narrow sidebar, **Copy**, **Download**, **Open in browser**, **Rendered**, and **Source** keep only their icons, which name themselves on hover, and the note moves to its own line.
   A long title or note wraps rather than hiding the actions or **Go to latest**.
 - A version whose saved copy was deleted, such as one a fork inherited from a session since deleted, reads **This version's saved copy is gone. Pick another version.**, and its **Copy**, **Download**, and **Open in browser** are off.
