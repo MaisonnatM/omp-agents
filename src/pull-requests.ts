@@ -400,19 +400,19 @@ export async function readBehindBy(pr: PullRequest, base: string, head: string):
 	}
 }
 
-const titles = createCache<Pick<PullRequestDetail, "title">>();
+const titles = createCache<Pick<PullRequestDetail, "title" | "state">>();
 
-/** A linked PR's title only, without reading its timeline, checks, or files. */
-export function loadPullRequestTitle(pr: PullRequest): Promise<Pick<PullRequestDetail, "title">> {
+/** A linked PR's title and state only, without reading its timeline, checks, or files. */
+export function loadPullRequestTitle(pr: PullRequest): Promise<Pick<PullRequestDetail, "title" | "state">> {
 	return titles.get(prKey(pr), async () => {
 		const data = dataOf(await ghGraphql(
-			"query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { title } } }",
+			"query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { title state isDraft } } }",
 			{ owner: pr.owner, repo: pr.repo, number: pr.number },
 		));
 		const node = isObject(data.repository) ? data.repository.pullRequest : null;
 		const title = isObject(node) ? str(node.title) : undefined;
-		if (!title) throw new Error(`Cannot read the title of ${prKey(pr)}`);
-		return { title };
+		if (!isObject(node) || !title) throw new Error(`Cannot read the title of ${prKey(pr)}`);
+		return { title, state: stateOf(node) };
 	});
 }
 
