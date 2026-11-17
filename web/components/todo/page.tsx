@@ -11,10 +11,9 @@ import { ALL_WORKSPACES, folderName } from "../../labels";
 import { hashForTodo, type TodoListView } from "../../routing";
 import { shortcutKeys } from "../../shortcuts";
 import { sectionId } from "../../section";
-import { groupFoldKey, groupTodos, keepsTodo, NO_FILTER, filters, type TodoGroup } from "../../todo-filter";
+import { groupFoldKey, groupTodos, keepsTodo, NO_FILTER, filters, soleCategory, type TodoGroup, withLiveCategories } from "../../todo-filter";
 import { useTodoDisplay, useTodoFilter } from "../../todo-state";
-import { inScope, LIST_KINDS, lastOf, placeIn, PRIORITY_LABEL, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf, leftIn } from "../../todo-views";
-import { useHiddenTodoCategories } from "../../use-hidden-todo-categories";
+import { inScope, LIST_KINDS, lastOf, placeIn, PRIORITY_LABEL, TODO_STATUS, type TodoEntry, todoMatcher, todosOf } from "../../todo-views";
 import { useOpenLatest } from "../../use-open-latest";
 import { useTodoDrag } from "../../use-todo-drag";
 import { type OpenPicker, useTodoKeys } from "../../use-todo-keys";
@@ -152,46 +151,54 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const [picker, setPicker] = useState<OpenPicker | null>(null);
 	const listRef = useRef<HTMLElement>(null);
 	const day = localDay();
-	const kind = LIST_KINDS[view.kind];
+	const kind = LIST_KINDS[view];
 	const frozen = disabled || kind.readOnly;
 	const canAdd = !disabled && kind.add !== null;
 	const sessions: KnownSessions = { hosts, past };
-	const [hidden] = useHiddenTodoCategories();
-	const [filter, setFilter] = useTodoFilter();
+	const [stored, setFilter] = useTodoFilter();
 	const [display, setDisplay] = useTodoDisplay();
+	// A category deleted since, here or in another window, leaves nothing out; the next change stores the filter without it.
+	const filter = withLiveCategories(stored, list.categories);
 	const filtering = filters(filter);
 	// Archive lists by when a todo was cleared, with no groups.
 	const grouping = kind.readOnly ? null : display.grouping;
 	const byStatus = grouping === "status";
-	const spanning = todosOf(list, view, day, sessions, hidden);
+	const spanning = todosOf(list, view, day, sessions);
 	const listed = inScope(spanning, scope);
 	const now = Date.now();
 	const kept = filtering ? listed.filter(todo => keepsTodo(todo, filter, day, now)) : listed;
-	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: kept.filter(todoMatcher(query)) };
-	// Looked up before the search and the sidebar's scope narrow the list, so neither takes the open todo off screen.
+	const matched = kept.filter(todoMatcher(query));
+	// The category Filter keeps alone, `null` while it keeps every category, several, or No category: a todo added here
+	// joins it, Clear done clears only it, rows leave out its badge, and an empty list says it holds nothing yet.
+	const joins = list.categories.find(({ id }) => id === soleCategory(filter.categories)) ?? null;
+	// Looked up before the search, Filter, and the sidebar's scope narrow the list, so none of them takes the open todo off
+	// screen; a palette link opens its todo on All and counts on this to show one Filter leaves out.
 	const open = openId === null ? null : (placeIn([spanning], openId)?.entry ?? null);
-	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd, workspace });
+	const editing = useTodoEditing({ list, kind, day, frozen, categories: filter.categories, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd, workspace });
 	// Todos move only among those of their status, so only the grouping by status lets you drag them.
 	const canMove = kind.canMove && byStatus;
 	const drag = useTodoDrag(canMove && !frozen, onChange);
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
-	const title = titleOf(list, view);
-	const left = leftIn(list, view, day, sessions, hidden, scope);
-	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
+	const title = view === "all" ? "Todo" : kind.tab;
+	const left = kind.readOnly ? listed.length : listed.filter(todo => todo.doneAt === null).length;
+	const anyClosed = matched.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
 	const search = query.trim();
-	const unmatched = section.todos.length === 0 && listed.length > 0 && (search !== "" || filtering);
+	// A category kept alone stands for a list of its own, so while nothing else narrows the list, it reads as empty rather than unmatched.
+	const narrowing = filtering && (joins === null || filters({ ...filter, categories: new Set() }));
+	const unmatched = matched.length === 0 && listed.length > 0 && (search !== "" || narrowing);
 	const emptyText = (): string | null => {
+		if (joins !== null) return `No todo in ${joins.name} yet.`;
 		if (scope.workspace !== null) return `No todo here names ${folderName(scope.workspace) ?? scope.workspace}, the workspace the sidebar shows. Choose ${ALL_WORKSPACES} in the sidebar to see every todo.`;
 		return kind.empty;
 	};
-	const empty = section.todos.length > 0 || unmatched ? null : emptyText();
-	const groups = (grouping === null ? [] : groupTodos(grouping, section.todos))
+	const empty = matched.length > 0 || unmatched ? null : emptyText();
+	const groups = (grouping === null ? [] : groupTodos(grouping, matched))
 		.map(groupView)
 		.filter(group => group.todos.length > 0 || (group.status === "todo" && canAdd))
 		// A search shows every match, closed ones too.
 		.map(group => ({ group, open: query !== "" || group.heading === null || !folds.isFolded(group.key) }));
-	const shown = kind.readOnly ? section.todos : groups.flatMap(({ group, open }) => (open ? group.todos : []));
+	const shown = kind.readOnly ? matched : groups.flatMap(({ group, open }) => (open ? group.todos : []));
 	useOpenLatest(id => hashForTodo(view, id), openId, shown[0]?.id ?? null, true);
 	const order = shown.flatMap(todo => [todo.id, ...(kind.readOnly ? [] : todo.children.map(child => child.id))]);
 	const at = open ? order.indexOf(open.todo.id) : -1;
@@ -200,15 +207,15 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	 * under other groupings, last of the list, where the list's end shows it.
 	 */
 	const draftPlace = (status: TodoStatus): { afterId: string | null; unfold: string[] } =>
-		byStatus ? { afterId: lastOf(section.todos, status), unfold: [groupFoldKey("status", status)] } : { afterId: null, unfold: [] };
+		byStatus ? { afterId: lastOf(matched, status), unfold: [groupFoldKey("status", status)] } : { afterId: null, unfold: [] };
 	const startDraft = (status: TodoStatus): void => {
 		const { afterId, unfold } = draftPlace(status);
 		folds.unfold(unfold);
-		editing.startDraft({ parentId: null, afterId, categoryId: section.categoryId, status });
+		editing.startDraft({ parentId: null, afterId, status });
 	};
 	const openStep = useTodoKeys({
 		listRef,
-		groups: kind.readOnly ? [section.todos] : groups.map(({ group }) => group.todos),
+		groups: kind.readOnly ? [matched] : groups.map(({ group }) => group.todos),
 		editingId: editing.editingId,
 		canMove,
 		disabled: frozen,
@@ -223,16 +230,15 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 
 	/** The new todo typed at this place; a top-level one only in the group of its status. */
 	const draftAt = (parentId: string | null, afterId: string | null, status?: TodoStatus): ReactNode => {
-		const draft = editing.draftAt(section, parentId, afterId);
+		const draft = editing.draftAt(parentId, afterId);
 		// A new key per place and per added todo, so the input starts with the draft's text wherever it moves.
-		return draft && (status === undefined || draft.status === status) && <DraftRow key={`draft:${parentId}:${afterId}:${draft.addedId}`} draft={draft} section={section} editing={editing} />;
+		return draft && (status === undefined || draft.status === status) && <DraftRow key={`draft:${parentId}:${afterId}:${draft.addedId}`} draft={draft} todos={matched} editing={editing} />;
 	};
 	const row = (entry: TodoEntry, siblings: readonly UserTodoLeaf[]) => (
 		<TodoRow
-			section={section}
 			entry={entry}
 			siblings={siblings}
-			category={entry.parent === null && view.kind !== "category" ? list.categories.find(({ id }) => id === entry.todo.categoryId) : undefined}
+			category={entry.parent === null && joins === null ? list.categories.find(({ id }) => id === entry.todo.categoryId) : undefined}
 			workspace={entry.parent === null && workspace === null ? (entry.todo.workspace ?? undefined) : undefined}
 			day={day}
 			sessions={sessions}
@@ -302,8 +308,8 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 						</Tooltip>
 					)}
 					{!kind.readOnly && anyClosed && !disabled && (
-						<Tooltip content="Move Done and Canceled todos to Archive">
-							<Button variant="ghost" size="compact" leadingIcon={IconSquareX} onClick={() => onChange({ op: "clear-done", categoryId: view.kind === "category" ? view.id : null })}>
+						<Tooltip content={joins === null ? "Move the Done and Canceled todos of every category to Archive" : `Move the Done and Canceled todos of ${joins.name} to Archive`}>
+							<Button variant="ghost" size="compact" leadingIcon={IconSquareX} onClick={() => onChange({ op: "clear-done", categoryId: joins?.id ?? null })}>
 								Clear done
 							</Button>
 						</Tooltip>
@@ -313,15 +319,27 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 		>
 			<ListSplit
 				widthKey="omp-agents.todo-list-width"
+				// Fits the five tabs, Filter, and Display on one row.
+				defaultWidth={480}
 				resizeLabel="Resize the todo list"
 				detailLabel="Open todo"
 				empty={{ icon: IconTodos, title: "No todo open", hint: `Click a todo, or focus one with ${shortcutKeys("todoNext")} and press Enter.` }}
 				list={
 					<section ref={listRef} tabIndex={-1} aria-label={title} className="outline-none focus-visible:ring-2 focus-visible:ring-ring mx-auto w-full max-w-3xl space-y-2 px-3 py-2">
-						<TodoViewBar todos={listed} filter={filter} onFilter={setFilter} display={kind.readOnly ? null : display} onDisplay={setDisplay} />
+						<TodoViewBar
+							view={view}
+							todos={listed}
+							categories={list.categories}
+							filter={filter}
+							onFilter={setFilter}
+							display={kind.readOnly ? null : display}
+							onDisplay={setDisplay}
+							disabled={disabled}
+							onChange={onChange}
+						/>
 						{kind.readOnly ? (
 							<ul aria-label="Archived todos" className="flex flex-col gap-0.5">
-								{section.todos.map(todo => (
+								{matched.map(todo => (
 									<ArchivedRow key={todo.id} todo={todo} disabled={disabled} open={todo.id === openId} onOpen={openTodo} onChange={onChange} />
 								))}
 							</ul>
@@ -353,7 +371,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 							<NothingMatches
 								noneMatch="No todo matches"
 								search={search}
-								filtering={filtering}
+								filtering={narrowing}
 								control="todo.filter.clear"
 								onClearSearch={() => setQuery("")}
 								onClearFilters={() => setFilter(NO_FILTER)}

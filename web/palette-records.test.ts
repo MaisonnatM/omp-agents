@@ -51,8 +51,8 @@ test("each todo, closed ones too, and pull request opens where the dashboard sho
 		],
 	});
 	expect(items.map(item => [item.id, item.section, item.title, item.subtitle, item.accessories, item.actions.flat().map(action => action.run)])).toEqual([
-		["todo:t1", "todos", "Fix login", undefined, [{ kind: "text", text: "Todo" }], [{ kind: "link", href: "#todo/work?open=t1" }]],
-		["todo:c1", "todos", "Write the test", "Fix login", [{ kind: "text", text: "Done" }], [{ kind: "link", href: "#todo/work?open=c1" }]],
+		["todo:t1", "todos", "Fix login", undefined, [{ kind: "text", text: "Todo" }], [{ kind: "link", href: "#todo?open=t1" }]],
+		["todo:c1", "todos", "Write the test", "Fix login", [{ kind: "text", text: "Done" }], [{ kind: "link", href: "#todo?open=c1" }]],
 		[
 			"pr:acme/web#4",
 			"pullRequests",

@@ -174,7 +174,7 @@ test("a sent prompt draws its references as chips that open here, and code stays
 		);
 	const html = prompt({ categories: [], todos: [todo], archive: [] });
 	expect(html.match(/data-chip="([\w-]+)"/g)).toEqual(['data-chip="skill"', 'data-chip="file"', 'data-chip="pull-request"', 'data-chip="todo"', 'data-chip="session"']);
-	expect(html.match(/href="[^"]*"/g)).toEqual(['href="#pull-requests/acme/web/7"', 'href="#todo/work?open=t1"', 'href="#session/s1"']);
+	expect(html.match(/href="[^"]*"/g)).toEqual(['href="#pull-requests/acme/web/7"', 'href="#todo?open=t1"', 'href="#session/s1"']);
 	expect(html).not.toContain("_blank");
 	expect(prompt({ categories: [], todos: [], archive: [todo] })).toContain('href="#todo/archive?open=t1"');
 	for (const unknown of [null, { categories: [], todos: [], archive: [] }]) expect(prompt(unknown)).not.toContain("#todo");

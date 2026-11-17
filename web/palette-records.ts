@@ -7,7 +7,7 @@ import type { Accessory, PaletteItem } from "./command-palette";
 import { hostLabel, pastLabel } from "./labels";
 import { PAGE_ICON } from "./page-icons";
 import { listedPullRequests } from "./pull-requests-model";
-import { hashForOpenTodo, hashForPullRequests, type OpenMode } from "./routing";
+import { hashForPullRequests, hashForTodo, type OpenMode } from "./routing";
 import { type SessionEntry, viewOf } from "./session-actions";
 import { workspaceCwd } from "./sessions";
 import { TODO_STATUS } from "./todo-views";
@@ -32,7 +32,7 @@ export function recordItems({ todos, pullRequestRepos }: PaletteRecords): Palett
 				icon: PAGE_ICON.todo,
 				accessories: [{ kind: "text", text: TODO_STATUS[leaf.status].label }],
 				kind: "Todo",
-				actions: [[{ id: "open", title: "Open todo", icon: PAGE_ICON.todo, run: { kind: "link", href: hashForOpenTodo(leaf.id, todo.categoryId) } }]],
+				actions: [[{ id: "open", title: "Open todo", icon: PAGE_ICON.todo, run: { kind: "link", href: hashForTodo("all", leaf.id) } }]],
 			}),
 		),
 	);

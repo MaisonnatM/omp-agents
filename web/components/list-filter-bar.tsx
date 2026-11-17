@@ -1,13 +1,14 @@
 /**
  * A list page's bar, whatever it lists: its view tabs, **Filter** with a submenu per field, the chip per filter that
- * leaves something out with **Clear all**, and the **Display** button with its grouping; and what the list shows while
- * the search or **Filter** keep nothing.
+ * leaves something out with **Clear all**, and the **Display** button with its grouping and the panel it can open; and
+ * what the list shows while the search or **Filter** keep nothing.
  */
 import { IconCrossMedium, IconFilter1, IconSettingsSliderHor } from "central-icons";
-import { type ComponentType, type ReactNode, type Ref, type RefObject, useRef, useState } from "react";
+import { type ComponentType, type ReactNode, type Ref, type RefObject, useId, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuCheckItem, MenuRadioGroup, MenuRadioItem, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
+import { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
@@ -243,15 +244,13 @@ export function ViewTabs<V extends string>({ views, labelOf, picked, control, on
 
 /**
  * **Display**: the sliders icon button, marked while `active`, whose menu is `children`. Its tooltip, `label`, hides
- * while the menu is open or while `tooltipHidden`, such as while a popover it opened is up; `buttonRef` reaches the
- * button, to hand focus back to it. The menu keeps whether it is open unless `open` and `onOpenChange` say.
+ * while the menu is open or while `tooltipHidden`, such as while a panel it opened is up; `buttonRef` reaches the
+ * button, to hand focus back to it.
  */
 export function DisplayButton({
 	label,
 	control,
 	active,
-	open,
-	onOpenChange,
 	tooltipHidden = false,
 	buttonRef,
 	menuClassName = "w-72",
@@ -260,18 +259,15 @@ export function DisplayButton({
 	label: string;
 	control: ControlId;
 	active: boolean;
-	open?: boolean;
-	onOpenChange?: (open: boolean) => void;
 	tooltipHidden?: boolean;
 	buttonRef?: Ref<HTMLButtonElement>;
 	menuClassName?: string;
 	children: ReactNode;
 }) {
-	const [ownOpen, setOwnOpen] = useState(false);
-	const shown = open ?? ownOpen;
+	const [open, setOpen] = useState(false);
 	return (
-		<DropdownMenu open={shown} onOpenChange={onOpenChange ?? setOwnOpen}>
-			<Tooltip content={label} forceOpen={shown || tooltipHidden ? false : undefined}>
+		<DropdownMenu open={open} onOpenChange={setOpen}>
+			<Tooltip content={label} forceOpen={open || tooltipHidden ? false : undefined}>
 				<DropdownMenuTrigger render={<Button ref={buttonRef} {...activityControl(control)} variant="outline" size="icon-compact" aria-label={label} active={active} />}>
 					<IconSettingsSliderHor />
 				</DropdownMenuTrigger>
@@ -280,6 +276,70 @@ export function DisplayButton({
 				{children}
 			</DropdownMenuContent>
 		</DropdownMenu>
+	);
+}
+
+/**
+ * {@link DisplayButton} with a panel it opens, such as **Repositories…**: `menu` gets the function that opens it, a
+ * popover under the same button, `title` over `description` then `children`, which unmount as it closes, and which
+ * hands focus back to **Display**. The button is marked while `active` or while the panel is up; `onEscapeKeyDown`
+ * can keep the panel open on Esc.
+ */
+export function DisplayWithPanel({
+	label,
+	control,
+	active,
+	menu,
+	title,
+	description,
+	panelClassName,
+	onEscapeKeyDown,
+	children,
+}: {
+	label: string;
+	control: ControlId;
+	active: boolean;
+	menu: (openPanel: () => void) => ReactNode;
+	title: string;
+	description: string;
+	/** The panel's width, such as `w-96`. */
+	panelClassName: string;
+	onEscapeKeyDown?: (event: KeyboardEvent) => void;
+	children: ReactNode;
+}) {
+	const [panel, setPanel] = useState(false);
+	const button = useRef<HTMLButtonElement>(null);
+	const titleId = useId();
+	return (
+		<Popover open={panel} onOpenChange={setPanel}>
+			<PopoverAnchor asChild>
+				<span className="inline-flex">
+					<DisplayButton label={label} control={control} active={active || panel} tooltipHidden={panel} buttonRef={button}>
+						{menu(() => setPanel(true))}
+					</DisplayButton>
+				</span>
+			</PopoverAnchor>
+			<PopoverContent
+				align="end"
+				collisionPadding={8}
+				aria-labelledby={titleId}
+				// With no trigger of its own, the popover hands focus back to **Display** as it closes.
+				onCloseAutoFocus={event => {
+					event.preventDefault();
+					button.current?.focus();
+				}}
+				onEscapeKeyDown={onEscapeKeyDown}
+				className={cn("max-h-(--radix-popover-content-available-height) max-w-[calc(100vw-2rem)] space-y-3 overflow-y-auto p-3", panelClassName)}
+			>
+				<PopoverHeader>
+					<PopoverTitle id={titleId} className="text-sm">
+						{title}
+					</PopoverTitle>
+					<PopoverDescription className="text-xs">{description}</PopoverDescription>
+				</PopoverHeader>
+				{children}
+			</PopoverContent>
+		</Popover>
 	);
 }
 
@@ -302,7 +362,7 @@ export function GroupingSubmenu<G extends string>({ groupings, labels, value, co
 }
 
 /**
- * The bar above a list: `tabs` where it has some, then **Filter**, marked while `filtering`, and `display`, the
+ * The bar above a list: `tabs`, then **Filter**, marked while `filtering`, and `display`, the
  * **Display** button, at the end of their row; under them a chip per field that leaves something out, with **Clear
  * all**, which calls `onClearAll`. `controls` are the activity controls of **Filter** and of the chips' clearing.
  */
@@ -315,7 +375,7 @@ export function ListFilterBar({
 	display,
 	className,
 }: {
-	tabs?: ReactNode;
+	tabs: ReactNode;
 	fields: readonly FilterField[];
 	filtering: boolean;
 	controls: { filter: ControlId; clear: ControlId };

@@ -15,7 +15,6 @@ import {
 	hashForPullRequestFiles,
 	hashForBotRoutine,
 	hashForSettings,
-	hashForOpenTodo,
 	hashForTodo,
 	hashForTodoId,
 	hashForView,
@@ -133,25 +132,24 @@ describe("layout hash", () => {
 		expect(routeFromHash("#pull-requests/acme/web.app/6596/filesx")).toEqual({ kind: "page", page: { kind: "pull-requests", target: null } });
 	});
 
-	test("the todo hash opens every todo, a list that is not a category, or one category's, with a todo open or none, and no todo hash is read as a layout", () => {
-		expect(hashForTodo({ kind: "all" })).toBe("#todo");
-		expect(hashForTodo({ kind: "category", id: "a b/c" })).toBe("#todo/a%20b%2Fc");
-		expect(routeFromHash("#todo")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" }, open: null } });
-		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "category", id: "a b/c" }, open: null } });
-		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" }, open: null } });
-		for (const kind of ["today", "agents", "archive"] as const) {
-			expect(hashForTodo({ kind })).toBe(`#todo/${kind}`);
-			expect(routeFromHash(`#todo/${kind}`)).toEqual({ kind: "page", page: { kind: "todo", list: { kind }, open: null } });
+	test("the todo hash opens every todo or one of the other lists, with a todo open or none, an old category link lists every todo, and no todo hash is read as a layout", () => {
+		expect(hashForTodo("all")).toBe("#todo");
+		expect(routeFromHash("#todo")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: null } });
+		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: null } });
+		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: null } });
+		for (const list of ["today", "needs", "agents", "archive"] as const) {
+			expect(hashForTodo(list)).toBe(`#todo/${list}`);
+			expect(routeFromHash(`#todo/${list}`)).toEqual({ kind: "page", page: { kind: "todo", list, open: null } });
 		}
-		expect(hashForOpenTodo("t 1", null)).toBe("#todo?open=t%201");
-		expect(hashForOpenTodo("t1", "work")).toBe("#todo/work?open=t1");
+		expect(hashForTodo("all", "t 1")).toBe("#todo?open=t%201");
 		const list = { categories: [], todos: [todo({ id: "t1" }), todo({ id: "t2", categoryId: "work", children: [todo({ id: "t3" })] })], archive: [todo({ id: "a1", children: [todo({ id: "a2" })] })] };
-		expect(hashForTodoId(list, "t3")).toBe("#todo/work?open=t3");
+		expect(hashForTodoId(list, "t3")).toBe("#todo?open=t3");
 		expect(hashForTodoId(list, "t1")).toBe("#todo?open=t1");
 		expect(hashForTodoId(list, "a2")).toBe("#todo/archive?open=a2");
 		expect(hashForTodoId(list, "gone")).toBeNull();
-		expect(routeFromHash("#todo?open=t%201")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" }, open: "t 1" } });
-		expect(routeFromHash("#todo/today?open=t1")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "today" }, open: "t1" } });
+		expect(routeFromHash("#todo?open=t%201")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: "t 1" } });
+		expect(routeFromHash("#todo/work?open=t1")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: "t1" } });
+		expect(routeFromHash("#todo/today?open=t1")).toEqual({ kind: "page", page: { kind: "todo", list: "today", open: "t1" } });
 		for (const hash of ["#todo", "#todo/0b9e", "#todo?open=t1"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
@@ -197,7 +195,7 @@ describe("layout hash", () => {
 
 	test("a malformed percent-escape names nothing instead of throwing: the page opens without its target, and its pane drops", () => {
 		const page = (page: Page): Route => ({ kind: "page", page });
-		expect(routeFromHash("#todo/%E0")).toEqual(page({ kind: "todo", list: { kind: "all" }, open: null }));
+		expect(routeFromHash("#todo/%E0")).toEqual(page({ kind: "todo", list: "all", open: null }));
 		expect(routeFromHash("#bots/%zz")).toEqual(page({ kind: "bots", target: null, adding: false }));
 		expect(routeFromHash("#bots/b1/routines/%zz")).toEqual(page({ kind: "bots", target: "b1", routine: null }));
 		expect(routeFromHash("#new/%E0?todo=t1")).toEqual(page({ kind: "new", cwd: null, todoId: "t1" }));

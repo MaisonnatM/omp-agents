@@ -1,5 +1,5 @@
-/** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
-import { IconAiBotHead, IconArchive, IconBubbleQuestion, IconCalendarClock, IconCircleCheck, IconCircleDashed, IconCircleX, IconContrast, IconFormCircle, IconTodos } from "central-icons";
+/** Which todos each of the Todo page's lists holds and what it lets you do. */
+import { IconCircleCheck, IconCircleDashed, IconCircleX, IconContrast, IconFormCircle } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { TodoAssignee, TodoPriority, TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
 import { everyWord } from "../src/shared/every-word";
@@ -10,10 +10,10 @@ import type { WindowScope } from "./sessions";
 import type { TodoListView } from "./routing";
 import { workStateOf, type TodoSessions } from "./todo-work-state";
 
-/** What a list shows and lets you do. A category's title is its own name. */
+/** What a list shows and lets you do. */
 export interface ListKind {
-	/** The page's title. */
-	title: string;
+	/** Its tab's name in the bar above the list. */
+	tab: string;
 	/** What adding a todo here offers; `null` for a list that takes none. */
 	add: { label: string; dueToday: boolean } | null;
 	/** Today sorts by due day and Archive by when it was cleared, so neither moves todos. */
@@ -24,23 +24,13 @@ export interface ListKind {
 	empty: string | null;
 }
 
-export const LIST_KINDS: Record<TodoListView["kind"], ListKind> = {
-	all: { title: "Todo", add: { label: "Add a todo", dueToday: false }, canMove: true, readOnly: false, empty: null },
-	today: { title: "Today", add: { label: "Add a todo due today", dueToday: true }, canMove: false, readOnly: false, empty: "Nothing is due today." },
-	needs: { title: "Needs you", add: null, canMove: false, readOnly: false, empty: "No todo is waiting on you." },
-	agents: { title: "From agents", add: null, canMove: true, readOnly: false, empty: "No agent has added a todo. An omp session adds one with its `user_todo` tool." },
-	archive: { title: "Archive", add: null, canMove: false, readOnly: true, empty: "Clear done puts closed todos here." },
-	category: { title: "Todo", add: { label: "Add a todo", dueToday: false }, canMove: true, readOnly: false, empty: null },
+export const LIST_KINDS: Record<TodoListView, ListKind> = {
+	all: { tab: "All", add: { label: "Add a todo", dueToday: false }, canMove: true, readOnly: false, empty: null },
+	today: { tab: "Today", add: { label: "Add a todo due today", dueToday: true }, canMove: false, readOnly: false, empty: "Nothing is due today." },
+	needs: { tab: "Needs you", add: null, canMove: false, readOnly: false, empty: "No todo is waiting on you." },
+	agents: { tab: "From agents", add: null, canMove: true, readOnly: false, empty: "No agent has added a todo. An omp session adds one with its `user_todo` tool." },
+	archive: { tab: "Archive", add: null, canMove: false, readOnly: true, empty: "Clear done puts closed todos here." },
 };
-
-/** The lists the sidebar shows above the categories, in its order, each with its name and icon. */
-export const SIDEBAR_LISTS: { view: Exclude<TodoListView, { kind: "category" }>; name: string; icon: IconComponent }[] = [
-	{ view: { kind: "all" }, name: "All", icon: IconTodos },
-	{ view: { kind: "today" }, name: "Today", icon: IconCalendarClock },
-	{ view: { kind: "needs" }, name: "Needs you", icon: IconBubbleQuestion },
-	{ view: { kind: "agents" }, name: "From agents", icon: IconAiBotHead },
-	{ view: { kind: "archive" }, name: "Archive", icon: IconArchive },
-];
 
 /** Each status as the page names it and draws it: its glyph and the glyph's color. */
 export const TODO_STATUS: Record<TodoStatus, { label: string; icon: [IconComponent, string] }> = {
@@ -61,9 +51,6 @@ export const ASSIGNEE_LABELS: Record<TodoAssignee, string> = { user: "You", agen
 
 /** The statuses in the order a list groups its todos: started work first, closed work last. */
 export const STATUS_GROUPS: readonly TodoStatus[] = ["in-progress", "todo", "backlog", "done", "canceled"];
-
-export const titleOf = (list: UserTodoList, view: TodoListView): string =>
-	view.kind === "category" ? (list.categories.find(({ id }) => id === view.id)?.name ?? LIST_KINDS.category.title) : LIST_KINDS[view.kind].title;
 
 /** A due day as the lists read it, and whether it has passed; `day` is today. */
 export function dueLabel(due: string, day: string): { text: string; overdue: boolean } {
@@ -95,25 +82,19 @@ export function inScope(todos: UserTodo[], { workspace }: WindowScope): UserTodo
 	return workspace === null ? todos : todos.filter(todo => todo.workspace === workspace);
 }
 
-/**
- * The top-level todos `view` lists, in its order: the list's, to do first then by earliest due day for Today, or the archive's, latest first.
- * The lists that span categories leave out the todos of the categories in `hidden`; a category's own list shows them.
- */
-export function todosOf(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>): UserTodo[] {
-	const shown = hidden.size === 0 ? list.todos : list.todos.filter(todo => todo.categoryId === null || !hidden.has(todo.categoryId));
-	switch (view.kind) {
+/** The top-level todos `view` lists, in its order: the list's, to do first then by earliest due day for Today, or the archive's, latest first. */
+export function todosOf(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions): UserTodo[] {
+	switch (view) {
 		case "all":
-			return shown;
-		case "category":
-			return list.todos.filter(todo => todo.categoryId === view.id);
+			return list.todos;
 		case "today":
-			return shown
+			return list.todos
 				.filter(todo => isDueBy(todo, day))
 				.toSorted((a, b) => Number(a.doneAt !== null) - Number(b.doneAt !== null) || earliestDue(a)!.localeCompare(earliestDue(b)!));
 		case "needs":
-			return shown.filter(todo => todo.doneAt === null && workStateOf(todo, sessions).kind === "needs-you");
+			return list.todos.filter(todo => todo.doneAt === null && workStateOf(todo, sessions).kind === "needs-you");
 		case "agents":
-			return shown.filter(todo => todo.addedBy !== null);
+			return list.todos.filter(todo => todo.addedBy !== null);
 		case "archive":
 			return list.archive;
 		default: {
@@ -121,18 +102,6 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 			return never;
 		}
 	}
-}
-
-/** How many of the top-level todos `view` lists in `scope` are still open; for Archive, how many it holds. */
-export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, hidden: ReadonlySet<string>, scope: WindowScope): number {
-	const todos = inScope(todosOf(list, view, day, sessions, hidden), scope);
-	return view.kind === "archive" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
-}
-
-/** What a list shows: its top-level todos, and the category a todo added there joins. */
-export interface Section {
-	categoryId: string | null;
-	todos: UserTodo[];
 }
 
 const CATEGORY_COLORS: readonly BadgeColor[] = ["blue", "violet", "amber", "emerald", "rose", "cyan", "orange", "fuchsia", "lime", "indigo"];
@@ -143,9 +112,6 @@ export function categoryColor(id: string): BadgeColor {
 	for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
 	return CATEGORY_COLORS[hash % CATEGORY_COLORS.length]!;
 }
-
-export const sameTodoView = (a: TodoListView, b: TodoListView): boolean =>
-	a.kind === b.kind && (a.kind !== "category" || (b.kind === "category" && a.id === b.id));
 
 /** Whether a todo's title or notes, or one under it, holds every word of `query`, ignoring case. */
 export function todoMatcher(query: string): (todo: UserTodo) => boolean {

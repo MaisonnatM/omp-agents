@@ -6,6 +6,7 @@ import { isDay, isNonEmpty, isObject } from "./json";
 import { inStatusOrder } from "./user-todos";
 import {
 	isClosed,
+	NO_CATEGORY,
 	TODO_ASSIGNEES,
 	TODO_PRIORITIES,
 	TODO_STATUSES,
@@ -188,6 +189,7 @@ export function parseTodoChange(value: unknown): UserTodoChange | null {
 		case "set-workspace":
 			return isOptional(value.workspace, SENT.workspace) ? { op, id, workspace: value.workspace } : null;
 		case "add-category":
+			return id !== NO_CATEGORY && isNonEmpty(name) && SENT.text(name) ? { op, id, name } : null;
 		case "rename-category":
 			return isNonEmpty(name) && SENT.text(name) ? { op, id, name } : null;
 		case "remove":

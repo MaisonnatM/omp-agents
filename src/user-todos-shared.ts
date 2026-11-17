@@ -56,11 +56,14 @@ export interface UserTodo extends UserTodoLeaf {
 	addedBy: string | null;
 }
 
-/** A category of the Todo page, which the sidebar lists to show its todos alone. */
+/** A category of the Todo page, which **Filter** shows alone and a todo's details pick. */
 export interface UserTodoCategory {
 	id: string;
 	name: string;
 }
+
+/** The key **Filter** gives the todos in no category, which no category's id may take. */
+export const NO_CATEGORY = "none";
 
 /** The Todo page's categories and todos, each in order, and the todos **Clear done** put away, latest first. */
 export interface UserTodoList {

@@ -4,10 +4,8 @@
  * filter that leaves something out.
  */
 import { IconCalendar4, IconCalendarClock4, IconFolder1, IconLayersTwo, IconUser } from "central-icons";
-import { useId, useRef, useState } from "react";
 import { repoKey, repoName } from "../../../src/shared/github";
 import { MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger, MenuSwitchItem } from "@/components/ui/menu";
-import { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
 import {
 	atLeastOneSection,
 	authorOptions,
@@ -26,7 +24,7 @@ import {
 import { DEFAULT_ORDER, PULL_REQUEST_SORTS, type PullRequestSort, SORT_LABELS, sectionTitles, withRepoStepped } from "../../pull-requests-model";
 import { activityControl } from "../../activity";
 import { useHiddenRepos } from "../../pull-requests-state";
-import { DisplayButton, dayField, type FilterField, GroupingSubmenu, ListFilterBar, setField, ViewTabs } from "../list-filter-bar";
+import { dayField, DisplayWithPanel, type FilterField, GroupingSubmenu, ListFilterBar, setField, ViewTabs } from "../list-filter-bar";
 import { ShownOrderList } from "../shown-order-list";
 import type { PullRequests } from "./pull-requests-list";
 
@@ -104,78 +102,53 @@ function RepositoriesPanel({ pulls }: { pulls: PullRequests }) {
  */
 function DisplayMenu({ pulls, display, onDisplay }: { pulls: PullRequests; display: PullRequestDisplay; onDisplay: (display: PullRequestDisplay) => void }) {
 	const [hidden] = useHiddenRepos();
-	const [repositories, setRepositories] = useState(false);
-	const [menu, setMenu] = useState(false);
-	const button = useRef<HTMLButtonElement>(null);
-	const titleId = useId();
 	const { order, onSort, onReset, everyRepo } = pulls;
 	const hiddenCount = everyRepo.filter(repo => hidden.has(repoKey(repo))).length;
 	const label = hiddenCount === 0 ? "Display" : `Display: ${hiddenCount} ${hiddenCount === 1 ? "repository" : "repositories"} hidden`;
 	return (
-		<Popover open={repositories} onOpenChange={setRepositories}>
-			<PopoverAnchor asChild>
-				<span className="inline-flex">
-					<DisplayButton
-						label={label}
-						control="pull-requests.display"
-						active={repositories || hiddenCount > 0}
-						open={menu}
-						onOpenChange={setMenu}
-						tooltipHidden={repositories}
-						buttonRef={button}
-					>
-						<GroupingSubmenu groupings={GROUPINGS} labels={GROUPING_LABELS} value={display.grouping} control="pull-requests.display.grouping" onValue={grouping => onDisplay({ ...display, grouping })} />
-						<MenuSubmenu>
-							<MenuSubmenuTrigger value={SORT_LABELS[order.sort]}>Ordering</MenuSubmenuTrigger>
-							<MenuSubmenuContent className="w-52">
-								<MenuRadioGroup value={order.sort} onValueChange={(sort: PullRequestSort) => onSort(sort)}>
-									{PULL_REQUEST_SORTS.map(sort => (
-										<MenuRadioItem key={sort} value={sort} closeOnClick>
-											{SORT_LABELS[sort]}
-										</MenuRadioItem>
-									))}
-								</MenuRadioGroup>
-								<MenuSeparator />
-								<MenuItem disabled={JSON.stringify(order) === JSON.stringify(DEFAULT_ORDER)} onClick={onReset}>
-									Reset the order
-								</MenuItem>
-							</MenuSubmenuContent>
-						</MenuSubmenu>
-						<MenuSwitchItem {...activityControl("pull-requests.display.empty")} checked={display.empty} closeOnClick={false} onCheckedChange={empty => onDisplay({ ...display, empty })}>
-							Show empty sections
-						</MenuSwitchItem>
-						{everyRepo.length > 0 && (
-							<>
-								<MenuSeparator />
-								<MenuItem {...activityControl("pull-requests.repositories")} onClick={() => setRepositories(true)}>
-									Repositories…
-									{hiddenCount > 0 && <span className="ml-auto pl-4 text-xs text-muted-foreground">{hiddenCount} hidden</span>}
-								</MenuItem>
-							</>
-						)}
-					</DisplayButton>
-				</span>
-			</PopoverAnchor>
-			<PopoverContent
-				align="end"
-				collisionPadding={8}
-				aria-labelledby={titleId}
-				// With no trigger of its own, the popover hands focus back to **Display** as it closes.
-				onCloseAutoFocus={event => {
-					event.preventDefault();
-					button.current?.focus();
-				}}
-				className="max-h-(--radix-popover-content-available-height) w-96 max-w-[calc(100vw-2rem)] space-y-3 overflow-y-auto p-3"
-			>
-				<PopoverHeader>
-					<PopoverTitle id={titleId} className="text-sm">
-						Repositories
-					</PopoverTitle>
-					<PopoverDescription className="text-xs">Hidden repositories also leave the tab's count. Saved in this browser.</PopoverDescription>
-				</PopoverHeader>
-				<RepositoriesPanel pulls={pulls} />
-			</PopoverContent>
-		</Popover>
+		<DisplayWithPanel
+			label={label}
+			control="pull-requests.display"
+			active={hiddenCount > 0}
+			menu={openPanel => (
+				<>
+					<GroupingSubmenu groupings={GROUPINGS} labels={GROUPING_LABELS} value={display.grouping} control="pull-requests.display.grouping" onValue={grouping => onDisplay({ ...display, grouping })} />
+					<MenuSubmenu>
+						<MenuSubmenuTrigger value={SORT_LABELS[order.sort]}>Ordering</MenuSubmenuTrigger>
+						<MenuSubmenuContent className="w-52">
+							<MenuRadioGroup value={order.sort} onValueChange={(sort: PullRequestSort) => onSort(sort)}>
+								{PULL_REQUEST_SORTS.map(sort => (
+									<MenuRadioItem key={sort} value={sort} closeOnClick>
+										{SORT_LABELS[sort]}
+									</MenuRadioItem>
+								))}
+							</MenuRadioGroup>
+							<MenuSeparator />
+							<MenuItem disabled={JSON.stringify(order) === JSON.stringify(DEFAULT_ORDER)} onClick={onReset}>
+								Reset the order
+							</MenuItem>
+						</MenuSubmenuContent>
+					</MenuSubmenu>
+					<MenuSwitchItem {...activityControl("pull-requests.display.empty")} checked={display.empty} closeOnClick={false} onCheckedChange={empty => onDisplay({ ...display, empty })}>
+						Show empty sections
+					</MenuSwitchItem>
+					{everyRepo.length > 0 && (
+						<>
+							<MenuSeparator />
+							<MenuItem {...activityControl("pull-requests.repositories")} onClick={openPanel}>
+								Repositories…
+								{hiddenCount > 0 && <span className="ml-auto pl-4 text-xs text-muted-foreground">{hiddenCount} hidden</span>}
+							</MenuItem>
+						</>
+					)}
+				</>
+			)}
+			title="Repositories"
+			description="Hidden repositories also leave the tab's count. Saved in this browser."
+			panelClassName="w-96"
+		>
+			<RepositoriesPanel pulls={pulls} />
+		</DisplayWithPanel>
 	);
 }
 

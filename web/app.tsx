@@ -43,7 +43,7 @@ import { UNREAD } from "./reads";
 import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { revealDetailsTab } from "./details-tabs";
-import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView, type TodoListView } from "./routing";
+import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
@@ -57,8 +57,6 @@ import { useSessionLists } from "./use-session-lists";
 import { useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
-
-const ALL_TODOS: TodoListView = { kind: "all" };
 
 /**
  * The dashboard: the socket's state, sliced into what each part reads, and the parts. Each hook it calls owns one
@@ -219,13 +217,6 @@ export function App() {
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 
-	const routedTodoList = page?.kind === "todo" ? page.list : null;
-	const categories = state.userTodos?.categories;
-	/** The list the Todo page shows; a category another window removed shows every todo. */
-	const todoView = useMemo(
-		(): TodoListView => (routedTodoList === null || (routedTodoList.kind === "category" && !categories?.some(({ id }) => id === routedTodoList.id)) ? ALL_TODOS : routedTodoList),
-		[routedTodoList, categories],
-	);
 	const listPage = listPageOf(page, row);
 	const pageArea = useRef<HTMLDivElement>(null);
 	const pageAreaWidth = useWidth(pageArea);
@@ -235,15 +226,12 @@ export function App() {
 			listPage && (
 				<PageList
 					page={listPage}
-					todoSessions={{ hosts: state.hosts, past: state.past }}
 					botList={botList}
-					userTodos={state.userTodos}
-					todoView={todoView}
 					sectionTarget={sectionTarget}
 					onSectionTarget={setSectionTarget}
 				/>
 			),
-		[listPage, state.hosts, state.past, botList, state.userTodos, todoView, sectionTarget],
+		[listPage, botList, sectionTarget],
 	);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const unreadNotices = useMemo(() => state.notices.filter(notice => !notice.read).length, [state.notices]);
@@ -315,7 +303,6 @@ export function App() {
 																	scope={scope}
 																	defaultWorkspace={defaultWorkspace}
 																	sectionTarget={sectionTarget}
-																	todoView={todoView}
 																	maximized={maximized}
 																	hasDetails={detailsView !== null}
 																	rightOpen={sidebars.panels.right.open}
