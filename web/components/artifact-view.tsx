@@ -7,7 +7,7 @@ import { activityControl } from "../activity";
 import type { Loaded } from "../artifact-links";
 import { CodeText } from "./file-text";
 import { useImageList } from "./markdown-images";
-import { MessageMarkdown } from "./message-markdown";
+import { MessageMarkdown, SESSION_AGENT_PRESET } from "./message-markdown";
 import { LoadNote } from "./sheet-details";
 
 interface RenderedProps {
@@ -71,7 +71,7 @@ function SvgImage({ url, title }: RenderedProps) {
 function MarkdownText({ text }: RenderedProps) {
 	return (
 		<div className="size-full overflow-auto px-4 py-3">
-			<MessageMarkdown text={text} />
+			<MessageMarkdown text={text} preset={SESSION_AGENT_PRESET} />
 		</div>
 	);
 }
