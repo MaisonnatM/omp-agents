@@ -12,9 +12,6 @@ The dashboard shows the same lines in Settings › What's new.
 - A Markdown artifact draws its `mermaid` diagrams and `chart` blocks as pictures, as a reply in the conversation does, instead of showing their source.
 - The stack menu on a pull request lists the session's other pull requests by number and title, with an icon that says whether each is open, a draft, merged, or closed.
 - Images in the Artifacts tab open when you click them: a screenshot inside an HTML page, or an SVG, fills the window, where you can zoom and step to the page's other images with the arrow keys.
-
-## 2026-11-16
-
 - The dashboard takes affectUI's Clean look in light and dark: the Inter font, softer grays, near-black buttons, and new shadows and corner radii.
 - Tool calls in a conversation show as small cards with the tool's icon, name, summary, and status, and the group line shows the last tools' icons and how many failed.
 - Thinking shows a small grid of dots with Thought, or a shimmering Thinking while it streams, over the text.
@@ -30,6 +27,9 @@ The dashboard shows the same lines in Settings › What's new.
 - A yes-or-no question from a session shows as a card with No and Yes buttons, each with its number key.
 - A tool approval names the tool and shows what it will run, with a Once or This session choice and Deny and Allow buttons.
 - Notifications gathers unread notices in one card that says how many are new, or All caught up.
+
+## 2026-11-16
+
 - omp-agents starts again on omp 18.21.0, which removed the piece the sandbox cleanup used to find a running ovnfs file system; the cleanup now asks `ovnfs status` itself, still without ever starting it. The weekly model replays run again too.
 - Settings › Agents no longer has a special case for omp's seance agent, which omp 18.21.0 removed.
 - Settings › Workspaces has a Filter workspaces field that narrows the Workspaces and Hidden lists by folder name or path as you type.
