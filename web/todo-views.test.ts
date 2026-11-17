@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { TodoStatus, UserTodo, UserTodoList } from "../src/user-todos-shared";
-import { inScope, leftIn, moveTo, todosOf } from "./todo-views";
+import { inScope, moveTo, todosOf } from "./todo-views";
 import type { WindowScope } from "./sessions";
 
 const todo = (id: string, status: TodoStatus): UserTodo => ({
@@ -51,13 +51,10 @@ describe("inScope", () => {
 		expect(ids("all", scope("/code/yampa"))).toEqual(["yampa"]);
 		expect(ids("all", scope("/code/omp-agents"))).toEqual(["agents"]);
 		expect(ids("archive", scope("/code/yampa"))).toEqual(["old-yampa"]);
-		expect(leftIn(list, "all", "2026-10-30", sessions, scope("/code/yampa"))).toBe(1);
-		expect(leftIn(list, "archive", "2026-10-30", sessions, scope("/code/yampa"))).toBe(1);
 	});
 
 	test("All workspaces shows every todo, those naming no workspace included", () => {
 		expect(ids("all", scope(null))).toEqual(["yampa", "agents", "none", "life", "garden"]);
 		expect(ids("archive", scope(null))).toEqual(["old-yampa", "old-none", "old-life"]);
-		expect(leftIn(list, "all", "2026-10-30", sessions, scope(null))).toBe(5);
 	});
 });

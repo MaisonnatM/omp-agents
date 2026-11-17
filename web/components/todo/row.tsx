@@ -6,7 +6,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem } from "@
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { DAY_FORMAT, dayLabel } from "../../labels";
-import { categoryColor, type Section, type TodoEntry } from "../../todo-views";
+import { categoryColor, type TodoEntry } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import type { TodoDrag } from "../../use-todo-drag";
 import type { TodoField } from "../../use-todo-keys";
@@ -17,7 +17,6 @@ import { TodoInput } from "./input";
 import { type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
 
 interface TodoRowProps {
-	section: Section;
 	entry: TodoEntry;
 	/** The todos beside it: a top-level todo's status group, or its parent's todos. */
 	siblings: readonly UserTodoLeaf[];
@@ -40,7 +39,7 @@ interface TodoRowProps {
 }
 
 /** A todo's row: its priority when set, status, and assignee, title, what it carries, when it was added, and the buttons that add under it and delete it. */
-export function TodoRow({ section, entry, siblings, category, workspace, day, sessions, disabled, open, picker, onPicker, drag, editing, onOpen, onChange }: TodoRowProps) {
+export function TodoRow({ entry, siblings, category, workspace, day, sessions, disabled, open, picker, onPicker, drag, editing, onOpen, onChange }: TodoRowProps) {
 	const { todo } = entry;
 	const top = entry.parent === null ? entry.todo : null;
 	const children = top?.children ?? [];
@@ -78,7 +77,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 					<TodoInput
 						initial={todo.text}
 						label="Todo"
-						onKey={(key, text) => editing.editKey(todo, entry.parent?.id ?? null, section.categoryId, key, text)}
+						onKey={(key, text) => editing.editKey(todo, entry.parent?.id ?? null, key, text)}
 						onLeave={text => editing.leaveEdit(todo, text)}
 					/>
 				) : (
@@ -132,7 +131,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 								<button
 									type="button"
 									aria-label={`Add a todo under ${todo.text}`}
-									onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}
+									onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, status: "todo" })}
 									className="text-muted-foreground hover:text-foreground"
 								>
 									<IconPlusSmall />
@@ -162,7 +161,7 @@ export function TodoRow({ section, entry, siblings, category, workspace, day, se
 					Rename
 				</MenuItem>
 				{top && (
-					<MenuItem onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}>
+					<MenuItem onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, status: "todo" })}>
 						<IconPlusSmall />
 						Add a todo under it
 					</MenuItem>
@@ -249,12 +248,13 @@ export function ArchivedRow({ todo, disabled, open, onOpen, onChange }: Archived
 
 interface DraftRowProps {
 	draft: Draft;
-	section: Section;
+	/** The list's top-level todos, which indenting and outdenting the draft move it among. */
+	todos: readonly UserTodo[];
 	editing: TodoEditing;
 }
 
 /** The row of a todo not added yet, which a new input types into. */
-export function DraftRow({ draft, section, editing }: DraftRowProps) {
+export function DraftRow({ draft, todos, editing }: DraftRowProps) {
 	return (
 		<li className={cn("flex items-start gap-1.5 rounded-md px-2 py-1 text-sm leading-snug", draft.parentId !== null && "ml-6")}>
 			<span className="flex w-6 shrink-0 justify-center">
@@ -263,7 +263,7 @@ export function DraftRow({ draft, section, editing }: DraftRowProps) {
 			<TodoInput
 				initial={draft.text}
 				label={draft.parentId === null ? "New todo" : "New todo under it"}
-				onKey={(key, text) => editing.draftKey(draft, section, key, text)}
+				onKey={(key, text) => editing.draftKey(draft, todos, key, text)}
 				onLeave={text => editing.leaveDraft(draft, text)}
 			/>
 		</li>

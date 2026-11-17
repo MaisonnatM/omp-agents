@@ -1,11 +1,11 @@
 /** `useTodoEditing`: the Todo page's typing state, which title or draft has the input, its keys, and delete with Undo. */
 import { useState } from "react";
 import { applyUserTodo } from "../../../src/user-todos";
-import type { TodoStatus, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../../src/user-todos-shared";
+import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../../src/user-todos-shared";
 import { hashForNewSession } from "../../routing";
 import { quickAddTodo } from "../../todo-quick-add";
-import { keepsCategory } from "../../todo-filter";
-import { type ListKind, lastOf, restoreOf, type Section, todoCwd } from "../../todo-views";
+import { keepsCategory, soleCategory } from "../../todo-filter";
+import { type ListKind, lastOf, restoreOf, todoCwd } from "../../todo-views";
 import { offerUndo } from "../toaster";
 import type { TodoKey } from "./input";
 
@@ -17,7 +17,6 @@ type Editing =
 			kind: "draft";
 			parentId: string | null;
 			afterId: string | null;
-			categoryId: string | null;
 			/** The status the new todo gets: the group it is typed in. */
 			status: TodoStatus;
 			text: string;
@@ -37,7 +36,7 @@ interface TodoEditingOptions {
 	day: string;
 	/** The list cannot be changed here: the server is out of reach, or the list is the archive. */
 	frozen: boolean;
-	/** The categories **Filter** keeps; a todo added in another leaves the list. */
+	/** The categories **Filter** keeps: a todo added here joins the one it keeps alone, and leaves the list for a category it does not keep. */
 	categories: ReadonlySet<string>;
 	onChange: (change: UserTodoChange) => void;
 	/** Todo `id` was deleted. */
@@ -55,20 +54,20 @@ const below = (todo: UserTodoLeaf): Pick<Draft, "afterId" | "status"> => ({ afte
 export interface TodoEditing {
 	/** The todo whose title is being typed. */
 	editingId: string | null;
-	/** The draft at this place of `section`, if the new todo being typed goes there. */
-	draftAt(section: Section, parentId: string | null, afterId: string | null): Draft | null;
+	/** The draft at this place, if the new todo being typed goes there. */
+	draftAt(parentId: string | null, afterId: string | null): Draft | null;
 	remove(id: string, text: string): void;
 	/** Starts typing todo `id`'s title. */
 	edit(id: string): void;
 	/** Starts a new todo with an empty title. */
-	startDraft(place: Pick<Draft, "parentId" | "afterId" | "categoryId" | "status">): void;
+	startDraft(place: Pick<Draft, "parentId" | "afterId" | "status">): void;
 	/** Focus left the input of todo `todo` with `text` in it. */
 	leaveEdit(todo: UserTodoLeaf, text: string): void;
 	leaveDraft(draft: Draft, text: string): void;
 	/** What `key` does in the input of todo `todo` under `parentId`; whether the input goes away. */
-	editKey(todo: UserTodoLeaf, parentId: string | null, categoryId: string | null, key: TodoKey, text: string): boolean;
-	/** What `key` does in the input of the new todo `draft` of `section`; whether the input goes away. */
-	draftKey(draft: Draft, section: Section, key: TodoKey, text: string): boolean;
+	editKey(todo: UserTodoLeaf, parentId: string | null, key: TodoKey, text: string): boolean;
+	/** What `key` does in the input of the new todo `draft` among the list's top-level `todos`; whether the input goes away. */
+	draftKey(draft: Draft, todos: readonly UserTodo[], key: TodoKey, text: string): boolean;
 }
 
 /** The page's typing: which title or new todo has the input, what its keys do, and deleting with **Undo**. */
@@ -94,9 +93,9 @@ export function useTodoEditing({ list, kind, day, frozen, categories, onChange, 
 	 * the todo out of this list.
 	 */
 	const add = (draft: Draft, text: string): { change: Extract<UserTodoChange, { op: "add" }>; afterId: string | null } | null => {
-		const { parentId, afterId, categoryId, status } = draft;
+		const { parentId, afterId, status } = draft;
 		const dueToday = parentId === null && kind.add?.dueToday === true;
-		const change = quickAddTodo(text, list.categories, day, { parentId, afterId, categoryId, workspace, status, due: dueToday ? day : null });
+		const change = quickAddTodo(text, list.categories, day, { parentId, afterId, categoryId: soleCategory(categories), workspace, status, due: dueToday ? day : null });
 		if (!change) return null;
 		onChange(change);
 		const leaves = (parentId === null && !keepsCategory(categories, change.categoryId)) || (dueToday && change.due !== null && change.due > day);
@@ -105,8 +104,7 @@ export function useTodoEditing({ list, kind, day, frozen, categories, onChange, 
 
 	return {
 		editingId: !frozen && editing.kind === "edit" ? editing.id : null,
-		draftAt: (section, parentId, afterId) =>
-			!frozen && editing.kind === "draft" && editing.parentId === parentId && editing.afterId === afterId && editing.categoryId === section.categoryId ? editing : null,
+		draftAt: (parentId, afterId) => (!frozen && editing.kind === "draft" && editing.parentId === parentId && editing.afterId === afterId ? editing : null),
 		remove,
 		edit: id => setEditing({ kind: "edit", id }),
 		startDraft: place => setEditing({ kind: "draft", ...place, text: "" }),
@@ -118,11 +116,11 @@ export function useTodoEditing({ list, kind, day, frozen, categories, onChange, 
 			add(draft, text);
 			setEditing(NOT_EDITING);
 		},
-		editKey: (todo, parentId, categoryId, key, text) => {
+		editKey: (todo, parentId, key, text) => {
 			switch (key) {
 				case "enter":
 					commit(todo, text);
-					setEditing(text.trim() && kind.add ? { kind: "draft", parentId, ...below(todo), categoryId, text: "" } : NOT_EDITING);
+					setEditing(text.trim() && kind.add ? { kind: "draft", parentId, ...below(todo), text: "" } : NOT_EDITING);
 					return true;
 				case "start": {
 					const top = parentId === null ? list.todos.find(({ id }) => id === todo.id) : undefined;
@@ -149,7 +147,7 @@ export function useTodoEditing({ list, kind, day, frozen, categories, onChange, 
 				}
 			}
 		},
-		draftKey: (draft, section, key, text) => {
+		draftKey: (draft, todos, key, text) => {
 			switch (key) {
 				case "enter": {
 					const added = add(draft, text);
@@ -170,13 +168,13 @@ export function useTodoEditing({ list, kind, day, frozen, categories, onChange, 
 					return true;
 				case "indent": {
 					// Under the top-level todo it follows, or the last one of its status when it ends them.
-					const parentId = draft.parentId === null ? (draft.afterId ?? lastOf(section.todos, draft.status)) : null;
+					const parentId = draft.parentId === null ? (draft.afterId ?? lastOf(todos, draft.status)) : null;
 					if (parentId === null) return false;
 					setEditing({ ...draft, parentId, afterId: null, text });
 					return true;
 				}
 				case "outdent": {
-					const parent = draft.parentId === null ? undefined : section.todos.find(todo => todo.id === draft.parentId);
+					const parent = draft.parentId === null ? undefined : todos.find(todo => todo.id === draft.parentId);
 					if (!parent) return false;
 					setEditing({ ...draft, parentId: null, ...below(parent), text });
 					return true;

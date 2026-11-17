@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import { hashForTodo, routeFromHash } from "./routing";
-import { leftIn, todosOf } from "./todo-views";
+import { todosOf } from "./todo-views";
 
 const todo = (id: string, doneAt: string | null = null): UserTodo => ({
 	id, text: id, body: "", status: doneAt === null ? "todo" : "done", priority: 0, assignee: null, doneAt, due: null, createdAt: null, categoryId: null, workspace: null, children: [], addedBy: null,
@@ -21,6 +21,5 @@ const sessions = {
 test("Needs you lists only unchecked todos whose latest session waits on the human", () => {
 	const view = "needs";
 	expect(todosOf(list, view, "2026-10-06", sessions).map(todo => todo.id)).toEqual(["question", "idle"]);
-	expect(leftIn(list, view, "2026-10-06", sessions, { workspace: null })).toBe(2);
 	expect(routeFromHash(hashForTodo(view))).toEqual({ kind: "page", page: { kind: "todo", list: view, open: null } });
 });

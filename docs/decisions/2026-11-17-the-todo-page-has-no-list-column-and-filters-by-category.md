@@ -25,8 +25,9 @@ The column's color checkboxes kept a category's todos out of the lists that span
 ## Consequences
 
 - **Filter** › **Category** checks any number of categories, with **No category** for todos in none; the choice lives in this browser with the other filters, where the hidden categories followed you through Settings › Sync.
-- A category checked alone stands in for its old list: new todos join it, **Clear done** clears only it, and rows drop the badge it would repeat.
+- A category checked alone stands in for its old list: new todos join it, **Clear done** clears only it, rows drop the badge it would repeat, and an empty one reads as empty rather than as a filter that matches nothing.
 - Deleting a category takes it out of the filter, and **No category** leaves once no category is left, so a stored filter never empties the list for good.
+- No category may take `none`, the key **No category** goes by, as its id.
 - `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` still open their lists, and any other `#todo/` address opens **All**.
 - The tabs carry no counts, as the Pull requests page's do not; the page's header still counts the list picked.
 

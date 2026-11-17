@@ -13,9 +13,10 @@ import {
 	type UserTodoChange,
 	type UserTodoLeaf,
 } from "../../../src/user-todos-shared";
+import { badgeColors } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { folderName } from "../../labels";
-import { ASSIGNEE_LABELS, dueLabel, PRIORITY_LABEL, TODO_STATUS } from "../../todo-views";
+import { ASSIGNEE_LABELS, categoryColor, dueLabel, PRIORITY_LABEL, TODO_STATUS } from "../../todo-views";
 import { type Choice, DuePicker, FieldPicker } from "../field-picker";
 
 export const PRIORITY_ICON: Record<TodoPriority, [IconComponent, string]> = {
@@ -34,6 +35,11 @@ export function StatusIcon({ status, className }: { status: TodoStatus; classNam
 export function PriorityIcon({ priority }: { priority: TodoPriority }) {
 	const [Icon, color] = PRIORITY_ICON[priority];
 	return <Icon aria-hidden className={cn("size-4 shrink-0", color)} />;
+}
+
+/** A category's color as a dot, gray for none. */
+export function CategoryDot({ categoryId }: { categoryId: string | null }) {
+	return <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: categoryId === null ? "var(--muted-foreground)" : badgeColors[categoryColor(categoryId)] }} />;
 }
 
 export const ASSIGNEE: Record<TodoAssignee | "none", { label: string; icon: IconComponent }> = {

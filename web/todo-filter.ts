@@ -1,7 +1,7 @@
 /** What the Todo page's list keeps and how it groups it: **Filter**, by category, priority, assignee, link, due day, and creation, and **Display**'s grouping. */
 import { isObject, isTexts, oneOf, parseJson } from "../src/json";
 import { addDays } from "../src/shared/days";
-import { TODO_ASSIGNEES, TODO_PRIORITIES, type TodoAssignee, type TodoPriority, type TodoStatus, type UserTodo, type UserTodoCategory, type UserTodoLeaf, type UserTodoLink } from "../src/user-todos-shared";
+import { NO_CATEGORY, TODO_ASSIGNEES, TODO_PRIORITIES, type TodoAssignee, type TodoPriority, type TodoStatus, type UserTodo, type UserTodoCategory, type UserTodoLeaf, type UserTodoLink } from "../src/user-todos-shared";
 import { type DayRange, type FilterOption, type GroupingDisplay, groupingDisplay, isDayRange, withinLast } from "./list-filter";
 import { ASSIGNEE_LABELS, earliestDue, PRIORITY_LABEL, PRIORITY_ORDER, STATUS_GROUPS } from "./todo-views";
 
@@ -15,9 +15,6 @@ const LINK_LABELS: Record<LinkKind, string> = { session: "Session", "pull-reques
 type PriorityKey = `${TodoPriority}`;
 
 const isPriorityKey = oneOf(TODO_PRIORITIES.map((priority): PriorityKey => `${priority}`));
-
-/** The Category key of a todo in no category; a category's id is a UUID, so none reads as it. */
-export const NO_CATEGORY = "none";
 
 /** What **Filter** keeps; an empty set keeps every category, priority, assignee, or link, and `null` any day. */
 export interface TodoFilter {
@@ -47,7 +44,7 @@ export function decodeFilter(raw: string | null): TodoFilter {
 	if (!isObject(stored)) return NO_FILTER;
 	const { categories, priorities, assignees, links, due, created } = stored;
 	return {
-		categories: new Set(isTexts(categories) ? categories.filter(key => key !== "") : []),
+		categories: new Set(isTexts(categories) ? categories : []),
 		priorities: new Set(isTexts(priorities) ? priorities.filter(isPriorityKey) : []),
 		assignees: new Set(isTexts(assignees) ? assignees.filter(isAssignee) : []),
 		links: new Set(isTexts(links) ? links.filter(isLinkKind) : []),
@@ -68,8 +65,8 @@ export function withLiveCategories(filter: TodoFilter, categories: readonly User
 	return live.length === filter.categories.size ? filter : { ...filter, categories: new Set(live) };
 }
 
-/** The one category `filter` keeps, which a todo added to the list joins; `null` while it keeps every category, several, or No category. */
-export function soleCategory({ categories }: TodoFilter): string | null {
+/** The one category `categories` keeps, which a todo added to the list joins; `null` while it keeps every category, several, or No category. */
+export function soleCategory(categories: ReadonlySet<string>): string | null {
 	const [only] = categories;
 	return categories.size === 1 && only !== NO_CATEGORY ? only! : null;
 }

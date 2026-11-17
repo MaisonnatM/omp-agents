@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { UserTodo } from "../src/user-todos-shared";
+import { NO_CATEGORY, type UserTodo } from "../src/user-todos-shared";
 import {
 	categoryOptions,
 	decodeDisplay,
@@ -9,7 +9,6 @@ import {
 	groupTodos,
 	keepsTodo,
 	linkOptions,
-	NO_CATEGORY,
 	NO_FILTER,
 	soleCategory,
 	type TodoFilter,
@@ -91,7 +90,7 @@ describe("stored filter and display", () => {
 		expect(decodeFilter("not json")).toEqual(NO_FILTER);
 		expect(decodeFilter(JSON.stringify({ categories: ["", "work"], priorities: ["9", "2"], assignees: "user", links: ["ticket"], due: 5, created: 14 }))).toEqual({
 			...NO_FILTER,
-			categories: new Set(["work"]),
+			categories: new Set(["", "work"]),
 			priorities: new Set(["2"]),
 			created: 14,
 		});
@@ -139,11 +138,11 @@ describe("categories", () => {
 	});
 
 	test("a todo added to the list joins the one category the filter keeps, and none under several or No category", () => {
-		expect(soleCategory(only(["work"]))).toBe("work");
-		expect(soleCategory(only([]))).toBeNull();
-		expect(soleCategory(only(["work", "home"]))).toBeNull();
-		expect(soleCategory(only([NO_CATEGORY]))).toBeNull();
-		expect(soleCategory(only([NO_CATEGORY, "work"]))).toBeNull();
+		expect(soleCategory(new Set(["work"]))).toBe("work");
+		expect(soleCategory(new Set())).toBeNull();
+		expect(soleCategory(new Set(["work", "home"]))).toBeNull();
+		expect(soleCategory(new Set([NO_CATEGORY]))).toBeNull();
+		expect(soleCategory(new Set([NO_CATEGORY, "work"]))).toBeNull();
 	});
 });
 

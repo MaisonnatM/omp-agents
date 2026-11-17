@@ -137,6 +137,7 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "edit-body", id: "a", body: "# Notes\n" })).toEqual({ t: "user-todo", change: { op: "edit-body", id: "a", body: "# Notes\n" } });
 		expect(change({ op: "categorize", id: "a", categoryId: null })).toEqual({ t: "user-todo", change: { op: "categorize", id: "a", categoryId: null } });
 		expect(change({ op: "add-category", id: "w", name: "Work" })).toEqual({ t: "user-todo", change: { op: "add-category", id: "w", name: "Work" } });
+		expect(change({ op: "add-category", id: "none", name: "Work" })).toBeNull();
 		expect(change({ op: "add", id: "a", parentId: null, afterId: null, text: "Ship" })).toBeNull();
 		expect(change({ op: "clear-done" })).toBeNull();
 		expect(change({ op: "toggle", id: "a", doneAt: "2026-10-05T09:00:00.000Z" })).toBeNull();

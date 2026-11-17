@@ -12,8 +12,6 @@ import { workStateOf, type TodoSessions } from "./todo-work-state";
 
 /** What a list shows and lets you do. */
 export interface ListKind {
-	/** The page's title. */
-	title: string;
 	/** Its tab's name in the bar above the list. */
 	tab: string;
 	/** What adding a todo here offers; `null` for a list that takes none. */
@@ -27,11 +25,11 @@ export interface ListKind {
 }
 
 export const LIST_KINDS: Record<TodoListView, ListKind> = {
-	all: { title: "Todo", tab: "All", add: { label: "Add a todo", dueToday: false }, canMove: true, readOnly: false, empty: null },
-	today: { title: "Today", tab: "Today", add: { label: "Add a todo due today", dueToday: true }, canMove: false, readOnly: false, empty: "Nothing is due today." },
-	needs: { title: "Needs you", tab: "Needs you", add: null, canMove: false, readOnly: false, empty: "No todo is waiting on you." },
-	agents: { title: "From agents", tab: "From agents", add: null, canMove: true, readOnly: false, empty: "No agent has added a todo. An omp session adds one with its `user_todo` tool." },
-	archive: { title: "Archive", tab: "Archive", add: null, canMove: false, readOnly: true, empty: "Clear done puts closed todos here." },
+	all: { tab: "All", add: { label: "Add a todo", dueToday: false }, canMove: true, readOnly: false, empty: null },
+	today: { tab: "Today", add: { label: "Add a todo due today", dueToday: true }, canMove: false, readOnly: false, empty: "Nothing is due today." },
+	needs: { tab: "Needs you", add: null, canMove: false, readOnly: false, empty: "No todo is waiting on you." },
+	agents: { tab: "From agents", add: null, canMove: true, readOnly: false, empty: "No agent has added a todo. An omp session adds one with its `user_todo` tool." },
+	archive: { tab: "Archive", add: null, canMove: false, readOnly: true, empty: "Clear done puts closed todos here." },
 };
 
 /** Each status as the page names it and draws it: its glyph and the glyph's color. */
@@ -104,18 +102,6 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 			return never;
 		}
 	}
-}
-
-/** How many of the top-level todos `view` lists in `scope` are still open; for Archive, how many it holds. */
-export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions, scope: WindowScope): number {
-	const todos = inScope(todosOf(list, view, day, sessions), scope);
-	return view === "archive" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
-}
-
-/** What a list shows: its top-level todos, and the category a todo added there joins, the one **Filter** keeps alone, else none. */
-export interface Section {
-	categoryId: string | null;
-	todos: UserTodo[];
 }
 
 const CATEGORY_COLORS: readonly BadgeColor[] = ["blue", "violet", "amber", "emerald", "rose", "cyan", "orange", "fuchsia", "lime", "indigo"];

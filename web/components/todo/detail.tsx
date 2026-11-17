@@ -5,7 +5,6 @@ import { addTodo } from "../../../src/user-todos";
 
 import type { Workspace } from "../../../src/shared/workspaces";
 import type { UserTodo, UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
-import { badgeColors } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -13,7 +12,7 @@ import { dayLabel } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type QuickItem, quickOn, todoActions, todoStart, type WorkActionId } from "../../quick-actions";
 import { hashForNewSession } from "../../routing";
-import { categoryColor, TODO_STATUS, type TodoEntry, todoCwd } from "../../todo-views";
+import { TODO_STATUS, type TodoEntry, todoCwd } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import type { TodoField } from "../../use-todo-keys";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
@@ -21,7 +20,7 @@ import { type Choice, FieldPicker } from "../field-picker";
 import { NotesEditor } from "../notes-editor";
 import { QuickActionButton, QuickStartNotice } from "../quick-actions";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar } from "../list-split";
-import { PROPERTY_BUTTON, StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker, TodoWorkspacePicker } from "./fields";
+import { CategoryDot, PROPERTY_BUTTON, StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker, TodoWorkspacePicker } from "./fields";
 import { TodoInput } from "./input";
 import { AddedByChip, type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
 
@@ -48,10 +47,6 @@ interface TodoDetailProps {
 	newSessionCwd: string;
 	/** The Workspaces the Workspace picker offers. */
 	workspaces: Workspace[];
-}
-
-function CategoryDot({ categoryId }: { categoryId: string | null }) {
-	return <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: categoryId === null ? "var(--muted-foreground)" : badgeColors[categoryColor(categoryId)] }} />;
 }
 
 /** A top-level todo's sub-todos: how many are done, a row per sub-todo with its own status and its priority when set, and a way to add one. */

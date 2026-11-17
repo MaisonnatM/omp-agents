@@ -62,6 +62,9 @@ export interface UserTodoCategory {
 	name: string;
 }
 
+/** The key **Filter** gives the todos in no category, which no category's id may take. */
+export const NO_CATEGORY = "none";
+
 /** The Todo page's categories and todos, each in order, and the todos **Clear done** put away, latest first. */
 export interface UserTodoList {
 	categories: UserTodoCategory[];

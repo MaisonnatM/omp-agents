@@ -9,7 +9,7 @@
   **Needs you** lists open todos whose latest linked session has a question open or is idle, wherever that session ran.
   **From agents** lists the todos that an agent added; see [Todos from agents](#todos-from-agents).
 - **Filter** › **Category** keeps the todos of the categories you check, in every list; **No category** keeps the todos in none, and each choice counts the list's todos in it.
-  It shows once you have a category, and with one category checked alone the rows drop their category badges.
+  It shows once you have a category, and with one category checked alone the rows drop their category badges, and an empty one says it holds no todo yet.
 - **Display** › **Categories…** lists your categories, each with its color.
   Its pencil renames a category, its trash can deletes it, keeping its todos in no category, and **New category** adds one; type the name and press Enter, and **Filter** then shows that category alone.
 - **Add a todo** at the end of a list's **Todo** group, or C outside a text field, starts a new todo in the category **Filter** keeps alone, else in none, in the sidebar's selected workspace, or in none under **All workspaces**; type its title and press Enter.
@@ -46,7 +46,7 @@
   An open top-level todo linked to a session shows a work-state dot in the list and a pill in the open todo, instead of repeating the session's name: **Agent working**, **Needs you**, **In review**, **Shipped**, **Session ended**, or **Session unavailable**.
   Hover the dot for its state; the dot and the pill open the latest linked session, and do not change the todo's status or category.
   A todo that holds others shows how many of them are done, as in `2/3`, right after its title.
-  The page's header counts the open top-level todos, and **Clear done** moves every Done and Canceled todo it lists to **Archive** at once, a closed todo under an open one as a todo of its own.
+  The page's header counts the open top-level todos, and **Clear done** moves every Done and Canceled todo to **Archive** at once, those of the category **Filter** keeps alone if it keeps one, a closed todo under an open one as a todo of its own.
   The server does the same by itself for a todo closed over 24 hours ago, when it starts and every minute after.
 - **Archive** lists the cleared todos, latest first, with the day each was closed.
   Hover one to put it back last in the list, in its category if that still exists, or to delete it for good, or right-click it for **Open**, **Put back in the list**, and **Delete for good**; **Empty** deletes them all, after you confirm.
