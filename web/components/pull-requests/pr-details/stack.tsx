@@ -1,17 +1,18 @@
 /** A pull request's stack and its session's other pull requests: the popover that a session's header and the pull request header both open. */
 import { IconMerged, IconPullRequest } from "central-icons";
 import { type MouseEvent, type ReactNode, useState } from "react";
-import { type LinkedPullRequest, type PullRequest, prKey, pullRequestUrl, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
+import { type LinkedPullRequest, type PullRequest, type PullRequestDetail, prKey, pullRequestUrl, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { queuedMergeOf } from "../../../../src/shared/merge-queue";
 import { age, LINK_VERB } from "../../../labels";
 import { hashForPullRequests } from "../../../routing";
+import { useRead } from "../../../reads";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useDashboardStatus } from "../../dashboard-context";
 import { OrgIcon } from "../../org-icon";
 import { Rail, RailRow } from "../../rail";
-import { Avatar } from "../avatars";
+import { Avatar, IconTip, STATE_ICON } from "../avatars";
 import { MergePopover, QueuedMergeNote, useMergeTarget } from "../merge-popover";
 import { ChecksIcon } from "../pr-row";
 import { useCancelMerge } from "../use-merge-controller";
@@ -52,27 +53,38 @@ export function StackPopover({ stack, others, current, onPick, align, trigger }:
 					<div className={top ? "border-t border-border py-1" : "py-1"}>
 						{top && <p className="px-3 pt-1 pb-0.5 text-xs text-muted-foreground">Also on this session</p>}
 						<ul>
-							{others.map(pr => (
-								<li key={prKey(pr)} className="flex items-center gap-2 py-1.5 pr-3 pl-3 text-sm">
-									<IconPullRequest className="size-3.5 shrink-0 text-muted-foreground" />
-									{pick ? (
-										<button type="button" onClick={() => pick(pr)} className="min-w-0 flex-1 truncate text-left tabular-nums underline-offset-2 hover:underline">
-											{pr.repo} #{pr.number}
-										</button>
-									) : (
-										<a href={hashForPullRequests(pr)} className="min-w-0 flex-1 truncate tabular-nums underline-offset-2 hover:underline">
-											{pr.repo} #{pr.number}
-										</a>
-									)}
-									<span className="shrink-0 text-xs text-muted-foreground">{LINK_VERB[pr.link]}</span>
-									<GithubLink pr={pr} />
-								</li>
-							))}
+							{others.map(pr => <OtherRow key={prKey(pr)} pr={pr} onPick={pick} />)}
 						</ul>
 					</div>
 				)}
 			</PopoverContent>
 		</Popover>
+	);
+}
+
+/** One of the session's other pull requests: its state, number and title once GitHub answers, and how the session touched it. */
+function OtherRow({ pr, onPick }: { pr: LinkedPullRequest; onPick?: (pr: PullRequest) => void }) {
+	const read = useRead<Pick<PullRequestDetail, "title" | "state">>(`/api/pull-request/title?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
+	const label = (
+		<>
+			<span className="text-muted-foreground tabular-nums">#{pr.number}</span> {read.data?.title ?? pr.repo}
+		</>
+	);
+	const name = `#${pr.number} ${read.data?.title ?? pr.repo}\nThis session ${LINK_VERB[pr.link]} it`;
+	return (
+		<li className="flex items-center gap-2 py-1.5 pr-3 pl-3 text-sm">
+			{read.data ? <IconTip icon={STATE_ICON[read.data.state]} className="[&_svg]:size-3.5" /> : <IconPullRequest className="size-3.5 shrink-0 text-muted-foreground" />}
+			{onPick ? (
+				<button type="button" title={name} onClick={() => onPick(pr)} className="min-w-0 flex-1 truncate text-left underline-offset-2 hover:underline">
+					{label}
+				</button>
+			) : (
+				<a href={hashForPullRequests(pr)} title={name} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
+					{label}
+				</a>
+			)}
+			<GithubLink pr={pr} />
+		</li>
 	);
 }
 

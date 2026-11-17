@@ -1,7 +1,7 @@
 # HTTP API: pull requests
 
-`GET /api/pull-request/title?owner=<o>&repo=<r>&number=<n>` answers `{ title }` for a bare GitHub PR link.
-It reads only the title through `gh api graphql`, using the same validated pull request query as the details routes, and keeps each answer for 30 seconds, sharing in-flight reads.
+`GET /api/pull-request/title?owner=<o>&repo=<r>&number=<n>` answers `{ title, state }` for a bare GitHub PR link, `state` being `open`, `draft`, `merged`, or `closed`.
+It reads only the title and state through `gh api graphql`, using the same validated pull request query as the details routes, and keeps each answer for 30 seconds, sharing in-flight reads.
 The page's existing `useRead` drops answers for a previous link and aborts the read when the link unmounts; explicit Markdown labels do not request a title.
 `GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>` answers `PullRequestChanges`: title and branches from REST, the files from the paginated REST files endpoint, and each file's `viewerViewedState` from paginated GraphQL.
 Files are ordered by source dependencies, tests in source order, and generated files last.
