@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-18
 
 - The window's top row is shorter: the header tabs keep the same small gap above and below them that the page keeps from the window's edges, and the sidebar toggle, back and forward, + and the macOS window buttons all line up with the tabs.
+- Tool calls in a conversation are back to one line each with the tool's icon, name, and summary, under a "Ran N tools" line that says how many failed, instead of the small cards.
 
 ## 2026-11-17
 

@@ -1,7 +1,7 @@
 /** `Transcript`, a session's messages, thinking, and tool calls as rendered in a pane. */
-import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise, IconArrowsRepeat, IconBrain, IconBubbleAlert, IconBubbleQuestion, IconBug, IconChainLink1, IconChip, IconCircleX, IconCode, IconCodeBrackets, IconConsole, IconEyeOpen, IconFileEdit, IconFileText, IconFlag1, IconFolderOpen, IconGlobe, IconGraduateCap, IconHistory, IconHourglass, IconImac, IconImages1, IconLightBulb, IconNote1, IconPageAdd, IconPageTextSearch, IconPlugin1, IconPullRequest, IconPageSearch, IconShieldCheck, IconShip, IconSparklesTwo, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
+import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise, IconArrowsRepeat, IconBrain, IconBubbleAlert, IconBubbleQuestion, IconBug, IconChainLink1, IconChip, IconCircleCheck, IconCircleX, IconCode, IconCodeBrackets, IconConsole, IconEyeOpen, IconFileEdit, IconFileText, IconFlag1, IconFolderOpen, IconGlobe, IconGraduateCap, IconHistory, IconHourglass, IconImac, IconImages1, IconLightBulb, IconNote1, IconPageAdd, IconPageTextSearch, IconPlugin1, IconPullRequest, IconPageSearch, IconShieldCheck, IconShip, IconSparklesTwo, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { createContext, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ArtifactSave } from "../../src/shared/artifacts";
 import type { View } from "../../src/shared/sessions";
 import { taskText } from "../../src/shared/routine-message";
@@ -18,8 +18,7 @@ import {
 	useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
-import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
-import { ToolCallCard, ToolCallGroup } from "@/components/ui/tool-call-card";
+import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
@@ -132,12 +131,12 @@ const OpenImage = createContext<(id: string, at: number) => void>(() => {});
 /** Opens a prompt's attached file in the transcript's dialog; outside a `Transcript` it does nothing. */
 const OpenFile = createContext<(file: PromptFile) => void>(() => {});
 
-/** The images a tool's result returned, as thumbnails on its card; one opens large in the transcript's viewer. */
+/** The images a tool's result returned, as thumbnails under its line; one opens large in the transcript's viewer. */
 function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: string }) {
 	const openImage = useContext(OpenImage);
 	const label = (index: number): string => `Image ${index + 1} from ${tool}`;
 	return (
-		<span className="flex flex-wrap gap-1.5" data-tool-images>
+		<span className="-mt-1 ml-6 flex flex-wrap gap-1.5" data-tool-images>
 			{srcs.map((src, index) => (
 				// A result's images never change, so their order names them.
 				<button
@@ -155,14 +154,10 @@ function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: stri
 	);
 }
 
-/** A tool's icon, from {@link TOOL_ICON}; an MCP server's tool not in it gets a plug, any other a toolbox. */
-function toolIcon(name: string): IconComponent {
-	return Object.hasOwn(TOOL_ICON, name) ? TOOL_ICON[name]! : name.startsWith("mcp__") ? IconPlugin1 : IconToolbox;
-}
-
 export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
 	const expanded = useContext(ToolsExpanded);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
+	const LoaderIcon = useIcon("loader");
 	const tools = entries.filter((entry): entry is ToolItem => entry.kind === "tool");
 	const running =
 		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind === "thinking" && entry.streaming);
@@ -172,43 +167,61 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 	// Open while running, else as `expanded` says; a manual toggle wins until `expanded` flips.
 	const [toggle, setToggle] = useState<{ open: boolean; expanded: boolean } | null>(null);
 	const open = toggle?.expanded === expanded ? toggle.open : running || expanded || pinned;
-	const title = running ? "Working" : tools.length ? `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}` : "Thought";
+	const header = running
+		? "Working"
+		: tools.length
+			? `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`
+			: "Thought";
 	const visible = entries.filter(entry => (entry.kind === "thinking" ? !hideThinking : !hideTools));
-	const icons = visible.slice(-3).map(entry => (entry.kind === "thinking" ? IconBrain : toolIcon(entry.name)));
 	return (
-		<ToolCallGroup
-			{...activityControl("transcript.activity-group")}
-			icons={icons}
-			title={title}
-			failed={failed}
-			running={running}
-			open={open}
-			onOpenChange={next => setToggle({ open: next, expanded })}
-		>
-			{visible.map(entry =>
-				entry.kind === "thinking" ? (
-					<TraceCollapsible key={entry.id} defaultOpen>
-						<TraceCollapsibleTrigger>
-							<TraceLine status={entry.streaming ? "running" : undefined}>
-								<TraceIcon>
-									<IconBrain />
-								</TraceIcon>
-								<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
-							</TraceLine>
-						</TraceCollapsibleTrigger>
-						<TraceCollapsibleContent className="text-[13px]">
-							<div data-thinking={entry.streaming ? "live" : "done"}>
-								<MessageMarkdown text={entry.text} />
-							</div>
-						</TraceCollapsibleContent>
-					</TraceCollapsible>
-				) : (
-					<ToolCallCard key={entry.id} icon={toolIcon(entry.name)} name={entry.name} summary={entry.summary} status={entry.status}>
-						{entry.images && <ToolImages id={entry.id} srcs={entry.images} tool={entry.name} />}
-					</ToolCallCard>
-				),
-			)}
-		</ToolCallGroup>
+		<TraceCollapsible open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="max-w-2xl self-start">
+			<TraceCollapsibleTrigger {...activityControl("transcript.activity-group")}>
+				<TraceLine status={running ? "running" : undefined}>
+					<TraceIcon>{running ? <LoaderIcon className="animate-spin" /> : tools.length ? <IconCircleCheck /> : <IconBrain />}</TraceIcon>
+					<TraceTitle>{header}</TraceTitle>
+				</TraceLine>
+			</TraceCollapsibleTrigger>
+			<TraceCollapsibleContent>
+				<Trace>
+					{visible.map(entry => {
+						if (entry.kind === "thinking") {
+							return (
+								<TraceCollapsible key={entry.id} defaultOpen>
+									<TraceCollapsibleTrigger>
+										<TraceLine status={entry.streaming ? "running" : undefined}>
+											<TraceIcon>
+												<IconBrain />
+											</TraceIcon>
+											<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
+										</TraceLine>
+									</TraceCollapsibleTrigger>
+									<TraceCollapsibleContent className="text-[13px]">
+										<div data-thinking={entry.streaming ? "live" : "done"}>
+											<MessageMarkdown text={entry.text} />
+										</div>
+									</TraceCollapsibleContent>
+								</TraceCollapsible>
+							);
+						}
+						const Icon = Object.hasOwn(TOOL_ICON, entry.name) ? TOOL_ICON[entry.name]! : entry.name.startsWith("mcp__") ? IconPlugin1 : IconToolbox;
+						return (
+							<Fragment key={entry.id}>
+								<TraceLine status={entry.status === "ok" ? undefined : entry.status}>
+									<TraceIcon>
+										<Icon />
+									</TraceIcon>
+									<TraceTitle>
+										{entry.name}
+										{entry.summary && <span className="text-muted-foreground/70"> {entry.summary}</span>}
+									</TraceTitle>
+								</TraceLine>
+								{entry.images && <ToolImages id={entry.id} srcs={entry.images} tool={entry.name} />}
+							</Fragment>
+						);
+					})}
+				</Trace>
+			</TraceCollapsibleContent>
+		</TraceCollapsible>
 	);
 });
 
