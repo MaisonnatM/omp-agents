@@ -85,7 +85,6 @@ export const CONTROLS = [
 	{ id: "composer-queue.remove", label: "Queued message, remove", area: "Composer" },
 	{ id: "changes-card.files.fold", label: "Overview Files section, folded or unfolded", area: "Right sidebar" },
 	{ id: "changes-card.images.fold", label: "Overview Images section, folded or unfolded", area: "Right sidebar" },
-	{ id: "changes-card.review", label: "Overview Review", area: "Right sidebar" },
 	{ id: "changes-card.file", label: "Overview file", area: "Right sidebar" },
 	{ id: "changes-card.image.select", label: "Overview image selected", area: "Right sidebar" },
 	{ id: "changes-card.image.clear", label: "Overview image selection cleared", area: "Right sidebar" },

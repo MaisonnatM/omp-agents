@@ -2,8 +2,6 @@
 import { useContext, useMemo, useState } from "react";
 import type { SessionFacts, View } from "../../src/shared/sessions";
 import { type AgentMedia, type AgentSource, type ChangedFile, lineTotals } from "../../src/shared/transcript";
-import { Button } from "@/components/ui/button";
-import { activityControl } from "../activity";
 import { useShortcuts } from "../shortcuts";
 import { useChangedFiles, useMedia, useSources } from "../pane-store";
 import { useStoredKeys } from "../stored-state";
@@ -73,7 +71,7 @@ interface ChangesSectionsProps {
 
 /**
  * The Files, Images, and Sources sections of the Overview tab, each shown only while it has items. On a session, a file
- * opens the session's changes at it and **Review** at the first; on a subagent, a file opens omp's recorded diffs of it.
+ * opens the session's changes at it, and the review shortcut at the first; on a subagent, a file opens omp's recorded diffs of it.
  */
 export function ChangesSections({ view, session: { sessionId, cwd, facts }, changes: { files, media, sources }, working }: ChangesSectionsProps) {
 	const [closed, toggle] = useStoredKeys(CLOSED_KEY);
@@ -98,13 +96,6 @@ export function ChangesSections({ view, session: { sessionId, cwd, facts }, chan
 					open={!closed.has("files")}
 					onToggle={() => toggle("files")}
 					fold="changes-card.files.fold"
-					action={
-						sessionId !== null && (
-							<Button {...activityControl("changes-card.review")} variant="ghost" size="xs" className="mr-1.5" aria-haspopup="dialog" onClick={() => setShown({ kind: "changes", path: files[0]!.path })}>
-								Review
-							</Button>
-						)
-					}
 				>
 					<ChangedFileList files={files} onOpen={path => setShown({ kind: sessionId === null ? "history" : "changes", path })} />
 				</OverviewSection>
