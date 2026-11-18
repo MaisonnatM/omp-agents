@@ -137,7 +137,7 @@ function ArtifactTitle({ view, artifacts, artifact }: { view: View; artifacts: A
 }
 
 /** Older and newer arrows around a menu of every version, then the shown one's note, and its kind, size, and save time or a way back to the latest. */
-function VersionBar({ artifact, version, onPick }: { artifact: Artifact; version: ArtifactVersion; onPick: (number: number) => void }) {
+export function VersionBar({ artifact, version, onPick }: { artifact: Artifact; version: ArtifactVersion; onPick: (number: number) => void }) {
 	const { save } = version;
 	const count = artifact.versions.length;
 	const latest = version.number === count;
