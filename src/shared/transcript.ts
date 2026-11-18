@@ -65,7 +65,8 @@ export function promptAuthor(text: string): PromptAuthor {
 /** A `/skill:` prompt as typed: the skill's token, then `text` after a space when there is any. */
 export const skillInvocation = (skill: string, text: string): string => (text ? `/skill:${skill} ${text}` : `/skill:${skill}`);
 
-export type Item =
+/** `at`: when the item began, in ms since the epoch, as its message's timestamp; absent on an item the server did not stamp. */
+export type Item = { at?: number } & (
 	/**
 	 * `skill`: the skill a `/skill:<name>` prompt invoked, with `text` holding only what the user typed after it; `null` for
 	 * any other prompt. `entryId`: the session-file entry omp can branch at; `null` for Collab and skill prompts and prompts
@@ -95,7 +96,8 @@ export type Item =
 	 * `artifact`: the checked record of a successful artifact save, absent on other tools or failed saves.
 	 */
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; images?: string[]; artifact?: ArtifactSave; to?: BotId }
-	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
+	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string }
+);
 
 /** A prompt the page shows: the user's, a routine's, or another Bot's message; the dashboard's opens a turn but shows nothing. */
 export type PromptItem = Extract<Item, { kind: "user" | "routine" | "bot-message" }>;

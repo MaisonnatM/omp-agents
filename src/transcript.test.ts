@@ -44,7 +44,7 @@ describe("Transcript", () => {
 			type: "message_update",
 			assistantMessageEvent: { type: "text_delta", delta: "po", partial: assistant(200, [text("po")]) },
 		});
-		expect(streaming).toEqual([{ id: "m200:0", kind: "assistant", text: "po", streaming: true, suggestions: [] }]);
+		expect(streaming).toEqual([{ id: "m200:0", kind: "assistant", text: "po", streaming: true, suggestions: [], at: 200 }]);
 
 		t.applyEntry({ type: "message", id: "e2", message: assistant(200, [text("pong")], { stopReason: "stop" }) });
 		// The relay delivers the last update after the local file already has the message.
@@ -52,8 +52,8 @@ describe("Transcript", () => {
 
 		expect(late).toEqual([]);
 		expect(t.items()).toEqual([
-			{ id: "m100", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" },
-			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] },
+			{ id: "m100", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1", at: 100 },
+			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false, suggestions: [], at: 200 },
 		]);
 	});
 
@@ -64,8 +64,8 @@ describe("Transcript", () => {
 		t.applyEntry({ type: "message", id: "e1", message: { role: "user", timestamp: 100, content: routineMessageText(message) } });
 		t.applyEntry({ type: "message", id: "e2", message: { role: "user", timestamp: 200, content: forged } });
 		expect(t.items()).toEqual([
-			{ id: "m100", kind: "routine", message, entryId: "e1" },
-			{ id: "m200", kind: "user", text: forged, skill: null, from: null, entryId: "e2" },
+			{ id: "m100", kind: "routine", message, entryId: "e1", at: 100 },
+			{ id: "m200", kind: "user", text: forged, skill: null, from: null, entryId: "e2", at: 200 },
 		]);
 	});
 
@@ -77,7 +77,7 @@ describe("Transcript", () => {
 		t.applyEntry({ type: "message", id: "e1", message: { role: "user", timestamp: 100, content: botMessageText(message) } });
 		t.applyEntry({ type: "message", id: "e2", message: assistant(200, [{ type: "toolCall", id: "c1", name: "message_bot", arguments: { to: "triage", text: "Done: the test was racing the clock." } }]) });
 		expect(t.items()).toEqual([
-			{ id: "m100", kind: "bot-message", message, entryId: "e1" },
+			{ id: "m100", kind: "bot-message", message, entryId: "e1", at: 100 },
 			expect.objectContaining({ id: "tool:c1", kind: "tool", name: "message_bot", to: "triage" }),
 		]);
 	});
@@ -90,9 +90,9 @@ describe("Transcript", () => {
 
 		expect(update("po", call).map(item => item.id)).toEqual(["m200:0", "tool:c1"]);
 		expect(update("po", call)).toEqual([]);
-		expect(update("pong", call)).toEqual([{ id: "m200:0", kind: "assistant", text: "pong", streaming: true, suggestions: [] }]);
+		expect(update("pong", call)).toEqual([{ id: "m200:0", kind: "assistant", text: "pong", streaming: true, suggestions: [], at: 200 }]);
 		expect(t.applyEvent({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: true })).toEqual([
-			{ id: "tool:c1", kind: "tool", name: "bash", summary: "ls", status: "error" },
+			{ id: "tool:c1", kind: "tool", name: "bash", summary: "ls", status: "error", at: 200 },
 		]);
 	});
 
@@ -101,14 +101,14 @@ describe("Transcript", () => {
 		const prompt = { role: "custom", customType: "collab-prompt", timestamp: 300, content: "hi", details: { from: "probe" } };
 		expect(t.applyEvent({ type: "message_start", message: prompt })).toEqual([]);
 		t.applyEntry({ type: "custom_message", id: "e3", customType: "collab-prompt", content: "hi", details: { from: "probe" } });
-		expect(t.items()).toEqual([{ id: "e3", kind: "user", text: "hi", skill: null, from: "probe", entryId: null }]);
+		expect(t.items()).toEqual([{ id: "e3", kind: "user", text: "hi", skill: null, from: "probe", entryId: null, at: 0 }]);
 	});
 
 	test("a peer's message shows once, as a prompt from its sender, live and from its file entry", () => {
 		const t = new Transcript();
 		const details = { id: "irc1", from: "Main", message: "Rebase onto main first." };
 		const record = { role: "custom", customType: "irc:incoming", timestamp: 310, content: "<irc>wrapped</irc>", display: true, details };
-		const card = { id: "irc:irc1", kind: "user" as const, text: "Rebase onto main first.", skill: null, from: "Main", entryId: null };
+		const card = { id: "irc:irc1", kind: "user" as const, text: "Rebase onto main first.", skill: null, from: "Main", entryId: null, at: 310 };
 		expect(t.applyEvent({ type: "irc_message", message: record })).toEqual([card]);
 		t.applyEntry({ type: "custom_message", id: "e4", customType: "irc:incoming", content: "<irc>wrapped</irc>", display: true, details });
 		expect(t.items()).toEqual([card]);
@@ -126,7 +126,7 @@ describe("Transcript", () => {
 		const t = new Transcript();
 		const steer = { role: "user", timestamp: 340, content: "<parent>stop</parent>", parentIrc: { from: "Main", body: "stop" }, steering: true };
 		t.applyEntry({ type: "message", id: "e5", message: steer });
-		expect(t.items()).toEqual([{ id: "m340", kind: "user", text: "stop", skill: null, from: "Main", entryId: "e5" }]);
+		expect(t.items()).toEqual([{ id: "m340", kind: "user", text: "stop", skill: null, from: "Main", entryId: "e5", at: 340 }]);
 	});
 
 	test("a prompt's images show inline until omp moves them to its blob store, then through the image route", () => {
@@ -145,7 +145,7 @@ describe("Transcript", () => {
 		const details = { name: "mma-mode", path: "/s/SKILL.md", args: "match this", prompt: "/skill:mma-mode match this" };
 		const prompt = (data: string) => ({ role: "custom", customType: "skill-prompt", content: [text("[IMPORTANT: …]"), { type: "image", data, mimeType: "image/png" }], display: true, details, attribution: "user", timestamp: 800 });
 		expect(t.applyEvent({ type: "message_end", message: prompt("aGVsbG8=") })).toEqual([
-			{ id: "m800", kind: "user", text: "match this", skill: "mma-mode", from: null, entryId: null, images: ["data:image/png;base64,aGVsbG8="] },
+			{ id: "m800", kind: "user", text: "match this", skill: "mma-mode", from: null, entryId: null, images: ["data:image/png;base64,aGVsbG8="], at: 800 },
 		]);
 		const { role: _, timestamp: __, ...fields } = prompt(`blob:sha256:${hash}`);
 		t.applyEntry({ type: "custom_message", id: "e1", ...fields, timestamp: new Date(800).toISOString() });
@@ -189,10 +189,10 @@ describe("Transcript", () => {
 		const update = "[omp-agents] Project update.\n- w1 stopped.";
 		expect(t.setStarting({ id: "req_1", text: update, images: [] })).toEqual([]);
 		expect(t.items()).toEqual([]);
-		expect(t.applyEvent({ type: "message_end", message: { role: "user", timestamp: 100, content: update } })).toEqual([{ id: "m100", kind: "dashboard", text: update, entryId: null }]);
+		expect(t.applyEvent({ type: "message_end", message: { role: "user", timestamp: 100, content: update } })).toEqual([{ id: "m100", kind: "dashboard", text: update, entryId: null, at: 100 }]);
 		const entry = { type: "message", id: "e1", message: { role: "user", timestamp: 100, content: [text(update)] } };
 		t.applyEntry(entry);
-		expect(t.items()).toEqual([{ id: "m100", kind: "dashboard", text: update, entryId: "e1" }]);
+		expect(t.items()).toEqual([{ id: "m100", kind: "dashboard", text: update, entryId: "e1", at: 100 }]);
 		expect(messageItemsOf(entry)).toEqual([]);
 	});
 
@@ -210,7 +210,7 @@ describe("Transcript", () => {
 		t.applyEvent({ type: "notice", level: "info", message: "Saved." });
 
 		expect(t.items().map(item => item.id)).toEqual(["m600", "m610:0", "notice1"]);
-		expect(t.items()[1]).toEqual({ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] });
+		expect(t.items()[1]).toEqual({ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [], at: 610 });
 	});
 
 	test("omp's notices show, except Collab joins and the xd:// tools mounted as MCP servers connect", () => {
@@ -219,7 +219,7 @@ describe("Transcript", () => {
 		t.applyEvent({ type: "notice", level: "info", message: "omp-agents joined the collab session", source: "collab" });
 		t.applyEvent({ type: "notice", level: "warning", message: "Prewalk not armed: no model.", source: "prewalk" });
 
-		expect(t.items()).toEqual([{ id: "notice1", kind: "notice", level: "warning", text: "Prewalk not armed: no model." }]);
+		expect(t.items()).toEqual([{ id: "notice1", kind: "notice", level: "warning", text: "Prewalk not armed: no model.", at: expect.any(Number) }]);
 	});
 
 	test("a fresh session's first /skill: prompt shows at once, and its file entry replaces it in place", () => {
@@ -227,7 +227,7 @@ describe("Transcript", () => {
 		const details = { name: "mma-mode", path: "/s/SKILL.md", args: "fix the scroll", prompt: "/skill:mma-mode fix the scroll" };
 		const prompt = { role: "custom", customType: "skill-prompt", content: "[IMPORTANT: …]", display: true, details, attribution: "user", timestamp: 600 };
 		expect(t.applyEvent({ type: "message_end", message: prompt })).toEqual([
-			{ id: "m600", kind: "user", text: "fix the scroll", skill: "mma-mode", from: null, entryId: null },
+			{ id: "m600", kind: "user", text: "fix the scroll", skill: "mma-mode", from: null, entryId: null, at: 600 },
 		]);
 		t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(610, [text("po")]) } });
 
@@ -244,10 +244,10 @@ describe("Transcript", () => {
 		const t = new Transcript();
 		const prompt = { role: "user", timestamp: 700, content: "fork me" };
 		expect(t.applyEvent({ type: "message_end", message: prompt })).toEqual([
-			{ id: "m700", kind: "user", text: "fork me", skill: null, from: null, entryId: null },
+			{ id: "m700", kind: "user", text: "fork me", skill: null, from: null, entryId: null, at: 700 },
 		]);
 		expect(t.applyEntry({ type: "message", id: "a1b2c3d4", message: prompt })).toEqual([
-			{ id: "m700", kind: "user", text: "fork me", skill: null, from: null, entryId: "a1b2c3d4" },
+			{ id: "m700", kind: "user", text: "fork me", skill: null, from: null, entryId: "a1b2c3d4", at: 700 },
 		]);
 	});
 
@@ -269,12 +269,12 @@ describe("Transcript", () => {
 		const call = { type: "toolCall", id: "c1", name: "bash", arguments: { command: "sleep 30 && echo done" } };
 		t.applyEntry({ type: "message", id: "e1", message: assistant(400, [call], { stopReason: "toolUse" }) });
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: call.arguments });
-		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "running" }]);
+		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "running", at: 400 }]);
 
 		t.applyEntry({ type: "message", id: "e2", message: { role: "toolResult", timestamp: 401, toolCallId: "c1", toolName: "bash", isError: true } });
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: call.arguments });
 
-		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "error" }]);
+		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "error", at: 400 }]);
 	});
 
 	test("a tool result's images show on its call, and a replayed call keeps them", () => {
@@ -292,7 +292,7 @@ describe("Transcript", () => {
 		t.applyEntry({ type: "message", id: "e1", message: assistant(600, [call], { stopReason: "toolUse" }) });
 
 		expect(t.items()).toEqual([
-			{ id: "tool:s1", kind: "tool", name: "browser", summary: "screenshot", status: "ok", images: [`/api/image?hash=${hash}&type=image%2Fwebp`, "data:image/png;base64,aGk="] },
+			{ id: "tool:s1", kind: "tool", name: "browser", summary: "screenshot", status: "ok", images: [`/api/image?hash=${hash}&type=image%2Fwebp`, "data:image/png;base64,aGk="], at: 600 },
 		]);
 	});
 
@@ -300,14 +300,14 @@ describe("Transcript", () => {
 		const t = new Transcript();
 		const call = { type: "toolCall", id: "y1", name: "yield", arguments: { type: "result", data: "done banana" } };
 		t.applyEntry({ type: "message", id: "e1", message: assistant(500, [call], { stopReason: "toolUse" }) });
-		expect(t.items()).toEqual([{ id: "tool:y1", kind: "tool", name: "yield", summary: "done banana", status: "running" }]);
+		expect(t.items()).toEqual([{ id: "tool:y1", kind: "tool", name: "yield", summary: "done banana", status: "running", at: 500 }]);
 	});
 
 	test("a tool cut off by an interrupt stops showing as running when the turn ends", () => {
 		const t = new Transcript();
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c2", toolName: "bash", args: { command: "sleep 40" } });
 		t.applyEvent({ type: "agent_end" });
-		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error" }]);
+		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error", at: expect.any(Number) }]);
 	});
 
 	test("thinking streams in place, a redacted block is left out, and an interrupt stops it streaming", () => {
@@ -319,10 +319,10 @@ describe("Transcript", () => {
 				assistantMessageEvent: { partial: assistant(200, [thinking(value), { type: "redactedThinking", data: "x" }]) },
 			});
 		expect(partial("")).toEqual([]);
-		expect(partial("hm")).toEqual([{ id: "m200:0", kind: "thinking", text: "hm", streaming: true }]);
-		expect(partial("hmm")).toEqual([{ id: "m200:0", kind: "thinking", text: "hmm", streaming: true }]);
+		expect(partial("hm")).toEqual([{ id: "m200:0", kind: "thinking", text: "hm", streaming: true, at: 200 }]);
+		expect(partial("hmm")).toEqual([{ id: "m200:0", kind: "thinking", text: "hmm", streaming: true, at: 200 }]);
 		t.applyEvent({ type: "agent_end" });
-		expect(t.items()).toEqual([{ id: "m200:0", kind: "thinking", text: "hmm", streaming: false }]);
+		expect(t.items()).toEqual([{ id: "m200:0", kind: "thinking", text: "hmm", streaming: false, at: 200 }]);
 
 		const saved = new Transcript();
 		saved.applyEntry({
@@ -331,8 +331,8 @@ describe("Transcript", () => {
 			message: assistant(200, [thinking("hmm"), { type: "redactedThinking", data: "x" }, text("ok")], { stopReason: "stop" }),
 		});
 		expect(saved.items()).toEqual([
-			{ id: "m200:0", kind: "thinking", text: "hmm", streaming: false },
-			{ id: "m200:2", kind: "assistant", text: "ok", streaming: false, suggestions: [] },
+			{ id: "m200:0", kind: "thinking", text: "hmm", streaming: false, at: 200 },
+			{ id: "m200:2", kind: "assistant", text: "ok", streaming: false, suggestions: [], at: 200 },
 		]);
 	});
 
@@ -376,10 +376,10 @@ describe("Transcript", () => {
 		}
 
 		expect(t.items()).toEqual([
-			{ id: "m1", kind: "user", text: "list files", skill: null, from: null, entryId: "e1" },
-			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok" },
-			{ id: "m4:0", kind: "assistant", text: "README.md", streaming: false, suggestions: [] },
-			{ id: "m4:stop", kind: "notice", level: "warning", text: "Interrupted." },
+			{ id: "m1", kind: "user", text: "list files", skill: null, from: null, entryId: "e1", at: 1 },
+			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok", at: 2 },
+			{ id: "m4:0", kind: "assistant", text: "README.md", streaming: false, suggestions: [], at: 4 },
+			{ id: "m4:stop", kind: "notice", level: "warning", text: "Interrupted.", at: 4 },
 		]);
 	});
 
@@ -395,8 +395,8 @@ describe("Transcript", () => {
 		t.applyEntry({ type: "message", id: "e2", message: { role: "user", timestamp: 2, content: [text(bare)] } });
 
 		expect(t.items()).toEqual([
-			{ id: "e1", kind: "user", text: "do X\nand Y", skill: "poteto-mode", from: "probe", entryId: null },
-			{ id: "m2", kind: "user", text: "", skill: "poteto-mode", from: null, entryId: "e2" },
+			{ id: "e1", kind: "user", text: "do X\nand Y", skill: "poteto-mode", from: "probe", entryId: null, at: 0 },
+			{ id: "m2", kind: "user", text: "", skill: "poteto-mode", from: null, entryId: "e2", at: 2 },
 		]);
 	});
 
@@ -406,7 +406,7 @@ describe("Transcript", () => {
 		t.applyEntry({ type: "custom_message", id: "e1", customType: "skill-prompt", content: "[IMPORTANT: …]", display: true, attribution: "user", details });
 		t.applyEntry({ type: "custom_message", id: "e2", customType: "skill-prompt", content: "body", display: false, details: { name: "mma-mode", path: "/s/SKILL.md" } });
 
-		expect(t.items()).toEqual([{ id: "e1", kind: "user", text: "fix the scroll", skill: "mma-mode", from: null, entryId: null }]);
+		expect(t.items()).toEqual([{ id: "e1", kind: "user", text: "fix the scroll", skill: "mma-mode", from: null, entryId: null, at: 0 }]);
 	});
 
 	test("a ! command renders as the user's command and output, fenced past any backticks in it, with its failure", () => {
@@ -459,6 +459,6 @@ describe("splitSuggestions", () => {
 	test("a reply's item carries its suggestions and shows only the body", () => {
 		const t = new Transcript();
 		t.applyEntry({ type: "message", id: "e1", message: assistant(300, [text("Done.\nSuggestions:\n1. Ship it")], { stopReason: "stop" }) });
-		expect(t.items()).toEqual([{ id: "m300:0", kind: "assistant", text: "Done.", streaming: false, suggestions: ["Ship it"] }]);
+		expect(t.items()).toEqual([{ id: "m300:0", kind: "assistant", text: "Done.", streaming: false, suggestions: ["Ship it"], at: 300 }]);
 	});
 });

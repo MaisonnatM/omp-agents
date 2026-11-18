@@ -83,7 +83,7 @@ describe("Views", () => {
 		await untilPublished(1);
 		expect(itemsOf(0)).toEqual({
 			reset: true,
-			items: [{ id: "m100", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" }],
+			items: [{ id: "m100", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1", at: 100 }],
 		});
 
 		// The reply streams (held back for the publish window), then the file catches up with the finished message.
@@ -91,14 +91,14 @@ describe("Views", () => {
 		appendFileSync(file, replyEntry("e2", assistant(200, [text("pong")], { stopReason: "stop" })));
 		views.poke(file);
 		await untilPublished(2);
-		expect(itemsOf(1)).toEqual({ reset: false, items: [{ id: "m200:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] }] });
+		expect(itemsOf(1)).toEqual({ reset: false, items: [{ id: "m200:0", kind: "assistant", text: "pong", streaming: false, suggestions: [], at: 200 }] });
 
 		// A straggling update from the relay arrives after the file settled the message.
 		views.applyEvent("a", streamed(200, "pon"));
 		views.note("a", null, "warning", "barrier");
 		await untilPublished(3);
 		expect(published).toHaveLength(3);
-		expect(itemsOf(2).items).toEqual([{ id: "notice1", kind: "notice", level: "warning", text: "barrier" }]);
+		expect(itemsOf(2).items).toEqual([{ id: "notice1", kind: "notice", level: "warning", text: "barrier", at: expect.any(Number) }]);
 	});
 
 	test("a fresh session's prompt shows from its live event until the file catches up, and stays ahead of the reply", async () => {
@@ -114,7 +114,7 @@ describe("Views", () => {
 
 		views.applyEvent("a", { type: "message_end", message: { role: "user", timestamp: 600, content: "say pong" } });
 		await untilPublished(2);
-		expect(itemsOf(1).items).toEqual([{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: null }]);
+		expect(itemsOf(1).items).toEqual([{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: null, at: 600 }]);
 
 		writeFileSync(file, userEntry("e1", 600, "say pong") + replyEntry("e2", assistant(610, [text("pong")], { stopReason: "stop" })));
 		views.poke(file);
@@ -122,8 +122,8 @@ describe("Views", () => {
 		const items = published.slice(2).flatMap((_, index) => itemsOf(index + 2).items);
 		expect(items).toEqual(
 			expect.arrayContaining([
-				{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" },
-				{ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] },
+				{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1", at: 600 },
+				{ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [], at: 610 },
 			]),
 		);
 		expect(items.filter(item => item.id === "m600")).toHaveLength(1);
@@ -148,8 +148,8 @@ describe("Views", () => {
 			view: main("a"),
 			reset: false,
 			items: [
-				{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" },
-				{ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] },
+				{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1", at: 600 },
+				{ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [], at: 610 },
 			],
 			removed: ["m600", "m610:0"],
 		});
@@ -170,7 +170,7 @@ describe("Views", () => {
 		const late = socket();
 		views.watch(late.ws, [main("a")], []);
 		expect(late.sent).toEqual([
-			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1" }, pending], removed: [] },
+			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1", at: 100 }, pending], removed: [] },
 		]);
 
 		starting.delete("a");
@@ -183,10 +183,10 @@ describe("Views", () => {
 				t: "items",
 				view: main("a"),
 				reset: false,
-				items: [{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: null, images: ["data:image/png;base64,aGk="] }],
+				items: [{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: null, images: ["data:image/png;base64,aGk="], at: 600 }],
 				removed: ["starting:req_1"],
 			},
-			{ t: "items", view: main("a"), reset: false, items: [{ id: "notice1", kind: "notice", level: "warning", text: "barrier" }], removed: [] },
+			{ t: "items", view: main("a"), reset: false, items: [{ id: "notice1", kind: "notice", level: "warning", text: "barrier", at: expect.any(Number) }], removed: [] },
 		]);
 	});
 
@@ -271,7 +271,7 @@ describe("Views", () => {
 		await untilPublished(2);
 		expect(itemsOf(1)).toEqual({
 			reset: true,
-			items: [{ id: "m900", kind: "user", text: "two", skill: null, from: null, entryId: "e9" }],
+			items: [{ id: "m900", kind: "user", text: "two", skill: null, from: null, entryId: "e9", at: 900 }],
 		});
 
 		paths.set("a:", null);
@@ -291,7 +291,7 @@ describe("Views", () => {
 		await untilPublished(1);
 		views.watch(second.ws, [main("a")], []);
 		expect(second.sent).toEqual([
-			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1" }], removed: [] },
+			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1", at: 100 }], removed: [] },
 		]);
 		expect(second.topics).toEqual(new Set(["view:live:a:"]));
 		expect(published).toHaveLength(1);

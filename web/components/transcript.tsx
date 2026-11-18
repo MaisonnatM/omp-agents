@@ -1,7 +1,7 @@
 /** `Transcript`, a session's messages, thinking, and tool calls as rendered in a pane. */
-import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise, IconArrowsRepeat, IconBrain, IconBubbleAlert, IconBubbleQuestion, IconBug, IconChainLink1, IconChip, IconCircleX, IconCode, IconCodeBrackets, IconConsole, IconEyeOpen, IconFileEdit, IconFileText, IconFlag1, IconFolderOpen, IconGlobe, IconGraduateCap, IconHistory, IconHourglass, IconImac, IconImages1, IconLightBulb, IconNote1, IconPageAdd, IconPageTextSearch, IconPlugin1, IconPullRequest, IconPageSearch, IconShieldCheck, IconShip, IconSparklesTwo, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
+import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise, IconArrowsRepeat, IconBrain, IconBubbleAlert, IconBubbleQuestion, IconBug, IconChainLink1, IconChip, IconCircleCheck, IconCircleX, IconCode, IconCodeBrackets, IconConsole, IconEyeOpen, IconFileEdit, IconFileText, IconFlag1, IconFolderOpen, IconGlobe, IconGraduateCap, IconHistory, IconHourglass, IconImac, IconImages1, IconLightBulb, IconNote1, IconPageAdd, IconPageTextSearch, IconPlugin1, IconPullRequest, IconPageSearch, IconShieldCheck, IconShip, IconSparklesTwo, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { createContext, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ArtifactSave } from "../../src/shared/artifacts";
 import type { View } from "../../src/shared/sessions";
 import { taskText } from "../../src/shared/routine-message";
@@ -18,20 +18,20 @@ import {
 	useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
-import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
-import { ToolCallCard, ToolCallGroup } from "@/components/ui/tool-call-card";
+import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { openArtifact, useShownArtifact } from "../artifact-requests";
-import { versionNumber } from "../artifacts-model";
+import { openArtifact, type ShownArtifact, useShownArtifact } from "../artifact-requests";
+import { type Artifact, savedArtifact, versionNumber } from "../artifacts-model";
+import { durationWords } from "../routines-model";
 import { mediaSrc } from "../api";
 import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { useArtifacts, usePaneLoaded, useTranscript } from "../pane-store";
 import { revealed, useReveal } from "../message-reveal";
-import { type ActivityItem, EMPTY_TRANSCRIPT, type ForkPoint, replacingPrompt, resendOf, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
+import { type Block, EMPTY_TRANSCRIPT, type ForkPoint, type GroupItem, replacingPrompt, resendOf, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { type ToolChipLabels, ToolChipsContext } from "./tool-chips";
@@ -132,12 +132,12 @@ const OpenImage = createContext<(id: string, at: number) => void>(() => {});
 /** Opens a prompt's attached file in the transcript's dialog; outside a `Transcript` it does nothing. */
 const OpenFile = createContext<(file: PromptFile) => void>(() => {});
 
-/** The images a tool's result returned, as thumbnails on its card; one opens large in the transcript's viewer. */
+/** The images a tool's result returned, as thumbnails under its line; one opens large in the transcript's viewer. */
 function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: string }) {
 	const openImage = useContext(OpenImage);
 	const label = (index: number): string => `Image ${index + 1} from ${tool}`;
 	return (
-		<span className="flex flex-wrap gap-1.5" data-tool-images>
+		<span className="-mt-1 ml-6 flex flex-wrap gap-1.5" data-tool-images>
 			{srcs.map((src, index) => (
 				// A result's images never change, so their order names them.
 				<button
@@ -155,60 +155,103 @@ function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: stri
 	);
 }
 
-/** A tool's icon, from {@link TOOL_ICON}; an MCP server's tool not in it gets a plug, any other a toolbox. */
-function toolIcon(name: string): IconComponent {
-	return Object.hasOwn(TOOL_ICON, name) ? TOOL_ICON[name]! : name.startsWith("mcp__") ? IconPlugin1 : IconToolbox;
+/** Ticks every second while `live`, so a running group's time counts up; `Date.now()` once otherwise. */
+function useNow(live: boolean): number {
+	const [now, setNow] = useState(Date.now);
+	useEffect(() => {
+		if (!live) return;
+		setNow(Date.now());
+		const timer = setInterval(() => setNow(Date.now()), 1000);
+		return () => clearInterval(timer);
+	}, [live]);
+	return now;
 }
 
-export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
+/**
+ * A turn's work: its tool calls, thinking, and the messages between them, under a line that says how long it worked.
+ * `from` and `to` as on its {@link Block}.
+ */
+export const ActivityGroup = memo(function ActivityGroup({ entries, from, to }: { entries: GroupItem[]; from: number | null; to: number | null }) {
 	const expanded = useContext(ToolsExpanded);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
+	const LoaderIcon = useIcon("loader");
 	const tools = entries.filter((entry): entry is ToolItem => entry.kind === "tool");
 	const running =
-		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind === "thinking" && entry.streaming);
+		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind !== "tool" && entry.streaming);
 	const failed = tools.filter(tool => tool.status === "error").length;
 	// A group that returned images stays open, so its images stay in sight.
 	const pinned = tools.some(tool => tool.images);
 	// Open while running, else as `expanded` says; a manual toggle wins until `expanded` flips.
 	const [toggle, setToggle] = useState<{ open: boolean; expanded: boolean } | null>(null);
 	const open = toggle?.expanded === expanded ? toggle.open : running || expanded || pinned;
-	const title = running ? "Working" : tools.length ? `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}` : "Thought";
-	const visible = entries.filter(entry => (entry.kind === "thinking" ? !hideThinking : !hideTools));
-	const icons = visible.slice(-3).map(entry => (entry.kind === "thinking" ? IconBrain : toolIcon(entry.name)));
+	const now = useNow(running);
+	const end = running ? now : (to ?? Math.max(...entries.map(entry => entry.at ?? 0)));
+	const took = from !== null && end >= from ? durationWords(end - from) : null;
+	const ran = tools.length ? `${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}` : "";
+	const header = running
+		? took ? `Working for ${took}` : "Working"
+		: took
+			? `Worked for ${took}${ran && ` · ${ran}`}`
+			: ran ? `Ran ${ran}` : "Thought";
+	const visible = entries.filter(entry =>
+		entry.kind === "thinking" ? !hideThinking : entry.kind === "tool" ? !hideTools : entry.text.trim() !== "",
+	);
 	return (
-		<ToolCallGroup
-			{...activityControl("transcript.activity-group")}
-			icons={icons}
-			title={title}
-			failed={failed}
-			running={running}
-			open={open}
-			onOpenChange={next => setToggle({ open: next, expanded })}
-		>
-			{visible.map(entry =>
-				entry.kind === "thinking" ? (
-					<TraceCollapsible key={entry.id} defaultOpen>
-						<TraceCollapsibleTrigger>
-							<TraceLine status={entry.streaming ? "running" : undefined}>
-								<TraceIcon>
-									<IconBrain />
-								</TraceIcon>
-								<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
-							</TraceLine>
-						</TraceCollapsibleTrigger>
-						<TraceCollapsibleContent className="text-[13px]">
-							<div data-thinking={entry.streaming ? "live" : "done"}>
-								<MessageMarkdown text={entry.text} />
-							</div>
-						</TraceCollapsibleContent>
-					</TraceCollapsible>
-				) : (
-					<ToolCallCard key={entry.id} icon={toolIcon(entry.name)} name={entry.name} summary={entry.summary} status={entry.status}>
-						{entry.images && <ToolImages id={entry.id} srcs={entry.images} tool={entry.name} />}
-					</ToolCallCard>
-				),
-			)}
-		</ToolCallGroup>
+		<TraceCollapsible open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="max-w-2xl self-start">
+			<TraceCollapsibleTrigger {...activityControl("transcript.activity-group")}>
+				<TraceLine status={running ? "running" : undefined}>
+					<TraceIcon>{running ? <LoaderIcon className="animate-spin" /> : tools.length ? <IconCircleCheck /> : <IconBrain />}</TraceIcon>
+					<TraceTitle>{header}</TraceTitle>
+				</TraceLine>
+			</TraceCollapsibleTrigger>
+			<TraceCollapsibleContent>
+				<Trace>
+					{visible.map(entry => {
+						if (entry.kind === "assistant") {
+							return (
+								<div key={entry.id} className="py-1 text-sm" data-item="narration">
+									<MessageMarkdown text={entry.text} />
+								</div>
+							);
+						}
+						if (entry.kind === "thinking") {
+							return (
+								<TraceCollapsible key={entry.id} defaultOpen>
+									<TraceCollapsibleTrigger>
+										<TraceLine status={entry.streaming ? "running" : undefined}>
+											<TraceIcon>
+												<IconBrain />
+											</TraceIcon>
+											<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
+										</TraceLine>
+									</TraceCollapsibleTrigger>
+									<TraceCollapsibleContent className="text-[13px]">
+										<div data-thinking={entry.streaming ? "live" : "done"}>
+											<MessageMarkdown text={entry.text} />
+										</div>
+									</TraceCollapsibleContent>
+								</TraceCollapsible>
+							);
+						}
+						const Icon = Object.hasOwn(TOOL_ICON, entry.name) ? TOOL_ICON[entry.name]! : entry.name.startsWith("mcp__") ? IconPlugin1 : IconToolbox;
+						return (
+							<Fragment key={entry.id}>
+								<TraceLine status={entry.status === "ok" ? undefined : entry.status}>
+									<TraceIcon>
+										<Icon />
+									</TraceIcon>
+									<TraceTitle>
+										{entry.name}
+										{entry.summary && <span className="text-muted-foreground/70"> {entry.summary}</span>}
+									</TraceTitle>
+								</TraceLine>
+								{entry.images && <ToolImages id={entry.id} srcs={entry.images} tool={entry.name} />}
+							</Fragment>
+						);
+					})}
+				</Trace>
+			</TraceCollapsibleContent>
+		</TraceCollapsible>
 	);
 });
 
@@ -268,8 +311,20 @@ function Row({ messageId, settled, className, children }: { messageId: string; s
 
 type ToolChip = { name: string; label: string; href: string | null; icon: IconComponent };
 
-/** A group of tool calls and thinking, with a chip for each label `chips` gives a call that finished in it. Memoized on its block, so a token leaves a settled group as it is. */
-const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chips }: { id: string; entries: ActivityItem[]; settled: boolean; shown: boolean; chips: ToolChipLabels }) {
+/**
+ * A turn's work group, with a chip for each label `chips` gives a call that finished in it and a card for each artifact
+ * it saved. Memoized on its block, so a token leaves a settled group as it is.
+ */
+const ActivityRow = memo(function ActivityRow({ block, settled, shown, chips, view, artifacts, shownArtifact }: {
+	block: Extract<Block, { kind: "activity" }>;
+	settled: boolean;
+	shown: boolean;
+	chips: ToolChipLabels;
+	view: View;
+	artifacts: readonly Artifact[];
+	shownArtifact: ShownArtifact | null;
+}) {
+	const { id, entries, from, to } = block;
 	const chipsShown = useMemo(() => {
 		const byLabel = new Map<string, ToolChip>();
 		for (const entry of entries) {
@@ -283,18 +338,21 @@ const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chi
 	if (!shown && chipsShown.length === 0) return null;
 	return (
 		<Row messageId={id} settled={settled}>
-			{shown && <ActivityGroup entries={entries} />}
+			{shown && <ActivityGroup entries={entries} from={from} to={to} />}
+			{shown &&
+				entries.filter(savedArtifact).map(item => {
+					const number = versionNumber(artifacts, item);
+					return (
+						<ArtifactCard
+							key={item.id}
+							save={item.artifact}
+							number={number}
+							showing={shownArtifact?.file === item.artifact.file && shownArtifact.number === number}
+							onOpen={() => openArtifact(view, { file: item.artifact.file, version: number })}
+						/>
+					);
+				})}
 			<ToolChips shown={chipsShown} />
-		</Row>
-	);
-});
-
-/** A saved artifact version's card; nothing on a Bot's page, which shows no activity. Its Open shows this version in the Artifacts tab. */
-const ArtifactRow = memo(function ArtifactRow({ id, view, save, number, showing, settled, shown }: { id: string; view: View; save: ArtifactSave; number: number; showing: boolean; settled: boolean; shown: boolean }) {
-	if (!shown) return null;
-	return (
-		<Row messageId={id} settled={settled}>
-			<ArtifactCard save={save} number={number} showing={showing} onOpen={() => openArtifact(view, { file: save.file, version: number })} />
 		</Row>
 	);
 });
@@ -655,6 +713,52 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 		return () => cancelAnimationFrame(frame);
 	}, [revealId, loaded, items, view, scrollToMessage]);
 
+	const itemRow = (item: Extract<Block, { kind: "item" }>["item"], settled: boolean): ReactNode => {
+		if (item.kind === "notice") {
+			return (
+				<Row key={item.id} messageId={item.id} settled={settled}>
+					<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
+						{item.text}
+					</p>
+				</Row>
+			);
+		}
+		if (item.kind === "routine") return <RoutineRow key={item.id} item={item} settled={settled} />;
+		if (item.kind === "bot-message") return <BotMessageRow key={item.id} item={item} settled={settled} />;
+		const point = forks.get(item.id);
+		const edit = editing?.item.id === item.id ? editing : null;
+		return (
+			<MessageRow
+				key={item.id}
+				item={item}
+				copyable={item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copyText(item).trim() !== ""}
+				forkAt={point?.entryId ?? null}
+				prefill={point?.prefill ?? false}
+				forking={here?.phase === "starting" && here.op.itemId === item.id}
+				forkDisabled={fork?.phase === "starting"}
+				failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
+				editAt={!editing && editable?.itemId === item.id ? editable.entryId : null}
+				editor={edit ? (
+					<PromptEditor
+						initial={edit.item.text}
+						text={edit.text}
+						pending={submitted !== null}
+						working={working}
+						error={resendError}
+						onChange={text => setEditing(current => current ? { ...current, text } : current)}
+						onSave={() => resend.run(edit, edit.text.trim())}
+						onCancel={() => setEditing(null)}
+					/>
+				) : undefined}
+				browser={BROWSER_AVAILABLE && view.kind === "live" ? view.instanceId : null}
+				replacing={item.id === replacing}
+				settled={settled}
+				onFork={onFork}
+				onEditing={beginEditing}
+			/>
+		);
+	};
+
 	return (
 		<OpenImage.Provider value={openImage}>
 		<OpenFile.Provider value={setFile}>
@@ -671,68 +775,12 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 							{visibleBlocks.map((block, index) => {
 								const settled = index < visibleBlocks.length - 1;
 								if (block.kind === "activity") {
-									return <ActivityRow key={block.id} id={block.id} entries={block.entries} settled={settled} shown={activityShown} chips={toolChips} />;
+									const row = <ActivityRow key={block.id} block={block} settled={settled} shown={activityShown} chips={toolChips} view={view} artifacts={artifacts} shownArtifact={shownArtifact} />;
+									if (activityShown) return row;
+									// A Bot's page draws no groups, so the messages written between tool calls show as messages.
+									return [...block.entries.flatMap(entry => (entry.kind === "assistant" ? [itemRow(entry, settled)] : [])), row];
 								}
-								if (block.kind === "artifact") {
-									const { id, artifact } = block.item;
-									const number = versionNumber(artifacts, block.item);
-									return (
-										<ArtifactRow
-											key={id}
-											id={id}
-											view={view}
-											save={artifact}
-											number={number}
-											showing={shownArtifact?.file === artifact.file && shownArtifact.number === number}
-											settled={settled}
-											shown={activityShown}
-										/>
-									);
-								}
-								const item = block.item;
-								if (item.kind === "notice") {
-									return (
-										<Row key={item.id} messageId={item.id} settled={settled}>
-											<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
-												{item.text}
-											</p>
-										</Row>
-									);
-								}
-								if (item.kind === "routine") return <RoutineRow key={item.id} item={item} settled={settled} />;
-								if (item.kind === "bot-message") return <BotMessageRow key={item.id} item={item} settled={settled} />;
-								const point = forks.get(item.id);
-								const edit = editing?.item.id === item.id ? editing : null;
-								return (
-									<MessageRow
-										key={item.id}
-										item={item}
-										copyable={item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copyText(item).trim() !== ""}
-										forkAt={point?.entryId ?? null}
-										prefill={point?.prefill ?? false}
-										forking={here?.phase === "starting" && here.op.itemId === item.id}
-										forkDisabled={fork?.phase === "starting"}
-										failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
-										editAt={!editing && editable?.itemId === item.id ? editable.entryId : null}
-										editor={edit ? (
-											<PromptEditor
-												initial={edit.item.text}
-												text={edit.text}
-												pending={submitted !== null}
-												working={working}
-												error={resendError}
-												onChange={text => setEditing(current => current ? { ...current, text } : current)}
-												onSave={() => resend.run(edit, edit.text.trim())}
-												onCancel={() => setEditing(null)}
-											/>
-										) : undefined}
-										browser={BROWSER_AVAILABLE && view.kind === "live" ? view.instanceId : null}
-										replacing={item.id === replacing}
-										settled={settled}
-										onFork={onFork}
-										onEditing={beginEditing}
-									/>
-								);
+								return itemRow(block.item, settled);
 							})}
 							{loaded && items.length === 0 && !working && !editing && empty}
 							{working && !streaming && (

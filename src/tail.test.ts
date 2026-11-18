@@ -47,7 +47,7 @@ describe("FileTail", () => {
 		await read();
 		expect(emits).toEqual([
 			{ reset: true, items: [] },
-			{ reset: false, items: [{ id: "m1", kind: "user", text: "first", skill: null, from: null, entryId: "e1" }] },
+			{ reset: false, items: [{ id: "m1", kind: "user", text: "first", skill: null, from: null, entryId: "e1", at: 1 }] },
 		]);
 	});
 
@@ -61,7 +61,7 @@ describe("FileTail", () => {
 		await read();
 		expect(emits).toEqual([
 			{ reset: true, items: [] },
-			{ reset: false, items: [{ id: "m2", kind: "user", text: "café ✓", skill: null, from: null, entryId: "e2" }] },
+			{ reset: false, items: [{ id: "m2", kind: "user", text: "café ✓", skill: null, from: null, entryId: "e2", at: 2 }] },
 		]);
 	});
 
@@ -71,7 +71,7 @@ describe("FileTail", () => {
 		await read();
 		writeFileSync(path, user(5, "new"));
 		await read();
-		expect(emits.at(-1)).toEqual({ reset: true, items: [{ id: "m5", kind: "user", text: "new", skill: null, from: null, entryId: "e5" }] });
+		expect(emits.at(-1)).toEqual({ reset: true, items: [{ id: "m5", kind: "user", text: "new", skill: null, from: null, entryId: "e5", at: 5 }] });
 	});
 
 	test("the changed files publish whole with the first read, then only the files a later read changed", async () => {
@@ -88,7 +88,7 @@ describe("FileTail", () => {
 		appendFileSync(path, edit("c2", "/repo/b.ts"));
 		await read();
 
-		expect(emits.at(-3)).toEqual({ reset: false, items: [{ id: "m2", kind: "user", text: "go on", skill: null, from: null, entryId: "e2" }] });
+		expect(emits.at(-3)).toEqual({ reset: false, items: [{ id: "m2", kind: "user", text: "go on", skill: null, from: null, entryId: "e2", at: 2 }] });
 		expect(works).toEqual([
 			{ reset: true, files: [] },
 			{ reset: false, files: [{ path: "/repo/a.ts", changes: [change] }] },
@@ -132,7 +132,7 @@ describe("FileTail", () => {
 			expect(emits).toHaveLength(1);
 
 			jest.advanceTimersByTime(50);
-			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "thinking", text: "x".repeat(30), streaming: true }] }]);
+			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "thinking", text: "x".repeat(30), streaming: true, at: 7 }] }]);
 		});
 
 		test("a burst of updates of a streaming reply publishes once the window ends, with the latest text", async () => {
@@ -143,7 +143,7 @@ describe("FileTail", () => {
 
 			jest.advanceTimersByTime(50);
 			jest.advanceTimersByTime(1000);
-			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "assistant", text: "x".repeat(30), streaming: true, suggestions: [] }] }]);
+			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "assistant", text: "x".repeat(30), streaming: true, suggestions: [], at: 7 }] }]);
 		});
 
 		test("the reply that ends the stream publishes at once with the held text, and the window publishes nothing after it", async () => {
@@ -154,7 +154,7 @@ describe("FileTail", () => {
 
 			tail.live(t => t.applyEvent({ type: "message_end", message: reply("pong", { stopReason: "stop" }) }));
 			await applied();
-			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] }] }]);
+			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "assistant", text: "pong", streaming: false, suggestions: [], at: 7 }] }]);
 
 			jest.advanceTimersByTime(1000);
 			expect(emits).toHaveLength(2);
