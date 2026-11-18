@@ -143,7 +143,7 @@ export const CONTROLS = [
 	{ id: "artifacts.artifact", label: "Artifacts tab artifact picked", area: "Artifacts" },
 	{ id: "artifacts.version", label: "Artifacts version picked", area: "Artifacts" },
 	{ id: "artifacts.latest", label: "Artifacts Go to latest", area: "Artifacts" },
-	{ id: "artifacts.rendered", label: "Artifacts Rendered view", area: "Artifacts" },
+	{ id: "artifacts.rendered", label: "Artifacts Preview view", area: "Artifacts" },
 	{ id: "artifacts.source", label: "Artifacts Source view", area: "Artifacts" },
 	{ id: "artifacts.copy", label: "Artifacts Copy", area: "Artifacts" },
 	{ id: "artifacts.download", label: "Artifacts Download", area: "Artifacts" },

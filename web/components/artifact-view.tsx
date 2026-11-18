@@ -59,7 +59,7 @@ function HtmlFrame({ url, title }: RenderedProps) {
 function SvgImage({ url, title }: RenderedProps) {
 	const { show, viewer } = useImageList();
 	return (
-		<div className="flex size-full items-center justify-center overflow-auto p-4">
+		<div className="flex size-full items-center justify-center overflow-auto bg-muted/40 p-6">
 			<button {...activityControl("media-viewer.open")} type="button" aria-label={`Open ${title}`} onClick={() => show([{ src: url, caption: title }], 0)} className="size-full cursor-zoom-in rounded-md">
 				<img src={url} alt={title} className="size-full object-contain" />
 			</button>
@@ -68,10 +68,13 @@ function SvgImage({ url, title }: RenderedProps) {
 	);
 }
 
+/** A document page: a reading column centred in the panel, with the page's own margins. */
 function MarkdownText({ text }: RenderedProps) {
 	return (
-		<div className="size-full overflow-auto px-4 py-3">
-			<MessageMarkdown text={text} preset={SESSION_AGENT_PRESET} />
+		<div className="size-full overflow-auto">
+			<article className="artifact-document mx-auto max-w-[40rem] px-10 py-9 @max-[30rem]/artifacts:px-5 @max-[30rem]/artifacts:py-6">
+				<MessageMarkdown text={text} preset={SESSION_AGENT_PRESET} />
+			</article>
 		</div>
 	);
 }
