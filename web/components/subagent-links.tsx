@@ -4,11 +4,11 @@ import { type MouseEvent, useMemo } from "react";
 import type { AgentRow, LiveView, RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { useIcon } from "@/lib/icon-context";
 import { subagentModeOf } from "../labels";
 import { hashForView, type OpenMode } from "../routing";
 import { useAction } from "../use-action";
 import { useDashboardActions } from "./dashboard-context";
+import { Spinner } from "./spinner";
 
 type SubagentView = LiveView & { agentId: string };
 
@@ -54,7 +54,6 @@ export function agentLink(links: SubagentLinksValue, agentId: string) {
 }
 
 export function CancelAgentButton({ view, onCancel, running }: { view: SubagentView; onCancel: (view: SubagentView) => Promise<void>; running: boolean }) {
-	const LoaderIcon = useIcon("loader");
 	const cancel = useAction(() => onCancel(view), "Could not cancel the subagent");
 	if (!running && !cancel.pending) return null;
 	return (
@@ -68,7 +67,7 @@ export function CancelAgentButton({ view, onCancel, running }: { view: SubagentV
 				disabled={cancel.pending}
 				onClick={() => cancel.run()}
 			>
-				{cancel.pending ? <LoaderIcon className="size-3.5 animate-spin" /> : <IconStopCircle className="size-3.5" />}
+				{cancel.pending ? <Spinner className="size-3.5" /> : <IconStopCircle className="size-3.5" />}
 			</Button>
 		</Tooltip>
 	);

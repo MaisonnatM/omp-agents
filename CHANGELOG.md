@@ -12,6 +12,16 @@ The dashboard shows the same lines in Settings › What's new.
 - A Markdown artifact draws its `mermaid` diagrams and `chart` blocks as pictures, as a reply in the conversation does, instead of showing their source.
 - The stack menu on a pull request lists the session's other pull requests by number and title, with an icon that says whether each is open, a draft, merged, or closed.
 - Images in the Artifacts tab open when you click them: a screenshot inside an HTML page, or an SVG, fills the window, where you can zoom and step to the page's other images with the arrow keys.
+- The dashboard takes affectUI's Clean look in light and dark: the Inter font, softer grays, near-black buttons, and new shadows and corner radii.
+- Tool calls in a conversation show as small cards with the tool's icon, name, summary, and status, and the group line shows the last tools' icons and how many failed.
+- The context ring's menu opens on a card with the tokens used, a grid filled to the share used, and when auto-compaction starts.
+- A plan's usage card leads with the share left of its tightest window, then lists each limit with its bar and reset time.
+- Shortcut keys, segmented tabs, toasts, loading bars, and spinners have a softer look, and a toast that stays open closes with a round ×.
+- The Overview's Files list shows each file's icon on a tinted square, green for new and red for deleted, with its line counts at the right.
+- Folder trees, in the changes dialog and Settings › Files, open with a turning chevron and show a guide line under each open folder.
+- A subagent's file diff highlights only the words that changed between a removed line and the added line that replaces it.
+- A yes-or-no question from a session shows as a card with No and Yes buttons, each with its number key.
+- A tool approval shows as the yes-or-no card asking "Allow bash?", with what it will run and Deny, Allow for session, and Allow once buttons, each with its number key.
 
 ## 2026-11-16
 

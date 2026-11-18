@@ -10,6 +10,7 @@ import {
 } from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { motion, useMotionValue } from "framer-motion";
+import { Kbd } from "@/components/kbd";
 import { cn } from "@/lib/utils";
 import { spring, exitFallbackMs } from "@/lib/springs";
 import { fontWeights } from "@/lib/font-weight";
@@ -138,9 +139,9 @@ function getSlideOffset(side: TooltipSide) {
 /** Keystroke chip rendered inside the (inverted) tooltip surface. */
 function TooltipKbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="-my-1 flex h-4 min-w-4 items-center justify-center rounded border border-background/30 px-1 font-sans text-[10px] text-background/80">
+    <Kbd size="sm" className="-my-1 text-background/80">
       {children}
-    </kbd>
+    </Kbd>
   );
 }
 

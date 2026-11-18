@@ -3,6 +3,7 @@ import { IconBubble2, IconFolder1 } from "central-icons";
 import { createContext, type ReactNode, type RefObject } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { folderName } from "../labels";
+import { Kbd } from "./kbd";
 import type { PromptEditorHandle } from "./prompt-editor";
 
 /** The text field of the composer around a picker, which takes the focus back once a choice closes the picker; `null` outside a composer. */
@@ -57,9 +58,7 @@ export function EmptyConversation({ title, children }: { title: string; children
 					["@", "files, todos, PRs, sessions"],
 				].map(([key, label]) => (
 					<li key={key} className="flex items-center gap-1.5">
-						<kbd className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-[5px] border border-border bg-background px-1.5 font-sans text-xs text-foreground">
-							{key}
-						</kbd>
+						<Kbd className="text-foreground">{key}</Kbd>
 						{label}
 					</li>
 				))}

@@ -240,6 +240,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 							loading={pending}
 							aria-label={`Choose model and effort: ${current ? modelDescription(current) : unset}, effort ${effort.current ? levelLabel(effort.current) : "Default"}`}
 							active={open !== null}
+							className="[&>span:last-child>svg:last-child]:transition-transform data-popup-open:[&>span:last-child>svg:last-child]:rotate-180 motion-reduce:[&>span:last-child>svg:last-child]:transition-none"
 						/>
 					}
 				>

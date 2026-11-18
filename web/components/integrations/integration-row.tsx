@@ -81,19 +81,17 @@ interface CalloutProps {
 	/** `status` for progress, `alert` for the outcome of what you just did, `group` with a `label` for a question; none for a standing state. */
 	role?: "status" | "alert" | "group";
 	label?: string;
-	/** Spins the icon, while the callout waits on something. */
-	spin?: boolean;
 	/** A button that resolves what the callout says, at its end. */
 	action?: ReactNode;
 	children: ReactNode;
 }
 
 /** A tinted note inside a row: a sign-in waiting on you, a question, or why the connection fails. */
-export function Callout({ tone, icon: Icon, role, label, spin = false, action, children }: CalloutProps) {
+export function Callout({ tone, icon: Icon, role, label, action, children }: CalloutProps) {
 	return (
 		<div role={role} aria-label={label} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-3 py-2.5 text-[13px] ring-1 ring-inset", TONE[tone])}>
 			<div className="flex min-w-0 flex-1 basis-64 items-start gap-2.5">
-				<Icon className={cn("mt-0.5 size-4 shrink-0", spin && "motion-safe:animate-spin")} aria-hidden />
+				<Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
 				<div className="min-w-0 text-pretty">{children}</div>
 			</div>
 			{action && <div className="ms-auto shrink-0 [&_svg]:text-current">{action}</div>}

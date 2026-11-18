@@ -13,6 +13,7 @@ import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { chordLabel, IS_MAC, modHeld } from "../shortcuts";
+import { Kbd } from "./kbd";
 
 const NONE: ReadonlySet<string> = new Set();
 const SEND_KEY = chordLabel({ key: "Enter" });
@@ -92,16 +93,13 @@ function Row({ sendKey, marked, label, className, children, ...props }: RowProps
 			style={{ fontVariationSettings: fontWeights.normal }}
 		>
 			{/* The key that sends this row; filled while the row is marked. */}
-			<kbd
+			<Kbd
 				aria-hidden="true"
-				className={cn(
-					"inline-flex shrink-0 items-center justify-center rounded-[5px] border px-1 font-sans tabular-nums transition-colors duration-80",
-					marked ? "border-foreground bg-foreground text-background" : "border-border bg-background",
-					compactStep ? "h-4 min-w-4 text-[10px]" : "h-[18px] min-w-[18px] text-[11px]",
-				)}
+				size={compactStep ? "sm" : "md"}
+				className={cn("transition-colors duration-80", marked ? "bg-foreground text-background shadow-none dark:bg-foreground dark:shadow-none" : "text-current")}
 			>
 				{sendKey}
-			</kbd>
+			</Kbd>
 			{/* py-1/-my-1 keeps truncate's overflow:hidden from clipping ascenders/descenders outside the trimmed box. */}
 			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{label}</span>
 			{children}
@@ -120,10 +118,6 @@ interface SuggestionRowProps {
 	onPick: (mark: boolean) => void;
 	/** Puts the row, with the marked ones, in the composer to edit first. */
 	onEdit: () => void;
-}
-
-function KeyChip({ children }: { children: ReactNode }) {
-	return <kbd className="inline-flex h-4 min-w-4 items-center justify-center rounded-[4px] border border-border bg-background px-1 font-sans text-[10px]">{children}</kbd>;
 }
 
 /**
@@ -159,9 +153,9 @@ function SuggestionRow({ label, index, active, marked, optionId, registerItem, o
 					active ? "opacity-100" : "opacity-0",
 				)}
 			>
-				<KeyChip>{SEND_KEY}</KeyChip> send
-				<KeyChip>{EDIT_KEY}</KeyChip> edit
-				<KeyChip>{MARK_KEY}</KeyChip>click mark
+				<Kbd size="sm">{SEND_KEY}</Kbd> send
+				<Kbd size="sm">{EDIT_KEY}</Kbd> edit
+				<Kbd size="sm">{MARK_KEY}</Kbd>click mark
 			</span>
 			<button
 				{...activityControl("composer-suggestions.edit")}

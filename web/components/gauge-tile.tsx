@@ -14,7 +14,7 @@ export const TONE_CLASS: Record<Tone, { text: string; bar: string }> = {
 const TILE = "flex w-full min-w-0 flex-col gap-1 rounded-md px-1.5 py-1 text-left tabular-nums outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring";
 
 /** A full-width bar filled to `fill`, 0 to 1, or left empty for `null`. */
-function GaugeBar({ fill, tone }: { fill: number | null; tone: Tone }) {
+export function GaugeBar({ fill, tone }: { fill: number | null; tone: Tone }) {
 	return (
 		<span aria-hidden className="block h-1 w-full overflow-hidden rounded-full bg-foreground/10">
 			{fill !== null && (

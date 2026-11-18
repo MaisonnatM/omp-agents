@@ -31,7 +31,7 @@ export function ActionPanel({ item, query, onToggle, onQuery, onRun, returnFocus
 		<>
 			<FooterButton disabled={!item} aria-expanded={query !== null} aria-haspopup="dialog" onClick={onToggle}>
 				Actions
-				<Kbd>{chordLabel(PANEL_CHORD)}</Kbd>
+				<Kbd size="sm">{chordLabel(PANEL_CHORD)}</Kbd>
 			</FooterButton>
 			{item && query !== null && <Panel item={item} query={query} onToggle={onToggle} onQuery={onQuery} onRun={onRun} returnFocus={returnFocus} />}
 		</>
@@ -84,7 +84,7 @@ function Panel({ item, query, onToggle, onQuery, onRun, returnFocus }: ActionPan
 										>
 											<Icon />
 											<span className="min-w-0 flex-1 truncate">{action.title}</span>
-											{chord && <Kbd className="h-5 text-[11px]">{chordLabel(chord)}</Kbd>}
+											{chord && <Kbd size="sm">{chordLabel(chord)}</Kbd>}
 										</CommandPrimitive.Item>
 									);
 								})}

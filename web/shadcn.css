@@ -1,5 +1,5 @@
-/* The utilities from shadcn's `tailwind.css` (the `shadcn` package's `dist/tailwind.css`) that `ui/trace.tsx` and
-   `ui/code-block.tsx` use, and `scrollbar-thin`, which `ui/code-block.tsx` uses and neither Tailwind nor that file defines.
+/* The utilities from shadcn's `tailwind.css` (the `shadcn` package's `dist/tailwind.css`) that the transcript's activity
+   groups and `ui/code-block.tsx` use, and `scrollbar-thin`, which `ui/code-block.tsx` uses and neither Tailwind nor that file defines.
    Their keyframes sit outside @theme: Tailwind keeps a theme keyframe only when an --animate-* token names it. */
 
 @utility scrollbar-thin {

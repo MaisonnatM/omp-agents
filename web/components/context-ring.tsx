@@ -3,6 +3,7 @@ import type { ContextUsage } from "../../src/shared/sessions";
 import type { CompactionState, ContextAction } from "../../src/shared/session-controls";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuSeparator, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger, MenuSwitchItem } from "@/components/ui/menu";
 import { Button } from "@/components/ui/button";
+import { type ContextLevel, ContextWindow, formatTokens } from "@/components/ui/context-window";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
@@ -12,8 +13,9 @@ const FILLING = 0.7;
 const NEARLY_FULL = 0.9;
 const RADIUS = 7;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-const tokens = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
-const ringClass = (used: number) => cn("inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring", used >= NEARLY_FULL ? "text-red-600 dark:text-red-400" : used >= FILLING ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground");
+const levelOf = (used: number): ContextLevel => (used >= NEARLY_FULL ? "full" : used >= FILLING ? "warn" : "ok");
+const LEVEL_TEXT: Record<ContextLevel, string> = { full: "text-red-600 dark:text-red-400", warn: "text-amber-600 dark:text-amber-400", ok: "text-muted-foreground" };
+const ringClass = (used: number) => cn("inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring", LEVEL_TEXT[levelOf(used)]);
 
 function Ring({ used, running = false }: { used: number; running?: boolean }) {
 	return (
@@ -27,7 +29,7 @@ function Ring({ used, running = false }: { used: number; running?: boolean }) {
 	);
 }
 
-const usageLabel = (context: ContextUsage) => `Context ${Math.round(context.tokens / context.window * 100)}% full: ${tokens.format(context.tokens)} of ${tokens.format(context.window)} tokens`;
+const usageLabel = (context: ContextUsage) => `Context ${Math.round(context.tokens / context.window * 100)}% full: ${formatTokens(context.tokens)} of ${formatTokens(context.window)} tokens`;
 
 export function ContextRing({ context }: { context: ContextUsage }) {
 	const used = Math.min(context.tokens / context.window, 1);
@@ -63,11 +65,8 @@ export function ContextRingMenu({ context, compaction, working, pending, autoPen
 					<span className="inline-flex items-center gap-1.5"><Ring used={used} running={busy} /></span>
 				</DropdownMenuTrigger>
 			</Tooltip>
-			<DropdownMenuContent side="top" align="end" className="w-64" finalFocus={() => { composer?.current?.focus(); return composer ? false : true; }}>
-				<div className="px-2 py-1.5 text-xs tabular-nums text-muted-foreground">
-					{tokens.format(context.tokens)} of {tokens.format(context.window)}
-					{compaction.thresholdTokens !== null && ` · auto at ${Math.round(compaction.thresholdTokens / context.window * 100)}%`}
-				</div>
+			<DropdownMenuContent side="top" align="end" className="w-72" finalFocus={() => { composer?.current?.focus(); return composer ? false : true; }}>
+				<ContextWindow tokens={context.tokens} limit={context.window} level={levelOf(used)} autoAt={compaction.thresholdTokens === null ? null : compaction.thresholdTokens / context.window} busy={busy} />
 				<MenuSeparator />
 				<MenuSubmenu>
 					<MenuSubmenuTrigger disabled={disabled} title={reason}>Compact</MenuSubmenuTrigger>

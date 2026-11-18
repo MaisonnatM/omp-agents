@@ -1,15 +1,17 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { IconArrowRotateClockwise, IconCheckmark1, IconFormCircle, IconCrossMedium, IconLoadingCircle, IconTrashCan } from "central-icons";
+import { IconArrowRotateClockwise, IconCheckmark1, IconFormCircle, IconCrossMedium, IconTrashCan } from "central-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
 import { CACHE_STEP, CLEANUP_STEPS, isSandboxStep, PREVIEW_SOURCE, PREVIEW_SOURCES, type CleanupStep, type PreviewSource, type Previews, type SandboxPlan, type StorageUsage } from "../../../src/shared/storage";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getJson, putJson } from "../../api";
 import { activityControl } from "../../activity";
 import { age, formatBytes } from "../../labels";
 import { valueOf } from "../../omp-settings";
 import { hashForSettings } from "../../routing";
 import { cleanupRows, keptSandboxes, runCleanup, sandboxTargets, type CleanupRow, type CleanupRun, type Loaded, type StepProgress } from "../../storage";
+import { Spinner } from "../spinner";
 import { ErrorText, LINK, type RowContext, Section, SettingRow } from "./editor";
 
 function UsageSection({ usage, error }: { usage: StorageUsage | null; error: string | null }) {
@@ -27,8 +29,8 @@ function UsageSection({ usage, error }: { usage: StorageUsage | null; error: str
 				)) : ["Session files", "Attachments", "Isolation sandboxes"].map(label => (
 					<div key={label}>
 						<dt className="text-xs text-muted-foreground">{label}</dt>
-						<dd className="mt-1 flex h-7 items-center">
-							<span aria-hidden className="h-3 w-12 rounded bg-muted motion-safe:animate-pulse" />
+						<dd className="mt-1 text-xl">
+							<Skeleton line width={48} />
 							<span className="sr-only">Measuring…</span>
 						</dd>
 					</div>
@@ -75,7 +77,7 @@ function ChecklistRow({ row, status, loading, finished, disabled, checked, onChe
 			</label>
 			{status && (
 				<p role="status" className="mt-2 flex items-center gap-2 pl-6 text-xs tabular-nums">
-					{status.state === "running" ? <IconLoadingCircle className="size-3 motion-safe:animate-spin" />
+					{status.state === "running" ? <Spinner className="size-3" />
 						: status.state === "done" ? <IconCheckmark1 className="size-3" />
 						: status.state === "failed" ? <IconCrossMedium className="size-3" /> : <IconFormCircle className="size-3" />}
 					{status.state === "waiting" && finished ? "Not run" : status.text}

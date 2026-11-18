@@ -1,4 +1,5 @@
 /** The page's toasts: the `toasts` manager that shows one from anywhere, `loadingToast` for work that takes a while, `offerUndo` after a delete or a move, and `Toaster`, which stacks them bottom right. */
+import { IconCrossMedium } from "central-icons";
 import { Toast } from "@base-ui/react/toast";
 import { type ReactNode, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -27,7 +28,7 @@ export interface ToastText {
 
 /**
  * Shows `text` with a spinner and the time since it opened, and returns its id. It never times out and has no
- * **Dismiss**: `toasts.update` changes its text as the work goes on, and {@link settleToast} turns it into how it ended.
+ * close button: `toasts.update` changes its text as the work goes on, and {@link settleToast} turns it into how it ended.
  */
 export const loadingToast = (text: ToastText): string => toasts.add({ ...text, type: "loading", data: { startedAt: Date.now() } });
 
@@ -85,8 +86,8 @@ export function UnderToasts({ children }: { children: ReactNode }) {
 /**
  * Every toast of the page, stacked at the bottom right, the newest last, each under its source when it has one; on a
  * phone, where a second toast would bury the page, only the newest, at the top, clear of the composer, and the next
- * one waits under it. A toast that never times out gets **Dismiss**. What {@link UnderToasts} draws sits below them,
- * outside their live region.
+ * one waits under it. A toast that never times out gets a round close button on its corner, shown on hover or focus,
+ * and always on a touch screen. What {@link UnderToasts} draws sits below them, outside their live region.
  */
 export function Toaster() {
 	const phone = usePhoneWidth();
@@ -127,23 +128,30 @@ function ToastList() {
 				key={toast.id}
 				toast={toast}
 				swipeDirection={phone ? ["up", "right"] : undefined}
-				className="rounded-lg border border-border bg-popover px-4 py-2 text-sm shadow-lg data-limited:hidden max-phone:translate-x-(--toast-swipe-movement-x) max-phone:translate-y-(--toast-swipe-movement-y)"
+				className="group/toast relative rounded-[10px] bg-popover text-[13px]/5 text-popover-foreground shadow-surface-6 data-limited:hidden max-phone:translate-x-(--toast-swipe-movement-x) max-phone:translate-y-(--toast-swipe-movement-y)"
 			>
-				<Toast.Content className="flex items-center gap-3 max-phone:flex-wrap max-phone:gap-y-1">
+				<Toast.Content className="flex items-start gap-2 p-3 max-phone:flex-wrap max-phone:gap-y-1">
 					<div className="flex min-w-0 flex-1 flex-col max-phone:basis-full">
 						{toast.data?.source && <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">{toast.data.source}</div>}
 						<div className="flex min-w-0 items-center gap-2">
-							{loading && <Spinner className="size-4" />}
-							<Toast.Title className="min-w-0 flex-1 truncate" />
+							{loading && <Spinner className="size-4 text-muted-foreground" />}
+							<Toast.Title className="min-w-0 flex-1 truncate font-medium" />
 							{startedAt !== undefined && <Elapsed since={startedAt} />}
 						</div>
 						<Toast.Description className="text-muted-foreground" />
 					</div>
 					<div className="contents max-phone:ms-auto max-phone:flex max-phone:gap-2">
-						<Toast.Action render={<Button variant="secondary" size="compact" />} />
-						{toast.timeout === 0 && <Toast.Close render={<Button variant="ghost" size="compact" />}>Dismiss</Toast.Close>}
+						<Toast.Action render={<Button variant="secondary" size="compact" className="self-center" />} />
 					</div>
 				</Toast.Content>
+				{toast.timeout === 0 && (
+					<Toast.Close
+						aria-label="Dismiss"
+						className="absolute -top-[7px] -left-[7px] flex size-6 scale-85 cursor-pointer items-center justify-center rounded-full bg-popover text-muted-foreground opacity-0 shadow-surface-2 transition-[opacity,scale] duration-150 ease-out outline-ring group-hover/toast:scale-100 group-hover/toast:opacity-100 group-focus-within/toast:scale-100 group-focus-within/toast:opacity-100 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none pointer-coarse:-top-2 pointer-coarse:-left-2 pointer-coarse:size-8 pointer-coarse:scale-100 pointer-coarse:opacity-100"
+					>
+						<IconCrossMedium aria-hidden className="size-3.5" />
+					</Toast.Close>
+				)}
 			</Toast.Root>
 		);
 	});

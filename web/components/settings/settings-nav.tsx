@@ -37,7 +37,7 @@ export function SettingsNav({ route: { section } }: { route: SettingsRoute }) {
 										{label}
 									</a>
 								</SidebarMenuButton>
-								{value === first?.value && <Kbd aria-hidden className="pointer-events-none absolute top-1/2 right-2 h-5 min-w-5 -translate-y-1/2 px-1 text-[11px]">↵</Kbd>}
+								{value === first?.value && <Kbd aria-hidden size="sm" className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2">↵</Kbd>}
 							</SidebarMenuItem>
 						))}
 					</SidebarMenu>

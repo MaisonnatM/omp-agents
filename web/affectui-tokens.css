@@ -1,0 +1,86 @@
+/* affectUI's design tokens, Clean look, light and dark: the values of affectui-app's `design-system/affectui-tokens.json`,
+   as its `scripts/generate-tokens.mjs` writes them into `app/styles/affectui.css`, keyed to the `.dark` class `web/theme.ts` sets.
+   Copy a new snapshot's Clean values here; `web/globals.css` points the app's own tokens at these. */
+
+/* --aui-font's Inter, one variable face for every weight, so `fontWeights`' 450 and 550 land between the static cuts.
+   Bun's build inlines a CSS font into the stylesheet, so only the Latin subset ships; other scripts fall back down the stack. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --aui-font: "Inter", "InterVariable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --aui-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --aui-radius: 7px;
+  --aui-radius-sm: 5px;
+  --aui-radius-lg: 10px;
+  --aui-ink: rgba(0, 0, 0, 0.88);
+  --aui-muted: rgba(0, 0, 0, 0.45);
+  --aui-placeholder: rgba(0, 0, 0, 0.3);
+  --aui-surface: #ffffff;
+  --aui-subtle: rgba(0, 0, 0, 0.03);
+  --aui-overlay: #ffffff;
+  --aui-border: rgba(0, 0, 0, 0.08);
+  --aui-border-strong: rgba(0, 0, 0, 0.13);
+  --aui-primary: rgba(0, 0, 0, 0.88);
+  --aui-on-primary: #ffffff;
+  --aui-focus: rgba(0, 96, 226, 0.7);
+  --aui-danger: #c4320a;
+  --aui-danger-soft: rgba(240, 68, 56, 0.1);
+  --aui-warning: #b25e00;
+  --aui-warning-soft: rgba(242, 138, 46, 0.12);
+  --aui-success: #1e8a4f;
+  --aui-success-soft: rgba(95, 200, 138, 0.14);
+  --aui-info: #0070d6;
+  --aui-info-soft: rgba(1, 144, 254, 0.1);
+  --aui-blue: #0190fe;
+  --aui-green: #5fc88a;
+  --aui-amber: #e8b000;
+  --aui-orange: #f28a2e;
+  --aui-red: #f04438;
+  --aui-pink: #ee3e9e;
+  --aui-purple: #a651f0;
+  --aui-teal: #13b3a0;
+  --aui-cyan: #14b3f0;
+  --aui-shadow-card: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 1px -1px rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --aui-shadow-popover: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 8px 24px -6px rgba(0, 0, 0, 0.14), 0 2px 6px -2px rgba(0, 0, 0, 0.06);
+  --aui-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dark {
+  --aui-ink: rgba(255, 255, 255, 0.9);
+  --aui-muted: rgba(255, 255, 255, 0.46);
+  --aui-placeholder: rgba(255, 255, 255, 0.3);
+  --aui-surface: #1c1c1e;
+  --aui-subtle: rgba(255, 255, 255, 0.04);
+  --aui-overlay: #1f1f22;
+  --aui-border: rgba(255, 255, 255, 0.14);
+  --aui-border-strong: rgba(255, 255, 255, 0.2);
+  --aui-primary: rgba(255, 255, 255, 0.9);
+  --aui-on-primary: #161618;
+  --aui-focus: rgba(77, 141, 255, 0.8);
+  --aui-danger: #ff8a7a;
+  --aui-danger-soft: rgba(255, 107, 95, 0.14);
+  --aui-warning: #ffb35c;
+  --aui-warning-soft: rgba(242, 161, 92, 0.14);
+  --aui-success: #7dcf9f;
+  --aui-success-soft: rgba(125, 207, 159, 0.14);
+  --aui-info: #4fb0fe;
+  --aui-info-soft: rgba(79, 176, 254, 0.14);
+  --aui-blue: #4fb0fe;
+  --aui-green: #7dcf9f;
+  --aui-amber: #e6c24d;
+  --aui-orange: #f2a15c;
+  --aui-red: #ff6b5f;
+  --aui-pink: #f06db5;
+  --aui-purple: #b98af0;
+  --aui-teal: #4fc3b4;
+  --aui-cyan: #5cc6ee;
+  --aui-shadow-card: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --aui-shadow-popover: 0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+}

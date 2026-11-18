@@ -1,5 +1,5 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { IconLayoutColumn, IconLoader, IconPause } from "central-icons";
+import { IconLayoutColumn, IconPause } from "central-icons";
 import { Fragment, memo, type ReactElement, type ReactNode } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { isPrivateHost, type RowPlacement, workspaceCwd, workspaceOf } from "../
 import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { Spinner } from "./spinner";
 import { type RowStatus, StatusDot, statusLabel } from "./status-dot";
 
 /** The muted facts after a session's name: the parts that apply. */
@@ -219,7 +220,7 @@ export const PastRow = memo(function PastRow({ session, pinned, placement, showW
 function HostStatus({ host, status }: { host: RosterHost; status: RowStatus }) {
 	const ending = useDashboardStatus().ending.has(host.instanceId);
 	return ending
-		? <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><IconLoader className="size-3 shrink-0 animate-spin" /></span>
+		? <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><Spinner className="size-3" /></span>
 		: <StatusDot status={status} />;
 }
 
