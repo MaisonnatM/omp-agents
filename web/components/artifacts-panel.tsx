@@ -99,40 +99,46 @@ export function ArtifactsPanel({ view, sessionId, artifacts }: ArtifactsPanelPro
 	);
 }
 
-/** The shown artifact's kind icon and title; with two artifacts or more, a menu that picks another, each at its latest version. */
+/** The shown artifact's kind icon and title, which shows in full with its file on hover; with two artifacts or more, a menu that picks another, each at its latest version. */
 function ArtifactTitle({ view, artifacts, artifact }: { view: View; artifacts: Artifact[]; artifact: Artifact }) {
 	const Icon = ARTIFACT_KIND[artifact.kind].icon;
+	const full = `${artifact.title}\n${artifact.file}`;
 	if (artifacts.length === 1) {
 		return (
-			<h3 title={artifact.file} className="flex min-w-0 items-center gap-1.5 px-1.5 text-sm font-medium">
+			<h3 title={full} className="flex min-w-0 items-center gap-1.5 px-1.5 text-sm font-medium">
 				<Icon className="size-3.5 shrink-0 text-muted-foreground" />
 				<span className="truncate">{artifact.title}</span>
 			</h3>
 		);
 	}
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger
-				{...activityControl("artifacts.artifact")}
-				render={<Button variant="ghost" size="compact" leadingIcon={Icon} trailingIcon={IconChevronDownSmall} aria-label={`${artifact.title}, one of ${artifacts.length} artifacts`} className="min-w-0 font-medium text-foreground" />}
-			>
-				{artifact.title}
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="max-w-96">
-				<MenuRadioGroup aria-label="Artifacts" value={artifact.file} onValueChange={(file: string) => pickArtifact(view, { file, version: "latest" })}>
-					{artifacts.map(each => {
-						const EachIcon = ARTIFACT_KIND[each.kind].icon;
-						return (
-							<MenuRadioItem key={each.file} value={each.file} title={each.file} closeOnClick>
-								<EachIcon />
-								<span className="min-w-0 flex-1 truncate">{each.title}</span>
-								{each.versions.length > 1 && <span className="pl-3 text-xs text-muted-foreground tabular-nums">v{each.versions.length}</span>}
-							</MenuRadioItem>
-						);
-					})}
-				</MenuRadioGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
+		<h3 className="flex min-w-0">
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					{...activityControl("artifacts.artifact")}
+					render={<Button variant="ghost" size="compact" leadingIcon={Icon} trailingIcon={IconChevronDownSmall} title={full} aria-label={`${artifact.title}, one of ${artifacts.length} artifacts`} className="min-w-0 font-medium text-foreground" />}
+				>
+					{artifact.title}
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" className="max-w-96">
+					<MenuRadioGroup aria-label="Artifacts" value={artifact.file} onValueChange={(file: string) => pickArtifact(view, { file, version: "latest" })}>
+						{artifacts.map(each => {
+							const EachIcon = ARTIFACT_KIND[each.kind].icon;
+							return (
+								<MenuRadioItem key={each.file} value={each.file} closeOnClick>
+									<EachIcon />
+									<span className="min-w-0 flex-1">
+										<span className="block truncate">{each.title}</span>
+										<span className="block truncate text-xs text-muted-foreground">{each.file}</span>
+									</span>
+									{each.versions.length > 1 && <span className="pl-3 text-xs text-muted-foreground tabular-nums">v{each.versions.length}</span>}
+								</MenuRadioItem>
+							);
+						})}
+					</MenuRadioGroup>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</h3>
 	);
 }
 
@@ -142,20 +148,20 @@ export function VersionBar({ artifact, version, onPick }: { artifact: Artifact; 
 	const count = artifact.versions.length;
 	const latest = version.number === count;
 	return (
-		<div className="flex min-h-9 shrink-0 items-center gap-1 border-t border-border px-1.5 text-xs text-muted-foreground">
+		<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-1 border-t border-border px-1.5 text-xs text-muted-foreground">
 			{count > 1 ? (
 				<>
 					<Tooltip content="Older version" side="top" disabled={version.number === 1}>
-						<Button {...activityControl("artifacts.version")} variant="ghost" size="icon-xs" aria-label="Older version" disabled={version.number === 1} onClick={() => onPick(version.number - 1)}>
+						<Button {...activityControl("artifacts.version")} variant="ghost" size="icon-compact" aria-label="Older version" disabled={version.number === 1} onClick={() => onPick(version.number - 1)}>
 							<IconChevronLeftSmall />
 						</Button>
 					</Tooltip>
 					<DropdownMenu>
 						<DropdownMenuTrigger
 							{...activityControl("artifacts.version")}
-							render={<Button variant="ghost" size="xs" trailingIcon={IconChevronDownSmall} aria-label={`Version ${version.number} of ${count}`} className="shrink-0 tabular-nums" />}
+							render={<Button variant="ghost" size="compact" trailingIcon={IconChevronDownSmall} aria-label={`Version ${version.number} of ${count}`} className="shrink-0 text-xs tabular-nums" />}
 						>
-							Version {version.number} of {count}
+							<span className={NARROW_HIDDEN}>Version</span> {version.number} of {count}
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="start" side="top" className="max-w-96">
 							<MenuRadioGroup aria-label="Versions" value={version.number} onValueChange={(number: number) => onPick(number)}>
@@ -170,7 +176,7 @@ export function VersionBar({ artifact, version, onPick }: { artifact: Artifact; 
 						</DropdownMenuContent>
 					</DropdownMenu>
 					<Tooltip content="Newer version" side="top" disabled={latest}>
-						<Button {...activityControl("artifacts.version")} variant="ghost" size="icon-xs" aria-label="Newer version" disabled={latest} onClick={() => onPick(version.number + 1)}>
+						<Button {...activityControl("artifacts.version")} variant="ghost" size="icon-compact" aria-label="Newer version" disabled={latest} onClick={() => onPick(version.number + 1)}>
 							<IconChevronRightSmall />
 						</Button>
 					</Tooltip>
@@ -178,18 +184,19 @@ export function VersionBar({ artifact, version, onPick }: { artifact: Artifact; 
 			) : (
 				<span className="shrink-0 px-1.5">Version 1</span>
 			)}
-			<span title={save.note ?? undefined} className="min-w-0 flex-1 truncate px-1">
+			{/* In a narrow panel the note takes a row of its own below the controls, so it reads in full rather than as "F…". */}
+			<span title={save.note ?? undefined} className="min-w-0 flex-1 truncate px-1 @max-[30rem]/artifacts:order-last @max-[30rem]/artifacts:basis-full @max-[30rem]/artifacts:pb-1.5 @max-[30rem]/artifacts:whitespace-normal empty:hidden">
 				{save.note}
 			</span>
 			{latest ? (
-				<span className={`shrink-0 pr-1.5 whitespace-nowrap ${NARROW_HIDDEN}`}>
+				<span className={`ml-auto shrink-0 pr-1.5 whitespace-nowrap ${NARROW_HIDDEN}`}>
 					{ARTIFACT_KIND[artifact.kind].label} · {formatBytes(save.bytes)} ·{" "}
 					<time dateTime={new Date(save.savedAt).toISOString()} title={new Date(save.savedAt).toLocaleString()}>
 						{listTime(save.savedAt)}
 					</time>
 				</span>
 			) : (
-				<Button {...activityControl("artifacts.latest")} variant="ghost" size="xs" onClick={() => onPick(count)} className="shrink-0 text-foreground">
+				<Button {...activityControl("artifacts.latest")} variant="ghost" size="compact" onClick={() => onPick(count)} className="ml-auto shrink-0 text-xs text-foreground">
 					Go to latest
 				</Button>
 			)}
