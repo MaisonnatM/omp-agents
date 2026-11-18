@@ -12,8 +12,8 @@
   The tooltip shows the full path, whether the session created, edited, or deleted the file, how often it changed, and how long ago.
   As in the session's changes, a count of zero is left out, so a file the agent only added to shows `+12` alone.
   A path inside the session's working directory shows relative to it.
-  Click a file to open the [session's changes](session-changes.md) at that file, or **Review**, or Cmd+Shift+G while **Overview** shows, at the first file.
-  A subagent has no changes of its own checkout and no **Review** button.
+  Click a file to open the [session's changes](session-changes.md) at that file, or press Cmd+Shift+G while **Overview** shows to open them at the first file.
+  A subagent has no changes of its own checkout.
   Clicking its file opens the changes omp recorded instead, newest first, with each change's kind, time, line counts, and numbered diff.
   Each recorded edit uses a Kobra-inspired diff card with old and new line numbers, syntax colors, and a horizontal code scroller.
   Added lines have a green tint and solid edge mark; removed lines have a red tint and hatched edge mark.

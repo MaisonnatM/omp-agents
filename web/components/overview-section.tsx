@@ -16,16 +16,14 @@ interface OverviewSectionProps {
 	onToggle: () => void;
 	/** The Activity control a click on the folding header records. */
 	fold: ControlId;
-	/** A control at the right of the header, outside the button that folds the section. */
-	action?: ReactNode;
 	children: ReactNode;
 }
 
-/** A filled folding header, its title then its count, with an optional action at its right, over the section's body. */
-export function OverviewSection({ title, count, detail, open, onToggle, fold, action, children }: OverviewSectionProps) {
+/** A filled folding header, its title then its count, over the section's body. */
+export function OverviewSection({ title, count, detail, open, onToggle, fold, children }: OverviewSectionProps) {
 	return (
 		<Collapsible open={open} onOpenChange={onToggle}>
-			<div className="flex h-9 items-center rounded-lg bg-muted">
+			<div className="flex h-7 items-center rounded-lg bg-muted">
 				<h3 className="flex h-full min-w-0 flex-1">
 					<CollapsibleTrigger
 						{...activityControl(fold)}
@@ -37,7 +35,6 @@ export function OverviewSection({ title, count, detail, open, onToggle, fold, ac
 						<IconChevronDownSmall aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", !open && "-rotate-90")} />
 					</CollapsibleTrigger>
 				</h3>
-				{action}
 			</div>
 			<CollapsibleContent keepMounted className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">
 				{children}

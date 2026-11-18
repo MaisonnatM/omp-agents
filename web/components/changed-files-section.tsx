@@ -135,8 +135,7 @@ export function ChangedFileList({ files, onOpen }: { files: ChangedFile[]; onOpe
 				const { status, look, summary } = factsOf(file);
 				const Icon = iconOf(name);
 				return (
-					// The rows rise in one after another, from the thirteenth on together, as the change summary's do.
-					<li key={file.path} className="border-t border-border/60 first:border-t-0 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-500 motion-safe:fill-mode-both" style={{ animationDelay: `${120 + Math.min(index, 12) * 70}ms` }}>
+					<li key={file.path} className="border-t border-border/60 first:border-t-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
 						<Tooltip content={`${file.path} · ${summary}`} side="left">
 							<button
 								{...activityControl("changes-card.file")}
