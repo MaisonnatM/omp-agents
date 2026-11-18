@@ -90,10 +90,10 @@ function toolApprovalOf(request: StepRequest): ToolApproval | null {
 	return { tool, origin, reason, details, deny };
 }
 
-/** An allow choice as a pill: omp's once and session choices by how long they last, a grant by its own label. */
+/** An allow choice as a button: omp's once and session choices by how long they last, a grant by its own label. */
 function scopeLabel(label: string): string {
-	if (label === "Approve" || label === "Approve Once") return "Once";
-	if (/^Approve .+ for this session$/.test(label)) return "This session";
+	if (label === "Approve" || label === "Approve Once") return "Allow once";
+	if (/^Approve .+ for this session$/.test(label)) return "Allow for session";
 	return shownLabel(label);
 }
 
@@ -161,8 +161,6 @@ function StepCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps
 	const [picked, setPicked] = useState<number | null>(null);
 	const question = questionOf(request);
 	const approval = toolApprovalOf(request);
-	// Allowing defaults to this call only, so a broader grant is always a deliberate pick.
-	const [scope, setScope] = useState(() => (request.kind === "select" ? Math.max(0, request.options.findIndex(option => scopeLabel(option.label) === "Once")) : 0));
 	const choose = (choice: QuestionAnswer): void => {
 		if (choice.kind === "option") setPicked(choice.index);
 		const answer = answerOf(request, choice);
@@ -191,15 +189,12 @@ function StepCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps
 			<PermissionRequest
 				{...shared}
 				tool={approval.tool}
-				sub={approval.origin}
-				reason={approval.reason}
+				reason={approval.reason ?? approval.origin}
 				details={approval.details}
 				label={header}
-				scopes={request.options.slice(0, approval.deny).map((option, index) => ({ label: scopeLabel(option.label), hint: keyOf(index) }))}
-				scope={scope}
-				onScope={setScope}
+				allows={request.options.slice(0, approval.deny).map((option, index) => ({ label: scopeLabel(option.label), hint: keyOf(index) }))}
 				denyHint={keyOf(approval.deny)}
-				onAllow={() => choose({ kind: "option", index: scope })}
+				onAllow={index => choose({ kind: "option", index })}
 				onDeny={() => choose({ kind: "option", index: approval.deny })}
 			/>
 		);

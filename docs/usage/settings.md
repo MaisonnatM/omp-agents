@@ -133,8 +133,7 @@
   **What a new session gets** unfolds the memory block a new session's prompt starts with, and its size in tokens; with Mnemopi and Hindsight a running session also gets memories recalled for each prompt, which the page cannot show.
   **Stored memory** shows the store of the backend picked.
   Local lists its files in a folder per group, **Lessons**, **Summary**, **Skills**, and **Session summaries**, and Sharpshooter its decision files in **Decisions**, with how many sessions wait to be folded in; folders work as in **Files**, and you select a file to read it and edit it as in **Files**.
-  Mnemopi lists its memories newest first, up to 500, grouped by kind under a chip per kind; the magnifier searches every kind.
-  A row's pencil edits a working memory in place, saved with Cmd+Enter and put back with Escape; the trash can forgets it, the archive box retires an episodic one from recall, and facts are read-only.
+  Mnemopi lists its memories newest first, up to 500, with a filter and a count of each kind: **Edit** changes a working memory's text, saved with **Save** or Cmd+Enter, where Enter starts a new line, and put back with Escape, **Forget** deletes it, **Retire** stops recall from using an episodic one, and facts are read-only.
   Hindsight lists the memories its server keeps for the workspace's bank, read-only.
   **Forget everything**, beside the **Stored memory** heading, deletes the workspace's Local, Sharpshooter, or Mnemopi store, and the line under the heading says what it removes; with Mnemopi it keeps the bank every workspace shares, and a memory of that bank changes everywhere when you edit or forget it.
   **Rebuild summary**, with Local, rebuilds the summary when the next session in the workspace starts.

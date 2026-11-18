@@ -3,12 +3,11 @@ import { type ReactNode, useState } from "react";
 import { type ModelChain, type ModelProfileEdit, type ModelProfileSummary, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
-import { modelLabel, providerLabel, providerOrg } from "../../labels";
+import { providerOrg } from "../../labels";
 import { CommandPicker } from "../command-picker";
-import { Model, ModelGlyph } from "../model-picker";
+import { Model } from "../model-picker";
 import { OrgIcon } from "../org-icon";
 import { type Catalog, EditBar, type Editing, ErrorText, FIELD, LINK, NumberField, OrderedList, SaveError, Section, useEditor, useSaving, writeOrReload } from "./editor";
 import { SelectorPicker } from "./selector-picker";
@@ -36,23 +35,15 @@ const RETRY_ROWS: [keyof RetrySettings, string, (value: boolean | number | strin
 	["waitForUsageReset", "Wait for usage reset", onOff],
 ];
 
-/** Fallbacks in the order omp tries them, as affectUI's fallback chain draws its models: a card each, its logo numbered by its place, joined by dashed links. */
+/** Fallbacks in the order omp tries them. */
 function Chain({ fallbacks }: { fallbacks: string[] }) {
 	if (fallbacks.length === 0) return <span className="text-muted-foreground">None</span>;
 	return (
-		<ol className="flex flex-wrap items-center gap-y-2">
+		<ol className="flex flex-wrap gap-x-4 gap-y-1">
 			{fallbacks.map((selector, index) => (
-				<li key={`${index}:${selector}`} className="flex items-center">
-					{index > 0 && <span aria-hidden className="w-4 border-t border-dashed border-muted-foreground/40" />}
-					<Tooltip content={selector}>
-						<span className="flex h-8 items-center gap-2 rounded-lg bg-surface-3 pr-2.5 pl-1.5 shadow-surface-2">
-							<ModelGlyph selector={selector}>
-								<span className="absolute -right-1 -bottom-1 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-background px-0.5 text-3xs font-medium text-muted-foreground tabular-nums ring-1 ring-border ring-inset">{index + 1}</span>
-							</ModelGlyph>
-							<span className="font-medium">{modelLabel(selector)}</span>
-							<span className="text-xs text-muted-foreground">{providerLabel(selector.slice(0, selector.indexOf("/")))}</span>
-						</span>
-					</Tooltip>
+				<li key={`${index}:${selector}`} className="flex items-baseline gap-1.5">
+					<span className="text-xs tabular-nums text-muted-foreground">{index + 1}</span>
+					<Model selector={selector} />
 				</li>
 			))}
 		</ol>

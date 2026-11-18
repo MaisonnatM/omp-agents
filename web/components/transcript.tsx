@@ -18,7 +18,7 @@ import {
 	useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
-import { ThinkingState } from "@/components/ui/thinking-state";
+import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace";
 import { ToolCallCard, ToolCallGroup } from "@/components/ui/tool-call-card";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
@@ -187,11 +187,21 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 		>
 			{visible.map(entry =>
 				entry.kind === "thinking" ? (
-					<ThinkingState key={entry.id} streaming={entry.streaming}>
-						<div data-thinking={entry.streaming ? "live" : "done"}>
-							<MessageMarkdown text={entry.text} />
-						</div>
-					</ThinkingState>
+					<TraceCollapsible key={entry.id} defaultOpen>
+						<TraceCollapsibleTrigger>
+							<TraceLine status={entry.streaming ? "running" : undefined}>
+								<TraceIcon>
+									<IconBrain />
+								</TraceIcon>
+								<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
+							</TraceLine>
+						</TraceCollapsibleTrigger>
+						<TraceCollapsibleContent className="text-[13px]">
+							<div data-thinking={entry.streaming ? "live" : "done"}>
+								<MessageMarkdown text={entry.text} />
+							</div>
+						</TraceCollapsibleContent>
+					</TraceCollapsible>
 				) : (
 					<ToolCallCard key={entry.id} icon={toolIcon(entry.name)} name={entry.name} summary={entry.summary} status={entry.status}>
 						{entry.images && <ToolImages id={entry.id} srcs={entry.images} tool={entry.name} />}

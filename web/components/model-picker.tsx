@@ -3,8 +3,8 @@ import { type ModelEntry, type ModelOption, type PlanUsage, selectorOf } from ".
 import type { FastMode } from "../../src/shared/sessions";
 import type { AdvisorState } from "../../src/shared/session-controls";
 import type { ControlId } from "../../src/shared/activity";
-import { IconBrain, IconChevronDownSmall, IconLightBulb, IconLightning, IconRuler, IconWallet1 } from "central-icons";
-import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { IconChevronDownSmall } from "central-icons";
+import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -19,7 +19,6 @@ import {
 	MenuSwitchItem,
 } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { ApiError, getJson, putJson, settingsUrl } from "../api";
 import { activityControl } from "../activity";
 import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
@@ -54,19 +53,6 @@ export function Model({ selector, titled = true }: { selector: string; titled?: 
 					{modelLabel(selector)}
 				</>
 			)}
-		</span>
-	);
-}
-
-/**
- * A model's logo on a small tile, as affectUI's model picker sets each model's glyph; an org with no logo shows the model's first letter.
- * `children` sit on the tile, such as a fallback's place in its chain.
- */
-export function ModelGlyph({ selector, className, children }: { selector: string; className?: string; children?: ReactNode }) {
-	return (
-		<span aria-hidden className={cn("relative grid size-5 shrink-0 place-items-center rounded-md bg-background text-foreground ring-1 ring-border ring-inset", className)}>
-			<OrgIcon org={modelOrg(selector)} className="text-current" fallback={<span className="text-3xs font-medium">{modelLabel(selector).charAt(0)}</span>} />
-			{children}
 		</span>
 	);
 }
@@ -107,7 +93,7 @@ function ProviderHeading({ provider, plans = NO_PLANS }: { provider: string; pla
 function ModelRow({ selector, id }: { selector: string; id: string }) {
 	return (
 		<>
-			<ModelGlyph selector={selector} />
+			<OrgIcon org={modelOrg(selector)} className="text-foreground" fallback={<span aria-hidden className="size-3 shrink-0" />} />
 			<span className="max-w-[60%] shrink-0 truncate">{modelLabel(selector)}</span>
 			<span className="ml-auto min-w-0 truncate text-xs text-muted-foreground">{id}</span>
 		</>
@@ -259,15 +245,14 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 					}
 				>
 					<span className="flex min-w-0 items-center gap-1.5">
-						{current && <ModelGlyph selector={current} />}
-						<span className={`max-w-56 ${MODEL_NAME_TRUNCATE}`}>{current ? modelLabel(current) : unset}</span>
+						<span className={`max-w-56 ${MODEL_NAME_TRUNCATE}`}>{current ? <Model selector={current} titled={false} /> : unset}</span>
 						{effort.current && <span className="shrink-0 text-muted-foreground">{levelLabel(effort.current)}</span>}
 					</span>
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent
 				side="top"
-				className="w-72"
+				className="w-64"
 				finalFocus={() => {
 					const refocus = picked.current && composer !== null;
 					picked.current = false;
@@ -283,26 +268,22 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 						disabled={pending || fast.state === null}
 						title={fast.state === null ? "This model has no fast tier." : "omp's /fast: priority service, at a higher price."}
 					>
-						<IconLightning />
 						Fast
 						{fast.state?.enabled && !fast.state.active && <span className="text-xs text-muted-foreground">not active</span>}
 					</MenuSwitchItem>
 				)}
 				{advisor && (
 					<MenuSwitchItem {...activityControl("composer.advisor")} checked={advisor.state?.enabled ?? false} onCheckedChange={advisor.onChange} disabled={pending || advisor.state === null} title={advisor.state === null ? "Set an advisor model in Settings → Models." : "Advisor for this session."}>
-						<IconLightBulb />
 						Advisor
 						{advisor.state && <span className="min-w-0 truncate text-xs text-muted-foreground">{advisor.state.models.length > 1 ? `${advisor.state.models.length} advisors` : modelLabel(advisor.state.models[0]!)}</span>}
 					</MenuSwitchItem>
 				)}
 				<MenuSwitchItem {...activityControl("composer.extra-usage")} checked={extra.on} onCheckedChange={extra.onChange} disabled={disabled || pending || extra.pending} title={extra.title}>
-					<IconWallet1 />
 					Extra usage
 				</MenuSwitchItem>
 				{contextWindow !== null && (
 					<MenuSubmenu>
 						<MenuSubmenuTrigger disabled={pending} value={tokens.format(contextWindow)}>
-							<IconRuler />
 							Context
 						</MenuSubmenuTrigger>
 						<MenuSubmenuContent>
@@ -324,7 +305,6 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 				)}
 				<MenuSubmenu>
 					<MenuSubmenuTrigger disabled={pending || levels.length === 0} value={effortValue} title={`Thinking level (${shortcutLabels("thinking").join(" or ")} cycles it)`}>
-						<IconBrain />
 						Effort
 					</MenuSubmenuTrigger>
 					<MenuSubmenuContent>
@@ -356,10 +336,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 						else if (BACK_TO_MENU[details.reason]) onOpenChange("menu");
 					}}
 				>
-					<MenuSubmenuTrigger value={current ? modelLabel(current) : unset}>
-						{current ? <ModelGlyph selector={current} className="-mx-0.5" /> : <span aria-hidden className="size-4 shrink-0" />}
-						Model
-					</MenuSubmenuTrigger>
+					<MenuSubmenuTrigger value={current ? modelLabel(current) : unset}>Model</MenuSubmenuTrigger>
 					<MenuSubmenuContent className="w-[min(24rem,calc(100vw-2rem))] overflow-hidden p-0">
 						<ModelSearch list={list} current={current} disabled={disabled || pending} onPick={pick} />
 					</MenuSubmenuContent>

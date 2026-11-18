@@ -223,7 +223,7 @@ export const PageSwitch = memo(function PageSwitch({
 					/>
 				);
 			}
-			return <EmptyHome hosts={hosts} rosterError={rosterError} />;
+			return <EmptyHome live={hosts.length > 0} rosterError={rosterError} />;
 		default: {
 			const never: never = page;
 			return never;

@@ -53,7 +53,7 @@ test("a confirm is an approval card with No and Yes buttons and the keys that an
 	expect(html).not.toContain('role="radio"');
 });
 
-test("omp's tool approval names the tool, its reason and details, and offers its allow choices as scopes with Once first picked", () => {
+test("omp's tool approval names the tool, its reason and details, and offers Deny then each allow choice as a button, Allow once primary", () => {
 	const html = renderStep({
 		id: "a",
 		title: "Allow tool: bash\nReason: outside the workspace\nCommand: rm -rf dist",
@@ -62,17 +62,16 @@ test("omp's tool approval names the tool, its reason and details, and offers its
 		checked: [],
 		options: [option("Approve"), option("Approve bash for this session"), option("Deny")],
 	});
-	expect(html).toContain(">bash</strong>");
-	expect(html).toContain(">outside the workspace</p>");
+	expect(html).toContain("Allow bash?</h3>");
+	expect(html).toContain("outside the workspace</div>");
 	expect(html).toContain("Command: rm -rf dist</pre>");
-	expect(html).toMatch(/role="radio" aria-checked="true"[^>]*>Once</);
-	expect(html).toMatch(/role="radio" aria-checked="false"[^>]*>This session</);
 	expect(html).toMatch(/>Deny<kbd[^>]*>3<\/kbd>/);
-	expect(html).toMatch(/>Allow<kbd[^>]*>1<\/kbd>/);
+	expect(html).toMatch(/>Allow for session<kbd[^>]*>2<\/kbd>/);
+	expect(html).toMatch(/>Allow once<kbd[^>]*>1<\/kbd>/);
 });
 
 test("a select that is not a tool approval stays a question", () => {
 	const html = renderStep({ id: "s", title: "Allow tool: bash", deadline: null, kind: "select", checked: [], options: [option("Yes"), option("No")] });
-	expect(html).not.toContain("wants to use");
+	expect(html).not.toContain("Allow bash?");
 	expect(html).toContain('role="radio"');
 });

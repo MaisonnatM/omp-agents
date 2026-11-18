@@ -1,8 +1,8 @@
 /**
  * Settings › omp memory: the backend omp remembers with and Auto-learn, what a new session in the workspace gets, and
- * the store itself in its own shape, files in a rail like Files' and rows in a panel filtered by kind, each edited or forgotten in place.
+ * the store itself in its own shape, files in a rail like Files' and rows in a list, each edited or forgotten in place.
  */
-import { IconArchive, IconChevronDownSmall, IconCrossMedium, IconLock, IconMagnifyingGlass, IconPencil, IconTrashCan } from "central-icons";
+import { IconChevronDownSmall, IconLock } from "central-icons";
 import { type ReactNode, useId, useState } from "react";
 import type { AgentSettingOption, AgentSettingRow, AgentSettings } from "../../../src/shared/agent-settings";
 import { everyWord } from "../../../src/shared/every-word";
@@ -192,13 +192,8 @@ function MemoryFiles({ files, cwd, context, empty }: { files: OmpMemoryFile[]; c
 }
 
 const KIND_LABELS: Record<OmpMemoryEntry["kind"], string> = { working: "Working", episodic: "Episodic", fact: "Fact", remote: "Hindsight" };
-/** The kinds in the order the row panel lists them, in its chips and under its headings. */
-const KINDS = Object.keys(KIND_LABELS) as OmpMemoryEntry["kind"][];
 
-/** Focuses the row panel's search field once, when it opens: a stable ref, so later renders do not take focus back. */
-const focusOnOpen = (input: HTMLInputElement | null): void => input?.focus();
-
-/** One entry: its text, which Edit turns into a field that ⌘Enter saves and Escape reverts, its age, and the actions omp allows on it, shown on hover or focus. */
+/** One entry: its text, which Edit turns into a field that ⌘Enter saves and Escape reverts, and the actions omp allows on it. */
 function EntryRow({ entry, cwd, context, confirm }: { entry: OmpMemoryEntry; cwd: string; context: MemoryContext; confirm: InlineConfirm }) {
 	const contentId = useId();
 	// The text being edited, with the content it started from: once the row holds other content, after a save or a
@@ -211,8 +206,6 @@ function EntryRow({ entry, cwd, context, confirm }: { entry: OmpMemoryEntry; cwd
 	const busy = saving.saving !== null;
 	const key = `${entry.bank}:${entry.id}`;
 	const row = { bank: entry.bank, id: entry.id, expected: entry.content };
-	const forgetArmed = confirm.isArmed(`forget:${key}`);
-	const retireArmed = confirm.isArmed(`retire:${key}`);
 	const save = (): void => {
 		if (draft === null || draft.trim() === "" || draft === entry.content) {
 			setEditing(null);
@@ -221,190 +214,117 @@ function EntryRow({ entry, cwd, context, confirm }: { entry: OmpMemoryEntry; cwd
 		send({ op: "update", ...row, content: draft });
 	};
 	return (
-		<li
-			aria-busy={busy}
-			className={cn("group/entry rounded-md px-2.5 pt-2 pb-1.5 transition-[background-color,opacity] hover:bg-hover focus-within:bg-hover motion-reduce:transition-none", busy && "opacity-60")}
-		>
-			{draft === null ? (
-				<p id={contentId} className="text-sm break-words whitespace-pre-wrap">
-					{entry.content}
+		<li aria-busy={busy} className={cn("flex items-start gap-4 py-2.5 transition-opacity motion-reduce:transition-none", busy && "opacity-60")}>
+			<div className="min-w-0 flex-1 space-y-1">
+				{draft === null ? (
+					<p id={contentId} className="text-sm break-words whitespace-pre-wrap">
+						{entry.content}
+					</p>
+				) : (
+					<textarea
+						aria-label="Memory text"
+						autoFocus
+						readOnly={busy}
+						value={draft}
+						rows={Math.min(8, draft.split("\n").length + 1)}
+						onChange={event => setEditing({ from: entry.content, text: event.target.value })}
+						onKeyDown={event => {
+							if (event.key === "Escape") {
+								event.preventDefault();
+								setEditing(null);
+							} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+								event.preventDefault();
+								save();
+							}
+						}}
+						className="w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					/>
+				)}
+				<p className="flex gap-2 text-xs text-muted-foreground">
+					<span>{KIND_LABELS[entry.kind]}</span>
+					{Number.isFinite(at) && <Age at={at} compact exact className="tabular-nums" />}
 				</p>
-			) : (
-				<textarea
-					aria-label="Memory text"
-					autoFocus
-					readOnly={busy}
-					value={draft}
-					rows={Math.min(8, draft.split("\n").length + 1)}
-					onChange={event => setEditing({ from: entry.content, text: event.target.value })}
-					onKeyDown={event => {
-						if (event.key === "Escape") {
-							event.preventDefault();
-							setEditing(null);
-						} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-							event.preventDefault();
-							save();
-						}
-					}}
-					className="block w-full resize-none bg-transparent text-sm caret-primary outline-none"
-				/>
-			)}
-			<div className="mt-0.5 flex min-h-6 items-center gap-2 text-xs text-muted-foreground">
-				{Number.isFinite(at) && <Age at={at} compact exact className="tabular-nums" />}
-				{entry.ops.length === 0 && <span className="rounded-sm bg-muted px-1.5 text-[11px] leading-4 font-medium">Read-only</span>}
+				{saving.error && <ErrorText>Not saved: {saving.error}</ErrorText>}
+			</div>
+			<div className="flex shrink-0 items-center gap-2">
 				{draft !== null ? (
-					<span className="ml-auto flex items-center gap-1">
-						<span className="me-1 hidden sm:inline">⌘↵ to save · Esc to cancel</span>
-						<Button variant="ghost" size="xs" disabled={busy} onClick={() => setEditing(null)}>
+					<>
+						<Button variant="ghost" size="compact" disabled={busy} onClick={() => setEditing(null)}>
 							Cancel
 						</Button>
-						<Button variant="primary" size="xs" disabled={busy} loading={saving.saving === "update"} onClick={save}>
+						<Button variant="primary" size="compact" disabled={busy} loading={saving.saving === "update"} onClick={save}>
 							Save
 						</Button>
-					</span>
+					</>
 				) : (
-					entry.ops.length > 0 && (
-						<span
-							className={cn(
-								"ml-auto flex items-center gap-0.5 transition-opacity group-hover/entry:opacity-100 group-focus-within/entry:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none",
-								!(busy || forgetArmed || retireArmed) && "opacity-0",
-							)}
-						>
-							{entry.ops.includes("update") && (
-								<Tooltip content="Edit">
-									<Button variant="ghost" size="icon-xs" aria-label="Edit" disabled={busy} aria-describedby={contentId} onClick={() => setEditing({ from: entry.content, text: entry.content })}>
-										<IconPencil />
-									</Button>
-								</Tooltip>
-							)}
-							{entry.ops.includes("retire") && (
-								<Tooltip content="Retire: recall stops using it; the row stays in the store" forceOpen={retireArmed ? false : undefined}>
-									<Button
-										variant={retireArmed ? "destructive-outline" : "ghost"}
-										size={retireArmed ? "xs" : "icon-xs"}
-										aria-label={retireArmed ? undefined : "Retire"}
-										disabled={busy}
-										loading={saving.saving === "retire"}
-										aria-describedby={contentId}
-										{...confirm.props(`retire:${key}`, () => send({ op: "retire", ...row }))}
-									>
-										{retireArmed ? "Confirm retire?" : <IconArchive />}
-									</Button>
-								</Tooltip>
-							)}
-							{entry.ops.includes("forget") && (
-								<Tooltip content="Forget" forceOpen={forgetArmed ? false : undefined}>
-									<Button
-										variant={forgetArmed ? "destructive-outline" : "ghost"}
-										size={forgetArmed ? "xs" : "icon-xs"}
-										aria-label={forgetArmed ? undefined : "Forget"}
-										className={cn(!forgetArmed && "hover:text-destructive-foreground")}
-										disabled={busy}
-										loading={saving.saving === "forget"}
-										aria-describedby={contentId}
-										{...confirm.props(`forget:${key}`, () => send({ op: "forget", ...row }))}
-									>
-										{forgetArmed ? "Confirm forget?" : <IconTrashCan />}
-									</Button>
-								</Tooltip>
-							)}
-						</span>
-					)
+					<>
+						{entry.ops.includes("update") && (
+							<Button variant="ghost" size="compact" disabled={busy} aria-describedby={contentId} onClick={() => setEditing({ from: entry.content, text: entry.content })}>
+								Edit
+							</Button>
+						)}
+						{entry.ops.includes("forget") && (
+							<Button
+								variant="destructive-outline"
+								size="compact"
+								disabled={busy}
+								loading={saving.saving === "forget"}
+								aria-describedby={contentId}
+								{...confirm.props(`forget:${key}`, () => send({ op: "forget", ...row }))}
+							>
+								{confirm.isArmed(`forget:${key}`) ? "Confirm forget?" : "Forget"}
+							</Button>
+						)}
+						{entry.ops.includes("retire") && (
+							<Tooltip content="Recall stops using it; the row stays in the store">
+								<Button
+									variant="destructive-outline"
+									size="compact"
+									disabled={busy}
+									loading={saving.saving === "retire"}
+									aria-describedby={contentId}
+									{...confirm.props(`retire:${key}`, () => send({ op: "retire", ...row }))}
+								>
+									{confirm.isArmed(`retire:${key}`) ? "Confirm retire?" : "Retire"}
+								</Button>
+							</Tooltip>
+						)}
+						{entry.ops.length === 0 && <span className="text-xs text-muted-foreground">Read-only</span>}
+					</>
 				)}
 			</div>
-			{saving.error && <ErrorText>Not saved: {saving.error}</ErrorText>}
 		</li>
 	);
 }
 
-/**
- * A row backend's entries, newest first, in one panel: kind chips with their counts, or a search across every kind in
- * their place; the entries under a heading per kind; and a caption with how many show.
- */
+/** A row backend's entries, newest first, narrowed by a filter, with a count per kind. */
 function MemoryEntries({ rows, cwd, context, confirm, empty }: { rows: OmpMemoryRows; cwd: string; context: MemoryContext; confirm: InlineConfirm; empty: string }) {
-	const [kind, setKind] = useState<OmpMemoryEntry["kind"] | "all">("all");
-	const [searching, setSearching] = useState(false);
 	const [query, setQuery] = useState("");
 	if ("error" in rows) return <ErrorText>Cannot read the memories: {rows.error}</ErrorText>;
 	if (rows.entries.length === 0) {
 		return <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">{empty}</p>;
 	}
 	const counts = Map.groupBy(rows.entries, entry => entry.kind);
-	// Search spans every kind; a kind whose last entry went shows every kind again.
-	const chosen = searching || kind === "all" || !counts.has(kind) ? "all" : kind;
 	const matches = everyWord(query);
-	const shown = rows.entries.filter(entry => (chosen === "all" || entry.kind === chosen) && matches(entry.content));
-	const groups = KINDS.flatMap(each => {
-		const entries = shown.filter(entry => entry.kind === each);
-		return entries.length === 0 ? [] : [{ kind: each, entries }];
-	});
-	const total = rows.entries.length;
-	const closeSearch = (): void => {
-		setSearching(false);
-		setQuery("");
-	};
-	const chip = (value: OmpMemoryEntry["kind"] | "all", label: string, count: number) => (
-		<button
-			key={value}
-			type="button"
-			aria-pressed={chosen === value}
-			onClick={() => setKind(value)}
-			className={cn(
-				"inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-ring",
-				chosen === value ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-hover hover:text-foreground",
-			)}
-		>
-			{label}
-			<span className="text-[10px] text-muted-foreground tabular-nums">{count.toLocaleString()}</span>
-		</button>
-	);
+	const shown = rows.entries.filter(entry => matches(entry.content));
 	return (
-		<div className="overflow-hidden rounded-xl bg-card shadow-surface-2">
-			<div className="flex min-h-12 items-center gap-2 border-b border-border py-2 ps-3 pe-2">
-				{searching ? (
-					<div
-						className="min-w-0 flex-1"
-						onBlur={event => {
-							if (query === "" && !event.currentTarget.parentElement?.contains(event.relatedTarget)) setSearching(false);
-						}}
-					>
-						<SearchField ref={focusOnOpen} label="Search memories" placeholder="Search every kind" query={query} onQuery={setQuery} />
-					</div>
-				) : (
-					<div role="group" aria-label="Show" className="flex min-w-0 flex-1 gap-1 overflow-x-auto scrollbar-hide">
-						{chip("all", "All", total)}
-						{KINDS.flatMap(each => {
-							const count = counts.get(each)?.length ?? 0;
-							return count === 0 ? [] : [chip(each, KIND_LABELS[each], count)];
-						})}
-					</div>
-				)}
-				<Tooltip content={searching ? "Close search" : "Search"}>
-					<Button variant="ghost" size="icon-compact" aria-label={searching ? "Close search" : "Search memories"} onClick={searching ? closeSearch : () => setSearching(true)}>
-						{searching ? <IconCrossMedium /> : <IconMagnifyingGlass />}
-					</Button>
-				</Tooltip>
+		<div className="space-y-2">
+			<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+				<SearchField label="Filter memories" placeholder="Filter" query={query} onQuery={setQuery} className="min-w-0 flex-1" />
+				<p className="text-xs text-muted-foreground tabular-nums">
+					{[...counts].map(([kind, entries]) => `${KIND_LABELS[kind]} ${entries.length.toLocaleString()}`).join(" · ")}
+				</p>
+				{rows.truncated && <p className="text-xs text-muted-foreground tabular-nums">Showing the newest {rows.entries.length.toLocaleString()}</p>}
 			</div>
 			{shown.length === 0 ? (
-				<p className="px-3 pt-5 pb-4 text-center text-sm text-muted-foreground">No memory matches.</p>
+				<p className="text-sm text-muted-foreground">No memory matches.</p>
 			) : (
-				<div className="p-1.5">
-					{groups.map(group => (
-						<section key={group.kind} aria-label={KIND_LABELS[group.kind]}>
-							{chosen === "all" && <h4 className="px-2.5 pt-2.5 pb-1 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">{KIND_LABELS[group.kind]}</h4>}
-							<ul>
-								{group.entries.map(entry => (
-									<EntryRow key={`${entry.bank}:${entry.id}`} entry={entry} cwd={cwd} context={context} confirm={confirm} />
-								))}
-							</ul>
-						</section>
+				<ul className="divide-y divide-border">
+					{shown.map(entry => (
+						<EntryRow key={`${entry.bank}:${entry.id}`} entry={entry} cwd={cwd} context={context} confirm={confirm} />
 					))}
-				</div>
+				</ul>
 			)}
-			<p className="flex min-h-10 items-center border-t border-border px-4 text-xs text-muted-foreground tabular-nums">
-				{shown.length === total ? `${total.toLocaleString()} ${total === 1 ? "memory" : "memories"}` : `${shown.length.toLocaleString()} of ${total.toLocaleString()} memories`}
-				{rows.truncated && ` · Showing the newest ${total.toLocaleString()}`}
-			</p>
 		</div>
 	);
 }
