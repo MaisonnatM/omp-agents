@@ -7,6 +7,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 - The window's top row is shorter: the header tabs keep the same small gap above and below them that the page keeps from the window's edges, and the sidebar toggle, back and forward, + and the macOS window buttons all line up with the tabs.
 - Tool calls in a conversation are back to one line each with the tool's icon, name, and summary, under a "Ran N tools" line that says how many failed, instead of the small cards.
+- A reply's work shows as one Working group: the thinking, the tool calls, and the messages the agent writes between them fold into it, and only its last message stays below. On a Bot's page those messages still show as messages.
 
 ## 2026-11-17
 

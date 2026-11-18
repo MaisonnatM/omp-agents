@@ -14,12 +14,22 @@ describe("transcript rendering", () => {
 
 	const thinking = (id: string): Item => ({ id, kind: "thinking", text: "hmm", streaming: false });
 
-	test("consecutive tools and thinking group into one block; a message splits groups", () => {
+	test("consecutive tools and thinking group into one block; a prompt splits groups", () => {
 		const blocks = blocksOf([thinking("h1"), tool("t1", "ok"), tool("t2", "ok"), user, tool("t3", "running")]);
 		expect(blocks.map(block => (block.kind === "activity" ? block.entries.map(entry => entry.id).join("+") : block.item.id))).toEqual([
 			"h1+t1+t2",
 			"u",
 			"t3",
+		]);
+	});
+
+	test("messages between tool calls join the group; the message after the last call stands alone", () => {
+		const say = (id: string): Item => ({ id, kind: "assistant", text: id, streaming: false, suggestions: [] });
+		const blocks = blocksOf([user, say("a1"), tool("t1", "ok"), say("a2"), thinking("h1"), tool("t2", "ok"), say("a3")]);
+		expect(blocks.map(block => (block.kind === "activity" ? block.entries.map(entry => entry.id).join("+") : block.item.id))).toEqual([
+			"u",
+			"a1+t1+a2+h1+t2",
+			"a3",
 		]);
 	});
 

@@ -30,7 +30,7 @@ import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { useArtifacts, usePaneLoaded, useTranscript } from "../pane-store";
 import { revealed, useReveal } from "../message-reveal";
-import { type ActivityItem, EMPTY_TRANSCRIPT, type ForkPoint, replacingPrompt, resendOf, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
+import { type Block, EMPTY_TRANSCRIPT, type ForkPoint, type GroupItem, replacingPrompt, resendOf, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { type ToolChipLabels, ToolChipsContext } from "./tool-chips";
@@ -154,13 +154,13 @@ function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: stri
 	);
 }
 
-export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
+export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: GroupItem[] }) {
 	const expanded = useContext(ToolsExpanded);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
 	const LoaderIcon = useIcon("loader");
 	const tools = entries.filter((entry): entry is ToolItem => entry.kind === "tool");
 	const running =
-		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind === "thinking" && entry.streaming);
+		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind !== "tool" && entry.streaming);
 	const failed = tools.filter(tool => tool.status === "error").length;
 	// A group that returned images stays open, so its images stay in sight.
 	const pinned = tools.some(tool => tool.images);
@@ -172,7 +172,9 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 		: tools.length
 			? `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`
 			: "Thought";
-	const visible = entries.filter(entry => (entry.kind === "thinking" ? !hideThinking : !hideTools));
+	const visible = entries.filter(entry =>
+		entry.kind === "thinking" ? !hideThinking : entry.kind === "tool" ? !hideTools : entry.text.trim() !== "",
+	);
 	return (
 		<TraceCollapsible open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="max-w-2xl self-start">
 			<TraceCollapsibleTrigger {...activityControl("transcript.activity-group")}>
@@ -184,6 +186,13 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 			<TraceCollapsibleContent>
 				<Trace>
 					{visible.map(entry => {
+						if (entry.kind === "assistant") {
+							return (
+								<div key={entry.id} className="py-1 text-sm" data-item="narration">
+									<MessageMarkdown text={entry.text} />
+								</div>
+							);
+						}
 						if (entry.kind === "thinking") {
 							return (
 								<TraceCollapsible key={entry.id} defaultOpen>
@@ -282,7 +291,7 @@ function Row({ messageId, settled, className, children }: { messageId: string; s
 type ToolChip = { name: string; label: string; href: string | null; icon: IconComponent };
 
 /** A group of tool calls and thinking, with a chip for each label `chips` gives a call that finished in it. Memoized on its block, so a token leaves a settled group as it is. */
-const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chips }: { id: string; entries: ActivityItem[]; settled: boolean; shown: boolean; chips: ToolChipLabels }) {
+const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chips }: { id: string; entries: GroupItem[]; settled: boolean; shown: boolean; chips: ToolChipLabels }) {
 	const chipsShown = useMemo(() => {
 		const byLabel = new Map<string, ToolChip>();
 		for (const entry of entries) {
@@ -668,6 +677,52 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 		return () => cancelAnimationFrame(frame);
 	}, [revealId, loaded, items, view, scrollToMessage]);
 
+	const itemRow = (item: Extract<Block, { kind: "item" }>["item"], settled: boolean): ReactNode => {
+		if (item.kind === "notice") {
+			return (
+				<Row key={item.id} messageId={item.id} settled={settled}>
+					<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
+						{item.text}
+					</p>
+				</Row>
+			);
+		}
+		if (item.kind === "routine") return <RoutineRow key={item.id} item={item} settled={settled} />;
+		if (item.kind === "bot-message") return <BotMessageRow key={item.id} item={item} settled={settled} />;
+		const point = forks.get(item.id);
+		const edit = editing?.item.id === item.id ? editing : null;
+		return (
+			<MessageRow
+				key={item.id}
+				item={item}
+				copyable={item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copyText(item).trim() !== ""}
+				forkAt={point?.entryId ?? null}
+				prefill={point?.prefill ?? false}
+				forking={here?.phase === "starting" && here.op.itemId === item.id}
+				forkDisabled={fork?.phase === "starting"}
+				failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
+				editAt={!editing && editable?.itemId === item.id ? editable.entryId : null}
+				editor={edit ? (
+					<PromptEditor
+						initial={edit.item.text}
+						text={edit.text}
+						pending={submitted !== null}
+						working={working}
+						error={resendError}
+						onChange={text => setEditing(current => current ? { ...current, text } : current)}
+						onSave={() => resend.run(edit, edit.text.trim())}
+						onCancel={() => setEditing(null)}
+					/>
+				) : undefined}
+				browser={BROWSER_AVAILABLE && view.kind === "live" ? view.instanceId : null}
+				replacing={item.id === replacing}
+				settled={settled}
+				onFork={onFork}
+				onEditing={beginEditing}
+			/>
+		);
+	};
+
 	return (
 		<OpenImage.Provider value={openImage}>
 		<OpenFile.Provider value={setFile}>
@@ -684,7 +739,10 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 							{visibleBlocks.map((block, index) => {
 								const settled = index < visibleBlocks.length - 1;
 								if (block.kind === "activity") {
-									return <ActivityRow key={block.id} id={block.id} entries={block.entries} settled={settled} shown={activityShown} chips={toolChips} />;
+									const row = <ActivityRow key={block.id} id={block.id} entries={block.entries} settled={settled} shown={activityShown} chips={toolChips} />;
+									if (activityShown) return row;
+									// A Bot's page draws no groups, so the messages written between tool calls show as messages.
+									return [...block.entries.flatMap(entry => (entry.kind === "assistant" ? [itemRow(entry, settled)] : [])), row];
 								}
 								if (block.kind === "artifact") {
 									const { id, artifact } = block.item;
@@ -702,50 +760,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 										/>
 									);
 								}
-								const item = block.item;
-								if (item.kind === "notice") {
-									return (
-										<Row key={item.id} messageId={item.id} settled={settled}>
-											<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
-												{item.text}
-											</p>
-										</Row>
-									);
-								}
-								if (item.kind === "routine") return <RoutineRow key={item.id} item={item} settled={settled} />;
-								if (item.kind === "bot-message") return <BotMessageRow key={item.id} item={item} settled={settled} />;
-								const point = forks.get(item.id);
-								const edit = editing?.item.id === item.id ? editing : null;
-								return (
-									<MessageRow
-										key={item.id}
-										item={item}
-										copyable={item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copyText(item).trim() !== ""}
-										forkAt={point?.entryId ?? null}
-										prefill={point?.prefill ?? false}
-										forking={here?.phase === "starting" && here.op.itemId === item.id}
-										forkDisabled={fork?.phase === "starting"}
-										failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
-										editAt={!editing && editable?.itemId === item.id ? editable.entryId : null}
-										editor={edit ? (
-											<PromptEditor
-												initial={edit.item.text}
-												text={edit.text}
-												pending={submitted !== null}
-												working={working}
-												error={resendError}
-												onChange={text => setEditing(current => current ? { ...current, text } : current)}
-												onSave={() => resend.run(edit, edit.text.trim())}
-												onCancel={() => setEditing(null)}
-											/>
-										) : undefined}
-										browser={BROWSER_AVAILABLE && view.kind === "live" ? view.instanceId : null}
-										replacing={item.id === replacing}
-										settled={settled}
-										onFork={onFork}
-										onEditing={beginEditing}
-									/>
-								);
+								return itemRow(block.item, settled);
 							})}
 							{loaded && items.length === 0 && !working && !editing && empty}
 							{working && !streaming && (
