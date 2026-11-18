@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-18
 
+- Agents can now run a helper on Fable 5.2 or Grok 4.7, so an arena can compare them with the other models.
 - Changed files appear at once with a quick fade, instead of sliding in one after another.
 - The Files section of Overview has no Review button anymore; click a file, or press Cmd+Shift+G, to open the changes.
 - The Files, Images, and Sources headers in Overview are shorter.
