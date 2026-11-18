@@ -23,8 +23,9 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
-import { openArtifact, useShownArtifact } from "../artifact-requests";
-import { versionNumber } from "../artifacts-model";
+import { openArtifact, type ShownArtifact, useShownArtifact } from "../artifact-requests";
+import { type Artifact, savedArtifact, versionNumber } from "../artifacts-model";
+import { durationWords } from "../routines-model";
 import { mediaSrc } from "../api";
 import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
@@ -154,7 +155,23 @@ function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: stri
 	);
 }
 
-export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: GroupItem[] }) {
+/** Ticks every second while `live`, so a running group's time counts up; `Date.now()` once otherwise. */
+function useNow(live: boolean): number {
+	const [now, setNow] = useState(Date.now);
+	useEffect(() => {
+		if (!live) return;
+		setNow(Date.now());
+		const timer = setInterval(() => setNow(Date.now()), 1000);
+		return () => clearInterval(timer);
+	}, [live]);
+	return now;
+}
+
+/**
+ * A turn's work: its tool calls, thinking, and the messages between them, under a line that says how long it worked.
+ * `from` and `to` as on its {@link Block}.
+ */
+export const ActivityGroup = memo(function ActivityGroup({ entries, from, to }: { entries: GroupItem[]; from: number | null; to: number | null }) {
 	const expanded = useContext(ToolsExpanded);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
 	const LoaderIcon = useIcon("loader");
@@ -167,11 +184,15 @@ export const ActivityGroup = memo(function ActivityGroup({ entries }: { entries:
 	// Open while running, else as `expanded` says; a manual toggle wins until `expanded` flips.
 	const [toggle, setToggle] = useState<{ open: boolean; expanded: boolean } | null>(null);
 	const open = toggle?.expanded === expanded ? toggle.open : running || expanded || pinned;
+	const now = useNow(running);
+	const end = running ? now : (to ?? Math.max(...entries.map(entry => entry.at ?? 0)));
+	const took = from !== null && end >= from ? durationWords(end - from) : null;
+	const ran = tools.length ? `${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}` : "";
 	const header = running
-		? "Working"
-		: tools.length
-			? `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`
-			: "Thought";
+		? took ? `Working for ${took}` : "Working"
+		: took
+			? `Worked for ${took}${ran && ` · ${ran}`}`
+			: ran ? `Ran ${ran}` : "Thought";
 	const visible = entries.filter(entry =>
 		entry.kind === "thinking" ? !hideThinking : entry.kind === "tool" ? !hideTools : entry.text.trim() !== "",
 	);
@@ -290,8 +311,20 @@ function Row({ messageId, settled, className, children }: { messageId: string; s
 
 type ToolChip = { name: string; label: string; href: string | null; icon: IconComponent };
 
-/** A group of tool calls and thinking, with a chip for each label `chips` gives a call that finished in it. Memoized on its block, so a token leaves a settled group as it is. */
-const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chips }: { id: string; entries: GroupItem[]; settled: boolean; shown: boolean; chips: ToolChipLabels }) {
+/**
+ * A turn's work group, with a chip for each label `chips` gives a call that finished in it and a card for each artifact
+ * it saved. Memoized on its block, so a token leaves a settled group as it is.
+ */
+const ActivityRow = memo(function ActivityRow({ block, settled, shown, chips, view, artifacts, shownArtifact }: {
+	block: Extract<Block, { kind: "activity" }>;
+	settled: boolean;
+	shown: boolean;
+	chips: ToolChipLabels;
+	view: View;
+	artifacts: readonly Artifact[];
+	shownArtifact: ShownArtifact | null;
+}) {
+	const { id, entries, from, to } = block;
 	const chipsShown = useMemo(() => {
 		const byLabel = new Map<string, ToolChip>();
 		for (const entry of entries) {
@@ -305,18 +338,21 @@ const ActivityRow = memo(function ActivityRow({ id, entries, settled, shown, chi
 	if (!shown && chipsShown.length === 0) return null;
 	return (
 		<Row messageId={id} settled={settled}>
-			{shown && <ActivityGroup entries={entries} />}
+			{shown && <ActivityGroup entries={entries} from={from} to={to} />}
+			{shown &&
+				entries.filter(savedArtifact).map(item => {
+					const number = versionNumber(artifacts, item);
+					return (
+						<ArtifactCard
+							key={item.id}
+							save={item.artifact}
+							number={number}
+							showing={shownArtifact?.file === item.artifact.file && shownArtifact.number === number}
+							onOpen={() => openArtifact(view, { file: item.artifact.file, version: number })}
+						/>
+					);
+				})}
 			<ToolChips shown={chipsShown} />
-		</Row>
-	);
-});
-
-/** A saved artifact version's card; nothing on a Bot's page, which shows no activity. Its Open shows this version in the Artifacts tab. */
-const ArtifactRow = memo(function ArtifactRow({ id, view, save, number, showing, settled, shown }: { id: string; view: View; save: ArtifactSave; number: number; showing: boolean; settled: boolean; shown: boolean }) {
-	if (!shown) return null;
-	return (
-		<Row messageId={id} settled={settled}>
-			<ArtifactCard save={save} number={number} showing={showing} onOpen={() => openArtifact(view, { file: save.file, version: number })} />
 		</Row>
 	);
 });
@@ -739,26 +775,10 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 							{visibleBlocks.map((block, index) => {
 								const settled = index < visibleBlocks.length - 1;
 								if (block.kind === "activity") {
-									const row = <ActivityRow key={block.id} id={block.id} entries={block.entries} settled={settled} shown={activityShown} chips={toolChips} />;
+									const row = <ActivityRow key={block.id} block={block} settled={settled} shown={activityShown} chips={toolChips} view={view} artifacts={artifacts} shownArtifact={shownArtifact} />;
 									if (activityShown) return row;
 									// A Bot's page draws no groups, so the messages written between tool calls show as messages.
 									return [...block.entries.flatMap(entry => (entry.kind === "assistant" ? [itemRow(entry, settled)] : [])), row];
-								}
-								if (block.kind === "artifact") {
-									const { id, artifact } = block.item;
-									const number = versionNumber(artifacts, block.item);
-									return (
-										<ArtifactRow
-											key={id}
-											id={id}
-											view={view}
-											save={artifact}
-											number={number}
-											showing={shownArtifact?.file === artifact.file && shownArtifact.number === number}
-											settled={settled}
-											shown={activityShown}
-										/>
-									);
 								}
 								return itemRow(block.item, settled);
 							})}

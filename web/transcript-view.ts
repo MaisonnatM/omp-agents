@@ -6,7 +6,6 @@ import type { RoutineTask } from "../src/routines";
 import { promptTitle } from "../src/shared/prompt-files";
 import { taskOf, taskText } from "../src/shared/routine-message";
 import { isPrompt, type Item, type PromptItem } from "../src/shared/transcript";
-import { type ArtifactToolItem, savedArtifact } from "./artifacts-model";
 import type { ActionState } from "./use-action";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -21,11 +20,14 @@ type DashboardItem = Extract<Item, { kind: "dashboard" }>;
 type Opener = PromptItem | DashboardItem;
 type AssistantItem = Extract<Item, { kind: "assistant" }>;
 
-/** A message or notice; a group of tool calls and thinking; or a call that saved an artifact, lifted out of its group to show as a card. */
+/**
+ * A message or notice, or a group of tool calls, thinking, and the messages between them. `from` is when the group's work
+ * began, the time of the item before it; `to` when it ended, the time of the item after it in the same turn, or `null`
+ * while nothing follows it. Either is `null` when the server did not stamp the item.
+ */
 export type Block =
 	| { kind: "item"; item: Exclude<Item, ActivityItem | DashboardItem> }
-	| { kind: "activity"; id: string; entries: GroupItem[] }
-	| { kind: "artifact"; item: ArtifactToolItem };
+	| { kind: "activity"; id: string; entries: GroupItem[]; from: number | null; to: number | null };
 
 /** Whether `item` opens a turn: a prompt, the user's, one a routine or another Bot sent, or one the dashboard sent in their place, which shows nothing. */
 export const opensTurn = (item: Item): item is Opener => isPrompt(item) || item.kind === "dashboard";
@@ -33,12 +35,14 @@ export const opensTurn = (item: Item): item is Opener => isPrompt(item) || item.
 const blockKey = (block: Block): string => (block.kind === "activity" ? block.id : block.item.id);
 
 const sameBlock = (a: Block, b: Block): boolean =>
-	a.kind === "activity" ? b.kind === "activity" && a.entries.length === b.entries.length && a.entries.every((entry, i) => entry === b.entries[i]) : a.kind === b.kind && a.item === b.item;
+	a.kind === "activity"
+		? b.kind === "activity" && a.from === b.from && a.to === b.to && a.entries.length === b.entries.length && a.entries.every((entry, i) => entry === b.entries[i])
+		: a.kind === b.kind && a.item === b.item;
 
 /**
  * The blocks of the items from `start` to `end`, without the prompts the dashboard sent. Tool calls and thinking group
  * together with the assistant messages between them, so a turn's work reads as one group and only the message after its
- * last tool call stands as its own block. A notice, a prompt, or a saved artifact ends a group. A block of `previous`
+ * last tool call stands as its own block. A notice or a prompt ends a group. A block of `previous`
  * whose items are the same objects comes back as the same object, so a row of an unchanged message or tool group,
  * memoized on its block, skips the render that a streamed token starts.
  */
@@ -48,8 +52,7 @@ function blocksOf(items: readonly Item[], start: number, end: number, previous: 
 	for (let at = end - 1; at >= start; at--) {
 		const item = items[at]!;
 		if (item.kind === "dashboard") continue;
-		if (savedArtifact(item)) activityAhead = false;
-		else if (item.kind === "tool" || item.kind === "thinking") activityAhead = true;
+		if (item.kind === "tool" || item.kind === "thinking") activityAhead = true;
 		else if (item.kind !== "assistant") activityAhead = false;
 		else if (activityAhead) grouped.add(at);
 	}
@@ -58,11 +61,13 @@ function blocksOf(items: readonly Item[], start: number, end: number, previous: 
 		const item = items[at]!;
 		if (item.kind === "dashboard") continue;
 		const last = blocks.at(-1);
-		if (savedArtifact(item)) blocks.push({ kind: "artifact", item });
-		else if (item.kind === "tool" || item.kind === "thinking" || (item.kind === "assistant" && grouped.has(at))) {
+		if (item.kind === "tool" || item.kind === "thinking" || (item.kind === "assistant" && grouped.has(at))) {
 			if (last?.kind === "activity") last.entries.push(item);
-			else blocks.push({ kind: "activity", id: item.id, entries: [item] });
-		} else blocks.push({ kind: "item", item });
+			else blocks.push({ kind: "activity", id: item.id, entries: [item], from: (items[at - 1] ?? item).at ?? null, to: null });
+		} else {
+			if (last?.kind === "activity") last.to = item.at ?? null;
+			blocks.push({ kind: "item", item });
+		}
 	}
 	if (previous.length === 0) return blocks;
 	const before = new Map(previous.map(block => [blockKey(block), block]));

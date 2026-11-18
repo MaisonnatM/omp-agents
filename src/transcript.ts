@@ -182,7 +182,6 @@ export function messageItemsOf(entry: unknown): MessageItem[] {
 export class Transcript {
 	/** Display order: by message time, then first seen. */
 	#items = new Map<string, Item>();
-	#times = new Map<string, number>();
 	/** Message keys and tool-call ids the file already settled; live events leave them alone. */
 	#settled = new Set<string>();
 	#noticeSeq = 0;
@@ -437,15 +436,13 @@ export class Transcript {
 		});
 	}
 
-	#upsert(item: Item): Item[] {
-		const prev = this.#items.get(item.id);
+	#upsert(fresh: Item): Item[] {
+		const prev = this.#items.get(fresh.id);
+		const item: Item = { ...fresh, at: prev?.at ?? this.#now };
 		if (prev && sameItem(prev, item)) return [];
 		if (prev || this.#now >= this.#latest) this.#items.set(item.id, item);
 		else this.#insert(item);
-		if (!prev) {
-			this.#times.set(item.id, this.#now);
-			this.#latest = Math.max(this.#latest, this.#now);
-		}
+		if (!prev) this.#latest = Math.max(this.#latest, this.#now);
 		return [item];
 	}
 
@@ -453,7 +450,7 @@ export class Transcript {
 	#insert(item: Item): void {
 		const entries = [...this.#items];
 		let at = entries.length;
-		while (at > 0 && (this.#times.get(entries[at - 1]![0]) ?? 0) > this.#now) at--;
+		while (at > 0 && (entries[at - 1]![1].at ?? 0) > this.#now) at--;
 		entries.splice(at, 0, [item.id, item]);
 		this.#items = new Map(entries);
 		this.#displacedFrom = Math.min(this.#displacedFrom ?? at, at);

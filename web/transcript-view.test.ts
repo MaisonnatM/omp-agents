@@ -33,16 +33,15 @@ describe("transcript rendering", () => {
 		]);
 	});
 
-	test("a saved artifact leaves its tool group as its own block; a failed save stays in the group", () => {
+	test("a saved artifact stays in its group, which spans from the prompt to the reply after it", () => {
 		const artifact: ArtifactSave = { file: "page.html", kind: "html", title: "Page", note: null, sha256: "a".repeat(64) as Sha256, bytes: 12, savedAt: 1_700_000_000_000 };
-		const saved: Item = { id: "s", kind: "tool", name: "artifact", summary: "page.html", status: "ok", artifact };
-		const failed: Item = { id: "f", kind: "tool", name: "artifact", summary: "page.html", status: "error" };
-		const blocks = blocksOf([tool("t1", "ok"), saved, tool("t2", "ok"), failed]);
-		expect(blocks.map(block => [block.kind, block.kind === "activity" ? block.entries.map(entry => entry.id).join("+") : block.item.id])).toEqual([
-			["activity", "t1"],
-			["artifact", "s"],
-			["activity", "t2+f"],
-		]);
+		const saved: Item = { id: "s", kind: "tool", name: "artifact", summary: "page.html", status: "ok", artifact, at: 20_000 };
+		const reply: Item = { id: "r", kind: "assistant", text: "done", streaming: false, suggestions: [], at: 61_000 };
+		const { blocks } = transcriptModel([{ ...user, at: 1_000 }, { ...tool("t1", "ok"), at: 2_000 }, saved, { ...tool("t2", "ok"), at: 30_000 }, reply], false);
+		const group = blocks[1]!;
+		expect(group.kind === "activity" && [group.entries.map(entry => entry.id), group.from, group.to]).toEqual([["t1", "s", "t2"], 1_000, 61_000]);
+		const open = transcriptModel([{ ...user, at: 1_000 }, { ...tool("t1", "running"), at: 2_000 }], true).blocks[1]!;
+		expect(open.kind === "activity" && [open.from, open.to]).toEqual([1_000, null]);
 	});
 
 	test("a block whose items did not change comes back as the same object, so a streamed token renders only its own row", () => {
