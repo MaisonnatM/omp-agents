@@ -55,7 +55,8 @@
   --popover-foreground: var(--aui-ink);
   --primary: var(--aui-primary);
   --primary-foreground: var(--aui-on-primary);
-  --dither-ink: var(--primary);
+  /* The blue `--primary` had before the affectUI port turned it neutral, so the new-session grid keeps its color. */
+  --dither-ink: #2f5be8;
   --dither-paper: var(--background);
   --dither-cell: 3px;
   --dither-bloom: 0.6;
@@ -131,6 +132,7 @@
 .dark {
   color-scheme: dark;
   --dither-bloom: 1;
+  --dither-ink: #4f5ff5;
   --muted: #252527;
   --accent: #2e2e30;
   --sidebar: #252527;
