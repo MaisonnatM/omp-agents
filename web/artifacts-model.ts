@@ -67,6 +67,11 @@ export function pickedVersion(artifacts: readonly Artifact[], pick: ArtifactPick
 	return { artifact, version: number === "latest" ? latest : (artifact.versions.find(version => version.number === number) ?? latest) };
 }
 
+/** The pick that shows `artifact`'s version `number`: `"latest"` for its newest, so the tab then follows new saves; the inverse of `pickedVersion`. */
+export function versionPick(artifact: Artifact, number: number): ArtifactPick {
+	return { file: artifact.file, version: number === artifact.versions.at(-1)!.number ? "latest" : number };
+}
+
 /** The saves a delta lands: items that now carry `artifact` and did not before, such as a call turning from running to done; a reset lands none. */
 export function landedSaves(before: readonly Item[], msg: { reset: boolean; items: readonly Item[] }): ArtifactSave[] {
 	if (msg.reset) return [];

@@ -4,7 +4,8 @@
  * the version full-bleed; and a version bar that steps through the versions and shows the shown one's note.
  */
 import { IconArrowInbox, IconChevronDownSmall, IconChevronLeftSmall, IconChevronRightSmall, IconCode, IconEyeOpen, IconSquareArrowTopRight } from "central-icons";
-import { useContext, useEffect, useState } from "react";
+import { type ReactNode, useContext, useEffect, useState } from "react";
+import type { ControlId } from "../../src/shared/activity";
 import type { View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuRadioGroup, MenuRadioItem } from "@/components/ui/menu";
@@ -13,7 +14,7 @@ import { useIcon } from "@/lib/icon-context";
 import { activityControl } from "../activity";
 import { useArtifactVersion } from "../artifact-links";
 import { pickArtifact, showArtifact, useArtifactPick } from "../artifact-requests";
-import { type Artifact, type ArtifactVersion, pickedVersion } from "../artifacts-model";
+import { type Artifact, type ArtifactVersion, pickedVersion, versionPick } from "../artifacts-model";
 import { formatBytes, listTime } from "../labels";
 import { useCopy } from "../use-copy";
 import { ARTIFACT_KIND, ArtifactView } from "./artifact-view";
@@ -26,7 +27,17 @@ const NARROW_HIDDEN = "@max-[30rem]/artifacts:hidden";
 const NARROW_SR_ONLY = "@max-[30rem]/artifacts:sr-only";
 
 /** Download and Open in browser are links, which take no `disabled`: with no address they look and act as a disabled button does. */
-const LINK_ACTION = "aria-disabled:pointer-events-none aria-disabled:opacity-50";
+function LinkAction({ control, label, url, download, children }: { control: ControlId; label: string; url: string | null; download?: string; children: ReactNode }) {
+	return (
+		<Tooltip content={label} side="bottom" disabled={url === null}>
+			<Button {...activityControl(control)} asChild variant="ghost" size="icon-compact" aria-label={label} className="aria-disabled:pointer-events-none aria-disabled:opacity-50">
+				<a href={url ?? undefined} {...(download ? { download } : { target: "_blank", rel: "noopener noreferrer" })} aria-disabled={url === null || undefined}>
+					{children}
+				</a>
+			</Button>
+		</Tooltip>
+	);
+}
 
 interface ArtifactsPanelProps {
 	view: View;
@@ -52,13 +63,12 @@ export function ArtifactsPanel({ view, sessionId, artifacts }: ArtifactsPanelPro
 	const ready = loaded.state === "ready" ? loaded.value : null;
 	const url = ready?.url ?? null;
 	const name = artifact.file.split("/").at(-1)!;
-	const pick = (number: number) => pickArtifact(view, { file: artifact.file, version: number === artifact.versions.at(-1)!.number ? "latest" : number });
 	return (
 		<SegmentedTabs value={source ? "source" : "rendered"} onValueChange={value => setSource(value === "source")} className="@container/artifacts flex min-h-0 flex-1 flex-col bg-background">
 			{/* In a narrow panel, such as the sidebar at its default width, the title takes a row of its own above the controls, as the Browser's address takes one below its buttons. */}
 			<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-1 border-b border-border px-1.5 @max-[24rem]/artifacts:py-1">
 				<div className="flex min-w-0 flex-1 @max-[24rem]/artifacts:basis-full">
-					<ArtifactTitle view={view} artifacts={artifacts} artifact={artifact} />
+					<ArtifactTitle artifacts={artifacts} artifact={artifact} onPick={file => pickArtifact(view, { file, version: "latest" })} />
 				</div>
 				<SegmentedTabsList aria-label="Show as">
 					<Tooltip content="Preview" side="bottom">
@@ -76,31 +86,23 @@ export function ArtifactsPanel({ view, sessionId, artifacts }: ArtifactsPanelPro
 				</SegmentedTabsList>
 				<span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-border @max-[24rem]/artifacts:ml-auto" />
 				<CopyAction text={ready?.text ?? null} />
-				<Tooltip content="Download" side="bottom">
-					<Button {...activityControl("artifacts.download")} asChild variant="ghost" size="icon-compact" aria-label="Download" className={LINK_ACTION}>
-						<a href={url ?? undefined} download={name} aria-disabled={url === null || undefined}>
-							<IconArrowInbox />
-						</a>
-					</Button>
-				</Tooltip>
-				<Tooltip content="Open in browser" side="bottom">
-					<Button {...activityControl("artifacts.open-in-browser")} asChild variant="ghost" size="icon-compact" aria-label="Open in browser" className={LINK_ACTION}>
-						<a href={url ?? undefined} target="_blank" rel="noopener noreferrer" aria-disabled={url === null || undefined}>
-							<IconSquareArrowTopRight />
-						</a>
-					</Button>
-				</Tooltip>
+				<LinkAction control="artifacts.download" label="Download" url={url} download={name}>
+					<IconArrowInbox />
+				</LinkAction>
+				<LinkAction control="artifacts.open-in-browser" label="Open in browser" url={url}>
+					<IconSquareArrowTopRight />
+				</LinkAction>
 			</div>
 			<SegmentedTabPanel value={source ? "source" : "rendered"} className="flex min-h-0 flex-1 flex-col outline-none">
 				<ArtifactView loaded={loaded} kind={artifact.kind} file={artifact.file} title={artifact.title} source={source} />
 			</SegmentedTabPanel>
-			<VersionBar artifact={artifact} version={version} onPick={pick} />
+			<VersionBar artifact={artifact} version={version} onPick={number => pickArtifact(view, versionPick(artifact, number))} />
 		</SegmentedTabs>
 	);
 }
 
 /** The shown artifact's kind icon and title, which shows in full with its file on hover; with two artifacts or more, a menu that picks another, each at its latest version. */
-function ArtifactTitle({ view, artifacts, artifact }: { view: View; artifacts: Artifact[]; artifact: Artifact }) {
+function ArtifactTitle({ artifacts, artifact, onPick }: { artifacts: Artifact[]; artifact: Artifact; onPick: (file: string) => void }) {
 	const Icon = ARTIFACT_KIND[artifact.kind].icon;
 	const full = `${artifact.title}\n${artifact.file}`;
 	if (artifacts.length === 1) {
@@ -121,7 +123,7 @@ function ArtifactTitle({ view, artifacts, artifact }: { view: View; artifacts: A
 					{artifact.title}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="start" className="max-w-96">
-					<MenuRadioGroup aria-label="Artifacts" value={artifact.file} onValueChange={(file: string) => pickArtifact(view, { file, version: "latest" })}>
+					<MenuRadioGroup aria-label="Artifacts" value={artifact.file} onValueChange={(file: string) => onPick(file)}>
 						{artifacts.map(each => {
 							const EachIcon = ARTIFACT_KIND[each.kind].icon;
 							return (
@@ -146,7 +148,8 @@ function ArtifactTitle({ view, artifacts, artifact }: { view: View; artifacts: A
 export function VersionBar({ artifact, version, onPick }: { artifact: Artifact; version: ArtifactVersion; onPick: (number: number) => void }) {
 	const { save } = version;
 	const count = artifact.versions.length;
-	const latest = version.number === count;
+	const latest = artifact.versions.at(-1)!;
+	const atLatest = version === latest;
 	return (
 		<div className="flex min-h-9 shrink-0 flex-wrap items-center gap-1 border-t border-border px-1.5 text-xs text-muted-foreground">
 			{count > 1 ? (
@@ -175,8 +178,8 @@ export function VersionBar({ artifact, version, onPick }: { artifact: Artifact; 
 							</MenuRadioGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<Tooltip content="Newer version" side="top" disabled={latest}>
-						<Button {...activityControl("artifacts.version")} variant="ghost" size="icon-compact" aria-label="Newer version" disabled={latest} onClick={() => onPick(version.number + 1)}>
+					<Tooltip content="Newer version" side="top" disabled={atLatest}>
+						<Button {...activityControl("artifacts.version")} variant="ghost" size="icon-compact" aria-label="Newer version" disabled={atLatest} onClick={() => onPick(version.number + 1)}>
 							<IconChevronRightSmall />
 						</Button>
 					</Tooltip>
@@ -185,10 +188,12 @@ export function VersionBar({ artifact, version, onPick }: { artifact: Artifact; 
 				<span className="shrink-0 px-1.5">Version 1</span>
 			)}
 			{/* In a narrow panel the note takes a row of its own below the controls, so it reads in full rather than as "F…". */}
-			<span title={save.note ?? undefined} className="min-w-0 flex-1 truncate px-1 @max-[30rem]/artifacts:order-last @max-[30rem]/artifacts:basis-full @max-[30rem]/artifacts:pb-1.5 @max-[30rem]/artifacts:whitespace-normal empty:hidden">
-				{save.note}
-			</span>
-			{latest ? (
+			{save.note && (
+				<span title={save.note} className="min-w-0 flex-1 truncate px-1 @max-[30rem]/artifacts:order-last @max-[30rem]/artifacts:basis-full @max-[30rem]/artifacts:pb-1.5 @max-[30rem]/artifacts:whitespace-normal">
+					{save.note}
+				</span>
+			)}
+			{atLatest ? (
 				<span className={`ml-auto shrink-0 pr-1.5 whitespace-nowrap ${NARROW_HIDDEN}`}>
 					{ARTIFACT_KIND[artifact.kind].label} · {formatBytes(save.bytes)} ·{" "}
 					<time dateTime={new Date(save.savedAt).toISOString()} title={new Date(save.savedAt).toLocaleString()}>
@@ -196,7 +201,7 @@ export function VersionBar({ artifact, version, onPick }: { artifact: Artifact; 
 					</time>
 				</span>
 			) : (
-				<Button {...activityControl("artifacts.latest")} variant="ghost" size="compact" onClick={() => onPick(count)} className="ml-auto shrink-0 text-xs text-foreground">
+				<Button {...activityControl("artifacts.latest")} variant="ghost" size="compact" onClick={() => onPick(latest.number)} className="ml-auto shrink-0 text-xs text-foreground">
 					Go to latest
 				</Button>
 			)}
@@ -211,7 +216,7 @@ function CopyAction({ text }: { text: string | null }) {
 	const CheckIcon = useIcon("check");
 	const label = copied ? "Copied" : "Copy";
 	return (
-		<Tooltip content={label} side="bottom">
+		<Tooltip content={label} side="bottom" disabled={text === null}>
 			<Button {...activityControl("artifacts.copy")} variant="ghost" size="icon-compact" disabled={text === null} onClick={() => text !== null && copy(text)} aria-label={label}>
 				{copied ? <CheckIcon /> : <CopyIcon />}
 			</Button>

@@ -11,7 +11,7 @@ export function ArtifactCard({ save, number, showing, onOpen }: { save: Artifact
 			{...activityControl("transcript.artifact-open")}
 			type="button"
 			data-item="artifact"
-			aria-label={`Open ${save.title}, version ${number}`}
+			// No aria-label: the title, the kind, version, and note line, and Open or Showing name the button as they read.
 			aria-current={showing || undefined}
 			onClick={onOpen}
 			className={cn(
