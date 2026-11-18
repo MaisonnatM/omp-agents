@@ -79,7 +79,7 @@ export const AppSidebar = memo(function AppSidebar({
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
-			<div className="flex h-(--page-header-height) shrink-0 items-center justify-end pr-2 select-none [-webkit-app-region:drag] *:[-webkit-app-region:no-drag]">
+			<div className="flex h-(--window-header-height) shrink-0 items-center justify-end pr-2 select-none [-webkit-app-region:drag] *:[-webkit-app-region:no-drag]">
 				<h1 className="sr-only">omp sessions</h1>
 				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}
 				<span aria-hidden className="size-7 shrink-0" />
