@@ -64,6 +64,8 @@ task:
     - anthropic/claude-opus-5-5
     - openai-codex/gpt-6.1-sol
     - cursor/gemini-3.1-pro
+    - anthropic/claude-fable-5-2
+    - cursor/grok-4.7
 
 # omp rejects pstack's skills from its plugin; extensions/pstack-skills.ts links them here, where omp loads them hidden as pstack intends.
 skills:
