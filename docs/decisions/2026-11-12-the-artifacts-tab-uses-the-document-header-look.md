@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-12
 decision-makers: Maxence Maisonnat
+superseded-by: 2026-11-18-the-artifacts-tab-and-card-follow-claudes-artifact-look
 ---
 
 # The Artifacts tab uses the Document header look

@@ -5,6 +5,11 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-18
 
+- The Artifacts tab takes the look of Claude's artifacts: one thin bar on top with the artifact's name, Preview and Source, and the actions, and the artifact filling the rest of the tab.
+- With two or more artifacts, click the name at the top of the Artifacts tab to pick another from a menu.
+- A bar at the bottom of the Artifacts tab steps to the older or newer version with its arrows, and Version 2 of 3 opens a menu of every version with its note.
+- A Markdown artifact reads as a document: a centered column with larger headings and more space between lines.
+- Each artifact in a conversation shows as a card with an icon, its title, and its kind, version, and note; click anywhere on it to open it.
 - Agents can now run a helper on Fable 5.2 or Grok 4.7, so an arena can compare them with the other models.
 - Changed files appear at once with a quick fade, instead of sliding in one after another.
 - The Files section of Overview has no Review button anymore; click a file, or press Cmd+Shift+G, to open the changes.

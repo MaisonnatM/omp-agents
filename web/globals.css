@@ -601,6 +601,14 @@
 .notes-editor .notes-nested { list-style: none; padding-left: 0; color: inherit; text-decoration: none; }
 .notes-editor .notes-nested::before, .notes-editor .notes-nested::after { display: none; }
 .notes-editor .notes-nested > .notes-checklist { padding-left: 1.6em; }
+/* An artifact's document page reads as a page, not a message: a body size for reading, a title-sized first heading,
+   and section headings that open room above them. */
+.artifact-document { font-size: .9375rem; line-height: 1.7; }
+.artifact-document .message-markdown :is(h1, h2, h3) { letter-spacing: -.01em; }
+.artifact-document .message-markdown h1 { font-size: 1.75em; font-weight: 700; line-height: 1.2; margin-block: 0 .6em; }
+.artifact-document .message-markdown h2 { font-size: 1.3em; margin-block: 1.8em .5em; }
+.artifact-document .message-markdown h3 { font-size: 1.1em; margin-block: 1.4em .4em; }
+.artifact-document .message-markdown :is(p, ul, ol, blockquote, table) { margin-block: .8em; }
 :is(.message-markdown, .code-lines) :is(.hljs-keyword, .hljs-selector-tag, .hljs-meta .hljs-keyword, .hljs-template-tag, .hljs-type) { color: #cf222e; }
 :is(.message-markdown, .code-lines) :is(.hljs-string, .hljs-regexp, .hljs-meta .hljs-string, .hljs-template-variable) { color: #0a3069; }
 :is(.message-markdown, .code-lines) :is(.hljs-number, .hljs-literal, .hljs-variable.constant_, .hljs-symbol, .hljs-bullet) { color: #0550ae; }
