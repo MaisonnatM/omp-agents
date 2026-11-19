@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { Bookmark, ProjectMemoryRepo } from "../src/shared/memory-page";
 import { routeFromHash } from "./routing";
-import { filterBookmarks, shownRepo } from "./memory-view";
+import { type BookmarkPlace, bookmarkGroups, filterBookmarks, folderCounts, inPlace, shownRepo } from "./memory-view";
 import { memoryHash } from "./components/memory/tabs";
 import type { MemoryRoute } from "./components/memory/module";
 
@@ -57,4 +57,27 @@ test("memory routes open omp memory, a repository's project memory, and a bookma
 		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "memory", ...route } });
 	}
 	expect(routeFromHash("#memory/elsewhere")).toEqual({ kind: "page", page: { kind: "memory", tab: "omp" } });
+});
+
+test("the folder tree counts each Zen folder with its subfolders, picks a folder with them, and groups by folder, then x.com", () => {
+	const bookmarks = [
+		bookmark("x:1", { source: "x" }),
+		bookmark("zen:2", { folder: "Toolbar / Design" }),
+		bookmark("zen:3", { folder: "Toolbar" }),
+		bookmark("zen:4", { folder: "Toolbar / Design" }),
+		bookmark("zen:5", { folder: "Menu" }),
+		bookmark("zen:6", { folder: "Toolbar Extra" }),
+	];
+	expect(Object.fromEntries(folderCounts(bookmarks))).toEqual({ Toolbar: 3, "Toolbar / Design": 2, Menu: 1, "Toolbar Extra": 1 });
+	const ids = (place: BookmarkPlace) => bookmarks.filter(item => inPlace(place, item)).map(({ id }) => id);
+	expect(ids({ kind: "zen", path: "Toolbar" })).toEqual(["zen:2", "zen:3", "zen:4"]);
+	expect(ids({ kind: "zen", path: "" })).toEqual(["zen:2", "zen:3", "zen:4", "zen:5", "zen:6"]);
+	expect(ids({ kind: "x" })).toEqual(["x:1"]);
+	expect(bookmarkGroups(bookmarks).map(({ name, bookmarks: grouped }) => [name, grouped.map(({ id }) => id)])).toEqual([
+		["Menu", ["zen:5"]],
+		["Toolbar", ["zen:3"]],
+		["Toolbar / Design", ["zen:2", "zen:4"]],
+		["Toolbar Extra", ["zen:6"]],
+		["x.com", ["x:1"]],
+	]);
 });

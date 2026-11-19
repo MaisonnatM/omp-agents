@@ -128,6 +128,12 @@ describe("X", () => {
 		expect(xBookmarksPage({ errors: [{ message: "nope" }] })).toBeNull();
 	});
 
+	test("decodes the character references X escapes in a post's author name and text", () => {
+		const post = tweetEntry({ __typename: "Tweet", rest_id: "333", core: { user_results: user("esc", "Tom &amp; Jerry") }, legacy: { created_at: "Mon Nov 16 09:00:00 +0000 2026", full_text: "100 PRs/week &gt; 1200 &lt;3 &amp; more" } });
+		const page = xBookmarksPage({ data: { bookmark_timeline_v2: { timeline: { instructions: [{ entries: [post] }] } } } });
+		expect(page?.bookmarks.map(({ title, text }) => ({ title, text }))).toEqual([{ title: "Tom & Jerry", text: "100 PRs/week > 1200 <3 & more" }]);
+	});
+
 	test("finds the Bookmarks query in the page's chunks, with the page's feature values", () => {
 		const html = 'x={69742:"bundle.Bookmarks",34778:"shared~bundle.BookmarkFolders~bundle.Bookmarks",1:"bundle.Home"};y={69742:"333a5c168651be6d",34778:"0123456789abcdef"};"on_flag":{"value":true},"off_flag":{"value":false}';
 		expect(bookmarkChunks(html)).toEqual([

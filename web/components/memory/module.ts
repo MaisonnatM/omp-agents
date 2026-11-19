@@ -15,6 +15,7 @@ export type MemoryControlId =
 	| "memory.project.save"
 	| "memory.project.delete"
 	| "memory.bookmarks.source"
+	| "memory.bookmarks.folder"
 	| "memory.bookmarks.open"
 	| "memory.bookmarks.sync";
 
@@ -58,7 +59,8 @@ export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, never, MemoryControl
 		{ id: "memory.project.save", label: "Project memory Save button", area: "Memory" },
 		{ id: "memory.project.delete", label: "Project memory Delete button", area: "Memory" },
 		{ id: "memory.bookmarks.source", label: "Bookmarks All, Zen, and x.com tabs", area: "Memory" },
-		{ id: "memory.bookmarks.open", label: "Bookmark row", area: "Memory" },
+		{ id: "memory.bookmarks.folder", label: "Bookmarks folder tree row", area: "Memory" },
+		{ id: "memory.bookmarks.open", label: "Bookmark reader Open link", area: "Memory" },
 		{ id: "memory.bookmarks.sync", label: "Bookmarks Sync x.com button", area: "Memory" },
 	],
 	listsItself: true,

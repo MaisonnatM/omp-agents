@@ -8,6 +8,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { atomicWriteText } from "./fs";
+import { decodeEntities } from "./html-text";
 import { isObject, parseJson } from "./json";
 import type { Bookmark, BookmarkSource, BookmarksView, XSyncState } from "./shared/memory-page";
 
@@ -239,7 +240,7 @@ async function discoverQuery(fetch: Fetch, cookies: XCookies): Promise<Bookmarks
 const pick = (value: unknown, ...keys: string[]): unknown => keys.reduce<unknown>((at, key) => (isObject(at) ? at[key] : undefined), value);
 const text = (value: unknown): string | null => (typeof value === "string" ? value : null);
 
-/** One timeline entry's post as a bookmark, or `null` for a cursor, a removed post, or one X sent without its author. */
+/** One timeline entry's post as a bookmark, with the character references X escapes in its author's name and text decoded, or `null` for a cursor, a removed post, or one X sent without its author. */
 function postOf(entry: unknown): Bookmark | null {
 	let result = pick(entry, "content", "itemContent", "tweet_results", "result");
 	if (pick(result, "__typename") === "TweetWithVisibilityResults") result = pick(result, "tweet");
@@ -247,8 +248,8 @@ function postOf(entry: unknown): Bookmark | null {
 	const user = pick(result, "core", "user_results", "result");
 	const handle = text(pick(user, "core", "screen_name")) ?? text(pick(user, "legacy", "screen_name"));
 	if (!id || !handle) return null;
-	const name = text(pick(user, "core", "name")) ?? text(pick(user, "legacy", "name")) ?? handle;
-	const body = text(pick(result, "note_tweet", "note_tweet_results", "result", "text")) ?? text(pick(result, "legacy", "full_text")) ?? "";
+	const name = decodeEntities(text(pick(user, "core", "name")) ?? text(pick(user, "legacy", "name")) ?? handle);
+	const body = decodeEntities(text(pick(result, "note_tweet", "note_tweet_results", "result", "text")) ?? text(pick(result, "legacy", "full_text")) ?? "");
 	const posted = Date.parse(text(pick(result, "legacy", "created_at")) ?? "");
 	return {
 		id: `x:${id}`,
