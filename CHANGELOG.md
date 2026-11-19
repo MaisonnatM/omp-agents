@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-19
 
+- A new Bot designer interviews you one question at a time, starting from the goal rather than the steps, and asks how to check the Bot's work and where feedback on it shows up, so the Bot it creates can improve itself. A designer you already made keeps its job until you edit it.
 - A dashboard that an omp session starts, such as an agent's test run on another port, no longer runs your routines or messages your Bots; only the dashboard you opened does, so two dashboards stop fighting over the same Bot conversation.
 
 ## 2026-11-18
