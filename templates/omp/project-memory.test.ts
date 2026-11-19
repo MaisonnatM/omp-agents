@@ -5,7 +5,8 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { packageDir } from "../../src/omp/install";
-import { MEMORY_REF, parseDoc, parseOps, planOps, type MemoryOp, type RawOp } from "./agent/extensions/project-memory/memory";
+import type { RawOp } from "./agent/extensions/project-memory/contract";
+import { MEMORY_REF, parseDoc, parseOps, planOps, type MemoryOp } from "./agent/extensions/project-memory/memory";
 import { intentOf } from "./agent/extensions/project-memory/news";
 
 interface Note {

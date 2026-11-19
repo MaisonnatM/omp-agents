@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test";
-import { routeFromHash } from "./routing";
-import { memoryHash } from "./components/memory/tabs";
-import type { MemoryRoute } from "./components/memory/module";
+import type { ProjectMemoryRepo } from "../../../src/shared/memory-page";
+import { routeFromHash } from "../../routing";
+import { shownRepo } from "./memory-view";
+import { memoryHash } from "./tabs";
+import type { MemoryRoute } from "./module";
 
 const repo = (root: string): ProjectMemoryRepo => ({ root, rootDisplay: root, name: root.split("/").pop()!, memories: [] });
 
@@ -14,10 +16,13 @@ test("the Project memory tab shows the repository the address names, else the wo
 	expect(shownRepo([], null, null)).toBeNull();
 });
 
+test("memory routes open omp memory, a repository's project memory, and a bookmark search, and round-trip", () => {
 	const routes: [MemoryRoute, string][] = [
 		[{ tab: "omp" }, "#memory"],
 		[{ tab: "project", repo: null }, "#memory/project"],
 		[{ tab: "project", repo: "/Users/me/code/omp agents" }, "#memory/project?repo=%2FUsers%2Fme%2Fcode%2Fomp%20agents"],
+		[{ tab: "bookmarks", q: "" }, "#memory/bookmarks"],
+		[{ tab: "bookmarks", q: "spring & design" }, "#memory/bookmarks?q=spring%20%26%20design"],
 	];
 	for (const [route, hash] of routes) {
 		expect(memoryHash(route)).toBe(hash);

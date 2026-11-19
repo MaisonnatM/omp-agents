@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { applyMemoryOps, indexText, MEMORY_KINDS, MEMORY_LIMIT, memoryTip, parseOps, readMemory, type Slug } from "./project-memory/memory";
+import { BODY_MAX, LINE_MAX, MEMORY_KINDS, SLUG_MAX } from "./project-memory/contract";
+import { applyMemoryOps, indexText, MEMORY_LIMIT, memoryTip, parseOps, readMemory, type Slug } from "./project-memory/memory";
 import { intentOf, isFirstPrompt, lastSeen, newsFor, NOTE_TYPE } from "./project-memory/news";
 import { placeOf, recordIntent } from "./project-memory/repo";
 
@@ -15,10 +16,10 @@ export default function projectMemory(pi: ExtensionAPI) {
 			.array(
 				z.object({
 					op: z.enum(["add", "update", "delete"]),
-					slug: z.string().describe("Lowercase letters, digits, and hyphens, at most 48, such as `release-needs-tag`."),
+					slug: z.string().describe(`Lowercase letters, digits, and hyphens, at most ${SLUG_MAX}, such as \`release-needs-tag\`.`),
 					kind: z.enum(MEMORY_KINDS).optional().describe("Required for add."),
-					line: z.string().optional().describe("Required for add: one self-contained line of at most 120 characters, readable without the body."),
-					body: z.string().optional().describe("Required for add: the detail, at most 2000 characters."),
+					line: z.string().optional().describe(`Required for add: one self-contained line of at most ${LINE_MAX} characters, readable without the body.`),
+					body: z.string().optional().describe(`Required for add: the detail, at most ${BODY_MAX} characters.`),
 				}),
 			)
 			.optional()

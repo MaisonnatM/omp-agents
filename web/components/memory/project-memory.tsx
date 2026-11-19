@@ -10,7 +10,7 @@ import { activityControl } from "../../activity";
 import { editProjectMemory, PROJECT_MEMORY_URL } from "../../api";
 import { type Editable, useEditableRead } from "../../editable-read";
 import { dateLabel } from "../../labels";
-import { shownRepo } from "../../memory-view";
+import { shownRepo } from "./memory-view";
 import { useShortcuts } from "../../shortcuts";
 import { CommandPicker } from "../command-picker";
 import { CountPill } from "../count-pill";
@@ -181,25 +181,51 @@ function RepoMemory({ repo, repos, view }: { repo: ProjectMemoryRepo; repos: Pro
 	);
 }
 
-/** The memories' table; with every kind shown, a sticky header with its count heads each kind's rows. */
-function MemoryTable({ groups, grouped, entry, onOpen }: { groups: { kind: ProjectMemoryKind; memories: ProjectMemoryEntry[] }[]; grouped: boolean; entry: ProjectMemoryEntry | null; onOpen: (slug: string) => void }) {
+const HEAD = "h-9 px-2 text-left text-xs font-medium text-muted-foreground";
+
+/** A column too wide for a narrow table shrinks to nothing rather than leaving the table, so the kind headers' span still matches the columns. */
+const NO_SLUG = "@max-3xl:invisible @max-3xl:w-0 @max-3xl:p-0";
+const NO_SESSION = "@max-4xl:invisible @max-4xl:w-0 @max-4xl:p-0";
+
+/**
+ * The memories' table; with every kind shown, a sticky header with its count heads each kind's rows, and with one kind
+ * picked the chip names it, so no column repeats the kind. Line keeps the room: Session goes under 56rem, then Slug under 48rem.
+ */
+function MemoryTable({
+	repo,
+	groups,
+	grouped,
+	entry,
+	drafts,
+	rows,
+	onOpen,
+}: {
+	repo: ProjectMemoryRepo;
+	groups: { kind: MemoryKind; memories: ProjectMemoryEntry[] }[];
+	grouped: boolean;
+	entry: ProjectMemoryEntry | null;
+	drafts: Record<string, Draft>;
+	rows: Map<string, HTMLButtonElement>;
+	onOpen: (slug: string) => void;
+}) {
 	if (groups.length === 0) return null;
 	return (
 		<table className="w-full table-fixed border-collapse text-sm">
-			<colgroup>
-				<col className="w-28" />
-				<col className="w-64" />
-				<col />
-				<col className="w-24" />
-				<col className="w-36" />
-			</colgroup>
-			<thead className="sticky top-0 z-[2] bg-background">
-				<tr className="h-9 border-b border-border text-left text-xs text-muted-foreground">
-					<th className="pl-4 font-medium">Kind</th>
-					<th className="font-medium">Slug</th>
-					<th className="font-medium">Line</th>
-					<th className="font-medium">Updated</th>
-					<th className="pr-4 font-medium">Session</th>
+			<caption className="sr-only">Memories in {repo.name}</caption>
+			<thead className="sticky top-0 z-2 bg-background">
+				<tr className="border-b border-border">
+					<th scope="col" className={cn(HEAD, "w-52 pl-4", NO_SLUG)}>
+						Slug
+					</th>
+					<th scope="col" className={cn(HEAD, "@max-3xl:pl-4")}>
+						Line
+					</th>
+					<th scope="col" className={cn(HEAD, "w-24 @max-4xl:pr-4")}>
+						Updated
+					</th>
+					<th scope="col" className={cn(HEAD, "w-28 pr-4", NO_SESSION)}>
+						Session
+					</th>
 				</tr>
 			</thead>
 			{groups.map(group => (
@@ -215,29 +241,33 @@ function MemoryTable({ groups, grouped, entry, onOpen }: { groups: { kind: Proje
 							</th>
 						</tr>
 					)}
-					{group.memories.map(memory => (
-						<tr
-							key={memory.slug}
-							tabIndex={0}
-							aria-current={memory === entry || undefined}
-							onClick={() => onOpen(memory.slug)}
-							onKeyDown={event => {
-								if (event.key !== "Enter" && event.key !== " ") return;
-								event.preventDefault();
-								onOpen(memory.slug);
-							}}
-							className={cn("h-10 cursor-pointer border-b border-border/60 outline-none hover:bg-accent/50 focus-visible:bg-accent/50", memory === entry && "bg-accent hover:bg-accent")}
-							{...activityControl("memory.project.open")}
-						>
-							<td className="pl-4">
-								<KindBadge kind={memory.kind} />
-							</td>
-							<td className="truncate pr-3 font-mono text-xs text-muted-foreground">{memory.slug}</td>
-							<td className="truncate pr-3">{memory.line}</td>
-							<td className="text-xs text-muted-foreground tabular-nums">{dateLabel(memory.updated)}</td>
-							<td className="truncate pr-4 text-xs text-muted-foreground">{sourceLabel(memory.source)}</td>
-						</tr>
-					))}
+					{group.memories.map(memory => {
+						const session = sessionOf(memory.source);
+						return (
+							<tr key={memory.slug} className={cn("relative h-10 border-b border-border/60 hover:bg-accent/50 has-[:focus-visible]:bg-accent/50", memory === entry && "bg-accent hover:bg-accent")}>
+								<td className={cn("truncate pl-4 pr-2 font-mono text-xs text-muted-foreground", NO_SLUG)}>{memory.slug}</td>
+								<td className="px-2 @max-3xl:pl-4">
+									<button
+										type="button"
+										ref={button => {
+											if (button) rows.set(memory.slug, button);
+											else rows.delete(memory.slug);
+										}}
+										title={memory.line}
+										aria-current={memory === entry || undefined}
+										onClick={() => onOpen(memory.slug)}
+										className="flex w-full min-w-0 items-center gap-2 text-left outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+										{...activityControl("memory.project.open")}
+									>
+										<span className="truncate">{memory.line}</span>
+										{drafts[memory.slug] && <span className="shrink-0 text-xs text-muted-foreground">Unsaved</span>}
+									</button>
+								</td>
+								<td className="px-2 text-xs text-muted-foreground tabular-nums @max-4xl:pr-4">{dateLabel(memory.updated)}</td>
+								<td className={cn("truncate pr-4 pl-2 text-xs text-muted-foreground", session !== null && "font-mono", NO_SESSION)}>{session ?? "This page"}</td>
+							</tr>
+						);
+					})}
 				</tbody>
 			))}
 		</table>
