@@ -1,5 +1,5 @@
-/** The workspace picker: the searchable directory list for the roster and the new session's directory. */
-import { IconFolder1, IconFolderAddRight } from "central-icons";
+/** The workspace pickers: the searchable directory list for the roster and the new session's directory, and the sidebar's workspace again in a page section it scopes. */
+import { IconFolder1, IconFolderAddRight, IconFolderOpen } from "central-icons";
 import { useState } from "react";
 import { errorText } from "../../src/json";
 import type { ControlId } from "../../src/shared/activity";
@@ -117,6 +117,42 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 						: []),
 				],
 			}}
+		/>
+	);
+}
+
+export const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
+
+/** The sidebar's workspace picker again, for Settings' workspace sections and the Memory page's omp memory: all workspaces read your user files only. */
+export function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; workspaces: Workspace[]; onPick: (cwd: string | null) => void }) {
+	const label = cwd === null ? "All workspaces" : workspaceLabel(cwd, workspaces);
+	const pick = (next: string | null) => (): void => {
+		if (next !== cwd) onPick(next);
+	};
+	return (
+		<CommandPicker
+			trigger={<span className="max-w-64 truncate">{label}</span>}
+			icon={IconFolderOpen}
+			ariaLabel={`Workspace: ${label}`}
+			search={{ label: "Search workspaces" }}
+			width="lg"
+			list={{
+				kind: "ready",
+				groups: [
+					{ key: "all", items: [{ value: "All workspaces", label: "All workspaces", selected: cwd === null, onSelect: pick(null) }] },
+					{
+						key: "workspaces",
+						heading: "Workspaces",
+						items: workspaces.map(workspace => ({
+							value: workspace.cwd,
+							label: <span className="truncate">{workspace.cwdDisplay}</span>,
+							selected: workspace.cwd === cwd,
+							onSelect: pick(workspace.cwd),
+						})),
+					},
+				],
+			}}
+			empty="No workspace matches."
 		/>
 	);
 }

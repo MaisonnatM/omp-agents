@@ -11,9 +11,10 @@ import { BookmarksTab } from "./bookmarks";
 import type { MemoryRoute } from "./module";
 import { ProjectMemoryTab } from "./project-memory";
 import { MEMORY_TABS, memoryHash } from "./tabs";
+import { WorkspacePicker } from "../workspace-picker";
 
 const META: Record<MemoryRoute["tab"], string> = {
-	omp: "What omp remembers in the sidebar's workspace",
+	omp: "What omp remembers in the workspace you pick",
 	project: "What agents recorded with the project_memory tool, per repository",
 	bookmarks: "Your Zen and x.com bookmarks, which agents search with the bookmarks tool",
 };
@@ -21,9 +22,17 @@ const META: Record<MemoryRoute["tab"], string> = {
 export function MemoryPage({ route, core }: { route: MemoryRoute; core: CoreData }) {
 	const cwd = core.workspace;
 	let body: ReactNode;
-	if (route.tab === "omp") body = <OmpMemory key={cwd ?? ""} cwd={cwd} />;
-	else if (route.tab === "project") body = <ProjectMemoryTab repo={route.repo} cwd={cwd} />;
-	else body = <BookmarksTab key={route.q} q={route.q} />;
+	if (route.tab === "omp") {
+		body = (
+			<>
+				<div className="flex items-center gap-2 border-b border-border px-4 py-2">
+					<WorkspacePicker cwd={cwd} workspaces={core.workspaces} onPick={core.onPickWorkspace} />
+				</div>
+				<OmpMemory key={cwd ?? ""} cwd={cwd} />
+			</>
+		);
+	} else if (route.tab === "project") body = <ProjectMemoryTab repo={route.repo} cwd={cwd} />;
+	else body = <BookmarksTab q={route.q} />;
 	return (
 		<PageFrame title="Memory" meta={META[route.tab]} actions={<ViewTabs tab={route.tab} />}>
 			{body}
@@ -31,11 +40,11 @@ export function MemoryPage({ route, core }: { route: MemoryRoute; core: CoreData
 	);
 }
 
-/** Settings › omp memory, for the sidebar's workspace; its file links open Settings › Files. */
+/** Settings › omp memory, for the picked workspace; its file links open Settings › Files. */
 function OmpMemory({ cwd }: { cwd: string | null }) {
 	const { settings, editing } = useSettingsEditing(cwd);
 	return (
-		<div className="mx-auto w-full max-w-5xl px-6 py-6">
+		<div className="w-full max-w-5xl px-4 py-4">
 			{settings.data === null ? (
 				settingsReadNote(settings)
 			) : (

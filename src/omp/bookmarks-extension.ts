@@ -4,7 +4,9 @@
  * loads it with `omp -e` into every session it starts, with the flag that names the X sync's file.
  */
 import { homedir } from "node:os";
-import { type BookmarkSearch, bookmarkLine, DEFAULT_SEARCH_LIMIT, readBookmarks, searchBookmarks, zenDir, zenProfileDir } from "../bookmarks";
+import { type BookmarkSearch, bookmarkLine, DEFAULT_SEARCH_LIMIT, searchBookmarks } from "../bookmarks/search";
+import { readBookmarks } from "../bookmarks/store";
+import { zenDir, zenProfileDir } from "../bookmarks/zen";
 import { type ExtensionApi, type ExtensionTool, flagValue, reply } from "./extension-kit";
 
 /** The flag that names the file the dashboard's X sync keeps the x.com bookmarks in. */
@@ -35,12 +37,12 @@ function bookmarksTool(pi: ExtensionApi): ExtensionTool<BookmarkSearch> {
 		async execute(_toolCallId, params) {
 			const xFile = flagValue(pi, BOOKMARKS_FLAGS.xFile);
 			const profile = zenProfileDir(zenDir(homedir()));
-			const { bookmarks, zenFound, x } = readBookmarks(profile, xFile ?? "");
+			const { bookmarks, zenFound, x } = readBookmarks(profile, xFile);
 			const found = searchBookmarks(bookmarks, params);
 			const notes = [
 				...(zenFound ? [] : ["Zen's profile was not found, so no Zen bookmark is searched."]),
 				...(xFile === null ? ["The dashboard did not name the X sync's file, so no x.com bookmark is searched."] : []),
-				...(xFile !== null && params.source !== "zen" && x.syncedAt === null ? ["The x.com bookmarks were never synced; the user syncs them on the dashboard's Memory page."] : []),
+				...(xFile !== null && params.source !== "zen" && x.synced === null ? ["The x.com bookmarks were never synced; the user syncs them on the dashboard's Memory page."] : []),
 			];
 			const lines = found.length > 0 ? found.map(bookmarkLine) : ["No bookmark matches."];
 			return reply([...notes, ...lines].join("\n"));

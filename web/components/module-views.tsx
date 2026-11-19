@@ -7,6 +7,7 @@ import type { ModuleChanges, ModuleValues, StoredModuleId } from "../../src/modu
 import type { Routine } from "../../src/routines";
 import type { Bot } from "../../src/shared/bots";
 import type { RosterHost } from "../../src/shared/sessions";
+import type { Workspace } from "../../src/shared/workspaces";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { SectionTarget } from "../section";
@@ -23,12 +24,14 @@ export interface CoreData {
 	bots: Bot[] | null;
 	/** The todo list, `null` until the server sends it. */
 	todos: UserTodoList | null;
-	/** The sessions are listed, so `cwd` names the workspace a new session starts in. */
+	/** The sessions are listed, so `workspaces` holds every workspace the sidebar offers. */
 	listed: boolean;
-	/** The directory a new session starts in, which the sidebar's workspace decides. */
-	cwd: string;
 	/** The workspace the sidebar picked, as Settings' workspace sections read it; `null` for all workspaces. */
 	workspace: string | null;
+	/** The workspaces the sidebar offers. */
+	workspaces: Workspace[];
+	/** Picks the sidebar's workspace, `null` for all workspaces, as Settings' workspace picker does. */
+	onPickWorkspace: (cwd: string | null) => void;
 	/** The running sessions in the sidebar's workspace. */
 	hosts: RosterHost[];
 	/** The page section a sidebar link last chose, to unfold, scroll to, and focus. */

@@ -1,15 +1,17 @@
 /** The Memory page's data: every workspace repository's project memory, and the bookmarks from Zen and x.com that agents can search. */
+import type { MemoryKind, RawOp } from "../../templates/omp/agent/extensions/project-memory/contract";
+import { everyWord } from "./every-word";
 
-export const PROJECT_MEMORY_KINDS = ["decision", "fact", "lesson"] as const;
-export type ProjectMemoryKind = (typeof PROJECT_MEMORY_KINDS)[number];
+/** The session name an edit from the Memory page records, so its memories' source reads `#dashboard`. */
+export const DASHBOARD_SESSION = "dashboard";
 
 /** One project memory, as the `project_memory` tool stores it under `refs/omp/memory`. */
 export interface ProjectMemoryEntry {
 	slug: string;
-	kind: ProjectMemoryKind;
-	/** One self-contained line, at most 120 characters. */
+	kind: MemoryKind;
+	/** One self-contained line, at most `LINE_MAX` characters. */
 	line: string;
-	/** The detail, at most 2000 characters. */
+	/** The detail, at most `BODY_MAX` characters. */
 	body: string;
 	/** `#<session id>` of the session that last added or updated it, or `#dashboard` for an edit from this page. */
 	source: string;
@@ -33,40 +35,52 @@ export interface ProjectMemoryView {
 	repos: ProjectMemoryRepo[];
 }
 
-/** One change, as the `project_memory` tool's `ops` take it; `kind`, `line`, and `body` are required for `add`. */
-export interface ProjectMemoryOp {
-	op: "add" | "update" | "delete";
-	slug: string;
-	kind?: ProjectMemoryKind;
-	line?: string;
-	body?: string;
-}
-
-/** `PUT /api/project-memory`: applies `ops` to `root`'s memory all or nothing; answered with the whole view, or 400 with the refusal reasons. */
+/** `PUT /api/project-memory`: applies `ops`, the `project_memory` tool's own, to `root`'s memory all or nothing; answered with the whole view, or 400 with the refusal reasons. */
 export interface ProjectMemoryEdit {
 	root: string;
-	ops: ProjectMemoryOp[];
+	ops: RawOp[];
 }
 
-export const BOOKMARK_SOURCES = ["zen", "x"] as const;
-export type BookmarkSource = (typeof BOOKMARK_SOURCES)[number];
-
-/** One bookmark: a Zen browser bookmark, or an x.com post you bookmarked. */
-export interface Bookmark {
-	/** `zen:<guid>` or `x:<post id>`. */
+/** A Zen browser bookmark. */
+export interface ZenBookmark {
+	source: "zen";
+	/** `zen:<guid>`. */
 	id: string;
-	source: BookmarkSource;
 	url: string;
-	/** The page title, or for a post its author's display name. */
+	/** The page title, else its URL. */
 	title: string;
-	/** Zen's folder path, such as `Toolbar / Design`; `null` for a post. */
-	folder: string | null;
-	/** A post's text; `null` for a Zen bookmark. */
-	text: string | null;
-	/** A post's `@handle`; `null` for a Zen bookmark. */
-	author: string | null;
-	/** ISO time it was bookmarked, or for a post when it was posted, since X does not say when you bookmarked it. */
+	/** Zen's folders from its root down, such as `["Toolbar", "Design"]`; none outside every folder. */
+	folder: string[];
+	/** ISO time it was bookmarked. */
 	addedAt: string;
+}
+
+/** An x.com post you bookmarked. */
+export interface XBookmark {
+	source: "x";
+	/** `x:<post id>`. */
+	id: string;
+	url: string;
+	/** Its author's display name. */
+	name: string;
+	/** Its author's `@handle`. */
+	handle: string;
+	text: string;
+	/** ISO time it was posted, since X does not say when you bookmarked it. */
+	addedAt: string;
+}
+
+export type Bookmark = ZenBookmark | XBookmark;
+export type BookmarkSource = Bookmark["source"];
+
+/** A test of whether a bookmark, from `source` when given, holds every word of `query` in any case: a page in its title, address, or folders, a post in its author, text, or address. */
+export function bookmarkMatcher(query: string, source?: BookmarkSource): (bookmark: Bookmark) => boolean {
+	const matches = everyWord(query);
+	return bookmark => {
+		if (source !== undefined && bookmark.source !== source) return false;
+		const fields = bookmark.source === "zen" ? [bookmark.title, bookmark.url, ...bookmark.folder] : [bookmark.name, bookmark.handle, bookmark.text, bookmark.url];
+		return matches(fields.join("\n"));
+	};
 }
 
 /** How the x.com bookmarks were last read, through the cookies of your signed-in Zen session. */

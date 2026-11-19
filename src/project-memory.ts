@@ -3,15 +3,13 @@
  * `project_memory` tool's own code, so an edit from the page is checked and recorded as the tool's are. See
  * docs/architecture/memory-page.md.
  */
-import { applyMemoryOps, type Memory, memoryTip, parseOps, type RawOp, readMemory } from "../templates/omp/agent/extensions/project-memory/memory";
+import { MEMORY_KINDS, type MemoryKind, type RawOp } from "../templates/omp/agent/extensions/project-memory/contract";
+import { applyMemoryOps, type Memory, memoryTip, parseOps, readMemory } from "../templates/omp/agent/extensions/project-memory/memory";
 import { placeOf } from "../templates/omp/agent/extensions/project-memory/repo";
 import { isObject } from "./json";
 import { displayPath } from "./paths";
 import { localDay } from "./shared/days";
-import type { ProjectMemoryEntry, ProjectMemoryRepo, ProjectMemoryView } from "./shared/memory-page";
-
-/** The session name an edit from the page records, so its memories' source reads `#dashboard`. */
-export const DASHBOARD_SOURCE = "dashboard";
+import { DASHBOARD_SESSION, type ProjectMemoryEdit, type ProjectMemoryEntry, type ProjectMemoryRepo, type ProjectMemoryView } from "./shared/memory-page";
 
 /** An edit the page sent that the memory refuses, with every reason. */
 export class MemoryEditRefused extends Error {}
@@ -34,31 +32,34 @@ export function projectMemoryView(roots: readonly string[]): ProjectMemoryView {
 	return { repos };
 }
 
-/** `body` as `{ root, ops }`, or why it is not one. */
-function parseEdit(body: unknown): { root: string; ops: RawOp[] } {
-	if (!isObject(body) || typeof body.root !== "string" || !Array.isArray(body.ops)) throw new MemoryEditRefused("Expected { root, ops }.");
+/** What `parseEdit` answers for a body that is not a {@link ProjectMemoryEdit}. */
+export const EDIT_SHAPE = "Expected { root, ops }, each op { op: add | update | delete, slug, kind?: decision | fact | lesson, line?, body? }.";
+
+const isText = (value: unknown): value is string | undefined => value === undefined || typeof value === "string";
+
+/** `body` as an edit when its fields have the edit's types, else `null`; whether its ops are valid is the memory's `parseOps` to say. */
+export function parseEdit(body: unknown): ProjectMemoryEdit | null {
+	if (!isObject(body) || typeof body.root !== "string" || !Array.isArray(body.ops)) return null;
 	const ops: RawOp[] = [];
 	for (const op of body.ops) {
-		if (!isObject(op) || (op.op !== "add" && op.op !== "update" && op.op !== "delete") || typeof op.slug !== "string") throw new MemoryEditRefused("Each op is { op: add | update | delete, slug, kind?, line?, body? }.");
+		if (!isObject(op) || (op.op !== "add" && op.op !== "update" && op.op !== "delete") || typeof op.slug !== "string") return null;
 		const { kind, line, body: text } = op;
-		if (kind !== undefined && kind !== "decision" && kind !== "fact" && kind !== "lesson") throw new MemoryEditRefused(`${op.op} ${op.slug}: kind is decision, fact, or lesson.`);
-		if ((line !== undefined && typeof line !== "string") || (text !== undefined && typeof text !== "string")) throw new MemoryEditRefused(`${op.op} ${op.slug}: line and body are text.`);
-		ops.push({ op: op.op, slug: op.slug, kind, line, body: text });
+		if ((kind !== undefined && !MEMORY_KINDS.includes(kind as MemoryKind)) || !isText(line) || !isText(text)) return null;
+		ops.push({ op: op.op, slug: op.slug, kind: kind as MemoryKind | undefined, line, body: text });
 	}
 	return { root: body.root, ops };
 }
 
 /**
- * Applies the page's edit `body` to its repository's memory all or nothing, recorded as source `#dashboard`, and returns
- * the view after it; throws {@link MemoryEditRefused} for a `root` not among `roots` or ops the memory refuses.
+ * Applies `edit` to its repository's memory all or nothing, recorded as source `#dashboard`, and returns the view after
+ * it; throws {@link MemoryEditRefused} for a `root` not among `roots` or ops the memory refuses.
  */
-export function editProjectMemory(roots: readonly string[], body: unknown, today = localDay()): ProjectMemoryView {
-	const { root, ops } = parseEdit(body);
+export function editProjectMemory(roots: readonly string[], { root, ops }: ProjectMemoryEdit, today = localDay()): ProjectMemoryView {
 	const place = roots.includes(root) ? placeOf(root) : null;
 	if (!place) throw new MemoryEditRefused(`${root} is not one of the workspace repositories.`);
 	const parsed = parseOps(ops);
 	if (!parsed.ok) throw new MemoryEditRefused(parsed.reasons.join(" "));
-	const plan = applyMemoryOps(place.root.commonDir, DASHBOARD_SOURCE, parsed.ops, today);
+	const plan = applyMemoryOps(place.root.commonDir, DASHBOARD_SESSION, parsed.ops, today);
 	if (!plan.ok) throw new MemoryEditRefused(plan.reasons.join(" "));
 	return projectMemoryView(roots);
 }

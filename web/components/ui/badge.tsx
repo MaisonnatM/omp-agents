@@ -96,7 +96,6 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
         : "default";
     const colorValue = color in badgeColors ? badgeColors[color as BadgeColor] : color;
     const isSolid = variant === "solid";
-    const dotSize = size === "compact" ? 6 : 7;
 
     const colorStyle = isSolid
       ? color === "gray"
@@ -107,8 +106,6 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
           }
       : {};
 
-    const dotColor = color === "gray" ? "var(--muted-foreground)" : colorValue;
-
     return (
       <span
         ref={ref}
@@ -116,16 +113,7 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
         style={{ ...colorStyle, ...style }}
         {...props}
       >
-        {!isSolid && (
-          <span
-            className="shrink-0 rounded-full"
-            style={{
-              width: dotSize,
-              height: dotSize,
-              backgroundColor: dotColor,
-            }}
-          />
-        )}
+        {!isSolid && <BadgeDot color={color} size={size} />}
         {/* text-box needs a block container — the badge root is a flex
             container, so the label gets its own span. Height is fixed (h-*),
             so trimming only recenters the letterforms. */}
@@ -137,5 +125,12 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
 
 Badge.displayName = "Badge";
 
-export { Badge, badgeVariants, badgeColors };
+/** The `dot` variant's colored dot alone, for a legend or a filter beside the badges it stands for. */
+function BadgeDot({ color = "gray", size = "default" }: { color?: BadgeColor | (string & {}); size?: BadgeSizeCanonical }) {
+  const dotSize = size === "compact" ? 6 : 7;
+  const backgroundColor = color === "gray" ? "var(--muted-foreground)" : color in badgeColors ? badgeColors[color as BadgeColor] : color;
+  return <span aria-hidden className="shrink-0 rounded-full" style={{ width: dotSize, height: dotSize, backgroundColor }} />;
+}
+
+export { Badge, BadgeDot, badgeVariants, badgeColors };
 export type { BadgeProps, BadgeColor, BadgeSize };

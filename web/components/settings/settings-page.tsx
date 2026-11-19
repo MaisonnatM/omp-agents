@@ -1,4 +1,3 @@
-import { IconFolderOpen } from "central-icons";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { OmpSettings } from "../../../src/shared/models";
 import type { TrustedProject } from "../../../src/shared/project-trust";
@@ -7,7 +6,6 @@ import { isPhonePage } from "../../api";
 import type { ReadState } from "../../reads";
 import { ompSettingsFiles } from "../../omp-settings";
 import { hashForSettings, SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
-import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
 import { ActivityTab } from "./activity-tab";
@@ -33,42 +31,7 @@ import { Workflows } from "./workflows-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
 import { WhatsNewTab } from "../whats-new";
-
-const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find((workspace) => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
-
-/** The sidebar's workspace picker again, for the sections it scopes: all workspaces read your user files only. */
-function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; workspaces: Workspace[]; onPick: (cwd: string | null) => void }) {
-	const label = cwd === null ? "All workspaces" : workspaceLabel(cwd, workspaces);
-	const pick = (next: string | null) => (): void => {
-		if (next !== cwd) onPick(next);
-	};
-	return (
-		<CommandPicker
-			trigger={<span className="max-w-64 truncate">{label}</span>}
-			icon={IconFolderOpen}
-			ariaLabel={`Workspace: ${label}`}
-			search={{ label: "Search workspaces" }}
-			width="lg"
-			list={{
-				kind: "ready",
-				groups: [
-					{ key: "all", items: [{ value: "All workspaces", label: "All workspaces", selected: cwd === null, onSelect: pick(null) }] },
-					{
-						key: "workspaces",
-						heading: "Workspaces",
-						items: workspaces.map((workspace) => ({
-							value: workspace.cwd,
-							label: <span className="truncate">{workspace.cwdDisplay}</span>,
-							selected: workspace.cwd === cwd,
-							onSelect: pick(workspace.cwd),
-						})),
-					},
-				],
-			}}
-			empty="No workspace matches."
-		/>
-	);
-}
+import { WorkspacePicker, workspaceLabel } from "../workspace-picker";
 
 const PANEL = "space-y-10 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background";
 

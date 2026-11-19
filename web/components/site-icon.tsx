@@ -11,6 +11,15 @@ export function addressParts(url: string): { hostname: string; scheme: string; h
 	return { hostname: parsed.hostname, scheme: parsed.protocol === "https:" ? "" : `${parsed.protocol}//`, host: parsed.host.replace(/^www\./, ""), rest };
 }
 
+/** `url`'s host, `null` for an address the page cannot read. */
+export function hostOf(url: string): string | null {
+	try {
+		return addressParts(url).hostname;
+	} catch {
+		return null;
+	}
+}
+
 /**
  * The site's icon, fetched by the server, or `fallback`, a globe by default, when the server finds none or `hostname` is `null`,
  * for a host the server must not learn; `className` sizes the icon.

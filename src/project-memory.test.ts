@@ -3,7 +3,8 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { editProjectMemory, MemoryEditRefused, projectMemoryView } from "./project-memory";
+import type { RawOp } from "../templates/omp/agent/extensions/project-memory/contract";
+import { editProjectMemory, MemoryEditRefused, parseEdit, projectMemoryView } from "./project-memory";
 
 const dirs: string[] = [];
 function repo(name: string): string {
@@ -16,7 +17,7 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(join(dir, ".."), { recursive: true, force: true });
 });
 
-const add = (slug: string, line: string) => ({ op: "add", slug, kind: "fact", line, body: "Detail." });
+const add = (slug: string, line: string): RawOp => ({ op: "add", slug, kind: "fact", line, body: "Detail." });
 
 describe("project memory", () => {
 	test("lists the repositories with memories first, then by name, each newest first", () => {
@@ -51,6 +52,14 @@ describe("project memory", () => {
 		const root = repo("app");
 		expect(() => editProjectMemory([root], { root, ops: [{ op: "delete", slug: "missing" }, { op: "add", slug: "Bad Slug" }] })).toThrow(MemoryEditRefused);
 		expect(() => editProjectMemory([root], { root, ops: [{ op: "update", slug: "missing", line: "x" }] })).toThrow("update missing: no memory has this slug; use add.");
-		expect(() => editProjectMemory([root], { root, ops: "nope" })).toThrow("Expected { root, ops }.");
+	});
+
+	test("reads an edit only when its fields have the edit's types", () => {
+		const ops = [{ op: "update", slug: "a-fact", kind: "lesson", line: "A line" }];
+		expect(parseEdit({ root: "/repo", ops })).toEqual({ root: "/repo", ops: [{ op: "update", slug: "a-fact", kind: "lesson", line: "A line", body: undefined }] });
+		expect(parseEdit({ root: "/repo", ops: "nope" })).toBeNull();
+		expect(parseEdit({ root: "/repo", ops: [{ op: "move", slug: "a-fact" }] })).toBeNull();
+		expect(parseEdit({ root: "/repo", ops: [{ op: "add", slug: "a-fact", kind: "rumor" }] })).toBeNull();
+		expect(parseEdit({ root: "/repo", ops: [{ op: "add", slug: "a-fact", line: 3 }] })).toBeNull();
 	});
 });

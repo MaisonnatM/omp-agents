@@ -14,12 +14,13 @@ export type MemoryControlId =
 	| "memory.project.add"
 	| "memory.project.save"
 	| "memory.project.delete"
-	| "memory.bookmarks.source"
 	| "memory.bookmarks.folder"
 	| "memory.bookmarks.open"
 	| "memory.bookmarks.sync";
 
-export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, never, MemoryControlId> = {
+type MemoryShortcutId = "memoryProjectNext" | "memoryProjectPrevious" | "memoryBookmarksNext" | "memoryBookmarksPrevious" | "memoryBookmarksClose";
+
+export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, MemoryShortcutId, MemoryControlId> = {
 	id: "memory",
 	tab: { label: "Memory", icon: IconBrain, place: 70 },
 	about: "What omp and your projects remember, and your Zen and x.com bookmarks, which agents can search.",
@@ -47,7 +48,41 @@ export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, never, MemoryControl
 	shortcuts: {
 		category: "Memory",
 		goTo: { label: "Go to your memory and bookmarks", command: "Go to memory", keys: [] },
-		rows: [],
+		rows: [
+			{
+				id: "memoryProjectNext",
+				label: "Project memory: focus the next memory, or open it while a memory is open",
+				keys: [
+					{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+					{ chord: { key: "j" }, scope: "outside-fields" },
+				],
+			},
+			{
+				id: "memoryProjectPrevious",
+				label: "Project memory: focus the previous memory, or open it while a memory is open",
+				keys: [
+					{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+					{ chord: { key: "k" }, scope: "outside-fields" },
+				],
+			},
+			{
+				id: "memoryBookmarksNext",
+				label: "Bookmarks: focus the next bookmark, or open it while a bookmark is open",
+				keys: [
+					{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+					{ chord: { key: "j" }, scope: "outside-fields" },
+				],
+			},
+			{
+				id: "memoryBookmarksPrevious",
+				label: "Bookmarks: focus the previous bookmark, or open it while a bookmark is open",
+				keys: [
+					{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+					{ chord: { key: "k" }, scope: "outside-fields" },
+				],
+			},
+			{ id: "memoryBookmarksClose", label: "Bookmarks: close the open bookmark", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+		],
 	},
 	controls: [
 		{ id: "memory.tab.omp", label: "Memory omp memory tab", area: "Memory" },
@@ -58,8 +93,7 @@ export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, never, MemoryControl
 		{ id: "memory.project.add", label: "Project memory New memory button", area: "Memory" },
 		{ id: "memory.project.save", label: "Project memory Save button", area: "Memory" },
 		{ id: "memory.project.delete", label: "Project memory Delete button", area: "Memory" },
-		{ id: "memory.bookmarks.source", label: "Bookmarks All, Zen, and x.com tabs", area: "Memory" },
-		{ id: "memory.bookmarks.folder", label: "Bookmarks folder tree row", area: "Memory" },
+		{ id: "memory.bookmarks.folder", label: "Bookmarks folder tree row and folder picker", area: "Memory" },
 		{ id: "memory.bookmarks.open", label: "Bookmark reader Open link", area: "Memory" },
 		{ id: "memory.bookmarks.sync", label: "Bookmarks Sync x.com button", area: "Memory" },
 	],

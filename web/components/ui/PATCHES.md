@@ -110,6 +110,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   `headerActions` is a prop, in place of the registry's detection of action children by type, and `SidebarGroupLabel` takes an `icon`.
 - `ui/scroll-area.tsx`: a `viewportRef` prop, which `SidebarContent` in `ui/sidebar.tsx` passes on.
 - `ui/badge.tsx`: `color` takes any CSS color beside a palette name, such as a GitHub label's.
+  `BadgeDot` exports the `dot` variant's dot alone, which the Project memory tab's kind filter draws beside each kind.
 - `lib/shape-context.tsx`: the rounded shape's `button` is `rounded-sm`, where the registry's is `rounded-lg`.
 - `ui/message-scroller.tsx`: the scroll button's default `variant` is `tertiary`, where the registry's is `secondary`.
 - `ui/tooltip.tsx`: `disabled` anchors hover to a non-focusable wrapper around a disabled child, `wrapperClassName` styles that wrapper, and the trigger ignores a focus that `isReturnedFocus` in `web/use-return-focus.ts` reports.

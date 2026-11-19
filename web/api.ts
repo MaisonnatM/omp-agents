@@ -140,20 +140,18 @@ export async function putJson<T>(url: string, body: unknown, signal?: AbortSigna
 	);
 }
 
-/** A `POST`, which counts as the user's action, keyed by its route. */
-export async function postJson<T>(url: string, body: unknown): Promise<T> {
-	record("action", `post ${url.split("?", 1)[0]}`);
-	return readJson<T>(await apiFetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
-}
-
 export const PROJECT_MEMORY_URL = "/api/project-memory";
 export const BOOKMARKS_URL = "/api/bookmarks";
 
 /** Applies `edit` to its repository's project memory, all or nothing, and answers every repository's. */
 export const editProjectMemory = (edit: ProjectMemoryEdit): Promise<ProjectMemoryView> => putJson(PROJECT_MEMORY_URL, edit);
 
-/** Reads the x.com bookmarks again through Zen's sign-in, and answers every bookmark. */
-export const syncXBookmarks = (): Promise<BookmarksView> => postJson(`${BOOKMARKS_URL}/x-sync`, {});
+/** Reads the x.com bookmarks again through Zen's sign-in, and answers every bookmark; counts as the user's action. */
+export async function syncXBookmarks(): Promise<BookmarksView> {
+	const url = `${BOOKMARKS_URL}/x-sync`;
+	record("action", `post ${url}`);
+	return readJson(await apiFetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
+}
 
 /**
  * A `PUT` to a route that streams its steps, as the server's `answerSteps` does: calls `onStep` with each as it arrives,
