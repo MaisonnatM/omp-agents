@@ -18,10 +18,10 @@
 - The repository picker lists every workspace's git repository with how many memories it holds.
   The page opens on the repository that holds the sidebar's workspace, and `#memory/project?repo=<path>` opens another.
 - **Search** narrows the table to memories whose slug, line, or body holds every word you type.
-- Click a row, or move to it with the up and down arrows or `j` and `k` and press Enter, to open the memory in a drawer over the table.
+- Click a row, or move to it with the up and down arrows or `j` and `k` and press Enter, to open the memory beside the table, as Bookmarks opens a bookmark; drag the line between them to size the table.
   Change its kind, line, or body, and click **Save**, or press Enter in the line or ⌘ Enter in the body.
-  The arrows at the drawer's top, or the same keys, open the previous and next row, and **×**, Escape, or a click beside the drawer closes it.
-- Closing the drawer or opening another memory keeps what you typed: the row says **Unsaved**, and opening it again brings your change back.
+  The arrows at the panel's top, or the same keys, open the previous and next row, and **×** or Escape closes it.
+- Closing the panel or opening another memory keeps what you typed: the row says **Unsaved**, and opening it again brings your change back.
   **Revert** drops it.
 - **New memory** asks for a slug, a kind, a line, and a body, and **Add memory** records it.
 - **Delete**, clicked twice, removes the open memory.
