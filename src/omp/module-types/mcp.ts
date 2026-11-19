@@ -41,11 +41,18 @@ export interface McpToolDefinition {
 export interface McpConnection {
 	name: string;
 }
+/** Subset of omp's `MCPToolCallResult` (src/mcp/types.ts): the parts the tool answered, text among them, and whether it failed. */
+export interface McpToolCallResult {
+	content: { type: string; text?: unknown }[];
+	isError?: boolean;
+}
 export interface McpClientModule {
 	/** Connects and initializes `config` as omp's sessions do, over its HTTP, SSE, or stdio transport. */
 	connectToServer(name: string, config: McpServerConfig, options?: { signal?: AbortSignal }): Promise<McpConnection>;
 	/** Every tool the connected server offers, following its cursor. */
 	listTools(connection: McpConnection, options?: { signal?: AbortSignal }): Promise<McpToolDefinition[]>;
+	/** `tools/call` of `toolName` with `args` on the connected server. */
+	callTool(connection: McpConnection, toolName: string, args: Record<string, unknown>, options?: { signal?: AbortSignal }): Promise<McpToolCallResult>;
 	disconnectServer(connection: McpConnection): Promise<void>;
 }
 export interface McpCredentialsModule {

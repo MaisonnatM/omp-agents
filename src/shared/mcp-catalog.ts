@@ -52,6 +52,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
 	{ id: "amplitude", label: "Amplitude", description: "Charts, events, and user analytics.", url: "https://mcp.amplitude.com/mcp", transport: "http", auth: "oauth", category: "Observability" },
 	{ id: "notion", label: "Notion", description: "Search, read, and edit pages and databases.", url: "https://mcp.notion.com/mcp", transport: "http", auth: "oauth", category: "Productivity" },
 	{ id: "atlassian", label: "Atlassian", description: "Jira issues and Confluence pages.", url: "https://mcp.atlassian.com/v1/mcp", transport: "http", auth: "oauth", category: "Productivity" },
+	{ id: "linear", label: "Linear", description: "Issues, projects, and comments in your Linear workspace.", url: "https://mcp.linear.app/mcp", transport: "http", auth: "oauth", category: "Productivity" },
 	{ id: "monday", label: "monday.com", description: "Boards, items, and updates.", url: "https://mcp.monday.com/mcp", transport: "http", auth: "oauth", category: "Productivity" },
 	{ id: "clickup", label: "ClickUp", description: "Tasks, lists, and docs.", url: "https://mcp.clickup.com/mcp", transport: "http", auth: "oauth", category: "Productivity" },
 	{ id: "granola", label: "Granola", description: "Your meeting notes and transcripts.", url: "https://mcp.granola.ai/mcp", transport: "http", auth: "oauth", category: "Productivity" },

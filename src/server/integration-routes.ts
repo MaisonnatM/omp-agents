@@ -1,4 +1,5 @@
 import type { Integrations } from "../integrations";
+import { readLinearIssue } from "../linear";
 import {
 	addMcpServerFrom,
 	loadMcpServers,
@@ -10,6 +11,7 @@ import {
 } from "../mcp-servers";
 import { ClientConfigError } from "../mcp-clients";
 import type { IntegrationTarget, McpIntegration } from "../shared/accounts";
+import { linearIssueId } from "../shared/linear";
 import { answer, checked, fail } from "./http";
 import { parseIntegrationTarget, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseSlackClient } from "./wire";
 import type { Handler, RouteKit, Routes } from "./route-kit";
@@ -59,6 +61,12 @@ export function integrationRoutes({ get, write }: RouteKit, integrations: Integr
 		return {};
 	});
 
+	/** `GET /api/linear/issue?id=`: the Linear issue `id` names, an id such as `ENG-123` or its link, read through omp's Linear MCP server. */
+	const linearIssue = get((params) => {
+		const id = linearIssueId(params.get("id") ?? "");
+		return id === null ? fail(400, "Expected ?id= naming a Linear issue, such as ENG-123") : answer(() => readLinearIssue(id));
+	});
+
 	return {
 		"/api/integrations": { GET: loaded },
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
@@ -70,5 +78,6 @@ export function integrationRoutes({ get, write }: RouteKit, integrations: Integr
 		"/api/mcp-servers/enabled": { PUT: mcpServerEnabled },
 		"/api/mcp-servers/remove": { PUT: mcpServerRemove },
 		"/api/integrations/slack/client": { PUT: slackClient },
+		"/api/linear/issue": { GET: linearIssue },
 	};
 }

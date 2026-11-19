@@ -1,5 +1,5 @@
-/** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, and once it has any its artifacts. */
-import { IconAiBotHead, IconBranch, IconBulletList, IconPlusSmall, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
+/** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, its artifacts once it has any, and a Linear issue. */
+import { IconAiBotHead, IconBranch, IconBulletList, IconLinear, IconPlusSmall, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
@@ -22,6 +22,7 @@ import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 import { StatusDot } from "./status-dot";
 import { agentLink, type SubagentLinksValue, useSubagentLinks } from "./subagent-links";
 import { SessionDiffsTab } from "./session-diffs-tab";
+import { SessionLinearTab, useLinkedIssues } from "./session-linear-tab";
 
 /** The right sidebar's open tabs, kept across views; the key keeps its old name, and a single tab name stored before tabs could close opens that tab. */
 export const TAB_KEY = "omp-agents.plan-tab";
@@ -43,10 +44,12 @@ export interface SessionWork {
 	sessionId: string | null;
 	/** The artifacts the view's session saved, most recently saved first. */
 	artifacts: Artifact[];
+	/** The ids of the Linear issues the view's prompts and replies link to, in the order they first appear. */
+	linearIssues: string[];
 }
 
-/** The **PRs** tab, the **Browser** tab for a live session in the desktop app, and the **Artifacts** tab once the session saved any. */
-export function sessionWorkTabs({ scope, working, pullRequests, hosts, live, view, sessionId, artifacts }: SessionWork): DetailsTab<"diffs" | "pull-requests" | "browser" | "artifacts">[] {
+/** The **PRs** tab, the **Browser** tab for a live session in the desktop app, the **Artifacts** tab once the session saved any, and the **Linear** tab. */
+export function sessionWorkTabs({ scope, working, pullRequests, hosts, live, view, sessionId, artifacts, linearIssues }: SessionWork): DetailsTab<"diffs" | "pull-requests" | "browser" | "artifacts" | "linear">[] {
 	return [
 		...(sessionId !== null
 			? [
@@ -98,6 +101,15 @@ export function sessionWorkTabs({ scope, working, pullRequests, hosts, live, vie
 					} as const,
 				]
 			: []),
+		{
+			value: "linear",
+			icon: IconLinear,
+			name: "Linear",
+			control: "session-details.tab.linear",
+			count: linearIssues.length,
+			scrollsItself: true,
+			content: <SessionLinearTab key={scope} linked={linearIssues} />,
+		},
 	];
 }
 
@@ -168,7 +180,7 @@ function SubagentConversation({ view, host, lastHost, models, workspaces }: Suba
 	return <ViewConversation view={view} focused={false} host={host} lastHost={lastHost} session={null} models={models} workspaces={workspaces} header={false} />;
 }
 
-interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts" | "pullRequests"> {
+interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "artifacts" | "pullRequests" | "linearIssues"> {
 	/** The session's directory, which relative file paths in pull requests resolve against. */
 	cwd: string | null;
 	/** The live view's roster row, whose subagents the **Overview** tab lists; `null` for a past or ended one. */
@@ -190,6 +202,7 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(each => each.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const artifacts = useArtifacts(view);
 	const [picked, setPicked] = useState<LiveView | null>(null);
+	const linearIssues = useLinkedIssues(view);
 	const opened = useSubagentLinks(view, host);
 	// A plain click on a subagent shows it in the **Subagent** tab; a split or a new window still opens it as a pane.
 	const links = useMemo<SubagentLinksValue | null>(
@@ -230,7 +243,7 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 					} as const,
 				]
 			: []),
-		...sessionWorkTabs({ scope, working, pullRequests, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts }),
+		...sessionWorkTabs({ scope, working, pullRequests, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts, linearIssues }),
 	];
 	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} menuSections={query => sessionMenuSections(links, query)} />;
 }

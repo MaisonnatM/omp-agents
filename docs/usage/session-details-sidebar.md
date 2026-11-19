@@ -1,10 +1,10 @@
 # Session details sidebar
 
-- The right sidebar shows the focused view's subagents and what its agents changed, its session's pull requests and artifacts, including the pull requests of its subagents, and in the desktop app the app a live session runs.
+- The right sidebar shows the focused view's subagents and what its agents changed, its session's pull requests and artifacts, including the pull requests of its subagents, a Linear issue, and in the desktop app the app a live session runs.
   It follows a live session, one of its subagents, or a past session.
   It hides for a pull request's details, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
 - It works as Capy's side panel: its header shows the tabs you opened, and **+** after them lists every tab the view can show, the one on screen checked, with its item count.
-  The tabs are **Overview**, the subagent you opened from it, **Diffs**, which a subagent's view leaves out, **PRs**, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, and **Artifacts**, which shows only once the agent saved an artifact.
+  The tabs are **Overview**, the subagent you opened from it, **Diffs**, which a subagent's view leaves out, **PRs**, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, **Artifacts**, which shows only once the agent saved an artifact, and **Linear**.
   Pick one in the **+** menu to open it as a tab, or to show it when it is already open; **Overview** is always open.
   The menu opens on a **Search** field: typing keeps only the tabs, subagents, and **New terminal** whose name holds the text, Enter opens the first matching tab, and the arrow keys move down to the rows.
   Below the tabs, the menu lists a running session's subagents, each opening in the sidebar as **Overview**'s rows do, then **New terminal**, which opens the [terminal](terminal.md) panel on a new shell; a paired phone leaves **New terminal** out.
@@ -32,4 +32,8 @@
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - **Browser** shows the app the session runs and adds an element you pick in it to the session's composer; see [Browser](browser.md).
 - **Artifacts** shows the pages, documents, and drawings the agent saved for you to look at, each version kept; see [Artifacts](artifacts.md).
+- **Linear** shows a Linear issue: its id, which opens it in Linear, its status, when it last changed, its title, priority, assignee, project, and labels, then its description.
+  It opens on the first issue the conversation links to, as `https://linear.app/<workspace>/issue/ENG-123`, and its count is the number of issues linked; with more than one, a chip per issue picks another.
+  Type an id such as `ENG-123`, or paste an issue's link, in the field at the top and press Enter to show any other issue.
+  The server reads the issue through the Linear MCP server omp uses, with omp's sign-in to it, so the tab needs Linear in [MCP servers](mcp-servers.md) and says so when omp has none.
 - A tab with nothing to show says so.

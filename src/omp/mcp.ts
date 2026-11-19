@@ -4,7 +4,7 @@
  * sign-in, and handing that sign-in to `signedFetch` for the APIs of the service behind a server.
  */
 import { createCache } from "../cache";
-import { isObject } from "../json";
+import { isObject, str } from "../json";
 import { runChecked } from "../proc";
 import { ApiError, type Bearer } from "../signed-fetch";
 import { ompCommand } from "./install";
@@ -225,41 +225,73 @@ function invalidateMcpSignIn(credentialId: string): void {
 }
 
 /**
+ * `run`'s answer over a connection to `server` through omp's client, with its configured transport and headers, and
+ * omp's token when `signedIn`. A 401 forgets the sign-in and throws `unauthorized()`; another refused status throws an {@link ApiError}.
+ */
+async function overConnection<T>(
+	server: McpServer,
+	signedIn: boolean,
+	unauthorized: () => Error,
+	run: (connection: McpConnection, signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+	const { name, config, credentialId } = server;
+	const expanded = discoveryHelpers.expandEnvVarsDeep(config);
+	const headers = { ...expanded.headers, ...(signedIn ? { Authorization: `Bearer ${await tokenOf(credentialId)}` } : {}) };
+	const signal = AbortSignal.timeout(TIMEOUT_MS);
+	let connection: McpConnection | undefined;
+	try {
+		connection = await mcpClient.connectToServer(name, { ...expanded, headers }, { signal });
+		return await run(connection, signal);
+	} catch (err) {
+		// omp's HTTP transport throws `MCPTransportError`, `failure: "http_status"` with the status as `code`, on a refused
+		// request; its legacy SSE transport throws a plain `HTTP 401: <body>` error.
+		const status = isObject(err) && err.failure === "http_status" ? err.code : err instanceof Error && err.message.startsWith("HTTP 401:") ? 401 : null;
+		if (status === 401) {
+			invalidateMcpSignIn(credentialId);
+			throw unauthorized();
+		}
+		if (typeof status === "number") throw new ApiError(`The "${name}" MCP server answered HTTP ${status}`, status);
+		throw err;
+	} finally {
+		if (connection) await mcpClient.disconnectServer(connection).catch(() => {});
+	}
+}
+
+/**
  * Every tool `server` offers through omp's client, with its configured transport and headers.
  * `signedIn` adds omp's token; unsigned discovery still works for public or header-authenticated servers.
  * Equivalent probes share a minute-old list; `fresh` bypasses it and failures are not kept.
  * Throws {@link McpUnauthorized} on discovery 401, not the service API's {@link McpRefused}.
  */
 export const listMcpTools = (server: McpServer, signedIn: boolean, fresh: boolean): Promise<McpToolDefinition[]> => {
-	const { name, config, credentialId } = server;
-	const expanded = discoveryHelpers.expandEnvVarsDeep(config);
-	const key = JSON.stringify([name, credentialId, signedIn, expanded]);
+	const key = JSON.stringify([server.name, server.credentialId, signedIn, discoveryHelpers.expandEnvVarsDeep(server.config)]);
 	return toolLists.get(
 		key,
-		async () => {
-			const headers = { ...expanded.headers, ...(signedIn ? { Authorization: `Bearer ${await tokenOf(credentialId)}` } : {}) };
-			const signal = AbortSignal.timeout(TIMEOUT_MS);
-			let connection: McpConnection | undefined;
-			try {
-				connection = await mcpClient.connectToServer(name, { ...expanded, headers }, { signal });
-				return await mcpClient.listTools(connection, { signal });
-			} catch (err) {
-				// omp's HTTP transport throws `MCPTransportError`, `failure: "http_status"` with the status as `code`, on a refused
-				// request; its legacy SSE transport throws a plain `HTTP 401: <body>` error.
-				const status = isObject(err) && err.failure === "http_status" ? err.code : err instanceof Error && err.message.startsWith("HTTP 401:") ? 401 : null;
-				if (status === 401) {
-					invalidateMcpSignIn(credentialId);
-					throw new McpUnauthorized(`${name} answered 401 Unauthorized`);
-				}
-				if (typeof status === "number") throw new ApiError(`The "${name}" MCP server answered HTTP ${status}`, status);
-				throw err;
-			} finally {
-				if (connection) await mcpClient.disconnectServer(connection).catch(() => {});
-			}
-		},
+		() => overConnection(server, signedIn, () => new McpUnauthorized(`${server.name} answered 401 Unauthorized`), (connection, signal) => mcpClient.listTools(connection, { signal })),
 		fresh,
 	);
 };
+
+/** A failed tool call's text is the server's error, sometimes as JSON with a `message`. */
+function toolError(text: string): string {
+	try {
+		const parsed: unknown = JSON.parse(text);
+		const message = isObject(parsed) ? str(parsed.message) : undefined;
+		if (message) return message;
+	} catch {}
+	return text;
+}
+
+/**
+ * The text `tool` answers for `args` on `server`, called with omp's sign-in; the server's own message thrown when the call fails.
+ * Throws {@link McpRefused} when the server refuses the sign-in.
+ */
+export async function callMcpTool(server: McpServer, tool: string, args: Record<string, unknown>): Promise<string> {
+	const result = await overConnection(server, true, () => refused(server), (connection, signal) => mcpClient.callTool(connection, tool, args, { signal }));
+	const text = result.content.map(part => (part.type === "text" ? str(part.text) : undefined)).find(part => part !== undefined) ?? "";
+	if (result.isError === true) throw new Error(toolError(text) || `The "${server.name}" MCP server's ${tool} failed`);
+	return text;
+}
 
 /** omp's user-level MCP config path. Slack's app settings live in that file, not in a second store. */
 export const userMcpConfigPath = (): string => dirs.getMCPConfigPath("user");
