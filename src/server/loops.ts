@@ -21,7 +21,7 @@ const ACTIVITY_CHECK_MS = 2 * 60_000;
 const PULL_MS = 5 * 60_000;
 /** Each dashboard check fetches the branch the server runs from. */
 const DASHBOARD_CHECK_MS = 5 * 60_000;
-/** Each process sample runs `ps` once and asks every daemon broker for its services. */
+/** Each process sample runs `ps` once and asks omp's daemon for its services. */
 const PROCESS_SAMPLE_MS = 15_000;
 
 export interface LoopHandlers {

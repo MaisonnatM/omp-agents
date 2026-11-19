@@ -5,9 +5,9 @@ import { isObject, type Parsed } from "../json";
 export interface SessionProcess {
 	/** Opaque, stable while it runs; the stop request names it. */
 	id: string;
-	/** `job`: a process group under the session's omp. `service`: a daemon omp's project broker runs for it. */
+	/** `job`: a process group under the session's omp. `service`: a unit omp's daemon runs for it in its project. */
 	kind: "job" | "service";
-	/** A broker daemon no session owns, such as omp's shared browser, which every live session of the project uses. */
+	/** A service no session owns, such as omp's shared browser, which every live session of the project uses. */
 	shared: boolean;
 	/** What to show: a job's top process's command line, a service's daemon name plus command. */
 	label: string;

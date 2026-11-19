@@ -1,11 +1,11 @@
 /**
- * What each live session runs besides omp: its jobs, the process groups under its omp, and its services, the daemons
- * omp's project broker runs for it. The watch lists them, stops one on request, stops the ones every session they serve
+ * What each live session runs besides omp: its jobs, the process groups under its omp, and its services, the `proc` units
+ * omp's daemon runs in its project. The watch lists them, stops one on request, stops the ones every session they serve
  * left idle for the setting's minutes, stops what a session that left the roster leaves behind, and ends a session left
  * idle for the setting's hours. Every stop of a session's processes goes through it; `docs/architecture/session-processes.md`
  * says what counts and why.
  */
-import type { DaemonReport, DaemonScope } from "../omp/module-types/processes";
+import type { UnitSnapshot } from "../omp/module-types/processes";
 import { run } from "../proc";
 import { cwdsArgv, cwdsIn, descendants, LISTENERS_ARGV, listeningPortsIn, parseCwds, parseListeners, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
 import { SerialLane } from "../serial-lane";
@@ -22,7 +22,7 @@ export const LIST_REUSE_MS = 2_000;
 /** A live session, as the roster has it. */
 export interface WatchedSession {
 	instanceId: string;
-	/** omp's session id, which a daemon names as its owner. */
+	/** omp's session id, which a service names as its owner. */
 	sessionId: string;
 	/** omp's pid. */
 	pid: number;
@@ -43,12 +43,12 @@ export interface SessionProcessWatchDeps {
 	readCwds(pids: readonly number[]): Promise<Map<number, string>>;
 	/** What app `dir` holds, the same for each checkout of it, such as `front/` of one repository; `null` outside git. */
 	appOf(dir: string): Promise<string | null>;
-	/** The daemons every broker scope runs now, without the ones that ended or that no live broker supervises. */
-	readDaemons(): Promise<DaemonReport[]>;
-	/** The project directory a broker scope names for `cwd`. */
+	/** The services omp's daemon runs now, without the ones that ended or that it does not supervise. */
+	readServices(): Promise<UnitSnapshot[]>;
+	/** The project directory a project scope names for `cwd`. */
 	projectDir(cwd: string): Promise<string>;
-	/** Stops generation `id` of daemon `name`. */
-	stopService(scope: DaemonScope, name: string, id: string): Promise<void>;
+	/** Stops `unit`'s generation it is listed with. */
+	stopService(unit: UnitSnapshot): Promise<void>;
 	/** Stops each process that still runs under the start time it is listed with. */
 	stopProcesses(processes: Processes): Promise<void>;
 	sessions(): WatchedSession[];
@@ -62,7 +62,7 @@ export interface SessionProcessWatchDeps {
 	settings(): ProcessSettings;
 }
 
-type Target = { kind: "job"; members: Processes } | { kind: "service"; scope: DaemonScope; name: string; daemonId: string };
+type Target = { kind: "job"; members: Processes } | { kind: "service"; unit: UnitSnapshot };
 
 /** A listed process, with what stops it and the sessions whose idleness lets the idle stop end it. */
 interface Item extends SessionProcess {
@@ -145,9 +145,9 @@ export class SessionProcessWatch {
 
 	async #sample(): Promise<Sample> {
 		const sessions = this.#deps.sessions();
-		const [table, reports, projectDirs, listeners] = await Promise.all([
+		const [table, services, projectDirs, listeners] = await Promise.all([
 			this.#deps.readTable(),
-			this.#deps.readDaemons(),
+			this.#deps.readServices(),
 			Promise.all(sessions.map(session => this.#deps.projectDir(session.cwd))),
 			this.#deps.readPorts(),
 		]);
@@ -189,37 +189,36 @@ export class SessionProcessWatch {
 		}
 
 		const orphans: Target[] = [];
-		for (const { scope, daemons } of reports) {
-			for (const { snapshot, command } of daemons) {
-				const owned = snapshot.owner;
-				const serves =
-					owned !== undefined
-						? sessions.filter(session => this.#seen.get(session.instanceId)?.owners.has(owned))
-						: scope.kind === "project"
-							? sessions.filter((_, index) => projectDirs[index] === scope.projectDir)
-							: [];
-				const target: Target = { kind: "service", scope, name: snapshot.name, daemonId: snapshot.id };
-				if (serves.length === 0) {
-					if (owned !== undefined && left.some(seen => seen.owners.has(owned))) orphans.push(target);
-					continue;
-				}
-				const tree = snapshot.pid === undefined ? [] : [snapshot.pid, ...descendants(table, snapshot.pid).keys()].flatMap(pid => table.get(pid) ?? []);
-				const item: Item = {
-					id: JSON.stringify(["service", scope.runtimeDir, snapshot.name, snapshot.id]),
-					kind: "service",
-					shared: owned === undefined,
-					label: command ? `${snapshot.name}: ${command}` : snapshot.name,
-					memoryBytes: memoryOf(tree),
-					cpuPercent: cpuOf(tree),
-					processCount: tree.length,
-					ports: portsOf(tree),
-					startedAt: snapshot.startedAt,
-					stopsAt: null,
-					target,
-					serves,
-				};
-				for (const session of serves) found.get(session.instanceId)?.items.push(item);
+		for (const unit of services) {
+			const { owner: owned, scope } = unit;
+			const serves =
+				owned !== undefined
+					? sessions.filter(session => this.#seen.get(session.instanceId)?.owners.has(owned))
+					: scope.kind === "project"
+						? sessions.filter((_, index) => projectDirs[index] === scope.dir)
+						: [];
+			const target: Target = { kind: "service", unit };
+			if (serves.length === 0) {
+				if (owned !== undefined && left.some(seen => seen.owners.has(owned))) orphans.push(target);
+				continue;
 			}
+			const main = unit.pids[0];
+			const tree = main === undefined ? [] : [main, ...descendants(table, main).keys()].flatMap(pid => table.get(pid) ?? []);
+			const item: Item = {
+				id: JSON.stringify(["service", unit.id, unit.generation]),
+				kind: "service",
+				shared: owned === undefined,
+				label: unit.command ? `${unit.key}: ${unit.command}` : unit.key,
+				memoryBytes: memoryOf(tree),
+				cpuPercent: cpuOf(tree),
+				processCount: tree.length,
+				ports: portsOf(tree),
+				startedAt: unit.startedAt,
+				stopsAt: null,
+				target,
+				serves,
+			};
+			for (const session of serves) found.get(session.instanceId)?.items.push(item);
 		}
 
 		const due = new Map<string, Target>();
@@ -283,7 +282,7 @@ export class SessionProcessWatch {
 	}
 
 	#stopTarget(target: Target): Promise<void> {
-		return target.kind === "job" ? this.#deps.stopProcesses(new Map(target.members)) : this.#deps.stopService(target.scope, target.name, target.daemonId);
+		return target.kind === "job" ? this.#deps.stopProcesses(new Map(target.members)) : this.#deps.stopService(target.unit);
 	}
 }
 

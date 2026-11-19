@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { DaemonReport } from "../omp/module-types/processes";
+import type { UnitSnapshot } from "../omp/module-types/processes";
 import { parsePs } from "../process-census";
 import { LIST_REUSE_MS, SessionProcessWatch, type WatchedSession } from "./session-processes";
 
@@ -15,22 +15,22 @@ const BROWSER = "  300     1   300   2048   6.5 Fri Oct  3 09:00:00 2026     chr
 const PS = [OMP_A, MCP_A, DEV, VITE, OMP_B, BROWSER];
 
 const DEV_ID = JSON.stringify(["job", 110, "Fri Oct 3 09:00:00 2026"]);
-const BROWSER_ID = JSON.stringify(["service", "/run/repo", "browser", "g1"]);
-const API_ID = JSON.stringify(["service", "/run/repo", "api", "g2"]);
+const BROWSER_ID = JSON.stringify(["service", "u1", "g1"]);
+const API_ID = JSON.stringify(["service", "u2", "g2"]);
 
-const SCOPE = { kind: "project", runtimeDir: "/run/repo", projectDir: "/repo" } as const;
-const BROWSER_DAEMON = { snapshot: { name: "browser", id: "g1", state: "running", pid: 300, startedAt: T0 }, supervised: true } as const;
-const API_DAEMON = { snapshot: { name: "api", id: "g2", state: "running", startedAt: T0, owner: "sa" }, command: "bun api.ts", supervised: true } as const;
+const SCOPE = { kind: "project", dir: "/repo" } as const;
+const BROWSER_UNIT: UnitSnapshot = { id: "u1", kind: "proc", scope: SCOPE, key: "browser", generation: "g1", state: "running", pids: [300], startedAt: T0, supervised: true };
+const API_UNIT: UnitSnapshot = { id: "u2", kind: "proc", scope: SCOPE, key: "api", generation: "g2", state: "running", pids: [], startedAt: T0, owner: "sa", command: "bun api.ts", supervised: true };
 
 const A: WatchedSession = { instanceId: "a", sessionId: "sa", pid: 100, cwd: "/repo", status: "idle", awaitsSubagents: false, stopsWhenIdle: true };
 const B: WatchedSession = { instanceId: "b", sessionId: "sb", pid: 200, cwd: "/repo/wt", status: "working", awaitsSubagents: false, stopsWhenIdle: true };
 
-/** A watch over a computer whose processes, daemons, sessions, and clock the test sets; a stop takes what it stopped off the computer. */
-function computer(daemons: DaemonReport["daemons"] = [BROWSER_DAEMON, API_DAEMON]) {
+/** A watch over a computer whose processes, services, sessions, and clock the test sets; a stop takes what it stopped off the computer. */
+function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
 	const state = {
 		now: T0,
 		ps: PS,
-		reports: [{ scope: SCOPE, daemons: [...daemons] }] as DaemonReport[],
+		services: [...services],
 		sessions: [A, B],
 		owner: true,
 		minutes: 30 as number | null,
@@ -61,11 +61,11 @@ function computer(daemons: DaemonReport["daemons"] = [BROWSER_DAEMON, API_DAEMON
 		readPorts: async () => state.listeners,
 		readCwds: async pids => new Map([...state.cwds].filter(([pid]) => pids.includes(pid))),
 		appOf: async dir => (dir === "/repo" ? "/repo/.git\n" : dir.startsWith("/repo/") ? `/repo/.git\n${dir.split("/").at(-1)}/` : null),
-		readDaemons: async () => state.reports,
+		readServices: async () => state.services,
 		projectDir: async cwd => (cwd.startsWith("/repo") ? "/repo" : cwd),
-		stopService: async (_scope, name, id) => {
-			stopped.push(`service ${name} ${id}`);
-			for (const report of state.reports) report.daemons = report.daemons.filter(daemon => daemon.snapshot.id !== id);
+		stopService: async unit => {
+			stopped.push(`service ${unit.key} ${unit.generation}`);
+			state.services = state.services.filter(each => each.id !== unit.id);
 		},
 		stopProcesses: async processes => {
 			stopped.push(`job ${[...processes.keys()].join(",")}`);
@@ -145,7 +145,7 @@ describe("SessionProcessWatch", () => {
 	});
 
 	test("a shared service stops only once every session of its project has been idle the setting's minutes", async () => {
-		const { state, stopped, tickAt } = computer([BROWSER_DAEMON]);
+		const { state, stopped, tickAt } = computer([BROWSER_UNIT]);
 		await tickAt(0);
 		await tickAt(20);
 		state.sessions = [A, { ...B, status: "idle" }];

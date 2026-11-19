@@ -18,7 +18,7 @@ The dashboard cannot change a session's in-process UI context; omp-agents keeps 
 
 ## Options considered
 
-- A runtime patch, `patches/omp-18.20.0-rpc-ask-form.patch`, adding `formDialog` to RPC mode's UI context when the host enabled `set_ask_dialog`: it maps each named form field to one question of the existing `ask` frame, checks the answers with the form's own rules, and asks again only for the fields that fail, with the reason. Chosen.
+- A runtime patch, now `patches/omp-19.0.0-rpc-ask-form.patch`, adding `formDialog` to RPC mode's UI context when the host enabled `set_ask_dialog`: it maps each named form field to one question of the existing `ask` frame, checks the answers with the form's own rules, and asks again only for the fields that fail, with the reason. Chosen.
 - Rebuild the form in the dashboard from the field-by-field frames: the server would have to hold `select` and `input` frames back, guess which belong to one `ask` call, and answer them in omp's order, reimplementing omp's fallback protocol where [omp modules](../architecture/omp-modules.md) says the server imports omp rather than reimplementing it.
 - Accept one card per field: no code to carry, but every multi-question `ask` loses its Back button and its single send, and multi-select rows arrive as repeated selects.
 

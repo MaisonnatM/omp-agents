@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-19
 
+- The dashboard now works with omp 19.0.0: the process list and Start dev server use omp's new background service manager, and old task sandboxes still get cleaned up.
+- Behind the scenes: the five omp patches are ported to omp 19.0.0; the tool-contracts patch got smaller because omp now does part of it.
 - A dashboard that an omp session starts, such as an agent's test run on another port, no longer runs your routines or messages your Bots; only the dashboard you opened does, so two dashboards stop fighting over the same Bot conversation.
 
 ## 2026-11-18

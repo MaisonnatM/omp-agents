@@ -4,7 +4,7 @@ A desktop app for every [omp](https://omp.sh) session and subagent on your machi
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Bun](https://img.shields.io/badge/bun-%E2%89%A51.4.4-black?logo=bun)](https://bun.sh)
-[![omp](https://img.shields.io/badge/omp-tested%2018.20.0-informational)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
+[![omp](https://img.shields.io/badge/omp-tested%2019.0.0-informational)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
 
 omp-agents lists the sessions that run in your terminals and the ones it starts itself, streams each conversation as it happens, and lets you message, steer, interrupt, resume, or fork any of them from one window.
 It reads omp's own session files and speaks omp's own protocols through omp's installed modules, so it stays in step with the omp version you run.
@@ -43,7 +43,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   Ending a session removes the git worktree it worked in, and keeps its branch and any worktree with uncommitted changes.
   An agent can end its own session through the starter kit's `end_session` tool, so "Merge on main, then end the session" needs no follow-up.
 - **Session processes.**
-  A live session's dev servers, watchers, and omp broker services, biggest memory first, each with a Stop button; the server stops them once their sessions have been idle for 30 minutes, or a time you pick, and when their session ends.
+  A live session's dev servers, watchers, and omp background services, biggest memory first, each with a Stop button; the server stops them once their sessions have been idle for 30 minutes, or a time you pick, and when their session ends.
 - **Pull requests.**
   A list of your GitHub pull requests, sorted by whose move it is and linked to the sessions that submitted or worked on them.
 - **Slack.**
@@ -69,7 +69,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - [Bun](https://bun.sh) 1.4.4 or later.
   Tested with Bun 1.4.4.
 - omp installed with Bun and on your `PATH`, signed in to at least one model provider with `/login`.
-  Tested with omp 18.20.0.
+  Tested with omp 19.0.0.
 
   ```sh
   bun install -g @oh-my-pi/pi-coding-agent
