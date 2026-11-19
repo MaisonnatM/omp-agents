@@ -73,11 +73,13 @@ function world() {
 
 function session(id: string, cwd: string, options: { kind?: "main" | "sub"; mode?: string; branch?: Entry[] } = {}) {
 	let hook: Hook | undefined;
+	let toolCall: ((event: { toolName: string }, ctx: Ctx) => { block: boolean; reason: string } | undefined) | undefined;
 	let tool: Tool | undefined;
 	projectMemory({
 		zod,
-		on(name: string, handler: Hook) {
+		on(name: string, handler: never) {
 			if (name === "before_agent_start") hook = handler;
+			if (name === "tool_call") toolCall = handler;
 		},
 		registerTool(registered: Tool) {
 			tool = registered;
@@ -94,6 +96,7 @@ function session(id: string, cwd: string, options: { kind?: "main" | "sub"; mode
 			branch.push({ type: "message", message: { role: "user", content: prompt } });
 			return message?.content ?? null;
 		},
+		end: () => toolCall?.({ toolName: "end_session" }, ctx)?.block ?? false,
 		async call(params: { repo?: string; read?: string; ops?: RawOp[] }): Promise<{ text: string; isError: boolean }> {
 			const result = await tool?.execute("call", params, undefined, undefined, ctx);
 			return { text: result?.content.map(part => part.text).join("") ?? "", isError: result?.isError ?? false };
@@ -381,6 +384,16 @@ describe("project_memory tool", () => {
 		expect(await me.call({})).toEqual({ text: `a [fact] — A. (updated ${today})\nb [lesson] — B. (updated ${today})`, isError: false });
 		expect(await me.call({ read: "a" })).toEqual({ text: `a [fact] — A. (updated ${today}, source #bbbbbbbb-mine)\n\nThe body of a.`, isError: false });
 		expect(await me.call({ read: "nope" })).toEqual({ text: "No memory has the slug nope; project_memory with no arguments lists them.", isError: true });
+	});
+
+	test("turns back the first end_session of a session that wrote no memory, and none after a write", async () => {
+		const { dir } = world();
+		const idle = session("cccccccc-idle", dir);
+		expect([idle.end(), idle.end()]).toEqual([true, false]);
+		const writer = session("dddddddd-writer", dir);
+		await writer.call({ ops: [add("w", "fact", "W.")] });
+		expect(writer.end()).toBe(false);
+		expect(session("eeeeeeee-outside", scratch).end()).toBe(false);
 	});
 
 	test("refuses a bad batch with every reason, ops from a subagent, read with ops, and a cwd outside git", async () => {
