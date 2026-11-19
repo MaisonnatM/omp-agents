@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, showDetailsTab } from "./details-tabs";
+import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, openDetailsTab, showDetailsTab } from "./details-tabs";
 
 describe("decodeDetailsTabs", () => {
 	test("a tab name stored before tabs could close opens that tab", () => {
@@ -24,6 +24,18 @@ describe("showDetailsTab", () => {
 
 	test("shows the first tab without adding it to the open tabs", () => {
 		expect(showDetailsTab({ open: ["pull-requests"], active: "pull-requests" }, "overview", "overview")).toEqual({ open: ["pull-requests"], active: null });
+	});
+});
+
+describe("openDetailsTab", () => {
+	test("opens a tab as the last one behind the tab on screen", () => {
+		expect(openDetailsTab({ open: ["pull-requests"], active: "pull-requests" }, "linear")).toEqual({ open: ["pull-requests", "linear"], active: "pull-requests" });
+		expect(openDetailsTab({ open: [], active: null }, "linear")).toEqual({ open: ["linear"], active: null });
+	});
+
+	test("leaves an open tab where it is", () => {
+		const tabs = { open: ["linear", "artifacts"], active: "artifacts" };
+		expect(openDetailsTab(tabs, "linear")).toEqual(tabs);
 	});
 });
 

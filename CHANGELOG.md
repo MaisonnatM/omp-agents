@@ -10,6 +10,7 @@ The dashboard shows the same lines in Settings › What's new.
 - Behind the scenes: the five omp patches are ported to omp 19.0.0; the tool-contracts patch got smaller because omp now does part of it.
 - A question that lets you pick several options now shows a checkbox on each option that ticks as you click it, and, when asked one step at a time, a Done selecting button instead of numbered rows with Done among them.
 - The session's right sidebar has a Linear tab, which shows the Linear issue the conversation links to, with its status, priority, assignee, and description, or any other issue whose id or link you type, read through the Linear server in Settings › MCP servers.
+- The session's right sidebar has a Linear tab, which opens by itself when the conversation links a Linear issue and shows that issue with its status, priority, assignee, and description, or any other issue whose id or link you type, read through the Linear server in Settings › MCP servers.
 - Settings › MCP servers offers Linear in its catalog, and every installed server now shows a logo: Linear's and Marked's marks, and the site's own icon for other servers.
 - A dashboard that an omp session starts, such as an agent's test run on another port, no longer runs your routines or messages your Bots; only the dashboard you opened does, so two dashboards stop fighting over the same Bot conversation.
 

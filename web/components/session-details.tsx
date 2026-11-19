@@ -1,6 +1,6 @@
 /** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, its artifacts once it has any, and a Linear issue. */
 import { IconAiBotHead, IconBranch, IconBulletList, IconLinear, IconPlusSmall, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -8,7 +8,7 @@ import { MenuGroup, MenuGroupLabel, MenuItem, MenuLinkItem, MenuSeparator } from
 import { activityControl } from "../activity";
 import { isPhonePage } from "../api";
 import type { Artifact } from "../artifacts-model";
-import { revealDetailsTab } from "../details-tabs";
+import { openStoredDetailsTab, revealDetailsTab } from "../details-tabs";
 import { useArtifacts, useShowConversation } from "../pane-store";
 import type { ModelList } from "../reads";
 import { requestNewTerminal } from "../terminal-requests";
@@ -197,12 +197,26 @@ interface SessionDetailsProps extends Omit<SessionWork, "scope" | "live" | "arti
 
 const SUBAGENT_TAB = "subagent";
 
+/**
+ * Opens the **Linear** tab behind the tab on screen once the session `scope` links more Linear issues than it did, as when its
+ * conversation loads or a reply links a new one; a closed tab stays closed until the session links another.
+ */
+function useOpenLinearOnLink(scope: string, count: number): void {
+	const seen = useRef({ scope, count: 0 });
+	useEffect(() => {
+		const before = seen.current.scope === scope ? seen.current.count : 0;
+		seen.current = { scope, count };
+		if (count > before) openStoredDetailsTab(TAB_KEY, "linear");
+	}, [scope, count]);
+}
+
 /** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, and its artifacts when it has any. */
 export function SessionDetails({ view, sessionId, working, cwd, hosts, host, lastHost, row, models, workspaces }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(each => each.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const artifacts = useArtifacts(view);
 	const [picked, setPicked] = useState<LiveView | null>(null);
 	const linearIssues = useLinkedIssues(view);
+	useOpenLinearOnLink(scope, linearIssues.length);
 	const opened = useSubagentLinks(view, host);
 	// A plain click on a subagent shows it in the **Subagent** tab; a split or a new window still opens it as a pane.
 	const links = useMemo<SubagentLinksValue | null>(

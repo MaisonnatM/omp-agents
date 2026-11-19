@@ -34,6 +34,11 @@ export function showDetailsTab({ open }: DetailsTabs, value: string, first: stri
 	return { open: open.includes(value) ? open : [...open, value], active: value };
 }
 
+/** Opens `value` as the last tab when it is not open yet, leaving the tab on screen as it was. */
+export function openDetailsTab(tabs: DetailsTabs, value: string): DetailsTabs {
+	return tabs.open.includes(value) ? tabs : { open: [...tabs.open, value], active: tabs.active };
+}
+
 /** Closes `value`; closing the tab on screen shows the one before it among those `shown`, the first tab at the least. */
 export function closeDetailsTab({ open, active }: DetailsTabs, value: string, shown: readonly string[]): DetailsTabs {
 	const rest = open.filter(each => each !== value);
@@ -45,4 +50,9 @@ export function closeDetailsTab({ open, active }: DetailsTabs, value: string, sh
 /** Shows `value` in the sidebar stored under `key`, whose first tab is `first`, as a reply's Review visuals does with the Browser. */
 export function revealDetailsTab(key: string, value: string, first: string): void {
 	updateStored(key, decodeDetailsTabs, encodeDetailsTabs, tabs => showDetailsTab(tabs, value, first));
+}
+
+/** Opens `value` behind the tab on screen in the sidebar stored under `key`, as a session that links a Linear issue does with the Linear tab. */
+export function openStoredDetailsTab(key: string, value: string): void {
+	updateStored(key, decodeDetailsTabs, encodeDetailsTabs, tabs => openDetailsTab(tabs, value));
 }
