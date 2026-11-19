@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-20
 
+- Memory: the omp memory tab is gone from the Memory page, which now opens on Project memory; omp memory stays in Settings › omp memory.
+- Project memory: the Memory page now opens on **All projects**, every repository's memories in one table with the project each belongs to; the repository picker still narrows it to one.
 - Sessions: ↑ and ↓ no longer switch to another session while a dialog, such as the image viewer, is open.
 - Terminal panel: a shell that ends now gives its terminal back to your Mac right away, so a long-running dashboard no longer runs out of terminals for new shells.
 - Behind the scenes: the slowest tests now get room to finish when your Mac is busy, so landing a change no longer fails on them by chance.
