@@ -58,7 +58,7 @@ Files, in `agent/`:
 - `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear and interface reviews, proof boxes, PR descriptions, and PR screenshots.
   These references load on demand rather than in every session's context.
 - `scripts/heavy.py`: `python3 ~/.omp/agent/scripts/heavy.py <command>` runs a heavy command, such as a build, a test suite, or a Playwright run, once one of the slots every session on the computer shares is free, so parallel sessions cannot pile builds onto the machine until tools time out.
-  There are `OMP_HEAVY_SLOTS` slots, by default a quarter of the CPU cores and at least one; each is an `flock` on a file in `/tmp/omp-heavy-<uid>`, or `OMP_HEAVY_DIR`, which the system releases when the holder ends, however it ends.
+  There are `OMP_HEAVY_SLOTS` slots, by default a third of the CPU cores and at least one; each is an `flock` on a file in `/tmp/omp-heavy-<uid>`, or `OMP_HEAVY_DIR`, which the system releases when the holder ends, however it ends.
   A waiting command prints once that it is queued and what holds each slot, and again when it starts; one argument runs through `/bin/sh -c`, for `&&` and pipes, and a heavy command started inside another runs at once in its parent's slot.
 - `APPEND_SYSTEM.md`: short final replies that open with the answer in bold and add only the Needs you, Not verified, and Done lines that have content, ending on up to three suggested next prompts, design variants named once and quoted by that name on every surface, a UI change handed off on a running dev server with checked screenshots, questions asked through the ask tool with the recommended option first, how Cursor models call omp's `ask`, `bash`, `grep`, and skills, and a code-quality review before any pull request, which a repository limits to the files its `.omp/review-paths` globs match.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that checks the diff against the `CODING_STANDARDS.md` at the root of the checkout it reviews, then runs the thermo-nuclear code quality review on the `plan` role's model.
@@ -92,6 +92,10 @@ Files, in `agent/`:
   A five-minute cache write costs 1.25 times the input price and an hour-long one twice that, and a conversation tail is read again within seconds, so this cuts the write bill without losing the warm head after a pause.
   It also stops cache warming while the session is idle.
   Set `OMP_CACHE_TAIL_TTL=1h` to turn it off.
+- `extensions/agent-pace.ts`: ends every tool-results message sent to Claude with the seconds since the prompt and Anthropic's nudge to request every independent tool call in one response.
+  Opus made one tool call in 82% of its tool turns, and Anthropic's prompting guides for Fable 5.1 and Opus 5.5 name this nudge and an elapsed-time line as the fixes.
+  Each message keeps the text it first got, so the cached conversation prefix does not change.
+  Set `OMP_AGENT_PACE=0` to turn it off.
 - `extensions/land.ts`, with `extensions/land/`: the `land` tool lands a committed branch on `main` in a repository that commits `.omp/land.json`, the way [Ultimate](https://github.com/HazAT/ultimate)'s lander does, with no model in the loop.
   It merges the branch's tip into a fresh temporary worktree of `origin/main` with a merge commit whose message carries the agent's divergence note, runs the setup and checks the file lists on that merged result, and pushes the merge commit, never forced.
   `land.json` holds `target` (default `main`), `remote` (default `origin`), `setup`, commands run in the worktree after the merge so a branch's new dependencies get installed, and `checks`, each a command or a list of commands that run at the same time; checks get `LAND_BASE` and `LAND_TIP`, the target and branch commits.
