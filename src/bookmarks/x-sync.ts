@@ -4,7 +4,7 @@
  */
 import { decodeEntities } from "../html-text";
 import { isObject, parseJson } from "../json";
-import type { XBookmark } from "../shared/memory-page";
+import type { XBookmark, XMedia } from "../shared/memory-page";
 import type { XCookies } from "./zen";
 
 /** The bearer token x.com's own web page sends, the same for every visitor. */
@@ -98,6 +98,32 @@ async function discoverQuery(fetch: Fetch, cookies: XCookies): Promise<Bookmarks
 
 const pick = (value: unknown, ...keys: string[]): unknown => keys.reduce<unknown>((at, key) => (isObject(at) ? at[key] : undefined), value);
 const text = (value: unknown): string | null => (typeof value === "string" ? value : null);
+const count = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? value : 0);
+
+/** One media item of a post, with a video's MP4 of the highest bitrate, or `null` for a kind the page does not show. */
+function mediaOf(item: unknown): XMedia | null {
+	const type = pick(item, "type");
+	const kind = type === "photo" ? "photo" : type === "video" ? "video" : type === "animated_gif" ? "gif" : null;
+	const url = text(pick(item, "media_url_https"));
+	if (!kind || !url) return null;
+	const variants = pick(item, "video_info", "variants");
+	const mp4s = (Array.isArray(variants) ? variants : []).filter(variant => pick(variant, "content_type") === "video/mp4" && text(pick(variant, "url")));
+	const best = mp4s.reduce<unknown>((top, variant) => (top === undefined || count(pick(variant, "bitrate")) > count(pick(top, "bitrate")) ? variant : top), undefined);
+	return {
+		kind,
+		url,
+		width: count(pick(item, "original_info", "width")) || count(pick(item, "sizes", "large", "w")),
+		height: count(pick(item, "original_info", "height")) || count(pick(item, "sizes", "large", "h")),
+		video: kind === "photo" ? null : text(pick(best, "url")),
+		alt: text(pick(item, "ext_alt_text")),
+	};
+}
+
+/** `full` without the `t.co` link X ends a post with to point at its media. */
+function withoutMediaLink(full: string, items: readonly unknown[]): string {
+	const links = new Set(items.map(item => text(pick(item, "url"))));
+	return full.replace(/\s*(https:\/\/t\.co\/\w+)\s*$/, (link, url: string) => (links.has(url) ? "" : link));
+}
 
 /** One timeline entry's post as a bookmark, with the character references X escapes in its author's name and text decoded, or `null` for a cursor, a removed post, or one X sent without its author. */
 function postOf(entry: unknown): XBookmark | null {
@@ -108,15 +134,20 @@ function postOf(entry: unknown): XBookmark | null {
 	const handle = text(pick(user, "core", "screen_name")) ?? text(pick(user, "legacy", "screen_name"));
 	if (!id || !handle) return null;
 	const posted = Date.parse(text(pick(result, "legacy", "created_at")) ?? "");
+	const extended = pick(result, "legacy", "extended_entities", "media");
+	const plain = pick(result, "legacy", "entities", "media");
+	const items: unknown[] = Array.isArray(extended) ? extended : Array.isArray(plain) ? plain : [];
+	const full = text(pick(result, "note_tweet", "note_tweet_results", "result", "text")) ?? text(pick(result, "legacy", "full_text")) ?? "";
 	return {
 		source: "x",
 		id: `x:${id}`,
 		url: `https://x.com/${handle}/status/${id}`,
 		name: decodeEntities(text(pick(user, "core", "name")) ?? text(pick(user, "legacy", "name")) ?? handle),
 		handle: `@${handle}`,
-		text: decodeEntities(text(pick(result, "note_tweet", "note_tweet_results", "result", "text")) ?? text(pick(result, "legacy", "full_text")) ?? ""),
+		text: decodeEntities(withoutMediaLink(full, items)),
 		lang: text(pick(result, "legacy", "lang")),
 		translation: null,
+		media: items.flatMap(item => mediaOf(item) ?? []),
 		addedAt: new Date(Number.isNaN(posted) ? 0 : posted).toISOString(),
 	};
 }

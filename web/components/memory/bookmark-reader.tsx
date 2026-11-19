@@ -1,4 +1,4 @@
-/** The open bookmark in the Bookmarks tab's reader: a post's whole text with its links, or a page's address and date, and a link that opens it in your browser. */
+/** The open bookmark in the Bookmarks tab's reader: a post's whole text with its links and its media, or a page's address and date, and a link that opens it in your browser. */
 import { IconCalendar1, IconGlobe, IconSquareArrowTopRight, IconTranslate } from "central-icons";
 import { Fragment, useState } from "react";
 import type { XBookmark, ZenBookmark } from "../../../src/shared/memory-page";
@@ -8,6 +8,7 @@ import { activityControl } from "../../activity";
 import { LINK } from "../settings/editor";
 import { MetaRow } from "../sheet-details";
 import { hostOf, SiteAddress, SiteIcon } from "../site-icon";
+import { PostMedia } from "./bookmark-media";
 
 const FULL_DATE = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
@@ -69,19 +70,22 @@ export function PostReader({ post }: { post: XBookmark }) {
 					<span className="block truncate text-sm text-muted-foreground">{post.handle}</span>
 				</span>
 			</header>
-			<div className="space-y-2">
-				{shown && <PostText text={shown} className="text-[15px] leading-relaxed" />}
-				{post.translation !== null && (
-					<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-						<IconTranslate aria-hidden className="size-3.5" />
-						{original ? `Original in ${languageName(post.lang ?? "")}` : `Translated from ${languageName(post.lang ?? "")}`}
-						<span aria-hidden>·</span>
-						<button type="button" aria-pressed={original} onClick={() => setOriginal(!original)} className={cn(LINK, "rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring")}>
-							{original ? "Show translation" : "Show original"}
-						</button>
-					</p>
-				)}
-			</div>
+			{shown && (
+				<div className="space-y-2">
+					<PostText text={shown} className="text-[15px] leading-relaxed" />
+					{post.translation !== null && (
+						<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+							<IconTranslate aria-hidden className="size-3.5" />
+							{original ? `Original in ${languageName(post.lang ?? "")}` : `Translated from ${languageName(post.lang ?? "")}`}
+							<span aria-hidden>·</span>
+							<button type="button" aria-pressed={original} onClick={() => setOriginal(!original)} className={cn(LINK, "rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring")}>
+								{original ? "Show translation" : "Show original"}
+							</button>
+						</p>
+					)}
+				</div>
+			)}
+			<PostMedia media={post.media} />
 			<p className="text-xs text-muted-foreground">Posted {fullDate(post.addedAt)}</p>
 			<OpenLink url={post.url} label="Open on x.com" />
 		</article>

@@ -44,7 +44,12 @@ X renames its GraphQL queries with each release, so each sync finds the `Bookmar
 It reads `https://x.com/home`, whose chunk maps name each code chunk and its hash; `bookmarkChunks` in `src/bookmarks/x-sync.ts` builds the URL of each chunk whose name holds `Bookmarks`, and `bookmarksQueryIn` finds `queryId:"…",operationName:"Bookmarks"` there with its `featureSwitches` and `fieldToggles`.
 Each feature takes the value the page's own feature configuration gives it, and `false` when the page gives none.
 `fetchXBookmarks` then reads 100 posts a page, following the bottom cursor until a page adds no new post or `MAX_X_BOOKMARKS` (2000) are read.
-`xBookmarksPage` maps each post to an `XBookmark`: its URL `https://x.com/<handle>/status/<id>`, its author's name, its text, the long text of a long post, `@handle`, and `lang`, the language X detected.
+`xBookmarksPage` maps each post to an `XBookmark`: its URL `https://x.com/<handle>/status/<id>`, its author's name, its text, the long text of a long post, `@handle`, `lang`, the language X detected, and `media`.
+`media` holds the post's photos, videos, and GIFs from `legacy.extended_entities.media`, or `legacy.entities.media` when X sent no extended list: each one's image or poster on `pbs.twimg.com`, its size, its alt text, and a video's or GIF's MP4 of the highest bitrate on `video.twimg.com`.
+The text drops the `t.co` link X ends it with when that link is a media item's `url`.
+The page loads the images straight from X, so its Content Security Policy in `web/index.html` allows `https://pbs.twimg.com` in `img-src`.
+X refuses `video.twimg.com` to a player whose page sends another site as `Referer`, and a `<video>` cannot drop it, so the player loads each MP4 through `GET /api/bookmarks/x-video?url=<MP4>`, in `src/bookmarks/x-video.ts`, which relays the player's `Range` to `video.twimg.com` only and answers X's bytes and range headers.
+It takes the media key as `?key=` like the other media routes, and `media-src` stays `'self'`.
 X does not say when a post was bookmarked, so `addedAt` is when it was posted, and the posts keep X's order, newest bookmark first, before the merge sorts them by that time.
 
 `translatePosts` in `src/bookmarks/translate.ts` then gives each post in another language its English as `translation`.
@@ -54,7 +59,7 @@ So the text of each post not yet translated leaves the machine for Google at a s
 A translation Google refuses, answers in another shape, or answers as the text was, as for a post X took for another language, stays `null` and never fails the sync; the next sync asks again.
 
 `src/bookmarks/store.ts` keeps the last sync that succeeded, its time and its posts, as `synced`, and why the last one failed as `lastError`, in `bookmarks-x.json` in the data directory, written atomically.
-A file in an older shape, or with a post missing a field, reads as never synced; a post kept before translations reads with `lang` and `translation` `null`.
+A file in an older shape, or with a post missing a field, reads as never synced; a post kept before translations or media reads with `lang` and `translation` `null` and `media` empty until the next sync.
 A failed sync keeps the posts of the last one that succeeded and records why in plain words: Zen holds no x.com sign-in, X refused the request, X limits how often bookmarks are read, X did not answer, or X changed its page.
 The cookies are never logged or kept.
 `XSyncState.signedIn` says whether Zen holds both cookies now.

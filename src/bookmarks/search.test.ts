@@ -3,8 +3,8 @@ import type { Bookmark } from "../shared/memory-page";
 import { bookmarkLine, searchBookmarks } from "./search";
 
 const list: Bookmark[] = [
-	{ source: "x", id: "x:1", url: "https://x.com/a/status/1", name: "A", handle: "@a", text: "A Figma plugin for tokens", lang: "en", translation: null, addedAt: "2026-01-01T00:00:00.000Z" },
-	{ source: "x", id: "x:2", url: "https://x.com/b/status/2", name: "B", handle: "@b", text: "Nouvelles de Bun", lang: "fr", translation: "Bun news", addedAt: "2025-01-01T00:00:00.000Z" },
+	{ source: "x", id: "x:1", url: "https://x.com/a/status/1", name: "A", handle: "@a", text: "A Figma plugin for tokens", lang: "en", translation: null, media: [], addedAt: "2026-01-01T00:00:00.000Z" },
+	{ source: "x", id: "x:2", url: "https://x.com/b/status/2", name: "B", handle: "@b", text: "Nouvelles de Bun", lang: "fr", translation: "Bun news", media: [], addedAt: "2025-01-01T00:00:00.000Z" },
 	{ source: "zen", id: "zen:a", url: "https://figma.com", title: "Figma", folder: ["Toolbar", "Design"], addedAt: "2024-01-01T00:00:00.000Z" },
 ];
 

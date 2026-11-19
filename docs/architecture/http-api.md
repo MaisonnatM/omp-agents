@@ -113,7 +113,7 @@ Each record is its file name, title, `status`, `date`, `decision-makers`, `super
 **Sport thumbnails** reads `GET /api/sport/thumb?id=<11-character YouTube id>` and answers the video's `hqdefault.jpg` from `i.ytimg.com`, which `src/server/sport-thumbs.ts` fetches once and keeps as `<id>.jpg` in `sportThumbsDir`, `<data dir>/sport-thumbs`, so the page's `img-src` stays `'self'`.
 It answers a JSON 400 for any other id, 404 when YouTube has no thumbnail, and 502 when YouTube does not answer; as an image route, it also takes the media key as `?key=`.
 
-**Memory page** reads `GET /api/project-memory`, each workspace repository's project memory, and changes one with `PUT /api/project-memory`, a 400 with every reason the memory gave when it refuses; `GET /api/bookmarks` answers the Zen and x.com bookmarks, and `POST /api/bookmarks/x-sync` reads the x.com bookmarks again first.
+**Memory page** reads `GET /api/project-memory`, each workspace repository's project memory, and changes one with `PUT /api/project-memory`, a 400 with every reason the memory gave when it refuses; `GET /api/bookmarks` answers the Zen and x.com bookmarks, `POST /api/bookmarks/x-sync` reads the x.com bookmarks again first, and `GET /api/bookmarks/x-video?url=<MP4>` relays a post's video from `video.twimg.com`, with the media key as `?key=`.
 See [Memory page](memory-page.md).
 
 Every response from these endpoints but that image is JSON.

@@ -1,6 +1,7 @@
 /** The Memory module's server half: every workspace repository's project memory, the bookmarks, and the `bookmarks` tool's extension. See docs/architecture/memory-page.md. */
 import { join } from "node:path";
 import { Bookmarks } from "./bookmarks/service";
+import { readXVideo } from "./bookmarks/x-video";
 import { zenDir, zenProfileDir } from "./bookmarks/zen";
 import type { ModuleCore, ServerModule } from "./modules";
 import { BOOKMARKS_FLAGS } from "./omp/bookmarks-extension";
@@ -16,10 +17,11 @@ const X_FILE = join(dataDir, "bookmarks-x.json");
 /** The omp extension every session loads, which gives it the `bookmarks` tool. */
 const BOOKMARKS_EXTENSION = { source: join(import.meta.dir, "omp", "bookmarks-extension.ts"), bundle: "bookmarks-extension.js" };
 
-/** `GET` and `PUT /api/project-memory`, and `GET /api/bookmarks` and `POST /api/bookmarks/x-sync`. */
-export function memoryRoutes({ get, write }: RouteKit, core: ModuleCore): Routes {
+/** `GET` and `PUT /api/project-memory`, and `GET /api/bookmarks`, `POST /api/bookmarks/x-sync`, and `GET /api/bookmarks/x-video`. */
+export function memoryRoutes({ get, media, write }: RouteKit, core: ModuleCore): Routes {
 	const roots = () => repositoriesOf(core.workspaces());
-	const bookmarks = new Bookmarks({ profileDir: () => zenProfileDir(zenDir(HOME)), xFile: X_FILE, fetch: (url, init) => fetch(url, init) });
+	const xFetch = (url: string, init?: RequestInit) => fetch(url, init);
+	const bookmarks = new Bookmarks({ profileDir: () => zenProfileDir(zenDir(HOME)), xFile: X_FILE, fetch: xFetch });
 	return {
 		"/api/project-memory": {
 			GET: get(async () => Response.json(projectMemoryView(await roots()))),
@@ -31,6 +33,7 @@ export function memoryRoutes({ get, write }: RouteKit, core: ModuleCore): Routes
 		},
 		"/api/bookmarks": { GET: get(async () => Response.json(bookmarks.view())) },
 		"/api/bookmarks/x-sync": { POST: write(() => null, () => bookmarks.syncX()) },
+		"/api/bookmarks/x-video": { GET: media((params, req) => readXVideo(xFetch, params.get("url"), req.headers.get("range"))) },
 	};
 }
 

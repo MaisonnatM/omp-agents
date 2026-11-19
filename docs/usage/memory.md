@@ -39,6 +39,8 @@
 - Click a bookmark, or move to it with the up and down arrows or `j` and `k` and press Enter, to read it on the right: a post's whole text with its links, or a page's address and date.
   The arrows at the reader's top, or the same keys, open the previous and next bookmark, and **×** or Escape closes it.
   **Open on x.com** or **Open page** opens it in your browser.
+- A post's photos, videos, and GIFs show under its text in the reader, and the list shows a small preview of the first one.
+  Click a photo to open it full size in a new tab; they load straight from X's servers.
 - A post in another language shows in English, in the list and in the reader, which says which language it was translated from; **Show original** shows the post as written.
   Each sync sends the text of the posts not yet translated to Google Translate, so that text leaves your machine for Google.
 - **Search** keeps the bookmarks whose title, address, folder, author, post, or a post's English holds every word you type, and `#memory/bookmarks?q=<words>` opens a search.

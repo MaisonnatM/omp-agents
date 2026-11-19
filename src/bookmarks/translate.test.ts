@@ -17,6 +17,7 @@ const post = (id: string, lang: string | null, text: string, translation: string
 	text,
 	lang,
 	translation,
+	media: [],
 	addedAt: "2026-11-19T00:00:00.000Z",
 });
 
@@ -62,7 +63,7 @@ test("a translation Google refuses stays empty, and the sync still keeps the pos
 		return Response.json({ data: { bookmark_timeline_v2: { timeline: { instructions: [{ entries: [french] }] } } } });
 	};
 	const store = new Bookmarks({ profileDir: () => null, xFile, fetch });
-	expect(store.view().bookmarks).toMatchObject([{ id: "x:9", lang: null, translation: null }]);
+	expect(store.view().bookmarks).toMatchObject([{ id: "x:9", lang: null, translation: null, media: [] }]);
 	const view = await new Bookmarks({ profileDir: () => profile, xFile, fetch }).syncX();
 	expect(view.x.error).toBeNull();
 	expect(view.bookmarks.filter(({ source }) => source === "x")).toMatchObject([{ id: "x:777", text: "Bonjour", lang: "fr", translation: null }]);

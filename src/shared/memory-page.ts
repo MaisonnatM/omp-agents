@@ -70,8 +70,23 @@ export interface XBookmark {
 	lang: string | null;
 	/** Its text in English, when it is in another language and the sync could translate it. */
 	translation: string | null;
+	/** Its photos, videos, and GIFs, in the post's order. */
+	media: XMedia[];
 	/** ISO time it was posted, since X does not say when you bookmarked it. */
 	addedAt: string;
+}
+
+/** A photo, video, or GIF in an x.com post, served by X. */
+export interface XMedia {
+	kind: "photo" | "video" | "gif";
+	/** The photo, or a video's or GIF's poster, on `pbs.twimg.com`. */
+	url: string;
+	width: number;
+	height: number;
+	/** A video's or GIF's MP4 of the highest bitrate, on `video.twimg.com`; `null` for a photo, or when X sent none. */
+	video: string | null;
+	/** The description its author wrote for screen readers. */
+	alt: string | null;
 }
 
 export type Bookmark = ZenBookmark | XBookmark;

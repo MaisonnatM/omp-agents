@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { dayLabel } from "../../labels";
 import { CountPill } from "../count-pill";
 import { hostOf, SiteIcon } from "../site-icon";
+import { MediaThumb } from "./bookmark-media";
 import type { BookmarkGroup } from "./bookmarks-view";
 
 interface BookmarkListProps {
@@ -79,16 +80,22 @@ function PageRow({ page }: { page: ZenBookmark }) {
 	);
 }
 
-/** An x.com post: its author, its date, and its text's start. */
+/** An x.com post: its author, its date, its text's start, and its first media's preview. */
 function PostRow({ post }: { post: XBookmark }) {
+	const says = post.translation ?? post.text;
+	const [media] = post.media;
 	return (
-		<span className="flex min-w-0 flex-1 flex-col">
-			<span className="flex items-start gap-2.5">
-				<RowTop url={post.url} title={post.name} at={post.addedAt} />
+		<span className="flex min-w-0 flex-1 items-start gap-3">
+			<span className="flex min-w-0 flex-1 flex-col">
+				<span className="flex items-start gap-2.5">
+					<RowTop url={post.url} title={post.name} at={post.addedAt} />
+				</span>
+				<span className="line-clamp-2 pl-6.5 text-xs text-muted-foreground">
+					{post.handle}
+					{says && ` · ${says}`}
+				</span>
 			</span>
-			<span className="line-clamp-2 pl-6.5 text-xs text-muted-foreground">
-				{post.handle} · {post.translation ?? post.text}
-			</span>
+			{media && <MediaThumb media={media} />}
 		</span>
 	);
 }
