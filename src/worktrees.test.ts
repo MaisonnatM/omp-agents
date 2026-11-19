@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,9 @@ import { runChecked } from "./proc";
 import { Worktrees, type WorktreeOccupant } from "./worktrees";
 import type { MergedPullRequest } from "./pull-requests";
 import type { WorktreeRemovalPlan } from "./worktrees-shared";
+
+// A test here starts 40 to 120 git processes; a land check's full-suite load, four times its usual length, pushed them all past 5 seconds.
+setDefaultTimeout(30_000);
 
 const dirs: string[] = [];
 afterEach(() => {

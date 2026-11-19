@@ -53,6 +53,8 @@ export class Terminal {
 					this.#scrollback.push(chunk);
 					if (this.#state.kind === "running") for (const listener of this.#state.listeners) listener.output(chunk);
 				},
+				// Bun frees the pseudo-terminal only when it closes or is collected, and the machine has a few hundred of them.
+				exit: terminal => terminal.close(),
 			},
 		});
 		void this.#proc.exited.then(() => {

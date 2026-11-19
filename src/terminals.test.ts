@@ -112,6 +112,7 @@ describe("Terminals", () => {
 		expect(await page.exited).toBeNull();
 	});
 
+	// Starts MAX_TERMINALS + 1 login shells; a land check's full-suite load once stretched it past 8 seconds.
 	test("refuses a shell past the cap until one exits", async () => {
 		const terminals = new Terminals();
 		const first = opened(terminals);
@@ -124,5 +125,5 @@ describe("Terminals", () => {
 		terminals.dispose();
 		await Promise.all(rest.map(page => page.exited));
 		expect(terminals.list()).toEqual([]);
-	});
+	}, 30_000);
 });

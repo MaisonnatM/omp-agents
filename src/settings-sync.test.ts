@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -17,6 +17,9 @@ import { missingGithubRepo, neverSynced, parseSyncSettings, SYNC_ITEMS, type Syn
 import { type BotId, parseBotId } from "./shared/bots";
 import { SourceControl } from "./source-control";
 import { addTodo } from "./user-todos";
+
+// Two machines syncing through a real repository start about 110 git processes; a land check's full-suite load pushed that past 5 seconds.
+setDefaultTimeout(30_000);
 
 const dirs: string[] = [];
 afterEach(() => {
