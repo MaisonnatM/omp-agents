@@ -6,6 +6,8 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-20
 
 - Sessions: ↑ and ↓ no longer switch to another session while a dialog, such as the image viewer, is open.
+- Terminal panel: a shell that ends now gives its terminal back to your Mac right away, so a long-running dashboard no longer runs out of terminals for new shells.
+- Behind the scenes: the slowest tests now get room to finish when your Mac is busy, so landing a change no longer fails on them by chance.
 - Session sidebar: the Linear tab now lists only the ticket a session works on, the tickets it created or updated, and the ones your prompts link, not every ticket the agent read or mentioned.
 - Session sidebar: a pull request a subagent only reviewed or commented on no longer shows; one a subagent opened still does.
 - Memory: a project memory now opens in a panel beside the table, as a bookmark does, instead of a sheet over it.
@@ -210,24 +212,3 @@ The dashboard shows the same lines in Settings › What's new.
 - When Update dashboard brings in a new version that does not start, the desktop app now goes back to the version you had and starts it again. The bell and the command menu say which update did not start and why, and Update dashboard waits for a newer one before it tries again.
 - When the dashboard stops on its own, the desktop app now starts it again after a few seconds, keeping your page. If it keeps stopping, the app shows what went wrong with a Retry button.
 - When Obscura is installed (`brew install obscura`), the starter kit adds it as a browser agents use by default to read and click through pages. It loads a page several times faster than Chrome and uses about a tenth of the memory. Screenshots and design checks still use Chrome.
-
-## 2026-11-12
-
-- The starter kit now tells agents to run builds, test suites, and browser runs through a small helper that lets only a few of them run at once across all sessions, a quarter of the computer's cores by default, so many sessions testing together no longer slow the computer until tools time out. A command that has to wait says it is queued and what it waits for.
-- The workspace pickers no longer list folders that were deleted, or folders inside an app's own data such as ~/.cache, ~/.codex, or ~/Library.
-- A session in a subfolder of a project, or in a test project made inside it, now counts in that project's workspace instead of adding one of its own.
-- In the new session's folder picker, type a path and choose Create folder to make that folder and start there.
-- In the box you type a prompt in, / now lists commands, $ lists skills by name, and @ stays for files and other mentions.
-- The plan usage at the bottom of the screen now shows one short chip per account, such as `yampa 5h 71% left · ✦ 2`, naming the account when a provider has two and how many windows are used up. Hovering or clicking a chip opens a card with every window's bar, when it resets, such as "Resets in 1d3h · Fri 13 Nov, 14:00", and the reset credits left.
-- You can ask an agent to make a page, a document, or a drawing for you to look at, and it opens beside the conversation in the new Artifacts tab of the right sidebar.
-- A page in the Artifacts tab is ready to use: its buttons and forms work, sealed off from the dashboard.
-- Each time the agent saves an artifact again, a numbered version is kept with a short note on what changed, so you can go back to any earlier one.
-- Go to latest, beside an earlier version, returns to the newest one.
-- You can see each save in the conversation as "Saved … as version N", and its Open button shows that version in the sidebar, even from a pane beside others.
-- You can switch an artifact between how it looks and its source text, copy it, download it, or open it in its own browser tab.
-- The pull request description tool and the ship workflow now stop a gh command that hangs after 20 seconds and say which one timed out, such as "gh pr view timed out after 20s", where they could wait many minutes and then report only "gh exited -1".
-- Fixed: a session's title no longer disappears in a narrow header, such as beside a wide right sidebar.
-- In a narrow header, the header's buttons now fold into one menu named after the tab you are on, as on a phone, so the title keeps room to read.
-- Fixed: a session's header beside a wide right sidebar now takes at most two rows, the title and then its buttons, where it could take three.
-- The menu named after your tab in a narrow header now shows a blue dot on its button and a count beside Personal or Work while the other space has sessions that need you, as the switch it replaces does.
-- Fixed: on a phone or in a narrow conversation, the Session card above the messages no longer looks like it covers them: it sits flat with a gap below it, and keeps its shadow only where it floats beside the messages.
