@@ -6,6 +6,8 @@ import { MODULE_LIST, type WebModuleId } from "./modules";
 import { adjacentSession, closePane, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
 
+const dialogOpen = (): boolean => document.querySelector('[role="dialog"], [role="alertdialog"]') !== null;
+
 /** What the page-wide shortcuts read when a key arrives, and what they call. */
 export interface PageShortcutInput {
 	page: Page | null;
@@ -78,9 +80,9 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (!next) return false;
 				open(next, "replace");
 			},
-			// ↑ and ↓ step only while the panes show: a page's list, or its native scrolling, keeps them.
-			sessionsNext: () => (latest.current.page ? false : step(1)),
-			sessionsPrevious: () => (latest.current.page ? false : step(-1)),
+			// ↑ and ↓ step only while the panes show with no dialog over them: a page's list, a dialog, or native scrolling keeps them.
+			sessionsNext: () => (latest.current.page || dialogOpen() ? false : step(1)),
+			sessionsPrevious: () => (latest.current.page || dialogOpen() ? false : step(-1)),
 			tools: () => latest.current.toggleTools(),
 			hideTools: () => latest.current.toggleHideTools(),
 			hideThinking: () => latest.current.toggleHideThinking(),

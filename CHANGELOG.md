@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-20
 
+- Sessions: ↑ and ↓ no longer switch to another session while a dialog, such as the image viewer, is open.
 - Session sidebar: the Linear tab now lists only the ticket a session works on, the tickets it created or updated, and the ones your prompts link, not every ticket the agent read or mentioned.
 - Session sidebar: a pull request a subagent only reviewed or commented on no longer shows; one a subagent opened still does.
 - Memory: a project memory now opens in a panel beside the table, as a bookmark does, instead of a sheet over it.
