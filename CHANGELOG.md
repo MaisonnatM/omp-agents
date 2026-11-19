@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-19
+
+- A dashboard that an omp session starts, such as an agent's test run on another port, no longer runs your routines or messages your Bots; only the dashboard you opened does, so two dashboards stop fighting over the same Bot conversation.
+
 ## 2026-11-18
 
 - The Artifacts tab takes the look of Claude's artifacts: one thin bar on top with the artifact's name, Preview and Source, and the actions, and the artifact filling the rest of the tab.

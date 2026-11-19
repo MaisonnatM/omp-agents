@@ -11,8 +11,7 @@ Service calls omit `async` and `timeout`; a readiness deadline belongs in `ready
 Finite checks use `async: true` when needed, without `name` or `ready`.
 Stop only your service with `write({path: "proc://<name>/kill"})`, omitting `content`; reading that path does not stop it.
 `kill $(lsof -ti tcp:<port>)` also kills every process connected to the port, such as another session's desktop window.
-The user's own dashboard runs routines and takes the todos agents add, so a smoke server logs which port owns them and leaves them alone.
-It takes them over only when that dashboard is not running, so a smoke run that must not run routines should not start with the user's dashboard stopped.
+The user's own dashboard runs routines and takes the todos agents add; a server started from an omp session (`PI_SESSION_ID` set) never runs routines, Bots, or the file inboxes, even after the user's dashboard exits.
 
 Every request needs the access token, stored in `~/.config/omp-agents/token`, or `$XDG_CONFIG_HOME/omp-agents/token` when that is set; the server prints no sign-in address, and `/?token=` signs nothing in.
 The page reads the token from its origin's `localStorage`, which only the desktop window's preload fills, so a browser smoke seeds the same entries itself, `pageAccess(token)` from `src/server/auth.ts`, as [Browser smoke](#browser-smoke) shows.
