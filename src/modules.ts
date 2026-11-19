@@ -2,6 +2,7 @@
  * The modules the dashboard is built with, and what a module gives the server: a feature beside the core, such as Sport,
  * which the core reaches only through this list. The page's half is `web/modules.ts`; see docs/architecture/modules.md.
  */
+import { MEMORY_MODULE } from "./memory-module";
 import type { InboxOptions, JsonInboxDir } from "./server/json-inbox";
 import type { RouteKit, Routes } from "./server/route-kit";
 import type { SessionJoin } from "./server/start";
@@ -38,17 +39,23 @@ export interface ServerModule<Id extends string = string> {
 	readonly store?: ModuleStore<unknown, unknown>;
 	/** What every session the dashboard starts joins with, such as the omp extension that gives it the module's tool. */
 	readonly join?: SessionJoin;
-	/** The module's own `/api/*` routes. */
-	routes?(kit: RouteKit): Routes;
+	/** The module's own `/api/*` routes; `core` is what they read of the core. */
+	routes?(kit: RouteKit, core: ModuleCore): Routes;
 	/** The files `scripts/build-desktop-artifact.ts` bundles into a packaged app for the module. */
 	readonly shipped?: readonly ShippedFile[];
+}
+
+/** What a module's routes read of the core. */
+export interface ModuleCore {
+	/** The workspaces the page shows: those sessions ran in and those Settings › Workspaces added, less the hidden ones. */
+	workspaces(): string[];
 }
 
 /** A module that keeps state, with the types of its state and of a change to it. */
 export type StoredModule<Id extends string, Value, Change> = Omit<ServerModule<Id>, "store"> & { readonly store: ModuleStore<Value, Change> };
 
 /** Every module, by id: adding one is adding its definition here and its page's to `WEB_MODULES` in `web/modules.ts`. */
-export const SERVER_MODULES = { sport: SPORT_MODULE };
+export const SERVER_MODULES = { sport: SPORT_MODULE, memory: MEMORY_MODULE };
 SERVER_MODULES satisfies { readonly [I in ModuleId]: ServerModule<I> };
 
 type Modules = typeof SERVER_MODULES;
@@ -65,7 +72,9 @@ export type ModuleFiles = { [I in StoredModuleId]: ModuleFile<ModuleValues[I], M
 
 /** The stored modules typed by id, so the store a lookup finds takes the change of the module the id names. */
 const STORED_MODULES: { readonly [I in StoredModuleId]: { readonly store: ModuleStore<ModuleValues[I], ModuleChanges[I]> } } = SERVER_MODULES;
-const STORED_IDS: readonly StoredModuleId[] = Object.values(SERVER_MODULES).flatMap(module => ("store" in module ? [module.id] : []));
+const STORED_IDS: readonly StoredModuleId[] = Object.values(SERVER_MODULES)
+	.filter((module): module is Modules[StoredModuleId] => "store" in module)
+	.map(module => module.id);
 
 export const isStoredModuleId = (id: unknown): id is StoredModuleId => STORED_IDS.some(stored => stored === id);
 
@@ -94,7 +103,7 @@ export const moduleJoins = (preferences: PagePreferences | null): SessionJoin[] 
 };
 
 /** Every module's `/api/*` routes. */
-export const moduleRoutes = (kit: RouteKit): Routes => Object.assign({}, ...Object.values(SERVER_MODULES).map(module => module.routes?.(kit) ?? {}));
+export const moduleRoutes = (kit: RouteKit, core: ModuleCore): Routes => Object.assign({}, ...Object.values(SERVER_MODULES).map(module => module.routes?.(kit, core) ?? {}));
 
 /** The files a packaged app bundles for the modules. */
 export const SHIPPED_FILES: readonly ShippedFile[] = Object.values(SERVER_MODULES).flatMap(module => module.shipped ?? []);

@@ -1,4 +1,4 @@
-# Page: sidebar, Todo, Bots, Routines, and Sport
+# Page: sidebar, Todo, Bots, Routines, Sport, and Memory
 
 - `web/components/sidebar-nav.tsx`: the left sidebar's page list, **New session**, **Notifications** with its unread count, each shown tab's row with its count, and **Settings**, with the open page's own list nested under its row only while the sidebar floats, as on a phone; the Pull requests and Todo rows have no list.
   `web/components/page-list.tsx` holds `PageList`, which picks the open page's own list, and `PageListColumn`, the column at the page's left that `web/app.tsx` shows it in whenever the sidebar does not float; a line on its right edge sizes it, the width in localStorage under `omp-agents.page-list-width`.
@@ -84,3 +84,10 @@
   `journal.tsx` holds `JournalTab`, the logs by week in a `ListSplit` with the open one in a `DetailBar`, and `progress.tsx` holds `ProgressTab`, the cards, the chart of the chosen one drawn by `ChartView`, and the records.
   `web/sport-view.ts` holds what the page writes, read from `src/sport-week.ts`: dates, loads and where they come from, a day's summary, doses, demos, pain and effort words, Arkose colors, and the journal's figures; its `logSave` builds the Fait dialog's list of changes.
   `web/sport-progress.ts` holds what the progress tab reads: its cards, the chart of the picked one against its target, and how far back the chart reaches.
+- `web/components/memory/page.tsx`: the Memory page, `MemoryPage`, a `PageFrame` whose header holds the `SegmentedTabs` of its three tabs, over the omp memory, the project memory, or the bookmarks.
+  Its omp memory tab draws `OmpMemoryTab` from Settings over `useSettingsEditing` in `web/components/settings/editor.tsx`, the same settings read Settings uses, and its file links open Settings › Files.
+  `web/components/memory/module.ts` holds `MEMORY_PAGE`, the page half of the Memory module: its tab, address, title, views, shortcuts, and controls; its data comes over the module's own routes, typed in `src/shared/memory-page.ts`; see [Modules](../architecture/modules.md).
+  `tabs.ts` holds `MEMORY_TABS` and `memoryHash`, each tab's address, name, and control.
+  `project-memory.tsx` holds `ProjectMemoryTab`, the repository's memories from `GET /api/project-memory` in a `ListSplit` with the open one, or a new one, in a `DetailBar` over `MemoryEditor`, which sends each save or delete as one `ProjectMemoryEdit` through `editProjectMemory` in `web/api.ts`.
+  `bookmarks.tsx` holds `BookmarksTab`, the bookmarks from `GET /api/bookmarks` with the search kept in the address, the source filter, the x.com sync state, and **Sync x.com**, which posts through `syncXBookmarks`.
+  `web/memory-view.ts` holds the page's pure part, tested in `web/memory-view.test.ts`: `shownRepo`, the repository the address or the sidebar's workspace picks, and `filterBookmarks`, the search and source filter.

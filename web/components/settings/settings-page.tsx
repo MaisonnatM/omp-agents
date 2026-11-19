@@ -1,18 +1,17 @@
 import { IconFolderOpen } from "central-icons";
-import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import type { OmpSettings } from "../../../src/shared/models";
 import type { TrustedProject } from "../../../src/shared/project-trust";
 import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
-import { isPhonePage, settingsUrl } from "../../api";
-import { useEditableRead } from "../../editable-read";
-import { type ReadState, useRead } from "../../reads";
+import { isPhonePage } from "../../api";
+import type { ReadState } from "../../reads";
 import { ompSettingsFiles } from "../../omp-settings";
 import { hashForSettings, SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
 import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
 import { ActivityTab } from "./activity-tab";
-import { type Catalog, type Editing, LINK } from "./editor";
+import { type Editing, LINK, settingsReadNote, useSettingsEditing } from "./editor";
 import { AgentsTab } from "./agents-tab";
 import { DecisionsTab } from "./decisions-tab";
 import { Files } from "./files-tab";
@@ -85,20 +84,10 @@ const loadAlert = (error: string): ReactNode => (
 	</p>
 );
 
-/** Why the omp sections are empty while omp's settings are not read: still reading, or the read failed. */
-const readNote = (read: ReadState<OmpSettings>): ReactNode =>
-	read.error === null ? (
-		<p className="text-sm text-muted-foreground">Reading omp's settings…</p>
-	) : (
-		<p role="alert" className="text-sm text-red-600 dark:text-red-400">
-			Cannot read omp's settings: {read.error}
-		</p>
-	);
-
 /** The omp sections' content once settings are read, else why they are empty. */
 function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing, selection: FileSelection): Record<"models" | "agents" | "omp" | "files" | "workflows", ReactNode> {
 	if (read.data === null) {
-		const note = readNote(read);
+		const note = settingsReadNote(read);
 		return { models: note, agents: note, omp: note, files: note, workflows: note };
 	}
 	const { routing, agentSettings, agents: catalog, files, workflows } = read.data;
@@ -158,19 +147,7 @@ export function SettingsPage({
 	/** The projects whose agent code the user trusted, for Settings › Workspaces. */
 	trustedProjects: TrustedProject[];
 }) {
-	const models = useRead<{ models: CatalogModel[] }>("/api/models");
-	const catalog = useMemo(
-		(): Catalog => ({
-			data: models.data && {
-				bySelector: new Map(models.data.models.map((model) => [model.selector, model])),
-				byProvider: Map.groupBy(models.data.models, (model) => model.provider),
-			},
-			error: models.error && `Cannot list omp's models: ${models.error}`,
-		}),
-		[models],
-	);
-	const settings = useEditableRead<OmpSettings>(settingsUrl("", cwd));
-	const editing: Editing = { cwd, catalog, write: settings.write, reload: settings.reload };
+	const { settings, editing } = useSettingsEditing(cwd);
 	const [openFile, setOpenFile] = useState<string | null>(null);
 	// Every section shares one scroller, so a newly opened one would start at the last one's offset.
 	const scroller = useRef<HTMLDivElement>(null);
@@ -182,7 +159,7 @@ export function SettingsPage({
 		...ompPanels(settings, cwd, editing, { path: openFile, open: setOpenFile }),
 		"omp-memory":
 			settings.data === null ? (
-				readNote(settings)
+				settingsReadNote(settings)
 			) : (
 				<OmpMemoryTab key={cwd ?? ""} active={section === "omp-memory"} settings={settings.data} editing={editing} onOpenFile={setOpenFile} />
 			),

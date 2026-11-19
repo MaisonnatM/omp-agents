@@ -609,6 +609,7 @@ export class Dashboard {
 		const broadcasts = this.#broadcasts;
 		return createRoutes({
 			guards,
+			modules: { workspaces: () => this.#workspaceCwds() },
 			sessions: {
 				knownWorkspaces: () => this.knownWorkspaces(),
 				addedCwds: () => this.#workspaces.value.added,

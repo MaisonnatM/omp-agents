@@ -11,6 +11,7 @@ import type { UserTodoList } from "../../src/user-todos-shared";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { SectionTarget } from "../section";
 import { useDashboardActions } from "./dashboard-context";
+import { MemoryPage } from "./memory/page";
 import { SportNav } from "./sport/nav";
 import { SportPage } from "./sport/page";
 
@@ -26,6 +27,8 @@ export interface CoreData {
 	listed: boolean;
 	/** The directory a new session starts in, which the sidebar's workspace decides. */
 	cwd: string;
+	/** The workspace the sidebar picked, as Settings' workspace sections read it; `null` for all workspaces. */
+	workspace: string | null;
 	/** The running sessions in the sidebar's workspace. */
 	hosts: RosterHost[];
 	/** The page section a sidebar link last chose, to unfold, scroll to, and focus. */
@@ -55,6 +58,7 @@ interface ModuleViews<I extends WebModuleId> {
 }
 
 const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
+	memory: { Page: MemoryPage },
 	sport: { Page: SportPage, Nav: SportNav },
 };
 

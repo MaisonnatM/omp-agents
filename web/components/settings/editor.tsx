@@ -1,6 +1,6 @@
 /** Shared Settings editors, native setting rows and controls, queued writes, save errors, and sections. */
 import { IconCrossMedium, IconLock, IconPencil } from "central-icons";
-import { type ComponentProps, type ReactNode, useId, useState } from "react";
+import { type ComponentProps, type ReactNode, useId, useMemo, useState } from "react";
 import type { AgentSettingChange, AgentSettingEdit, AgentSettingOption, AgentSettingRow } from "../../../src/shared/agent-settings";
 import type { CatalogModel, OmpFile, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,9 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { errorText } from "../../../src/json";
 import { ApiError, putJson, settingsUrl } from "../../api";
-import type { Editable } from "../../editable-read";
+import { type Editable, useEditableRead } from "../../editable-read";
 import { formatValue, isChanged, valueOf } from "../../omp-settings";
-import type { ReadState } from "../../reads";
+import { type ReadState, useRead } from "../../reads";
 import { hashForSettings } from "../../routing";
 import { useAction } from "../../use-action";
 import { OrderButton } from "../order-button";
@@ -58,6 +58,33 @@ export interface Editing {
 	/** Re-read everything from disk, keeping the page as it is until the answer arrives. */
 	reload: () => void;
 }
+
+/** omp's settings for `cwd`, `null` for your user files only, and what every editor of them shares, with the models `omp models` lists. */
+export function useSettingsEditing(cwd: string | null): { settings: Editable<OmpSettings>; editing: Editing } {
+	const models = useRead<{ models: CatalogModel[] }>("/api/models");
+	const catalog = useMemo(
+		(): Catalog => ({
+			data: models.data && {
+				bySelector: new Map(models.data.models.map(model => [model.selector, model])),
+				byProvider: Map.groupBy(models.data.models, model => model.provider),
+			},
+			error: models.error && `Cannot list omp's models: ${models.error}`,
+		}),
+		[models],
+	);
+	const settings = useEditableRead<OmpSettings>(settingsUrl("", cwd));
+	return { settings, editing: { cwd, catalog, write: settings.write, reload: settings.reload } };
+}
+
+/** Why a section of omp's settings is empty while they are not read: still reading, or the read failed. */
+export const settingsReadNote = (read: ReadState<OmpSettings>): ReactNode =>
+	read.error === null ? (
+		<p className="text-sm text-muted-foreground">Reading omp's settings…</p>
+	) : (
+		<p role="alert" className="text-sm text-red-600 dark:text-red-400">
+			Cannot read omp's settings: {read.error}
+		</p>
+	);
 
 /** Queue one write and refresh a conflicting read before reporting the failure to its editor. */
 export async function writeOrReload<T>(target: { write: Editable<T>["write"]; reload: () => void }, send: () => Promise<T>): Promise<T> {

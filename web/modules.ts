@@ -6,6 +6,7 @@
  */
 import type { IconComponent } from "@/lib/icon-context";
 import type { ModuleChanges, ModuleValues, StoredModuleId } from "../src/modules";
+import { MEMORY_PAGE } from "./components/memory/module";
 import { SPORT_PAGE } from "./components/sport/module";
 import type { Binding } from "./shortcuts";
 
@@ -28,7 +29,7 @@ export interface PageStore<Value, Change> {
 	apply(value: Value, change: Change): Value | null;
 }
 
-interface PageModule<Id extends string, Route, Shortcut extends string = never, Control extends string = never> {
+export interface PageModule<Id extends string, Route, Shortcut extends string = never, Control extends string = never> {
 	readonly id: Id;
 	/** The module's sidebar tab, whose id is the module's. `place` orders it among every tab, the core's too, lowest first. */
 	readonly tab: { label: string; icon: IconComponent; place: number };
@@ -65,7 +66,7 @@ export type StoredPageModule<Id extends string, Route, Value, Change, Shortcut e
 };
 
 /** Every module: adding one is adding its definition here and its server half to `SERVER_MODULES` in `src/modules.ts`. */
-export const WEB_MODULES = { sport: SPORT_PAGE };
+export const WEB_MODULES = { memory: MEMORY_PAGE, sport: SPORT_PAGE };
 
 type WebModules = typeof WEB_MODULES;
 export type WebModuleId = keyof WebModules;
