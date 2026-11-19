@@ -10,7 +10,6 @@ import { activityControl } from "../../activity";
 import { editProjectMemory, PROJECT_MEMORY_URL } from "../../api";
 import { type Editable, useEditableRead } from "../../editable-read";
 import { dateLabel } from "../../labels";
-import { ALL_REPOS, shownRepo } from "./memory-view";
 import { useShortcuts } from "../../shortcuts";
 import { CommandPicker } from "../command-picker";
 import { CountPill } from "../count-pill";
@@ -36,8 +35,8 @@ type Open = { key: string } | "new" | null;
 /** The key of a draft: the row's key, or `""` for the new one, which no row key can be. */
 const draftKey = (row: Row | null): string => row?.key ?? "";
 
-/** `repo`, the repository the address names, or `ALL_REPOS` for every one, else the one holding `cwd`, the sidebar's workspace. */
-export function ProjectMemoryTab({ repo, cwd }: { repo: string | null; cwd: string | null }) {
+/** `repo`, the repository the address names; every repository's when it names none, or one no workspace holds. */
+export function ProjectMemoryTab({ repo }: { repo: string | null }) {
 	const view = useEditableRead<ProjectMemoryView>(PROJECT_MEMORY_URL);
 	if (view.data === null) {
 		return (
@@ -46,20 +45,18 @@ export function ProjectMemoryTab({ repo, cwd }: { repo: string | null; cwd: stri
 			</div>
 		);
 	}
-	if (repo === ALL_REPOS) return <RepoMemory key={ALL_REPOS} scope={null} repos={view.data.repos} view={view} />;
-	const shown = shownRepo(view.data.repos, repo, cwd);
-	if (shown === null) return <p className="px-4 py-4 text-sm text-muted-foreground">No workspace is in a git repository, so there is no project memory to show.</p>;
-	return <RepoMemory key={shown.root} scope={shown} repos={view.data.repos} view={view} />;
+	const shown = repo === null ? undefined : view.data.repos.find(each => each.root === repo);
+	return <RepoMemory key={shown?.root ?? ""} scope={shown ?? null} repos={view.data.repos} view={view} />;
 }
 
 /** **All projects**, then the repositories, each with how many memories it holds; picking one opens its address. */
 function RepoPicker({ scope, repos }: { scope: ProjectMemoryRepo | null; repos: ProjectMemoryRepo[] }) {
 	const total = repos.reduce((sum, each) => sum + each.memories.length, 0);
 	const choices = [
-		{ root: ALL_REPOS, name: "All projects", detail: `${repos.length.toLocaleString()} repositories`, count: total },
+		{ root: null, name: "All projects", detail: `${repos.length.toLocaleString()} repositories`, count: total },
 		...repos.map(each => ({ root: each.root, name: each.name, detail: each.rootDisplay, count: each.memories.length })),
 	];
-	const current = scope?.root ?? ALL_REPOS;
+	const current = scope?.root ?? null;
 	return (
 		<span className="contents" {...activityControl("memory.project.repo")}>
 			<CommandPicker

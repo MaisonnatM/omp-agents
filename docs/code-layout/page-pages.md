@@ -93,4 +93,4 @@
   `bookmarks.tsx` holds `BookmarksTab`, the bookmarks from `GET /api/bookmarks` with the search the address owns, the x.com sync state, and **Sync x.com**, which posts through `syncXBookmarks`, over the folder tree, the list, and the open bookmark in a `ListSplit`'s `DetailBar`; it steps the rows and the reader with the `memoryBookmarksNext`, `memoryBookmarksPrevious`, and `memoryBookmarksClose` shortcuts.
   `bookmark-list.tsx` holds `BookmarkList`, the list grouped by folder, each row a button; `bookmark-tree.tsx` holds `BookmarkTree`, the tree of **All bookmarks**, **x.com**, **Zen**, and Zen's folders with their counts, and `BookmarkPlacePicker`, the same places as a picker on a narrow tab; `bookmark-reader.tsx` holds `PageReader` and `PostReader`, the open bookmark read in full.
   `bookmarks-view.ts` holds what the tab reads from the bookmarks, the place picked, Zen's folder tree, and the list's groups, tested in `bookmarks-view.test.ts`.
-  `memory-view.ts` holds `shownRepo`, the repository the address or the sidebar's workspace picks, tested with the page's routes in `memory-view.test.ts`.
+  `memory-routes.test.ts` tests the page's routes.

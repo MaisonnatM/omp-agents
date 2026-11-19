@@ -9,9 +9,8 @@
   On a narrow page the table drops the session, then the slug, so the line keeps its room, and hovering a cut line shows all of it.
 - With **All** picked, the table groups the memories under a header per kind with its count, which stays at the top as you scroll.
   The **Decision**, **Fact**, and **Lesson** chips, each with its count, show only that kind.
-- The repository picker lists every workspace's git repository with how many memories it holds.
-  The page opens on the repository that holds the sidebar's workspace, and `#memory?repo=<path>` opens another.
-  **All projects**, at the top of the picker or `#memory?repo=all`, lists every repository's memories in one table with a **Project** column; New memory shows only with one repository picked.
+- The repository picker lists **All projects**, then every workspace's git repository, each with how many memories it holds.
+  The page opens on **All projects**, every repository's memories in one table with a **Project** column, and `#memory?repo=<path>` opens one repository; New memory shows only with one repository picked.
 - **Search** narrows the table to memories whose slug, line, or body holds every word you type.
 - Click a row, or move to it with the up and down arrows or `j` and `k` and press Enter, to open the memory beside the table, as Bookmarks opens a bookmark; drag the line between them to size the table.
   Change its kind, line, or body, and click **Save**, or press Enter in the line or ⌘ Enter in the body.

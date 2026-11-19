@@ -13,8 +13,8 @@ const META: Record<MemoryRoute["tab"], string> = {
 	bookmarks: "Your Zen and x.com bookmarks, which agents search with the bookmarks tool",
 };
 
-export function MemoryPage({ route, core }: { route: MemoryRoute; core: CoreData }) {
-	const body = route.tab === "project" ? <ProjectMemoryTab repo={route.repo} cwd={core.workspace} /> : <BookmarksTab q={route.q} />;
+export function MemoryPage({ route }: { route: MemoryRoute; core: CoreData }) {
+	const body = route.tab === "project" ? <ProjectMemoryTab repo={route.repo} /> : <BookmarksTab q={route.q} />;
 	return (
 		<PageFrame title="Memory" meta={META[route.tab]} actions={<ViewTabs tab={route.tab} />}>
 			{body}
