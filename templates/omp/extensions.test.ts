@@ -455,12 +455,12 @@ describe("ship_stage review gates", () => {
 	const INTERFACE_BOX = "- [x] Interface review";
 	const THERMONUCLEAR_BOX = "- [x] Thermo-nuclear code quality review";
 	// GitHub's answer to the gate's read of a PR with this body changing `file`.
-	const prRead = (body: string, file: string, isDraft = true) => {
+	const prRead = (body: string, file: string, isDraft = true, statusCheckRollup: object = { state: "SUCCESS" }) => {
 		const pullRequest = {
 			state: "OPEN", isDraft, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null, body,
 			changedFiles: 1, files: { nodes: [{ path: file }] },
 			reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } },
-			commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
+			commits: { nodes: [{ commit: { statusCheckRollup } }] },
 		};
 		return { code: 0, stderr: "", stdout: JSON.stringify({ data: { repository: { pullRequest } } }) };
 	};
@@ -545,6 +545,18 @@ describe("ship_stage review gates", () => {
 	test("recording live on a PR under review records it", () => {
 		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage: "live", pr: 7, repo: "owner/name" }, response: prRead(THERMONUCLEAR_BOX, "README.md", false) });
 		expect(result.run).toEqual({ isError: false, stage: "live" });
+	});
+
+	test.each([
+		["only a review gate fails", "SUCCESS", "waiting for review"],
+		["a review gate and lint fail", "FAILURE", "Fix CI (checks failing)"],
+		["a review gate fails while lint runs", null, "waiting for review · checks running"],
+	])("live on a PR where %s reads its status from the other checks", (_, lint, summary) => {
+		const check = (name: string, conclusion: string | null) => ({ name, status: conclusion ? "COMPLETED" : "IN_PROGRESS", conclusion });
+		const nodes = [check("human-review", "FAILURE"), check("run-tests", "SUCCESS"), check("lint", lint)];
+		const rollup = { state: "FAILURE", contexts: { totalCount: nodes.length, nodes } };
+		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage: "live", pr: 7, repo: "owner/name" }, response: prRead(THERMONUCLEAR_BOX, "README.md", false, rollup) });
+		expect(result.text).toContain(`Live: ${summary}`);
 	});
 
 	test("quota exhaustion exposes stale status and cannot advance the ready gate", () => {

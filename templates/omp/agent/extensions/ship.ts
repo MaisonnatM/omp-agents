@@ -112,7 +112,21 @@ const PR_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$
 state isDraft mergeable mergeStateStatus reviewDecision body changedFiles
 files(first:100){nodes{path}}
 reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
-commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}`;
+commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:100){totalCount nodes{
+... on CheckRun{name status conclusion} ... on StatusContext{context state}}}}}}}}}}`;
+
+interface CheckContext {
+	name?: string;
+	status?: string;
+	conclusion?: string | null;
+	context?: string;
+	state?: string;
+}
+
+interface CheckRollup {
+	state: string;
+	contexts?: { totalCount: number; nodes: CheckContext[] };
+}
 
 interface PrResponse {
 	state: "OPEN" | "MERGED" | "CLOSED";
@@ -124,12 +138,37 @@ interface PrResponse {
 	changedFiles: number;
 	files: { nodes: { path: string }[] };
 	reviewThreads: { nodes: { isResolved: boolean }[]; pageInfo: { hasNextPage: boolean } };
-	commits: { nodes: { commit: { statusCheckRollup: { state: string } | null } }[] };
+	commits: { nodes: { commit: { statusCheckRollup: CheckRollup | null } }[] };
+}
+
+/** A check that fails until someone approves, such as a `human-review` job: it waits on review, not on a CI fix. */
+const REVIEW_GATE = /review|approv/i;
+const FAILED: Record<string, true> = { FAILURE: true, ERROR: true, TIMED_OUT: true, CANCELLED: true, STARTUP_FAILURE: true, ACTION_REQUIRED: true };
+
+function contextState(c: CheckContext): PrStatus["checks"] {
+	if (c.name === undefined) return c.state === "SUCCESS" ? "pass" : FAILED[c.state ?? ""] ? "fail" : "pending";
+	if (c.status !== "COMPLETED") return "pending";
+	return FAILED[c.conclusion ?? ""] ? "fail" : "pass";
+}
+
+/**
+ * The head commit's checks, leaving out a failing review gate while the PR waits for approval, so it reads as waiting
+ * for review rather than CI to fix. GitHub's rollup stands when it has more checks than the query returned.
+ */
+function checksOf(rollup: CheckRollup | null | undefined, approved: boolean): PrStatus["checks"] {
+	if (!rollup) return "none";
+	const state = rollup.state === "SUCCESS" ? "pass" : rollup.state === "FAILURE" || rollup.state === "ERROR" ? "fail" : "pending";
+	const contexts = rollup.contexts;
+	if (state !== "fail" || approved || !contexts || contexts.totalCount > contexts.nodes.length) return state;
+	const checks = contexts.nodes.map(c => ({ name: c.name ?? c.context ?? "", state: contextState(c) }));
+	const rest = checks.filter(c => !(c.state === "fail" && REVIEW_GATE.test(c.name)));
+	if (rest.length === checks.length || rest.some(c => c.state === "fail")) return "fail";
+	return rest.some(c => c.state === "pending") ? "pending" : "pass";
 }
 
 /** The PR's status; `read` returns the text of a paths file in the checkout, `undefined` when it has none. */
 export function parsePr(pr: PrResponse, read: (pathsFile: string) => string | undefined): PrStatus {
-	const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup?.state;
+	const approved = pr.reviewDecision === "APPROVED";
 	const threads = pr.reviewThreads.nodes;
 	return {
 		state: pr.state,
@@ -139,8 +178,8 @@ export function parsePr(pr: PrResponse, read: (pathsFile: string) => string | un
 		unresolvedThreads: threads.filter(t => !t.isResolved).length,
 		moreThreads: pr.reviewThreads.pageInfo.hasNextPage,
 		changesRequested: pr.reviewDecision === "CHANGES_REQUESTED",
-		approved: pr.reviewDecision === "APPROVED",
-		checks: !rollup ? "none" : rollup === "SUCCESS" ? "pass" : rollup === "FAILURE" || rollup === "ERROR" ? "fail" : "pending",
+		approved,
+		checks: checksOf(pr.commits.nodes[0]?.commit.statusCheckRollup, approved),
 		reviews: reviewsOf(pr.body, pr.files.nodes.map(file => file.path), pr.changedFiles, read),
 	};
 }
@@ -373,7 +412,13 @@ export default function ship(pi: ExtensionAPI) {
 		changedFiles: z.number().int(),
 		files: z.object({ nodes: z.array(z.object({ path: z.string() })) }),
 		reviewThreads: z.object({ nodes: z.array(z.object({ isResolved: z.boolean() })), pageInfo: z.object({ hasNextPage: z.boolean() }) }),
-		commits: z.object({ nodes: z.array(z.object({ commit: z.object({ statusCheckRollup: z.object({ state: z.string() }).nullable() }) })) }),
+		commits: z.object({ nodes: z.array(z.object({ commit: z.object({ statusCheckRollup: z.object({
+			state: z.string(),
+			contexts: z.object({ totalCount: z.number().int(), nodes: z.array(z.object({
+				name: z.string().optional(), status: z.string().optional(), conclusion: z.string().nullable().optional(),
+				context: z.string().optional(), state: z.string().optional(),
+			})) }).optional(),
+		}).nullable() }) })) }),
 	});
 	const prStatusSchema = z.object({
 		state: z.enum(["OPEN", "MERGED", "CLOSED"]), draft: z.boolean(), conflicts: z.boolean(), behind: z.boolean(),
