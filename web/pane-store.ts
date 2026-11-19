@@ -127,7 +127,8 @@ const composerOf = ({ completions, withdrawn }: PaneData): ComposerData => ({ co
 const sameComposer = (a: ComposerData, b: ComposerData): boolean => a.completions === b.completions && a.withdrawn === b.withdrawn;
 const sameElements = <T>(a: readonly T[], b: readonly T[]): boolean => a.length === b.length && a.every((entry, index) => entry === b[index]);
 const savesOf = (pane: PaneData): ArtifactToolItem[] => pane.items.filter(savedArtifact);
-const linkedIssuesOf = (pane: PaneData): string[] => linearIssueIdsIn(pane.items.flatMap(item => (item.kind === "user" || item.kind === "assistant" ? [item.text] : [])));
+// Only the user's own prompts: an issue the agent's replies name, such as one it read or searched, is not the session's.
+const linkedIssuesOf = (pane: PaneData): string[] => linearIssueIdsIn(pane.items.flatMap(item => (item.kind === "user" && item.from === null ? [item.text] : [])));
 
 /** `view`'s transcript: the one field a streamed token changes, so only the components that draw it read it. */
 export const useTranscript = (view: View): Item[] => usePaneSelect(view, itemsOf);
@@ -156,7 +157,7 @@ export function useArtifacts(view: View): Artifact[] {
 	return useMemo(() => artifactsOf(saves), [saves]);
 }
 
-/** The ids of the Linear issues `view`'s prompts and replies link to, in the order they first appear; the same list while a streamed token links none. */
+/** The ids of the Linear issues `view`'s user prompts link to, in the order they first appear; the same list while a streamed token links none. */
 export const useLinkedIssues = (view: View): string[] => usePaneSelect(view, linkedIssuesOf, sameElements);
 
 /** Views some mounted components show, by {@link hashForView}, with how many components show each, as one list the page streams. */

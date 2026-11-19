@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-20
 
+- Session sidebar: the Linear tab now lists only the ticket a session works on and the ones your prompts link, not every ticket the agent read or mentioned.
 - Memory: a project memory now opens in a panel beside the table, as a bookmark does, instead of a sheet over it.
 - Agents now get one reminder to save a project memory before they end a session that recorded none.
 - Pull requests: a pull request whose only failing check waits for a person to approve it, such as `human-review`, now shows under review instead of Fix CI.
