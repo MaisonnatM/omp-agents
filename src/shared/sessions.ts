@@ -101,6 +101,8 @@ export interface SessionFacts {
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
 	ship: ShipProgress | null;
+	/** The Linear issues the session's own Linear `save_issue` calls created or updated, by id such as `ENG-123`, in first-saved order. */
+	issues: readonly string[];
 	/** The arenas the session recorded, in the order it started them. */
 	arenas: readonly ArenaRecord[];
 	/**

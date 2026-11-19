@@ -219,8 +219,9 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 	const [picked, setPicked] = useState<LiveView | null>(null);
 	const promptIssues = useLinkedIssues(view);
 	const shipIssue = row?.ship?.issue?.toUpperCase() ?? null;
-	// The issue a /ship run works on, then those the user's prompts link.
-	const linearIssues = useMemo(() => (shipIssue && !promptIssues.includes(shipIssue) ? [shipIssue, ...promptIssues] : promptIssues), [shipIssue, promptIssues]);
+	const savedIssues = row?.issues;
+	// The issue a /ship run works on, those the session saved through Linear, then those the user's prompts link.
+	const linearIssues = useMemo(() => [...new Set([...(shipIssue ? [shipIssue] : []), ...(savedIssues ?? []), ...promptIssues])], [shipIssue, savedIssues, promptIssues]);
 	useOpenLinearOnLink(scope, linearIssues);
 	const opened = useSubagentLinks(view, host);
 	// A plain click on a subagent shows it in the **Subagent** tab; a split or a new window still opens it as a pane.

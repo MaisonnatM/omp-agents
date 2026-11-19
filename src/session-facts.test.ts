@@ -245,6 +245,24 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).pullRequests).toEqual([]);
 	});
 
+	test("links a subagent's PR only when it opened it, and the issues the session's own Linear save_issue calls saved", async () => {
+		const dir = sessionDir();
+		const session = join(dir, "2026-10-01T00-00-00-000Z_s2.jsonl");
+		writeFileSync(session, [
+			toolCall("s", "write", { path: "xd://mcp__linear_save_issue", content: "{}" }),
+			result("s", '{"identifier":"ENG-9","url":"https://linear.app/acme/issue/ENG-9/fix"}'),
+			toolCall("g", "write", { path: "xd://mcp__linear_get_issue", content: "{}" }),
+			result("g", '{"url":"https://linear.app/acme/issue/ENG-1/read-only"}'),
+		].join("\n") + "\n");
+		mkdirSync(join(dir, "2026-10-01T00-00-00-000Z_s2"), { recursive: true });
+		writeFileSync(join(dir, "2026-10-01T00-00-00-000Z_s2", "Reviewer.jsonl"), [bashCall("c", "gh pr comment https://github.com/o/r/pull/5 -b hi"), ...prCreated("p", 6)].join("\n") + "\n");
+
+		const index = new SessionFactsIndex(async () => null, NO_GIT);
+		await index.refresh([{ path: session, cwd: dir, modifiedAt: 1 }]);
+		expect(index.factsOf(session).pullRequests.map(pr => pr.number)).toEqual([6]);
+		expect(index.factsOf(session).issues).toEqual(["ENG-9"]);
+	});
+
 	test("shows the latest parent workflow stage and picks up live review work on append", async () => {
 		const dir = sessionDir();
 		const session = join(dir, "2026-10-01T00-00-00-000Z_ship.jsonl");

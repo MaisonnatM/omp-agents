@@ -5,7 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-20
 
-- Session sidebar: the Linear tab now lists only the ticket a session works on and the ones your prompts link, not every ticket the agent read or mentioned.
+- Session sidebar: the Linear tab now lists only the ticket a session works on, the tickets it created or updated, and the ones your prompts link, not every ticket the agent read or mentioned.
+- Session sidebar: a pull request a subagent only reviewed or commented on no longer shows; one a subagent opened still does.
 - Memory: a project memory now opens in a panel beside the table, as a bookmark does, instead of a sheet over it.
 - Agents now get one reminder to save a project memory before they end a session that recorded none.
 - Pull requests: a pull request whose only failing check waits for a person to approve it, such as `human-review`, now shows under review instead of Fix CI.
@@ -229,8 +230,3 @@ The dashboard shows the same lines in Settings › What's new.
 - Fixed: a session's header beside a wide right sidebar now takes at most two rows, the title and then its buttons, where it could take three.
 - The menu named after your tab in a narrow header now shows a blue dot on its button and a count beside Personal or Work while the other space has sessions that need you, as the switch it replaces does.
 - Fixed: on a phone or in a narrow conversation, the Session card above the messages no longer looks like it covers them: it sits flat with a gap below it, and keeps its shadow only where it floats beside the messages.
-
-## 2026-11-11
-
-- In Settings, Workflows, the ship workflow's diagram now shows its real path: the reviews it can skip, the ready step, the live review loop of rebases, comments, and CI fixes, and the merge at the end.
-- A workflow can draw its own diagram in Settings, Workflows by holding a mermaid block in its skill file; without one, its numbered steps still show in a line.

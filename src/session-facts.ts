@@ -23,6 +23,7 @@ import { expandHome } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, parseRemote, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo, repoKey } from "./shared/github";
+import { linearIssueIdsIn } from "./shared/linear";
 import { located, within } from "../templates/omp/agent/extensions/shell/commands";
 import { taskText } from "./shared/routine-message";
 import { type ArenaRecord, SHIP_STAGES, SHIP_WORK, type SessionBranch, type SessionFacts, type ShipProgress } from "./shared/sessions";
@@ -50,7 +51,9 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "omp-arena.state", "omp-agents.headless", '"cwd"', '"toolName":"edit"', '"toolName":"write"', '"name":"read"', "cd ", "-C "];
+const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "omp-arena.state", "omp-agents.headless", '"cwd"', '"toolName":"edit"', '"toolName":"write"', '"name":"read"', "cd ", "-C ", "linear_save_issue"];
+/** omp's Linear MCP tool that creates or updates an issue, called directly or through a write to its `xd://` device. */
+const SAVE_ISSUE = /(?:^|\/\/)mcp__linear_save_issue$/;
 /**
  * Where `located` starts a bash call that names no absolute `cwd`, so a relative `cd` keeps its path relative to the
  * session's directory, which the scan does not know: no real directory starts with a NUL.
@@ -136,6 +139,8 @@ export function parseShipProgress(data: unknown): ShipProgress | null {
 
 /** No arenas: one value, so that a session without any keeps the same facts from one refresh to the next. */
 const NO_ARENAS: readonly ArenaRecord[] = [];
+/** No saved issues, one value for the same reason. */
+const NO_ISSUES: readonly string[] = [];
 
 /** An arena as its `omp-arena.state` entry records it, or `null` when the entry lacks a task or two distinct runners; a judge that is a runner is dropped. */
 export function parseArenaRecord(data: unknown): ArenaRecord | null {
@@ -168,6 +173,10 @@ export class SessionFactsScan {
 	/** The PR numbers the session's own prompts name, `#7049` or `PR 7049`. */
 	readonly named = new Set<number>();
 	ship: ShipProgress | null = null;
+	/** The ids of the issues its Linear `save_issue` calls saved; a new array whenever one is added. */
+	issues: readonly string[] = NO_ISSUES;
+	/** `save_issue` calls whose result has not been read yet. */
+	readonly #savingIssues = new Set<string>();
 	/** The arenas the `arena` tool recorded, each replaced whole by a later entry naming the same runners. */
 	arenas: readonly ArenaRecord[] = NO_ARENAS;
 	/** omp ran the session as `omp -p` or `--mode json`, as the `headless-mark` extension records. */
@@ -195,7 +204,7 @@ export class SessionFactsScan {
 
 	applyLine(line: string): void {
 		const backgrounding = this.#pending.size > 0 && line.includes('"jobId"');
-		const answering = this.#pending.size > 0 && line.includes('"toolResult"');
+		const answering = (this.#pending.size > 0 || this.#savingIssues.size > 0) && line.includes('"toolResult"');
 		if (!backgrounding && !answering && !MARKERS.some(marker => line.includes(marker)) && !line.includes('"role":"user"') && !line.includes("skill-prompt")) return;
 		let entry: unknown;
 		try {
@@ -255,6 +264,7 @@ export class SessionFactsScan {
 			}
 			if (cwd) this.#workedIn(cwd);
 			if (call.name === "read" && typeof call.args.path === "string") this.#read(call.args.path);
+			if (SAVE_ISSUE.test(call.name) || (call.name === "write" && typeof call.args.path === "string" && SAVE_ISSUE.test(call.args.path))) this.#savingIssues.add(call.id);
 		}
 		this.#toolResult(entry.message);
 	}
@@ -269,6 +279,10 @@ export class SessionFactsScan {
 				this.#changed.add(path);
 				this.#workedIn(dirname(path));
 			}
+		}
+		if (callId !== undefined && this.#savingIssues.delete(callId) && !result.isError) {
+			const saved = linearIssueIdsIn([textOf(result.content)]).filter(id => !this.issues.includes(id));
+			if (saved.length > 0) this.issues = [...this.issues, ...saved];
 		}
 		if (result.toolName === "bash") {
 			const expected = callId === undefined ? undefined : this.#take(callId);
@@ -419,6 +433,7 @@ interface SessionScan {
 	branch: SessionBranch | null;
 	/** The /ship stage, arenas, and headless mark of its own file as the last refresh reported them, which `#scan` compares with. */
 	ship: ShipProgress | null;
+	issues: readonly string[];
 	arenas: readonly ArenaRecord[];
 	headless: boolean;
 }
@@ -503,7 +518,7 @@ const SCAN_PARALLEL = PROBE_PARALLEL;
 const ASK_AGAIN_MS = 60_000;
 
 /** The facts of a session before its first scan: one value, so that a caller can tell by identity that they did not change. */
-const NO_FACTS: SessionFacts = { pullRequests: [], ship: null, arenas: NO_ARENAS, worktree: null, branch: null, workspace: null, gone: false };
+const NO_FACTS: SessionFacts = { pullRequests: [], ship: null, issues: NO_ISSUES, arenas: NO_ARENAS, worktree: null, branch: null, workspace: null, gone: false };
 
 export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
@@ -560,7 +575,7 @@ export class SessionFactsIndex {
 		const gone = dir !== undefined && this.placement.gone(dir);
 		if (!session || sessionPath === null) return workspace || gone ? { ...NO_FACTS, workspace, gone } : NO_FACTS;
 		const own = this.#ownFile(sessionPath)?.fold;
-		return { pullRequests: session.pullRequests, ship: own?.scan.ship ?? null, arenas: session.arenas, worktree: session.worktree, branch: session.branch, workspace, gone };
+		return { pullRequests: session.pullRequests, ship: own?.scan.ship ?? null, issues: own?.scan.issues ?? NO_ISSUES, arenas: session.arenas, worktree: session.worktree, branch: session.branch, workspace, gone };
 	}
 
 	/** Whether omp last started session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
@@ -665,9 +680,12 @@ export class SessionFactsIndex {
 		return branchChanged || !same;
 	}
 
-	/** Collect every transcript's refs into the session. */
+	/** Collect the session's own refs, then the PRs its subagents opened: one a subagent only acted on, such as one it reviewed, is not the session's work. */
 	#gather(session: SessionScan, own: SessionFactsScan): void {
-		session.refs = transcriptsOf(session).flatMap(transcript => [...transcript.fold.scan.found.values()]);
+		session.refs = transcriptsOf(session).flatMap(transcript => {
+			const refs = [...transcript.fold.scan.found.values()];
+			return transcript === session.own ? refs : refs.filter(ref => ref.kind === "pr" && ref.link === "submitted");
+		});
 		session.named = own.named;
 	}
 
@@ -774,7 +792,7 @@ export class SessionFactsIndex {
 		session ??= {
 			modifiedAt: Number.NaN, cwd, own: new FoldedFile(path, () => new TranscriptFold(new SessionFactsScan(true), this.#ownFileFolds.map(folds => folds.start(path)))), subagents: new Map(),
 			refs: [], repo: null, named: new Set(), pullRequests: [], workDirs: [], worktree: null, branch: null,
-			ship: null, arenas: NO_ARENAS, headless: false,
+			ship: null, issues: NO_ISSUES, arenas: NO_ARENAS, headless: false,
 		};
 		this.#sessions.set(path, session);
 		for (const file of await subagentFiles(path)) {
@@ -785,8 +803,9 @@ export class SessionFactsIndex {
 		const own = session.own.fold.scan;
 		const ship = own.ship ?? null;
 		// The scan builds a new arenas list only when an arena entry arrives, so identity tells a change.
-		const changed = JSON.stringify(session.ship) !== JSON.stringify(ship) || own.arenas !== session.arenas || own.headless !== session.headless;
+		const changed = JSON.stringify(session.ship) !== JSON.stringify(ship) || own.arenas !== session.arenas || own.headless !== session.headless || own.issues !== session.issues;
 		session.ship = ship;
+		session.issues = own.issues;
 		session.arenas = own.arenas;
 		session.headless = own.headless;
 		const workDirs = [...own.workDirs].reverse().map(dir => absolute(cwd, dir));

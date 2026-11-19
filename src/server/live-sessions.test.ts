@@ -9,7 +9,7 @@ import type { HostSnapshot } from "../omp/collab";
 import type { SessionFacts } from "../shared/sessions";
 import { LiveSessions, withSubject } from "./live-sessions";
 
-const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], ship: null, arenas: [], worktree: null, branch: null, workspace: null, gone: false };
+const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], ship: null, issues: [], arenas: [], worktree: null, branch: null, workspace: null, gone: false };
 
 const dirs: string[] = [];
 /** The servers whose guests joined terminal sessions, which a test leaves. */
