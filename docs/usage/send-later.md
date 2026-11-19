@@ -24,6 +24,8 @@
 - A scheduled message carries text only: the clock button is off while the draft holds attached files or starts with a `!` or `$` command.
 - Sends go on the dashboard's minute tick, so a send can go up to a minute after its time.
   A send whose time passed while the dashboard was closed goes at the first tick after it starts.
+- An agent can schedule a message to its own session, such as a check on CI in five minutes after it pushed a pull request.
+  It shows in the **Scheduled** group and above the composer like one you scheduled, with **Send now**, **Edit**, and **Cancel**, and arrives as your message would.
 
 ## Continue after a usage limit or a connection error
 
