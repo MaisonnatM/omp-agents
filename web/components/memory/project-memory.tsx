@@ -1,4 +1,4 @@
-/** The Memory page's Project memory tab: one repository's memories in a table grouped by kind, beside the open memory, which is edited, added, or deleted there. */
+/** The Memory page's Project memory tab: one repository's memories, or every repository's, in a table grouped by kind, beside the open memory, which is edited, added, or deleted there. */
 import { IconBrain, IconFolderOpen, IconPlusSmall } from "central-icons";
 import { useRef, useState } from "react";
 import { MEMORY_KINDS, type MemoryKind, type RawOp } from "../../../templates/omp/agent/extensions/project-memory/contract";
@@ -10,7 +10,7 @@ import { activityControl } from "../../activity";
 import { editProjectMemory, PROJECT_MEMORY_URL } from "../../api";
 import { type Editable, useEditableRead } from "../../editable-read";
 import { dateLabel } from "../../labels";
-import { shownRepo } from "./memory-view";
+import { ALL_REPOS, shownRepo } from "./memory-view";
 import { useShortcuts } from "../../shortcuts";
 import { CommandPicker } from "../command-picker";
 import { CountPill } from "../count-pill";
@@ -21,13 +21,22 @@ import { LoadNote } from "../sheet-details";
 import { type Draft, draftOf, isSaved, KIND_LABELS, KindDot, MemoryEditor, sessionOf } from "./project-memory-editor";
 import { memoryHash } from "./tabs";
 
-/** The memory open beside the table: one by its slug, or a new one being written. */
-type Open = { slug: string } | "new" | null;
+/** One memory with the repository that holds it; `key` tells apart the same slug in two repositories. */
+interface Row {
+	key: string;
+	repo: ProjectMemoryRepo;
+	memory: ProjectMemoryEntry;
+}
 
-/** The key of a draft: the memory's slug, or `""` for the new one, which no slug can be. */
-const draftKey = (entry: ProjectMemoryEntry | null): string => entry?.slug ?? "";
+const rowKey = (repo: ProjectMemoryRepo, slug: string): string => `${repo.root}\n${slug}`;
 
-/** `repo`, the repository the address names, else the one holding `cwd`, the sidebar's workspace. */
+/** The memory open beside the table: one by its row key, or a new one being written. */
+type Open = { key: string } | "new" | null;
+
+/** The key of a draft: the row's key, or `""` for the new one, which no row key can be. */
+const draftKey = (row: Row | null): string => row?.key ?? "";
+
+/** `repo`, the repository the address names, or `ALL_REPOS` for every one, else the one holding `cwd`, the sidebar's workspace. */
 export function ProjectMemoryTab({ repo, cwd }: { repo: string | null; cwd: string | null }) {
 	const view = useEditableRead<ProjectMemoryView>(PROJECT_MEMORY_URL);
 	if (view.data === null) {
@@ -37,20 +46,27 @@ export function ProjectMemoryTab({ repo, cwd }: { repo: string | null; cwd: stri
 			</div>
 		);
 	}
+	if (repo === ALL_REPOS) return <RepoMemory key={ALL_REPOS} scope={null} repos={view.data.repos} view={view} />;
 	const shown = shownRepo(view.data.repos, repo, cwd);
 	if (shown === null) return <p className="px-4 py-4 text-sm text-muted-foreground">No workspace is in a git repository, so there is no project memory to show.</p>;
-	return <RepoMemory key={shown.root} repo={shown} repos={view.data.repos} view={view} />;
+	return <RepoMemory key={shown.root} scope={shown} repos={view.data.repos} view={view} />;
 }
 
-/** The repositories, each with how many memories it holds; picking one opens its address. */
-function RepoPicker({ repo, repos }: { repo: ProjectMemoryRepo; repos: ProjectMemoryRepo[] }) {
+/** **All projects**, then the repositories, each with how many memories it holds; picking one opens its address. */
+function RepoPicker({ scope, repos }: { scope: ProjectMemoryRepo | null; repos: ProjectMemoryRepo[] }) {
+	const total = repos.reduce((sum, each) => sum + each.memories.length, 0);
+	const choices = [
+		{ root: ALL_REPOS, name: "All projects", detail: `${repos.length.toLocaleString()} repositories`, count: total },
+		...repos.map(each => ({ root: each.root, name: each.name, detail: each.rootDisplay, count: each.memories.length })),
+	];
+	const current = scope?.root ?? ALL_REPOS;
 	return (
 		<span className="contents" {...activityControl("memory.project.repo")}>
 			<CommandPicker
-				trigger={<span className="max-w-64 truncate">{repo.name}</span>}
+				trigger={<span className="max-w-64 truncate">{scope?.name ?? "All projects"}</span>}
 				icon={IconFolderOpen}
-				ariaLabel={`Repository: ${repo.rootDisplay}`}
-				tooltip={repo.rootDisplay}
+				ariaLabel={`Repository: ${scope?.rootDisplay ?? "All projects"}`}
+				tooltip={scope?.rootDisplay ?? "All projects"}
 				search={{ label: "Search repositories" }}
 				width="lg"
 				list={{
@@ -58,18 +74,18 @@ function RepoPicker({ repo, repos }: { repo: ProjectMemoryRepo; repos: ProjectMe
 					groups: [
 						{
 							key: "repos",
-							items: repos.map(each => ({
-								value: `${each.name} ${each.rootDisplay}`,
+							items: choices.map(each => ({
+								value: `${each.name} ${each.detail}`,
 								label: (
 									<span className="flex min-w-0 flex-1 items-baseline gap-2">
 										<span className="truncate">{each.name}</span>
-										<span className="truncate text-xs text-muted-foreground">{each.rootDisplay}</span>
-										<span className="ml-auto text-xs text-muted-foreground tabular-nums">{each.memories.length.toLocaleString()}</span>
+										<span className="truncate text-xs text-muted-foreground">{each.detail}</span>
+										<span className="ml-auto text-xs text-muted-foreground tabular-nums">{each.count.toLocaleString()}</span>
 									</span>
 								),
-								selected: each.root === repo.root,
+								selected: each.root === current,
 								onSelect: () => {
-									if (each.root !== repo.root) location.hash = memoryHash({ tab: "project", repo: each.root });
+									if (each.root !== current) location.hash = memoryHash({ tab: "project", repo: each.root });
 								},
 							})),
 						},
@@ -81,47 +97,50 @@ function RepoPicker({ repo, repos }: { repo: ProjectMemoryRepo; repos: ProjectMe
 	);
 }
 
-/** The repository picker, kind filter, search, and New memory over the table, with the open memory beside it. */
-function RepoMemory({ repo, repos, view }: { repo: ProjectMemoryRepo; repos: ProjectMemoryRepo[]; view: Editable<ProjectMemoryView> }) {
+/** The repository picker, kind filter, search, and New memory over the table, with the open memory beside it; `scope` `null` shows every repository's. */
+function RepoMemory({ scope, repos, view }: { scope: ProjectMemoryRepo | null; repos: ProjectMemoryRepo[]; view: Editable<ProjectMemoryView> }) {
 	const [open, setOpen] = useState<Open>(null);
 	const [query, setQuery] = useState("");
 	const [kind, setKind] = useState<MemoryKind | null>(null);
 	const [drafts, setDrafts] = useState<Record<string, Draft>>({});
-	const rows = useRef(new Map<string, HTMLButtonElement>());
+	const rowButtons = useRef(new Map<string, HTMLButtonElement>());
 	const newButton = useRef<HTMLButtonElement>(null);
+	const all: Row[] = (scope === null ? repos : [scope]).flatMap(repo => repo.memories.map(memory => ({ key: rowKey(repo, memory.slug), repo, memory })));
+	if (scope === null) all.sort((a, b) => b.memory.updated.localeCompare(a.memory.updated));
 	const matches = everyWord(query);
-	const found = repo.memories.filter(memory => matches(`${memory.slug}\n${memory.line}\n${memory.body}`));
-	const groups = (kind === null ? MEMORY_KINDS : [kind]).map(each => ({ kind: each, memories: found.filter(memory => memory.kind === each) })).filter(group => group.memories.length > 0);
-	const memories = groups.flatMap(group => group.memories);
-	const entry = open !== null && open !== "new" ? (repo.memories.find(memory => memory.slug === open.slug) ?? null) : null;
-	const shown = open === "new" || entry !== null;
-	useReturnFocus(shown ? draftKey(entry) : null, key => key, key => (key === "" ? newButton.current : rows.current.get(key)), memories);
-	const send = (ops: RawOp[]): Promise<ProjectMemoryView> => view.write(() => editProjectMemory({ root: repo.root, ops }));
-	const keepDraft = (of: ProjectMemoryEntry | null, draft: Draft | null): void =>
-		setDrafts(all => {
-			const { [draftKey(of)]: _, ...rest } = all;
-			return draft === null || isSaved(of, draft) ? rest : { ...rest, [draftKey(of)]: draft };
+	const found = all.filter(({ repo, memory }) => matches(`${memory.slug}\n${memory.line}\n${memory.body}${scope === null ? `\n${repo.name}` : ""}`));
+	const groups = (kind === null ? MEMORY_KINDS : [kind]).map(each => ({ kind: each, rows: found.filter(row => row.memory.kind === each) })).filter(group => group.rows.length > 0);
+	const shownRows = groups.flatMap(group => group.rows);
+	const entry = open !== null && open !== "new" ? (all.find(row => row.key === open.key) ?? null) : null;
+	const shown = (open === "new" && scope !== null) || entry !== null;
+	useReturnFocus(shown ? draftKey(entry) : null, key => key, key => (key === "" ? newButton.current : rowButtons.current.get(key)), shownRows);
+	const target = entry?.repo ?? scope;
+	const send = (ops: RawOp[]): Promise<ProjectMemoryView> => (target === null ? Promise.reject(new Error("No repository to save in.")) : view.write(() => editProjectMemory({ root: target.root, ops })));
+	const keepDraft = (of: Row | null, draft: Draft | null): void =>
+		setDrafts(every => {
+			const { [draftKey(of)]: _, ...rest } = every;
+			return draft === null || isSaved(of?.memory ?? null, draft) ? rest : { ...rest, [draftKey(of)]: draft };
 		});
 	const step = (by: 1 | -1): void => {
 		if (open === "new") return;
-		const at = entry !== null ? memories.indexOf(entry) : memories.findIndex(memory => rows.current.get(memory.slug) === document.activeElement);
-		const next = at >= 0 ? memories[at + by] : memories[by === 1 ? 0 : memories.length - 1];
+		const at = entry !== null ? shownRows.indexOf(entry) : shownRows.findIndex(row => rowButtons.current.get(row.key) === document.activeElement);
+		const next = at >= 0 ? shownRows[at + by] : shownRows[by === 1 ? 0 : shownRows.length - 1];
 		if (!next) return;
-		if (entry !== null) return setOpen({ slug: next.slug });
-		const row = rows.current.get(next.slug);
-		row?.focus();
-		row?.scrollIntoView({ block: "nearest" });
+		if (entry !== null) return setOpen({ key: next.key });
+		const button = rowButtons.current.get(next.key);
+		button?.focus();
+		button?.scrollIntoView({ block: "nearest" });
 	};
 	useShortcuts({ memoryProjectNext: () => step(1), memoryProjectPrevious: () => step(-1), memoryProjectClose: () => setOpen(null) });
-	const at = entry === null ? -1 : memories.indexOf(entry);
+	const at = entry === null ? -1 : shownRows.indexOf(entry);
 	const chips: { value: MemoryKind | null; label: string; count: number }[] = [
 		{ value: null, label: "All", count: found.length },
-		...MEMORY_KINDS.map(each => ({ value: each, label: KIND_LABELS[each], count: found.filter(memory => memory.kind === each).length })),
+		...MEMORY_KINDS.map(each => ({ value: each, label: KIND_LABELS[each], count: found.filter(row => row.memory.kind === each).length })),
 	];
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2">
-				<RepoPicker repo={repo} repos={repos} />
+				<RepoPicker scope={scope} repos={repos} />
 				<div role="group" aria-label="Kind" className="flex items-center gap-1">
 					{chips.map(chip => (
 						<Button key={chip.label} variant="ghost" size="compact" active={kind === chip.value} aria-pressed={kind === chip.value} onClick={() => setKind(chip.value)}>
@@ -133,9 +152,11 @@ function RepoMemory({ repo, repos, view }: { repo: ProjectMemoryRepo; repos: Pro
 				</div>
 				<div className="ml-auto flex items-center gap-2">
 					<SearchField label="Search memories" placeholder="Search" query={query} onQuery={setQuery} className="w-36" />
-					<Button ref={newButton} variant="ghost" size="compact" leadingIcon={IconPlusSmall} onClick={() => setOpen("new")} {...activityControl("memory.project.add")}>
-						New memory
-					</Button>
+					{scope !== null && (
+						<Button ref={newButton} variant="ghost" size="compact" leadingIcon={IconPlusSmall} onClick={() => setOpen("new")} {...activityControl("memory.project.add")}>
+							New memory
+						</Button>
+					)}
 				</div>
 			</div>
 			<div className="min-h-0 flex-1">
@@ -147,28 +168,41 @@ function RepoMemory({ repo, repos, view }: { repo: ProjectMemoryRepo; repos: Pro
 					empty={{ icon: IconBrain, title: "No memory open", hint: "Pick a memory to read and edit it here." }}
 					list={
 						<div className="@container">
-							<MemoryTable repo={repo} groups={groups} grouped={kind === null} entry={entry} drafts={drafts} rows={rows.current} onOpen={slug => setOpen({ slug })} />
-							{repo.memories.length === 0 && <p className="px-4 py-4 text-sm text-muted-foreground">No memory in {repo.name} yet. An agent records one with its project_memory tool, or click New memory.</p>}
-							{repo.memories.length > 0 && memories.length === 0 && <p className="px-4 py-4 text-sm text-muted-foreground">No memory matches.</p>}
+							<MemoryTable
+								caption={scope === null ? "Memories in every project" : `Memories in ${scope.name}`}
+								withProject={scope === null}
+								groups={groups}
+								grouped={kind === null}
+								entry={entry}
+								drafts={drafts}
+								rowButtons={rowButtons.current}
+								onOpen={key => setOpen({ key })}
+							/>
+							{all.length === 0 && (
+								<p className="px-4 py-4 text-sm text-muted-foreground">
+									{scope === null ? "No project memory yet. An agent records one with its project_memory tool." : `No memory in ${scope.name} yet. An agent records one with its project_memory tool, or click New memory.`}
+								</p>
+							)}
+							{all.length > 0 && shownRows.length === 0 && <p className="px-4 py-4 text-sm text-muted-foreground">No memory matches.</p>}
 						</div>
 					}
 					detail={
 						shown ? (
-							<section key={draftKey(entry)} aria-label={entry?.slug ?? "New memory"}>
+							<section key={draftKey(entry)} aria-label={entry?.memory.slug ?? "New memory"}>
 								<DetailBar
-									leading={entry === null ? "New memory" : <span className="font-mono">{entry.slug}</span>}
+									leading={entry === null ? "New memory" : <span className="font-mono">{entry.memory.slug}</span>}
 									previous={{ label: "Previous memory", icon: CH_PREVIOUS, shortcut: "memoryProjectPrevious", onClick: at > 0 ? () => step(-1) : undefined }}
-									next={{ label: "Next memory", icon: CH_NEXT, shortcut: "memoryProjectNext", onClick: at >= 0 && at < memories.length - 1 ? () => step(1) : undefined }}
+									next={{ label: "Next memory", icon: CH_NEXT, shortcut: "memoryProjectNext", onClick: at >= 0 && at < shownRows.length - 1 ? () => step(1) : undefined }}
 									close={{ label: "Close the memory", icon: CH_CLOSE, shortcut: "memoryProjectClose", onClick: () => setOpen(null) }}
 								/>
 								<MemoryEditor
-									entry={entry}
-									draft={drafts[draftKey(entry)] ?? draftOf(entry)}
+									entry={entry?.memory ?? null}
+									draft={drafts[draftKey(entry)] ?? draftOf(entry?.memory ?? null)}
 									onDraft={draft => keepDraft(entry, draft)}
 									send={send}
 									onSaved={slug => {
 										keepDraft(entry, null);
-										setOpen({ slug });
+										if (target !== null) setOpen({ key: rowKey(target, slug) });
 									}}
 									onDeleted={() => {
 										keepDraft(entry, null);
@@ -192,29 +226,32 @@ const NO_SESSION = "@max-4xl:invisible @max-4xl:w-0 @max-4xl:p-0";
 
 /**
  * The memories' table; with every kind shown, a sticky header with its count heads each kind's rows, and with one kind
- * picked the chip names it, so no column repeats the kind. Line keeps the room: Session goes under 56rem, then Slug under 48rem.
+ * picked the chip names it, so no column repeats the kind. `withProject` adds the repository's column, for All projects.
+ * Line keeps the room: Session goes under 56rem, then Slug under 48rem.
  */
 function MemoryTable({
-	repo,
+	caption,
+	withProject,
 	groups,
 	grouped,
 	entry,
 	drafts,
-	rows,
+	rowButtons,
 	onOpen,
 }: {
-	repo: ProjectMemoryRepo;
-	groups: { kind: MemoryKind; memories: ProjectMemoryEntry[] }[];
+	caption: string;
+	withProject: boolean;
+	groups: { kind: MemoryKind; rows: Row[] }[];
 	grouped: boolean;
-	entry: ProjectMemoryEntry | null;
+	entry: Row | null;
 	drafts: Record<string, Draft>;
-	rows: Map<string, HTMLButtonElement>;
-	onOpen: (slug: string) => void;
+	rowButtons: Map<string, HTMLButtonElement>;
+	onOpen: (key: string) => void;
 }) {
 	if (groups.length === 0) return null;
 	return (
 		<table className="w-full table-fixed border-collapse text-sm">
-			<caption className="sr-only">Memories in {repo.name}</caption>
+			<caption className="sr-only">{caption}</caption>
 			<thead className="sticky top-0 z-2 bg-background">
 				<tr className="border-b border-border">
 					<th scope="col" className={cn(HEAD, "w-52 pl-4", NO_SLUG)}>
@@ -223,6 +260,11 @@ function MemoryTable({
 					<th scope="col" className={cn(HEAD, "@max-3xl:pl-4")}>
 						Line
 					</th>
+					{withProject && (
+						<th scope="col" className={cn(HEAD, "w-32")}>
+							Project
+						</th>
+					)}
 					<th scope="col" className={cn(HEAD, "w-24 @max-4xl:pr-4")}>
 						Updated
 					</th>
@@ -235,37 +277,44 @@ function MemoryTable({
 				<tbody key={group.kind}>
 					{grouped && (
 						<tr>
-							<th colSpan={4} scope="colgroup" className="sticky top-9 z-1 h-9 border-b border-border bg-muted/80 pl-4 text-left text-xs font-medium backdrop-blur">
+							<th colSpan={withProject ? 5 : 4} scope="colgroup" className="sticky top-9 z-1 h-9 border-b border-border bg-muted/80 pl-4 text-left text-xs font-medium backdrop-blur">
 								<span className="flex items-center gap-2">
 									<KindDot kind={group.kind} />
 									{KIND_LABELS[group.kind]}
-									<CountPill count={group.memories.length} />
+									<CountPill count={group.rows.length} />
 								</span>
 							</th>
 						</tr>
 					)}
-					{group.memories.map(memory => {
+					{group.rows.map(row => {
+						const { memory } = row;
 						const session = sessionOf(memory.source);
+						const current = row.key === entry?.key;
 						return (
-							<tr key={memory.slug} className={cn("relative h-10 border-b border-border/60 hover:bg-accent/50 has-[:focus-visible]:bg-accent/50", memory === entry && "bg-accent hover:bg-accent")}>
+							<tr key={row.key} className={cn("relative h-10 border-b border-border/60 hover:bg-accent/50 has-[:focus-visible]:bg-accent/50", current && "bg-accent hover:bg-accent")}>
 								<td className={cn("truncate pl-4 pr-2 font-mono text-xs text-muted-foreground", NO_SLUG)}>{memory.slug}</td>
 								<td className="px-2 @max-3xl:pl-4">
 									<button
 										type="button"
 										ref={button => {
-											if (button) rows.set(memory.slug, button);
-											else rows.delete(memory.slug);
+											if (button) rowButtons.set(row.key, button);
+											else rowButtons.delete(row.key);
 										}}
 										title={memory.line}
-										aria-current={memory === entry || undefined}
-										onClick={() => onOpen(memory.slug)}
+										aria-current={current || undefined}
+										onClick={() => onOpen(row.key)}
 										className="flex w-full min-w-0 items-center gap-2 text-left outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
 										{...activityControl("memory.project.open")}
 									>
 										<span className="truncate">{memory.line}</span>
-										{drafts[memory.slug] && <span className="shrink-0 text-xs text-muted-foreground">Unsaved</span>}
+										{drafts[row.key] && <span className="shrink-0 text-xs text-muted-foreground">Unsaved</span>}
 									</button>
 								</td>
+								{withProject && (
+									<td className="truncate px-2 text-xs text-muted-foreground" title={row.repo.rootDisplay}>
+										{row.repo.name}
+									</td>
+								)}
 								<td className="px-2 text-xs text-muted-foreground tabular-nums @max-4xl:pr-4">{dateLabel(memory.updated)}</td>
 								<td className={cn("truncate pr-4 pl-2 text-xs text-muted-foreground", session !== null && "font-mono", NO_SESSION)}>{session ?? "This page"}</td>
 							</tr>

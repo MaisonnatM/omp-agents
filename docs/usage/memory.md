@@ -11,6 +11,7 @@
   The **Decision**, **Fact**, and **Lesson** chips, each with its count, show only that kind.
 - The repository picker lists every workspace's git repository with how many memories it holds.
   The page opens on the repository that holds the sidebar's workspace, and `#memory?repo=<path>` opens another.
+  **All projects**, at the top of the picker or `#memory?repo=all`, lists every repository's memories in one table with a **Project** column; New memory shows only with one repository picked.
 - **Search** narrows the table to memories whose slug, line, or body holds every word you type.
 - Click a row, or move to it with the up and down arrows or `j` and `k` and press Enter, to open the memory beside the table, as Bookmarks opens a bookmark; drag the line between them to size the table.
   Change its kind, line, or body, and click **Save**, or press Enter in the line or ⌘ Enter in the body.
