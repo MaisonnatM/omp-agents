@@ -1,4 +1,4 @@
-/** The Memory page's three tabs and their addresses. */
+/** The Memory page's two tabs and their addresses. */
 import { hashForPage } from "../../routing";
 import type { MemoryControlId, MemoryRoute } from "./module";
 
@@ -7,7 +7,6 @@ export const memoryHash = (route: MemoryRoute): string => hashForPage({ kind: "m
 
 /** The tabs the page's header lists; `control` tags each. */
 export const MEMORY_TABS = [
-	{ route: { tab: "omp" }, name: "omp memory", control: "memory.tab.omp" },
 	{ route: { tab: "project", repo: null }, name: "Project memory", control: "memory.tab.project" },
 	{ route: { tab: "bookmarks", q: "" }, name: "Bookmarks", control: "memory.tab.bookmarks" },
 ] as const satisfies readonly { route: MemoryRoute; name: string; control: MemoryControlId }[];

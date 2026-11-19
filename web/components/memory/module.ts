@@ -2,11 +2,10 @@
 import { IconBrain } from "central-icons";
 import type { PageModule } from "../../modules";
 
-/** The Memory page's tab: omp memory, one repository's project memory (`null` for the one the page picks), or the bookmarks narrowed by search `q`. */
-export type MemoryRoute = { tab: "omp" } | { tab: "project"; repo: string | null } | { tab: "bookmarks"; q: string };
+/** The Memory page's tab: one repository's project memory (`null` for the one the page picks), or the bookmarks narrowed by search `q`. */
+export type MemoryRoute = { tab: "project"; repo: string | null } | { tab: "bookmarks"; q: string };
 
 export type MemoryControlId =
-	| "memory.tab.omp"
 	| "memory.tab.project"
 	| "memory.tab.bookmarks"
 	| "memory.project.repo"
@@ -23,16 +22,15 @@ type MemoryShortcutId = "memoryProjectNext" | "memoryProjectPrevious" | "memoryP
 export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, MemoryShortcutId, MemoryControlId> = {
 	id: "memory",
 	tab: { label: "Memory", icon: IconBrain, place: 70 },
-	about: "What omp and your projects remember, and your Zen and x.com bookmarks, which agents can search.",
-	home: { tab: "omp" },
-	/** `#memory` is omp memory, `#memory/project` the project memory with `?repo=<root>` that repository's, and `#memory/bookmarks` the bookmarks with `?q=<search>` a search. */
+	about: "What your projects remember, and your Zen and x.com bookmarks, which agents can search.",
+	home: { tab: "project", repo: null },
+	/** `#memory` is the project memory with `?repo=<root>` that repository's (`#memory/project` too, from older links), and `#memory/bookmarks` the bookmarks with `?q=<search>` a search. */
 	address: {
 		parse(rest, query) {
-			if (rest === "project") return { tab: "project", repo: query.get("repo") || null };
 			if (rest === "bookmarks") return { tab: "bookmarks", q: query.get("q") ?? "" };
-			return { tab: "omp" };
+			return { tab: "project", repo: query.get("repo") || null };
 		},
-		rest: route => (route.tab === "omp" ? null : route.tab),
+		rest: route => (route.tab === "project" ? null : route.tab),
 		query(route) {
 			if (route.tab === "project") return route.repo === null ? null : `repo=${encodeURIComponent(route.repo)}`;
 			return route.tab === "bookmarks" && route.q !== "" ? `q=${encodeURIComponent(route.q)}` : null;
@@ -40,11 +38,10 @@ export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, MemoryShortcutId, Me
 	},
 	title: () => "Memory",
 	views: [
-		{ key: "memory", label: "omp memory" },
-		{ key: "memory/project", label: "Project memory" },
+		{ key: "memory", label: "Project memory" },
 		{ key: "memory/bookmarks", label: "Bookmarks" },
 	],
-	view: route => (route.tab === "omp" ? "memory" : `memory/${route.tab}`),
+	view: route => (route.tab === "project" ? "memory" : `memory/${route.tab}`),
 	shortcuts: {
 		category: "Memory",
 		goTo: { label: "Go to your memory and bookmarks", command: "Go to memory", keys: [] },
@@ -86,7 +83,6 @@ export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, MemoryShortcutId, Me
 		],
 	},
 	controls: [
-		{ id: "memory.tab.omp", label: "Memory omp memory tab", area: "Memory" },
 		{ id: "memory.tab.project", label: "Memory Project memory tab", area: "Memory" },
 		{ id: "memory.tab.bookmarks", label: "Memory Bookmarks tab", area: "Memory" },
 		{ id: "memory.project.repo", label: "Project memory repository picker", area: "Memory" },

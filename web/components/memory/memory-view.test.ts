@@ -16,11 +16,10 @@ test("the Project memory tab shows the repository the address names, else the wo
 	expect(shownRepo([], null, null)).toBeNull();
 });
 
-test("memory routes open omp memory, a repository's project memory, and a bookmark search, and round-trip", () => {
+test("memory routes open a repository's project memory and a bookmark search, and round-trip", () => {
 	const routes: [MemoryRoute, string][] = [
-		[{ tab: "omp" }, "#memory"],
-		[{ tab: "project", repo: null }, "#memory/project"],
-		[{ tab: "project", repo: "/Users/me/code/omp agents" }, "#memory/project?repo=%2FUsers%2Fme%2Fcode%2Fomp%20agents"],
+		[{ tab: "project", repo: null }, "#memory"],
+		[{ tab: "project", repo: "/Users/me/code/omp agents" }, "#memory?repo=%2FUsers%2Fme%2Fcode%2Fomp%20agents"],
 		[{ tab: "bookmarks", q: "" }, "#memory/bookmarks"],
 		[{ tab: "bookmarks", q: "spring & design" }, "#memory/bookmarks?q=spring%20%26%20design"],
 	];
@@ -28,5 +27,5 @@ test("memory routes open omp memory, a repository's project memory, and a bookma
 		expect(memoryHash(route)).toBe(hash);
 		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "memory", ...route } });
 	}
-	expect(routeFromHash("#memory/elsewhere")).toEqual({ kind: "page", page: { kind: "memory", tab: "omp" } });
+	expect(routeFromHash("#memory/project?repo=%2Fr")).toEqual({ kind: "page", page: { kind: "memory", tab: "project", repo: "/r" } });
 });
