@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-20
 
+- Pull requests: a failing `human-review` check no longer shows **Fix CI**, even once the pull request is approved and the check has not rerun yet.
 - Memory: the omp memory tab is gone from the Memory page, which now opens on Project memory; omp memory stays in Settings › omp memory.
 - Project memory: the Memory page now opens on **All projects**, every repository's memories in one table with the project each belongs to; the repository picker still narrows it to one.
 - Sessions: ↑ and ↓ no longer switch to another session while a dialog, such as the image viewer, is open.
