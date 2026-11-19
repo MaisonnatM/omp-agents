@@ -19,6 +19,20 @@ function parseOptions(options: unknown, details: unknown): RequestOption[] | nul
 	return rows;
 }
 
+/**
+ * A select's checkbox rows from omp's `selectionMarker`, `markableCount`, and `checkedIndices`, which RPC and Collab
+ * frames share: an `ask` multi-select question sent step by step, whose trailing rows, such as Done selecting, are actions.
+ */
+function checkboxesOf(frame: Record<string, unknown>, options: RequestOption[]): { checkboxes: number; checked: number[] } {
+	if (frame.selectionMarker !== "checkbox") return { checkboxes: 0, checked: [] };
+	const markable = frame.markableCount;
+	const checkboxes = typeof markable === "number" && Number.isInteger(markable) && markable >= 0 && markable <= options.length ? markable : options.length;
+	const checked = Array.isArray(frame.checkedIndices)
+		? frame.checkedIndices.filter((index): index is number => Number.isInteger(index) && index >= 0 && index < checkboxes)
+		: [];
+	return { checkboxes, checked };
+}
+
 /** omp's `RpcAskDialogQuestion`s, or `null` when any is malformed. */
 function parseAskQuestions(value: unknown): AskQuestion[] | null {
 	if (!Array.isArray(value) || value.length === 0) return null;
@@ -57,7 +71,7 @@ export function parseRpcRequest(frame: Record<string, unknown>, now: number): Rp
 	switch (frame.method) {
 		case "select": {
 			const options = parseOptions(frame.options, frame.optionDetails);
-			return options ? { kind: "add", request: { ...base, kind: "select", options, checked: [] } } : null;
+			return options ? { kind: "add", request: { ...base, kind: "select", options, ...checkboxesOf(frame, options) } } : null;
 		}
 		case "confirm":
 			return { kind: "add", request: { ...base, kind: "confirm", message: str(frame.message) ?? "" } };
@@ -109,11 +123,7 @@ export function parseCollabRequest(value: unknown): UserRequest | null {
 	if (value.kind !== "select") return null;
 	const options = parseOptions(value.options, null);
 	if (!options) return null;
-	const checked =
-		value.selectionMarker === "checkbox" && Array.isArray(value.checkedIndices)
-			? value.checkedIndices.filter((index): index is number => Number.isInteger(index) && index >= 0 && index < options.length)
-			: [];
-	return { ...base, kind: "select", options, checked };
+	return { ...base, kind: "select", options, ...checkboxesOf(value, options) };
 }
 
 /**

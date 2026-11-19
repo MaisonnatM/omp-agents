@@ -27,6 +27,7 @@ describe("parseRpcRequest", () => {
 					{ label: "Red", description: null },
 					{ label: "Blue", description: "calm" },
 				],
+				checkboxes: 0,
 				checked: [],
 			},
 		});
@@ -49,6 +50,20 @@ describe("parseRpcRequest", () => {
 		expect(parseRpcRequest(frame("cancel", { targetId: "r0" }), NOW)).toEqual({ kind: "cancel", id: "r0" });
 		expect(parseRpcRequest(frame("notify", { message: "hi" }), NOW)).toBeNull();
 		expect(parseRpcRequest(frame("select", { title: "Pick", options: [1, 2] }), NOW)).toBeNull();
+	});
+
+	test("reads an ask multi-select step as checkbox rows, its checked rows, and its trailing actions", () => {
+		const frame = {
+			type: "extension_ui_request",
+			id: "r2",
+			method: "select",
+			title: "(1 selected) Scope",
+			options: ["Combobox", "Color Picker", "Other (type your own)", "✓ Done selecting"],
+			selectionMarker: "checkbox",
+			checkedIndices: [1, 3, 7],
+			markableCount: 3,
+		};
+		expect(parseRpcRequest(frame, NOW)).toMatchObject({ kind: "add", request: { kind: "select", checkboxes: 3, checked: [1] } });
 	});
 
 	test("reads a whole ask as one request titled by its first question, and drops a malformed one", () => {
@@ -117,6 +132,7 @@ describe("parseCollabRequest", () => {
 				{ label: "Rust", description: null },
 				{ label: "Next →", description: null },
 			],
+			checkboxes: 2,
 			checked: [0],
 		});
 	});
@@ -137,6 +153,7 @@ describe("parseCollabRequest", () => {
 			deadline: null,
 			kind: "select",
 			options: [{ label: "Yes", description: null }],
+			checkboxes: 0,
 			checked: [],
 		});
 	});
@@ -149,6 +166,7 @@ describe("PendingRequests", () => {
 		deadline,
 		kind: "select",
 		options: [{ label: "Red", description: null }],
+		checkboxes: 0,
 		checked: [],
 	});
 
