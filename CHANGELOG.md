@@ -8,6 +8,7 @@ The dashboard shows the same lines in Settings › What's new.
 - A new Memory tab gathers your omp memory, each repository's project memory, and your bookmarks in one page.
 - You can read, add, edit, and delete the project memories your agents wrote, for every repository you work in.
 - Your Zen bookmarks and your x.com bookmarks show in Memory, searchable, and Sync x.com reads the x.com ones again through your Zen sign-in.
+- x.com posts in another language show in English, translated by Google Translate when you sync, and the reader can show the original.
 - Agents can now search your bookmarks when you ask them to.
 - Agents now ask for several independent tool calls at once more often and see how long they have been working, so Claude sessions should finish sooner. Set OMP_AGENT_PACE=0 to turn it off.
 - Builds and test runs from parallel sessions wait less: the machine now shares a third of its CPU cores between them instead of a quarter.

@@ -115,6 +115,8 @@ function postOf(entry: unknown): XBookmark | null {
 		name: decodeEntities(text(pick(user, "core", "name")) ?? text(pick(user, "legacy", "name")) ?? handle),
 		handle: `@${handle}`,
 		text: decodeEntities(text(pick(result, "note_tweet", "note_tweet_results", "result", "text")) ?? text(pick(result, "legacy", "full_text")) ?? ""),
+		lang: text(pick(result, "legacy", "lang")),
+		translation: null,
 		addedAt: new Date(Number.isNaN(posted) ? 0 : posted).toISOString(),
 	};
 }

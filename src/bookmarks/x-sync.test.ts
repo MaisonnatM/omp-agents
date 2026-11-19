@@ -2,11 +2,11 @@ import { expect, test } from "bun:test";
 import { tweetEntry, X_PAGE, xUser } from "./fixtures";
 import { bookmarkChunks, bookmarksQueryIn, xBookmarksPage } from "./x-sync";
 
-test("maps a page of the Bookmarks answer to bookmarks and its next cursor", () => {
+test("maps a page of the Bookmarks answer to bookmarks, with the language X detected, and its next cursor", () => {
 	expect(xBookmarksPage(X_PAGE)).toEqual({
 		bookmarks: [
-			{ source: "x", id: "x:111", url: "https://x.com/omarsar0/status/111", name: "elvis", handle: "@omarsar0", text: "Strong primitives", addedAt: "2026-11-18T14:09:32.000Z" },
-			{ source: "x", id: "x:222", url: "https://x.com/old/status/222", name: "Old Shape", handle: "@old", text: "The whole long post", addedAt: "2026-11-17T10:00:00.000Z" },
+			{ source: "x", id: "x:111", url: "https://x.com/omarsar0/status/111", name: "elvis", handle: "@omarsar0", text: "Strong primitives", lang: "en", translation: null, addedAt: "2026-11-18T14:09:32.000Z" },
+			{ source: "x", id: "x:222", url: "https://x.com/old/status/222", name: "Old Shape", handle: "@old", text: "The whole long post", lang: null, translation: null, addedAt: "2026-11-17T10:00:00.000Z" },
 		],
 		cursor: "NEXT",
 	});

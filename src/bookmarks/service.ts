@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { atomicWriteText } from "../fs";
 import type { BookmarksView } from "../shared/memory-page";
 import { mergeBookmarks, readXFile, type XFile } from "./store";
+import { translatePosts } from "./translate";
 import { type Fetch, fetchXBookmarks, NOT_SIGNED_IN, XSyncError } from "./x-sync";
 import { COOKIES, PLACES, readXCookies, readZenBookmarks } from "./zen";
 
@@ -69,7 +70,8 @@ export class Bookmarks {
 		let next: XFile;
 		try {
 			if (!cookies) throw new XSyncError(NOT_SIGNED_IN);
-			const bookmarks = await fetchXBookmarks(this.env.fetch, cookies);
+			const posts = await fetchXBookmarks(this.env.fetch, cookies);
+			const bookmarks = await translatePosts(this.env.fetch, posts, readXFile(this.env.xFile).synced?.bookmarks ?? []);
 			next = { synced: { at: (this.env.now?.() ?? new Date()).toISOString(), bookmarks }, lastError: null };
 		} catch (error) {
 			if (!(error instanceof XSyncError)) throw error;

@@ -1,6 +1,6 @@
 /** The open bookmark in the Bookmarks tab's reader: a post's whole text with its links, or a page's address and date, and a link that opens it in your browser. */
-import { IconCalendar1, IconGlobe, IconSquareArrowTopRight } from "central-icons";
-import { Fragment } from "react";
+import { IconCalendar1, IconGlobe, IconSquareArrowTopRight, IconTranslate } from "central-icons";
+import { Fragment, useState } from "react";
 import type { XBookmark, ZenBookmark } from "../../../src/shared/memory-page";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -44,7 +44,20 @@ export function PageReader({ page }: { page: ZenBookmark }) {
 	);
 }
 
+const LANGUAGES = new Intl.DisplayNames(["en"], { type: "language" });
+
+/** `lang`'s name in English, `French` for `fr`; the code itself when the browser knows no name for it. */
+function languageName(lang: string): string {
+	try {
+		return LANGUAGES.of(lang) ?? lang;
+	} catch {
+		return lang;
+	}
+}
+
 export function PostReader({ post }: { post: XBookmark }) {
+	const [original, setOriginal] = useState(false);
+	const shown = original || post.translation === null ? post.text : post.translation;
 	return (
 		<article className="mx-auto max-w-2xl space-y-5 px-8 py-8">
 			<header className="flex items-center gap-3">
@@ -56,7 +69,19 @@ export function PostReader({ post }: { post: XBookmark }) {
 					<span className="block truncate text-sm text-muted-foreground">{post.handle}</span>
 				</span>
 			</header>
-			{post.text && <PostText text={post.text} className="text-[15px] leading-relaxed" />}
+			<div className="space-y-2">
+				{shown && <PostText text={shown} className="text-[15px] leading-relaxed" />}
+				{post.translation !== null && (
+					<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+						<IconTranslate aria-hidden className="size-3.5" />
+						{original ? `Original in ${languageName(post.lang ?? "")}` : `Translated from ${languageName(post.lang ?? "")}`}
+						<span aria-hidden>·</span>
+						<button type="button" aria-pressed={original} onClick={() => setOriginal(!original)} className={cn(LINK, "rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring")}>
+							{original ? "Show translation" : "Show original"}
+						</button>
+					</p>
+				)}
+			</div>
 			<p className="text-xs text-muted-foreground">Posted {fullDate(post.addedAt)}</p>
 			<OpenLink url={post.url} label="Open on x.com" />
 		</article>

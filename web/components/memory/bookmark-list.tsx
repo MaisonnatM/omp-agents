@@ -87,7 +87,7 @@ function PostRow({ post }: { post: XBookmark }) {
 				<RowTop url={post.url} title={post.name} at={post.addedAt} />
 			</span>
 			<span className="line-clamp-2 pl-6.5 text-xs text-muted-foreground">
-				{post.handle} · {post.text}
+				{post.handle} · {post.translation ?? post.text}
 			</span>
 		</span>
 	);

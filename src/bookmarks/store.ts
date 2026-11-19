@@ -12,8 +12,16 @@ export interface XFile {
 
 const NO_X: XFile = { synced: null, lastError: null };
 
-const isXBookmark = (value: unknown): value is XBookmark =>
-	isObject(value) && value.source === "x" && [value.id, value.url, value.name, value.handle, value.text, value.addedAt].every(field => typeof field === "string");
+const isText = (value: unknown): value is string => typeof value === "string";
+const isOptionalText = (value: unknown): value is string | null | undefined => value === undefined || value === null || isText(value);
+
+/** `value` as a post, `null` when a field is missing or not text; a file from before translations reads with none. */
+function xBookmarkOf(value: unknown): XBookmark | null {
+	if (!isObject(value) || value.source !== "x") return null;
+	const { id, url, name, handle, text, addedAt, lang, translation } = value;
+	if (!isText(id) || !isText(url) || !isText(name) || !isText(handle) || !isText(text) || !isText(addedAt) || !isOptionalText(lang) || !isOptionalText(translation)) return null;
+	return { source: "x", id, url, name, handle, text, addedAt, lang: lang ?? null, translation: translation ?? null };
+}
 
 /** The file at `path`, or no sync when it is missing, unreadable, or in another shape; a post not in the shape is left out. */
 export function readXFile(path: string): XFile {
@@ -26,7 +34,7 @@ export function readXFile(path: string): XFile {
 	if (!isObject(raw)) return NO_X;
 	const { synced, lastError } = raw;
 	return {
-		synced: isObject(synced) && typeof synced.at === "string" && Array.isArray(synced.bookmarks) ? { at: synced.at, bookmarks: synced.bookmarks.filter(isXBookmark) } : null,
+		synced: isObject(synced) && typeof synced.at === "string" && Array.isArray(synced.bookmarks) ? { at: synced.at, bookmarks: synced.bookmarks.flatMap(post => xBookmarkOf(post) ?? []) } : null,
 		lastError: typeof lastError === "string" ? lastError : null,
 	};
 }

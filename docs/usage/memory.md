@@ -39,7 +39,9 @@
 - Click a bookmark, or move to it with the up and down arrows or `j` and `k` and press Enter, to read it on the right: a post's whole text with its links, or a page's address and date.
   The arrows at the reader's top, or the same keys, open the previous and next bookmark, and **×** or Escape closes it.
   **Open on x.com** or **Open page** opens it in your browser.
-- **Search** keeps the bookmarks whose title, address, folder, author, or post holds every word you type, and `#memory/bookmarks?q=<words>` opens a search.
+- A post in another language shows in English, in the list and in the reader, which says which language it was translated from; **Show original** shows the post as written.
+  Each sync sends the text of the posts not yet translated to Google Translate, so that text leaves your machine for Google.
+- **Search** keeps the bookmarks whose title, address, folder, author, post, or a post's English holds every word you type, and `#memory/bookmarks?q=<words>` opens a search.
 - The right of the toolbar says when the x.com bookmarks were last read, or why they could not be.
   They are read through your x.com sign-in in Zen, so sign in to x.com in Zen first.
   **Sync x.com** reads them again.

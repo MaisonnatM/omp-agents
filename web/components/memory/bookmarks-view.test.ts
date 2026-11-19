@@ -3,9 +3,9 @@ import { type Bookmark, bookmarkMatcher, type XBookmark, type ZenBookmark } from
 import { type BookmarkPlace, bookmarkGroups, folderTree, inPlace, treeRows } from "./bookmarks-view";
 
 const page = (id: string, folder: string[], fields: Partial<ZenBookmark> = {}): ZenBookmark => ({ source: "zen", id, url: "https://example.com", title: "", folder, addedAt: "2026-11-19T00:00:00Z", ...fields });
-const post = (id: string, fields: Partial<XBookmark> = {}): XBookmark => ({ source: "x", id, url: "https://x.com/a/status/1", name: "A", handle: "@a", text: "", addedAt: "2026-11-19T00:00:00Z", ...fields });
+const post = (id: string, fields: Partial<XBookmark> = {}): XBookmark => ({ source: "x", id, url: "https://x.com/a/status/1", name: "A", handle: "@a", text: "", lang: null, translation: null, addedAt: "2026-11-19T00:00:00Z", ...fields });
 
-test("a search keeps the bookmarks holding every word in a page's title, address, or folders, or a post's author or text", () => {
+test("a search keeps the bookmarks holding every word in a page's title, address, or folders, or a post's author, text, or translation", () => {
 	const bookmarks: Bookmark[] = [
 		page("zen:1", ["Toolbar", "Design"], { title: "Spring physics", url: "https://www.joshwcomeau.com/animation" }),
 		post("x:2", { name: "Emil", handle: "@emilkowalski", text: "Design engineering tips" }),
@@ -17,6 +17,8 @@ test("a search keeps the bookmarks holding every word in a page's title, address
 	expect(ids("EMILKOWALSKI tips")).toEqual(["x:2"]);
 	expect(ids("joshwcomeau spring")).toEqual(["zen:1"]);
 	expect(ids("bun design")).toEqual([]);
+	const french = post("x:4", { text: "Astuces de conception", lang: "fr", translation: "Design tips" });
+	expect([bookmarkMatcher("design tips")(french), bookmarkMatcher("astuces")(french), bookmarkMatcher("recettes")(french)]).toEqual([true, true, false]);
 });
 
 test("the folder tree counts each Zen folder with its subfolders, and picking a folder keeps its subfolders' bookmarks", () => {

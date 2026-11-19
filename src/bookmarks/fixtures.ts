@@ -74,7 +74,7 @@ export const X_PAGE = {
 					{
 						type: "TimelineAddEntries",
 						entries: [
-							tweetEntry({ __typename: "Tweet", rest_id: "111", core: { user_results: xUser("omarsar0", "elvis") }, legacy: { created_at: "Wed Nov 18 14:09:32 +0000 2026", full_text: "Strong primitives" } }),
+							tweetEntry({ __typename: "Tweet", rest_id: "111", core: { user_results: xUser("omarsar0", "elvis") }, legacy: { created_at: "Wed Nov 18 14:09:32 +0000 2026", full_text: "Strong primitives", lang: "en" } }),
 							tweetEntry({
 								__typename: "TweetWithVisibilityResults",
 								tweet: {

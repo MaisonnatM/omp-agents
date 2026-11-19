@@ -21,10 +21,13 @@ function clipped(value: string, max: number): string {
 	return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
 
-/** One bookmark as one compact line: the day, the source, where it sits or who posted it, what it says, and its URL. */
+/** One bookmark as one compact line: the day, the source, where it sits or who posted it, what it says, a post's English first, and its URL. */
 export function bookmarkLine(bookmark: Bookmark): string {
 	const day = bookmark.addedAt.slice(0, 10);
-	if (bookmark.source === "x") return `${day} [x] ${bookmark.handle}: ${clipped(bookmark.text, 240)} ${bookmark.url}`;
+	if (bookmark.source === "x") {
+		const says = bookmark.translation === null ? clipped(bookmark.text, 240) : `${clipped(bookmark.translation, 240)} (original, ${bookmark.lang}: ${clipped(bookmark.text, 160)})`;
+		return `${day} [x] ${bookmark.handle}: ${says} ${bookmark.url}`;
+	}
 	const folder = bookmark.folder.join(" / ");
 	return `${day} [zen]${folder ? ` ${folder} ·` : ""} ${clipped(bookmark.title, 160)} ${bookmark.url}`;
 }

@@ -66,6 +66,10 @@ export interface XBookmark {
 	/** Its author's `@handle`. */
 	handle: string;
 	text: string;
+	/** The language X detected in its text, a BCP 47 code such as `fr`; `null` when X gave none. */
+	lang: string | null;
+	/** Its text in English, when it is in another language and the sync could translate it. */
+	translation: string | null;
 	/** ISO time it was posted, since X does not say when you bookmarked it. */
 	addedAt: string;
 }
@@ -73,12 +77,12 @@ export interface XBookmark {
 export type Bookmark = ZenBookmark | XBookmark;
 export type BookmarkSource = Bookmark["source"];
 
-/** A test of whether a bookmark, from `source` when given, holds every word of `query` in any case: a page in its title, address, or folders, a post in its author, text, or address. */
+/** A test of whether a bookmark, from `source` when given, holds every word of `query` in any case: a page in its title, address, or folders, a post in its author, text, translation, or address. */
 export function bookmarkMatcher(query: string, source?: BookmarkSource): (bookmark: Bookmark) => boolean {
 	const matches = everyWord(query);
 	return bookmark => {
 		if (source !== undefined && bookmark.source !== source) return false;
-		const fields = bookmark.source === "zen" ? [bookmark.title, bookmark.url, ...bookmark.folder] : [bookmark.name, bookmark.handle, bookmark.text, bookmark.url];
+		const fields = bookmark.source === "zen" ? [bookmark.title, bookmark.url, ...bookmark.folder] : [bookmark.name, bookmark.handle, bookmark.text, bookmark.translation ?? "", bookmark.url];
 		return matches(fields.join("\n"));
 	};
 }
