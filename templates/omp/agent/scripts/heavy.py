@@ -5,7 +5,7 @@ Usage: heavy.py COMMAND [ARG ...]
        heavy.py 'SHELL COMMAND'    one argument runs through /bin/sh -c, for && and pipes
 
 Every omp session on this computer shares the slots, so at most OMP_HEAVY_SLOTS heavy commands run at once,
-by default a quarter of the CPU cores and at least 1. A slot is an flock on a file in OMP_HEAVY_DIR, by default
+by default a third of the CPU cores and at least 1. A slot is an flock on a file in OMP_HEAVY_DIR, by default
 /tmp/omp-heavy-<uid>; the kernel releases it when this process ends, however it ends, so no slot goes stale.
 A waiter says once on stderr that it is queued and what holds the slots, and again when it gets one.
 A heavy command run inside another, which finds OMP_HEAVY_SLOT set, runs at once in its parent's slot.
@@ -28,7 +28,7 @@ POLL_SECONDS = 0.5
 def slot_count() -> int:
     raw = os.environ.get("OMP_HEAVY_SLOTS", "").strip()
     if not raw:
-        return max(1, (os.cpu_count() or 1) // 4)
+        return max(1, (os.cpu_count() or 1) // 3)
     if not raw.isdigit() or int(raw) < 1:
         sys.exit(f"heavy: OMP_HEAVY_SLOTS must be a whole number of at least 1, not {raw!r}")
     return int(raw)
