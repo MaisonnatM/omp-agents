@@ -119,13 +119,15 @@ const digitKeys = (modifiers: Omit<Chord, "key">, scope: Scope): Binding[] =>
 /** A category of Settings › Keyboard: the core's, a tab's but Bots', which has no shortcuts of its own, or Changes. */
 export type ShortcutCategory = "general" | "sessions" | Exclude<SidebarTab, "bots"> | "changes";
 
-/** The categories Settings › Keyboard lists the shortcuts under, in order: the core's, then each tab's in the sidebar's order, then Changes. */
+/** The categories Settings › Keyboard lists the shortcuts under, in order: the core's, then each tab's in the sidebar's order but a module's with no rows, then Changes. */
 export const SHORTCUT_CATEGORIES: readonly { id: ShortcutCategory; label: string }[] = [
 	{ id: "general", label: "General" },
 	{ id: "sessions", label: "Sessions" },
-	...SIDEBAR_TABS.flatMap(({ value, label }): { id: ShortcutCategory; label: string }[] =>
-		isWebModuleId(value) ? [{ id: value, label: moduleOf({ kind: value }).shortcuts.category }] : value === "bots" ? [] : [{ id: value, label }],
-	),
+	...SIDEBAR_TABS.flatMap(({ value, label }): { id: ShortcutCategory; label: string }[] => {
+		if (!isWebModuleId(value)) return value === "bots" ? [] : [{ id: value, label }];
+		const { shortcuts } = moduleOf({ kind: value });
+		return shortcuts.rows.length > 0 ? [{ id: value, label: shortcuts.category }] : [];
+	}),
 	{ id: "changes", label: "Changes" },
 ];
 

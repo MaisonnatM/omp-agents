@@ -3,6 +3,7 @@
  * carries the access token that the sign-in page kept in localStorage; a 401 signs the page out.
  */
 import { MEDIA_KEY_PARAM, MEDIA_KEY_STORAGE_KEY, SOCKET_PROTOCOL, SOCKET_TOKEN_PREFIX, TOKEN_STORAGE_KEY } from "../src/shared/access";
+import type { BookmarksView, ProjectMemoryEdit, ProjectMemoryView } from "../src/shared/memory-page";
 import type { BranchRelease } from "../src/shared/git";
 import { isObject } from "../src/json";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
@@ -137,6 +138,19 @@ export async function putJson<T>(url: string, body: unknown, signal?: AbortSigna
 			signal,
 		}),
 	);
+}
+
+export const PROJECT_MEMORY_URL = "/api/project-memory";
+export const BOOKMARKS_URL = "/api/bookmarks";
+
+/** Applies `edit` to its repository's project memory, all or nothing, and answers every repository's. */
+export const editProjectMemory = (edit: ProjectMemoryEdit): Promise<ProjectMemoryView> => putJson(PROJECT_MEMORY_URL, edit);
+
+/** Reads the x.com bookmarks again through Zen's sign-in, and answers every bookmark; counts as the user's action. */
+export async function syncXBookmarks(): Promise<BookmarksView> {
+	const url = `${BOOKMARKS_URL}/x-sync`;
+	record("action", `post ${url}`);
+	return readJson(await apiFetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }));
 }
 
 /**

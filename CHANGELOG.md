@@ -6,6 +6,12 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-20
 
 - Pull requests: a pull request whose only failing check waits for a person to approve it, such as `human-review`, now shows under review instead of Fix CI.
+- A new Memory tab gathers your omp memory, each repository's project memory, and your bookmarks in one page.
+- You can read, add, edit, and delete the project memories your agents wrote, for every repository you work in.
+- Your Zen bookmarks and your x.com bookmarks show in Memory, searchable, and Sync x.com reads the x.com ones again through your Zen sign-in.
+- x.com posts in another language show in English, translated by Google Translate when you sync, and the reader can show the original.
+- x.com posts in Memory now show their photos, videos, and GIFs.
+- Agents can now search your bookmarks when you ask them to.
 - Agents now ask for several independent tool calls at once more often and see how long they have been working, so Claude sessions should finish sooner. Set OMP_AGENT_PACE=0 to turn it off.
 - Builds and test runs from parallel sessions wait less: the machine now shares a third of its CPU cores between them instead of a quarter.
 
@@ -228,7 +234,3 @@ The dashboard shows the same lines in Settings › What's new.
 
 - The Todos card no longer shows the agent's todo list or the Ship steps; it keeps Subagents, Files, Images, and Sources.
 - The Todos card is now the Session card, and Settings › Preferences says Show session card.
-## 2026-11-11
-
-- The Browser's new Screen size menu shows the app as an iPhone, an iPad, or a laptop sees it, with a touch screen and Safari's user agent on the phone and tablet, so you can test its responsive layout; its Rotate turns the phone or tablet sideways, a size too big for the Browser shrinks to fit, and the session keeps its pick for 30 days.
-- A Browser picture taken at a screen size keeps that size's own width and its chip names the size, such as Mobile, 390×844.

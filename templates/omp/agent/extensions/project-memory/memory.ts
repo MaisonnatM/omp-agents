@@ -1,12 +1,9 @@
 import { spawnSync } from "node:child_process";
+import { BODY_MAX, LINE_MAX, MEMORY_KINDS, type MemoryKind, type RawOp, SLUG_MAX, SLUG_PATTERN, sourceTag } from "./contract";
 import type { Sha } from "./repo";
 
 export const MEMORY_REF = "refs/omp/memory";
-export const MEMORY_KINDS = ["decision", "fact", "lesson"] as const;
-export const LINE_MAX = 120;
-export const BODY_MAX = 2000;
 export const MEMORY_LIMIT = 150;
-const SLUG = /^[a-z0-9][a-z0-9-]{0,47}$/;
 const RACE_TRIES = 20;
 // A fixed identity, so a repository without `user.name` can still record memory.
 const IDENTITY = {
@@ -16,8 +13,7 @@ const IDENTITY = {
 	GIT_COMMITTER_EMAIL: "project-memory@omp.invalid",
 };
 
-export type MemoryKind = (typeof MEMORY_KINDS)[number];
-/** A memory's key, `^[a-z0-9][a-z0-9-]{0,47}$`; only `parseOps` and `parseDoc` make one. */
+/** A memory's key, {@link SLUG_PATTERN}; only `parseOps` and `parseDoc` make one. */
 export type Slug = string & { readonly __slug: unique symbol };
 
 export interface Memory {
@@ -34,15 +30,6 @@ export interface MemoryDoc {
 	memories: Record<Slug, Memory>;
 }
 
-/** One op as the `project_memory` tool's flat schema takes it. */
-export interface RawOp {
-	op: "add" | "update" | "delete";
-	slug: string;
-	kind?: MemoryKind;
-	line?: string;
-	body?: string;
-}
-
 export type MemoryOp =
 	| { op: "add"; slug: Slug; kind: MemoryKind; line: string; body: string }
 	| { op: "update"; slug: Slug; kind?: MemoryKind; line?: string; body?: string }
@@ -56,7 +43,7 @@ export type MemoryChange = { change: "added" | "updated"; slug: Slug; memory: Me
 
 const EMPTY: MemoryDoc = { memories: {} };
 
-const isSlug = (value: unknown): value is Slug => typeof value === "string" && SLUG.test(value);
+const isSlug = (value: unknown): value is Slug => typeof value === "string" && SLUG_PATTERN.test(value);
 const isKind = (value: unknown): value is MemoryKind => MEMORY_KINDS.includes(value as MemoryKind);
 
 /** The tool's ops as domain ops, or every op that is malformed and why. */
@@ -66,7 +53,7 @@ export function parseOps(raw: readonly RawOp[]): { ok: true; ops: MemoryOp[] } |
 	const reasons: string[] = [];
 	for (const { op, slug, kind, line, body } of raw) {
 		const problems: string[] = [];
-		if (!isSlug(slug)) problems.push("a slug is 1 to 48 lowercase letters, digits, and hyphens, starting with a letter or digit");
+		if (!isSlug(slug)) problems.push(`a slug is 1 to ${SLUG_MAX} lowercase letters, digits, and hyphens, starting with a letter or digit`);
 		if (op === "add") {
 			const missing = (["kind", "line", "body"] as const).filter(field => ({ kind, line, body })[field] === undefined);
 			if (missing.length > 0) problems.push(`add needs ${missing.join(", ")}`);
@@ -209,7 +196,7 @@ export function applyMemoryOps(commonDir: string, session: string, ops: readonly
 	let lost = "";
 	for (let attempt = 0; attempt < RACE_TRIES; attempt++) {
 		const old = memoryTip(commonDir);
-		const plan = planOps(readMemory(commonDir, old), ops, `#${session}`, today);
+		const plan = planOps(readMemory(commonDir, old), ops, sourceTag(session), today);
 		if (!plan.ok) return plan;
 		const blob = git(commonDir, ["hash-object", "-w", "--stdin"], sortedJson(plan.doc));
 		const tree = git(commonDir, ["mktree"], `100644 blob ${blob}\tmemory.json\n`);

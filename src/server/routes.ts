@@ -4,7 +4,7 @@
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { isObject } from "../json";
-import { moduleRoutes } from "../modules";
+import { type ModuleCore, moduleRoutes } from "../modules";
 import type { Integrations } from "../integrations";
 import { readCollabAutoStart, shareTerminalSessions } from "../omp/config";
 import { isTerminalAccess } from "../shared/readiness";
@@ -39,6 +39,8 @@ export interface RouteEnv {
 	processes: ProcessRoutesEnv;
 	storage: StorageRoutesEnv;
 	phoneAccess: PhoneAccessRoutesEnv;
+	/** What the modules' routes read of the core. */
+	modules: ModuleCore;
 }
 
 /** Every `/api/*` route, by path and method. */
@@ -66,7 +68,7 @@ export function createRoutes(env: RouteEnv): Routes {
 		...syncRoutes(kit, env.sync),
 		...processRoutes(kit, env.processes),
 		...storageRoutes(kit, env.storage, env.sessions),
-		...moduleRoutes(kit),
+		...moduleRoutes(kit, env.modules),
 		...phoneAccessRoutes(env.guards, env.phoneAccess),
 	};
 	return { ...routes, ...activityRoutes(kit, env.activity, routes) };

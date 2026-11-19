@@ -13,6 +13,7 @@ The core keeps the sessions, pull requests, todos, Bots and their routines, Sett
 | Module | Server definition | Page definition | Page components |
 | --- | --- | --- | --- |
 | Sport | `SPORT_MODULE` in `src/sport-module.ts` | `SPORT_PAGE` in `web/components/sport/module.ts` | `SportPage` and `SportNav` |
+| Memory | `MEMORY_MODULE` in `src/memory-module.ts` | `MEMORY_PAGE` in `web/components/memory/module.ts` | `MemoryPage` |
 
 A module without a server definition keeps its server side in the core.
 
@@ -29,7 +30,7 @@ A `ServerModule` has an `id` and four optional parts.
 - `store`: a `ModuleStore`, the state kept in one file.
   `open()` reads the file into a `ModuleFile`, `parse` checks a change a page sent, and `inbox` drains the changes an agent's tool leaves in a directory.
 - `join`: what every session the dashboard starts joins with, such as the omp extension that gives it the module's tool.
-- `routes`: the module's own `/api/*` routes, built from the core's `RouteKit`.
+- `routes`: the module's own `/api/*` routes, built from the core's `RouteKit` and a `ModuleCore`, what they read of the core: the workspaces the page shows.
 - `shipped`: the files `scripts/build-desktop-artifact.ts` bundles into a packaged app.
 
 The core reads these through `openModules`, `parseModuleChange`, `moduleInboxes`, `moduleJoins`, `moduleRoutes`, and `SHIPPED_FILES`.
@@ -59,7 +60,7 @@ The page half is split in three files so that the pure registry never imports Re
 `web/modules.ts` holds the contract and the list, the module's `module.ts` holds its definition, and `web/components/module-views.tsx` maps each id to its `Page` and `Nav` components.
 
 Every module's `Page` takes its `route` and `core`, a `CoreData` that `PageSwitch` builds from the core's own state.
-`CoreData` holds the routines, the Bots, the todo list, whether the sessions are listed, where a new session starts, the sidebar workspace's running sessions, and the page section a sidebar link last chose.
+`CoreData` holds the routines, the Bots, the todo list, whether the sessions are listed, where a new session starts, the workspace the sidebar picked, the sidebar workspace's running sessions, and the page section a sidebar link last chose.
 A module reads core data through it without importing the core's stores.
 A stored module's `Page` also takes its `state`, `disabled`, and `onChange`.
 A module's `Nav`, which every module has but one whose page `listsItself`, takes its `route`, the chosen `section`, and `onSection`, which `PageList` passes so a list can scroll its page to a section.

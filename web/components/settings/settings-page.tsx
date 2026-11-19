@@ -1,18 +1,15 @@
-import { IconFolderOpen } from "central-icons";
-import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import type { OmpSettings } from "../../../src/shared/models";
 import type { TrustedProject } from "../../../src/shared/project-trust";
 import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
-import { isPhonePage, settingsUrl } from "../../api";
-import { useEditableRead } from "../../editable-read";
-import { type ReadState, useRead } from "../../reads";
+import { isPhonePage } from "../../api";
+import type { ReadState } from "../../reads";
 import { ompSettingsFiles } from "../../omp-settings";
 import { hashForSettings, SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
-import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
 import { ActivityTab } from "./activity-tab";
-import { type Catalog, type Editing, LINK } from "./editor";
+import { type Editing, LINK, settingsReadNote, useSettingsEditing } from "./editor";
 import { AgentsTab } from "./agents-tab";
 import { DecisionsTab } from "./decisions-tab";
 import { Files } from "./files-tab";
@@ -34,42 +31,7 @@ import { Workflows } from "./workflows-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
 import { WhatsNewTab } from "../whats-new";
-
-const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find((workspace) => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
-
-/** The sidebar's workspace picker again, for the sections it scopes: all workspaces read your user files only. */
-function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; workspaces: Workspace[]; onPick: (cwd: string | null) => void }) {
-	const label = cwd === null ? "All workspaces" : workspaceLabel(cwd, workspaces);
-	const pick = (next: string | null) => (): void => {
-		if (next !== cwd) onPick(next);
-	};
-	return (
-		<CommandPicker
-			trigger={<span className="max-w-64 truncate">{label}</span>}
-			icon={IconFolderOpen}
-			ariaLabel={`Workspace: ${label}`}
-			search={{ label: "Search workspaces" }}
-			width="lg"
-			list={{
-				kind: "ready",
-				groups: [
-					{ key: "all", items: [{ value: "All workspaces", label: "All workspaces", selected: cwd === null, onSelect: pick(null) }] },
-					{
-						key: "workspaces",
-						heading: "Workspaces",
-						items: workspaces.map((workspace) => ({
-							value: workspace.cwd,
-							label: <span className="truncate">{workspace.cwdDisplay}</span>,
-							selected: workspace.cwd === cwd,
-							onSelect: pick(workspace.cwd),
-						})),
-					},
-				],
-			}}
-			empty="No workspace matches."
-		/>
-	);
-}
+import { WorkspacePicker, workspaceLabel } from "../workspace-picker";
 
 const PANEL = "space-y-10 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background";
 
@@ -85,20 +47,10 @@ const loadAlert = (error: string): ReactNode => (
 	</p>
 );
 
-/** Why the omp sections are empty while omp's settings are not read: still reading, or the read failed. */
-const readNote = (read: ReadState<OmpSettings>): ReactNode =>
-	read.error === null ? (
-		<p className="text-sm text-muted-foreground">Reading omp's settings…</p>
-	) : (
-		<p role="alert" className="text-sm text-red-600 dark:text-red-400">
-			Cannot read omp's settings: {read.error}
-		</p>
-	);
-
 /** The omp sections' content once settings are read, else why they are empty. */
 function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing, selection: FileSelection): Record<"models" | "agents" | "omp" | "files" | "workflows", ReactNode> {
 	if (read.data === null) {
-		const note = readNote(read);
+		const note = settingsReadNote(read);
 		return { models: note, agents: note, omp: note, files: note, workflows: note };
 	}
 	const { routing, agentSettings, agents: catalog, files, workflows } = read.data;
@@ -158,19 +110,7 @@ export function SettingsPage({
 	/** The projects whose agent code the user trusted, for Settings › Workspaces. */
 	trustedProjects: TrustedProject[];
 }) {
-	const models = useRead<{ models: CatalogModel[] }>("/api/models");
-	const catalog = useMemo(
-		(): Catalog => ({
-			data: models.data && {
-				bySelector: new Map(models.data.models.map((model) => [model.selector, model])),
-				byProvider: Map.groupBy(models.data.models, (model) => model.provider),
-			},
-			error: models.error && `Cannot list omp's models: ${models.error}`,
-		}),
-		[models],
-	);
-	const settings = useEditableRead<OmpSettings>(settingsUrl("", cwd));
-	const editing: Editing = { cwd, catalog, write: settings.write, reload: settings.reload };
+	const { settings, editing } = useSettingsEditing(cwd);
 	const [openFile, setOpenFile] = useState<string | null>(null);
 	// Every section shares one scroller, so a newly opened one would start at the last one's offset.
 	const scroller = useRef<HTMLDivElement>(null);
@@ -182,7 +122,7 @@ export function SettingsPage({
 		...ompPanels(settings, cwd, editing, { path: openFile, open: setOpenFile }),
 		"omp-memory":
 			settings.data === null ? (
-				readNote(settings)
+				settingsReadNote(settings)
 			) : (
 				<OmpMemoryTab key={cwd ?? ""} active={section === "omp-memory"} settings={settings.data} editing={editing} onOpenFile={setOpenFile} />
 			),

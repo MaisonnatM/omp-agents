@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { ControlId } from "../../src/shared/activity";
+import type { ModuleControlId } from "../modules";
 import { activityControl } from "../activity";
 import type { ReadState } from "../reads";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
@@ -144,7 +145,7 @@ interface CommandPickerProps {
 	/** What the list reads when no item matches; nothing when omitted. */
 	empty?: ReactNode;
 	/** The Activity control a click on the trigger records; none when omitted. */
-	control?: ControlId;
+	control?: ControlId | ModuleControlId;
 }
 
 /** A button that opens a searchable, grouped list of choices; picking one closes it. The dashboard's every combobox. */
