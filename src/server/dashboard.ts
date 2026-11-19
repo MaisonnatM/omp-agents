@@ -155,6 +155,8 @@ export class Dashboard {
 	readonly #stopping = new AbortController();
 	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the file inboxes. */
 	readonly #ownerLock: OwnerLock;
+	/** Whether this server may take the owner lock; a server an omp session started, such as a smoke run, never does. */
+	readonly #unattended: boolean;
 	readonly #sessions: LiveSessions;
 	readonly #views: Views;
 	readonly #notices: Notices;
@@ -198,9 +200,13 @@ export class Dashboard {
 	#activityFresh = false;
 	readonly #usage: UsagePoll;
 
-	/** `selfUpdate` is **Update dashboard**, which pulls the checkout the server runs from and restarts the server. */
-	constructor(port: number, selfUpdate: SelfUpdate) {
+	/**
+	 * `selfUpdate` is **Update dashboard**, which pulls the checkout the server runs from and restarts the server.
+	 * `unattended` is false for a server an omp session started, which then never runs routines, Bots, or the file inboxes.
+	 */
+	constructor(port: number, selfUpdate: SelfUpdate, unattended = true) {
 		this.#selfUpdate = selfUpdate;
+		this.#unattended = unattended;
 		// An older version kept the workspace list in `projects.json`, so it moves first.
 		adoptOldWorkspaces(oldWorkspacesFile, workspacesFile);
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
@@ -688,7 +694,8 @@ export class Dashboard {
 		this.#loops.watch();
 		// Before the owner lock, whose taking drains the inboxes.
 		await this.#rescanFiles();
-		if (!this.#claimUnattendedWork()) {
+		if (!this.#unattended) console.log("omp-agents: an omp session started this server, so it never runs routines, Bots, or the file inboxes.");
+		else if (!this.#claimUnattendedWork()) {
 			const owner = this.#ownerLock.holder();
 			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the file inboxes; this one takes over when it exits.`);
 		}
@@ -882,6 +889,7 @@ export class Dashboard {
 	 */
 	#claimUnattendedWork(): boolean {
 		const was = this.#ownerLock.held;
+		if (!this.#unattended) return false;
 		const owns = this.#ownerLock.acquire();
 		if (owns && !was) {
 			console.log("omp-agents: this server now runs routines and the file inboxes.");

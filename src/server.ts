@@ -37,7 +37,8 @@ const page = await loadPage();
 const served: ServedBuild = { source, page: await pageBuild(page), pid: process.pid, startedAt };
 const buildMsg = JSON.stringify({ t: "build", id: served.page } satisfies ServerMsg);
 const selfUpdate = await SelfUpdate.forServer(PORT, restart);
-const dashboard = new Dashboard(PORT, selfUpdate);
+// A server an omp session started, such as an agent's smoke run, shares the real config, so it leaves the routines to the user's dashboard.
+const dashboard = new Dashboard(PORT, selfUpdate, !process.env.PI_SESSION_ID);
 // The port is bound before the sessions are attached, so a taken port fails before any keeper is joined, but no page
 // may start or resume a session until the server knows which ones survived.
 const notReattached = refuseUntil(dashboard.reattached, "The dashboard is still attaching to the sessions that kept running.");
