@@ -59,6 +59,7 @@ test("omp's tool approval names the tool, its reason and details, and offers Den
 		title: "Allow tool: bash\nReason: outside the workspace\nCommand: rm -rf dist",
 		deadline: null,
 		kind: "select",
+		checkboxes: 0,
 		checked: [],
 		options: [option("Approve"), option("Approve bash for this session"), option("Deny")],
 	});
@@ -71,7 +72,23 @@ test("omp's tool approval names the tool, its reason and details, and offers Den
 });
 
 test("a select that is not a tool approval stays a question", () => {
-	const html = renderStep({ id: "s", title: "Allow tool: bash", deadline: null, kind: "select", checked: [], options: [option("Yes"), option("No")] });
+	const html = renderStep({ id: "s", title: "Allow tool: bash", deadline: null, kind: "select", checkboxes: 0, checked: [], options: [option("Yes"), option("No")] });
 	expect(html).not.toContain("Allow bash?");
 	expect(html).toContain('role="radio"');
+});
+
+test("an ask multi-select sent step by step ticks its checked rows and turns Done selecting into a button", () => {
+	const html = renderStep({
+		id: "m",
+		title: "(1 selected) Scope",
+		deadline: null,
+		kind: "select",
+		checkboxes: 3,
+		checked: [1],
+		options: [option("Combobox"), option("Color Picker"), option("Other (type your own)"), option("✓ Done selecting")],
+	});
+	expect(html).toContain(">Scope</h3>");
+	expect(html.match(/role="checkbox"/g)).toHaveLength(3);
+	expect(html.match(/aria-checked="true"/g)).toHaveLength(1);
+	expect(html).toMatch(/<button[^>]*>(?:(?!<\/button>)[\s\S])*>Done selecting<(?:(?!<\/button>)[\s\S])*<\/button>/);
 });

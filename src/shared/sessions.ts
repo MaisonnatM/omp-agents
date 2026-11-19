@@ -308,8 +308,11 @@ export type UserRequest = {
 	/** When omp stops waiting and takes its default, in ms since the epoch; `null` when it waits for good. */
 	deadline: number | null;
 } & (
-	/** `checked`: rows a multi-select question has ticked so far. */
-	| { kind: "select"; options: RequestOption[]; checked: number[] }
+	/**
+	 * `checkboxes`: how many leading rows are checkboxes, the rest being actions such as Done selecting; 0 for a plain
+	 * pick. `checked`: the checkbox rows ticked so far.
+	 */
+	| { kind: "select"; options: RequestOption[]; checkboxes: number; checked: number[] }
 	| { kind: "confirm"; message: string }
 	| { kind: "text"; field: TextField; placeholder: string | null; prefill: string }
 	| { kind: "ask"; questions: AskQuestion[] }

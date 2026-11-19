@@ -20,16 +20,23 @@ type StepRequest = Exclude<UserRequest, { kind: "ask" }>;
 /** omp's own labels can carry Nerd Font glyphs that the page's fonts lack; an answer keeps the label. */
 const shownLabel = (label: string): string => label.replace(/\p{Co}/gu, "").trim();
 
+/** The `(N selected) ` count omp puts before a multi-select question for its terminal, which the ticked rows show here. */
+const SELECTED_COUNT = /\(\d+ selected\) (?=[^\n]*$)/;
+
 /** The request as one question. Row indices are omp's option indices, so a pick maps back to omp's label. */
 function questionOf(request: StepRequest): Question {
 	switch (request.kind) {
-		case "select":
+		case "select": {
+			const multi = request.checkboxes > 0;
+			const rows = multi ? request.options.slice(0, request.checkboxes) : request.options;
 			return {
 				kind: "options",
-				title: request.title,
-				options: request.options.map(option => ({ title: shownLabel(option.label), description: option.description ?? undefined })),
-				layout: request.options.some(option => (option.description?.length ?? 0) > 48) ? "stacked" : "inline",
+				title: multi ? request.title.replace(SELECTED_COUNT, "") : request.title,
+				options: rows.map(option => ({ title: shownLabel(option.label), description: option.description ?? undefined })),
+				layout: rows.some(option => (option.description?.length ?? 0) > 48) ? "stacked" : "inline",
+				multi,
 			};
+		}
 		case "confirm":
 			return { kind: "options", title: request.title, description: request.message || undefined, options: CONFIRM_ROWS, layout: "inline" };
 		case "text":
@@ -182,7 +189,13 @@ function StepCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps
 		reply({ kind: "cancel" });
 	};
 	const header = <CardHeader status={statusOf(request, queued)} sent={sent} onDismiss={() => reply({ kind: "cancel" })} />;
-	const shared = { onKeyDown: cancelOnEscape, "aria-busy": sent || undefined, className: cn("mb-3", sent && "pointer-events-none opacity-60") };
+	// A ticked checkbox shows at once and keeps the card live: omp answers it with the same select, its row checked.
+	const toggled = request.kind === "select" && picked !== null && picked < request.checkboxes ? picked : null;
+	const shared = {
+		onKeyDown: cancelOnEscape,
+		"aria-busy": sent || undefined,
+		className: cn("mb-3", sent && toggled === null && "pointer-events-none opacity-60"),
+	};
 
 	if (approval && request.kind === "select") {
 		return (
@@ -217,13 +230,30 @@ function StepCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps
 			/>
 		);
 	}
+	let checked: number[] = picked === null ? [] : [picked];
+	let footer: ReactNode = null;
+	if (request.kind === "select") {
+		checked = toggled === null ? request.checked : request.checked.includes(toggled) ? request.checked.filter(index => index !== toggled) : [...request.checked, toggled];
+		if (request.checkboxes > 0) {
+			footer = (
+				<div className="flex items-center justify-end gap-2 -mx-2 sm:-mx-3">
+					{request.options.slice(request.checkboxes).map((option, offset) => (
+						<Button key={option.label} size="sm" onClick={() => choose({ kind: "option", index: request.checkboxes + offset })}>
+							{/* Without the status mark omp puts before an action, such as the ✓ of Done selecting. */}
+							{shownLabel(option.label).replace(/^[^\p{L}\p{N}]+/u, "")}
+						</Button>
+					))}
+				</div>
+			);
+		}
+	}
 	return (
 		<QuestionCard
 			{...shared}
 			question={question}
-			// A select's checked rows come from omp; any other request shows the row picked here.
-			checked={request.kind === "select" ? request.checked : picked === null ? [] : [picked]}
+			checked={checked}
 			defaultText={request.kind === "text" ? request.prefill : undefined}
+			footer={footer}
 			onAnswer={choose}
 			header={header}
 			className={cn(shared.className, "max-w-none")}

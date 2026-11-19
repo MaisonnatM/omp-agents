@@ -42,7 +42,7 @@ Below the phone width, which `usePhoneWidth` in `web/use-phone-width.ts` reads, 
 Questions use `web/components/question-card.tsx`, the dashboard's own card in the look of Fluid's `ask-user-questions`, which `web/components/user-request.tsx` fills from omp's request.
 A select is one row per omp option, and a confirm is **Yes** and **No** rows, both in `question-options.tsx`, which reuses Fluid's hover highlight and merged selection backgrounds; an input or an editor is a free-text field.
 An input an extension marks `secret`, such as an API key prompt, is a password field that shows dots, which the page neither saves nor shows anywhere else.
-A terminal session's select takes its checked rows from the request, since omp sends a multi-select pick back as a new request with the row checked.
+A select whose leading rows are checkboxes, a multi-select step that omp sends back as a new request with the row checked, shows those rows as checkboxes ticked from the request, ticks a picked row before omp answers, and turns the rows after them, such as `Done selecting`, into buttons in the card's footer.
 A dashboard session's `ask` request holds every question; `AskCard` keeps the picks and typed text of each, shows multi-select rows as checkboxes, and sends one `ask` answer after the last question.
 A question with no options, a text field of the `ask` tool's form, opens as a text field that may be sent blank to keep the field's value, with Back beside its button; on a stock omp, which sends that form a field at a time ([Dashboard sessions](dashboard-sessions.md)), each field is a card of its own.
 
