@@ -33,8 +33,8 @@
 - **Browser** shows the app the session runs and adds an element you pick in it to the session's composer; see [Browser](browser.md).
 - **Artifacts** shows the pages, documents, and drawings the agent saved for you to look at, each version kept; see [Artifacts](artifacts.md).
 - **Linear** shows a Linear issue: its id, which opens it in Linear, its status, when it last changed, its title, priority, assignee, project, and labels, then its description.
-  It opens on the first issue the conversation links to, as `https://linear.app/<workspace>/issue/ENG-123`, and its count is the number of issues linked; with more than one, a chip per issue picks another.
+  It opens on the first issue the conversation links to, as `https://linear.app/<workspace>/issue/ENG-123`, and its count is the number of issues linked; with more than one, a menu beside the field picks another.
   The tab opens by itself, behind the tab on screen, when the session's conversation links an issue, so its chip with the count shows in the tab row; once you close it, it stays closed until the session links another issue or you open the session again.
-  Type an id such as `ENG-123`, or paste an issue's link, in the field at the top and press Enter to show any other issue.
+  Type an id such as `ENG-123`, or paste an issue's link, in the field at the top and press Enter to show any other issue; it shows without joining the menu, and text that is neither says so under the field.
   The server reads the issue through the Linear MCP server omp uses, with omp's sign-in to it, so the tab needs Linear in [MCP servers](mcp-servers.md) and says so when omp has none.
 - A tab with nothing to show says so.

@@ -1,8 +1,8 @@
 /** The building blocks of an integration row: its brand tile, the list surface, the row itself, and its callouts. */
 import type { IconComponent } from "@/lib/icon-context";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { mediaSrc } from "../../api";
+import { SiteIcon } from "../site-icon";
 import { type BrandLogo, BrandMark } from "./brand-logos";
 
 interface MarkTileProps {
@@ -15,17 +15,14 @@ interface MarkTileProps {
 
 /** A row's mark on its tile: a brand's mark in its colors, else `icon`, else `site`'s icon, else `name`'s first letter. */
 export function MarkTile({ logo = null, icon: Icon, site = null, name }: MarkTileProps) {
-	const [siteFailed, setSiteFailed] = useState<string | null>(null);
 	return (
 		<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 text-foreground shadow-surface-2">
 			{logo ? (
 				<BrandMark logo={logo} className="size-5" />
 			) : Icon ? (
 				<Icon className="size-4 text-muted-foreground" />
-			) : site !== null && siteFailed !== site ? (
-				<img alt="" src={mediaSrc(`/api/favicon?${new URLSearchParams({ host: site })}`)} onError={() => setSiteFailed(site)} className="size-5 rounded-[3px] object-contain" />
 			) : (
-				<span className="text-sm font-medium text-muted-foreground">{name.charAt(0).toUpperCase()}</span>
+				<SiteIcon hostname={site} className="size-5" fallback={<span className="text-sm font-medium text-muted-foreground">{name.charAt(0).toUpperCase()}</span>} />
 			)}
 		</span>
 	);
