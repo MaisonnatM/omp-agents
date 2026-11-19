@@ -8,7 +8,7 @@ import { GithubQuotaPaused } from "./github-quota";
 import { GitHubQuotaError } from "../templates/omp/agent/extensions/github/access";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
-import { type CheckRunState, isBotAuthor, type PullRequestList, type PullRequestSummary, type PullRequestRole, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey, unresolvedOf } from "./shared/github";
+import { type CheckRunState, type CheckState, isBotAuthor, type PullRequestList, type PullRequestSummary, type PullRequestRole, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestReaction, type PullRequestThread, prKey, pullRequestName, REACTION_CONTENTS, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey, unresolvedOf } from "./shared/github";
 import { MERGE_METHODS, type MergeMethod } from "./shared/source-control";
 
 export { repoOf } from "./github";
@@ -17,6 +17,12 @@ const MERGED_DAYS = 7;
 
 /** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
 const THREADS = 100;
+
+/** The head commit's first `first` checks, by name and state. */
+const CONTEXTS = (first: number): string => `contexts(first: ${first}) { totalCount nodes {
+	... on CheckRun { name status conclusion detailsUrl }
+	... on StatusContext { context state targetUrl }
+} }`;
 
 /** The pull request's author, its requested reviewers, and its latest reviews, which its row in the list and its details both show. */
 const REVIEW_FIELDS = `author { login ${AVATAR} }
@@ -30,7 +36,7 @@ const PR_FIELDS = `... on PullRequest {
 	number title isDraft state reviewDecision mergeable viewerCanUpdateBranch headRefName baseRefName createdAt updatedAt mergedAt additions deletions
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
-	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+	commits(last: 1) { nodes { commit { statusCheckRollup { state ${CONTEXTS(30)} } } } }
 	comments { totalCount }
 	reviewThreads(first: ${THREADS}) { totalCount nodes { id isResolved } }
 }`;
@@ -137,7 +143,8 @@ function parsePullRequestHead(node: Record<string, unknown>, botStarted: Readonl
 	const reviewers = parseReviewers(node, author.login);
 	const commits = nodesOf(node.commits);
 	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
-	const rollup = isObject(commit.statusCheckRollup) ? str(commit.statusCheckRollup.state) : undefined;
+	const rollup = isObject(commit.statusCheckRollup) ? commit.statusCheckRollup : {};
+	const review = reviewOf(str(node.reviewDecision), reviewers);
 	const state = stateOf(node);
 	return {
 		title,
@@ -146,8 +153,8 @@ function parsePullRequestHead(node: Record<string, unknown>, botStarted: Readonl
 		author,
 		reviewers,
 		state,
-		review: reviewOf(str(node.reviewDecision), reviewers),
-		checks: STATUS[rollup ?? ""] ?? "none",
+		review,
+		checks: checksOf(rollup, review),
 		// `UNKNOWN` means GitHub has not computed it yet; a merged or closed pull request has nothing to conflict with.
 		conflicts: (state === "open" || state === "draft") && node.mergeable === "CONFLICTING",
 		additions: num(node.additions) ?? 0,
@@ -240,10 +247,7 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 			associatedPullRequests(first: 10) { nodes { number } }
 		} } }
 		${REVIEW_FIELDS}
-		commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
-			... on CheckRun { name status conclusion detailsUrl }
-			... on StatusContext { context state targetUrl }
-		} } } } } }
+		commits(last: 1) { nodes { commit { statusCheckRollup { state ${CONTEXTS(100)} } } } }
 		files(first: 100) { nodes { path additions deletions changeType } }
 		comments(last: 50) { nodes { ${COMMENT_FIELDS} } }
 		reviews(last: 50) { nodes { state submittedAt author { __typename login ${AVATAR} } body url ${REACTION_FIELDS} } }
@@ -252,6 +256,24 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 		} }
 	} }
 }`;
+
+/** A check that fails until someone approves, such as a `human-review` job: it waits on review, not on a CI fix. */
+const REVIEW_GATE = /review|approv/i;
+
+/**
+ * The head commit's checks, leaving out a failing review gate while the pull request waits for approval, so it files
+ * under review rather than CI to fix. GitHub's rollup stands when it has more checks than the query returned.
+ */
+function checksOf(rollup: Record<string, unknown>, review: ReviewDecision): CheckState {
+	const state = STATUS[str(rollup.state) ?? ""] ?? "none";
+	const nodes = nodesOf(rollup.contexts);
+	if (state !== "failing" || review === "approved" || totalOf(rollup.contexts) > nodes.length) return state;
+	const checks = nodes.map(parseCheck).filter(check => check !== null);
+	const rest = checks.filter(check => !(check.state === "failing" && REVIEW_GATE.test(check.name)));
+	if (rest.length === checks.length) return state;
+	if (rest.some(check => check.state === "failing")) return "failing";
+	return rest.some(check => check.state === "pending") ? "pending" : "passing";
+}
 
 const CHECK_ORDER: CheckRunState[] = ["failing", "pending", "passing", "skipped"];
 
