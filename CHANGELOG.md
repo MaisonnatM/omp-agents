@@ -12,6 +12,7 @@ The dashboard shows the same lines in Settings › What's new.
 - x.com posts in another language show in English, translated by Google Translate when you sync, and the reader can show the original.
 - x.com posts in Memory now show their photos, videos, and GIFs.
 - Agents can now search your bookmarks when you ask them to.
+- Ship: `ship_stage` now reads the same pull request as waiting for review too, instead of sending its session to Fix CI.
 - Agents now ask for several independent tool calls at once more often and see how long they have been working, so Claude sessions should finish sooner. Set OMP_AGENT_PACE=0 to turn it off.
 - Builds and test runs from parallel sessions wait less: the machine now shares a third of its CPU cores between them instead of a quarter.
 
