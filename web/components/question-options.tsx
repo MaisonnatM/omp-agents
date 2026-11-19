@@ -1,4 +1,5 @@
 /** `QuestionOptions`, the pickable rows of a question card, with keyboard moves and a sliding hover highlight. */
+import { IconCheckmark1 } from "central-icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
@@ -83,6 +84,18 @@ function OptionRow({ index, option, layout, selected, multi, active, tabIndex, a
 				shape.item,
 			)}
 		>
+			{multi && (
+				<span
+					aria-hidden
+					className={cn(
+						"shrink-0 inline-flex items-center justify-center size-4 rounded-[4px] border transition-colors duration-80",
+						stacked && "mt-0.5",
+						selected ? "border-foreground bg-foreground text-background" : "border-muted-foreground/40 text-transparent",
+					)}
+				>
+					<IconCheckmark1 className="size-3" />
+				</span>
+			)}
 			<span
 				className={cn(
 					"min-w-0 flex-1 leading-snug",
