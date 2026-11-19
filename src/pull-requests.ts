@@ -154,7 +154,7 @@ function parsePullRequestHead(node: Record<string, unknown>, botStarted: Readonl
 		reviewers,
 		state,
 		review,
-		checks: checksOf(rollup, review),
+		checks: checksOf(rollup),
 		// `UNKNOWN` means GitHub has not computed it yet; a merged or closed pull request has nothing to conflict with.
 		conflicts: (state === "open" || state === "draft") && node.mergeable === "CONFLICTING",
 		additions: num(node.additions) ?? 0,
@@ -261,13 +261,13 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 const REVIEW_GATE = /review|approv/i;
 
 /**
- * The head commit's checks, leaving out a failing review gate while the pull request waits for approval, so it files
- * under review rather than CI to fix. GitHub's rollup stands when it has more checks than the query returned.
+ * The head commit's checks, leaving out a failing review gate, so the pull request files under review rather than CI to fix.
+ * An approved one still counts: its gate stays red until it reruns. GitHub's rollup stands when it has more checks than the query returned.
  */
-function checksOf(rollup: Record<string, unknown>, review: ReviewDecision): CheckState {
+function checksOf(rollup: Record<string, unknown>): CheckState {
 	const state = STATUS[str(rollup.state) ?? ""] ?? "none";
 	const nodes = nodesOf(rollup.contexts);
-	if (state !== "failing" || review === "approved" || totalOf(rollup.contexts) > nodes.length) return state;
+	if (state !== "failing" || totalOf(rollup.contexts) > nodes.length) return state;
 	const checks = nodes.map(parseCheck).filter(check => check !== null);
 	const rest = checks.filter(check => !(check.state === "failing" && REVIEW_GATE.test(check.name)));
 	if (rest.length === checks.length) return state;
