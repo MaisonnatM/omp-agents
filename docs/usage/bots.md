@@ -96,7 +96,8 @@
 ## Bot designers
 
 - A Bot designer, **Dr Eggbot** unless you rename it, designs Bots with you in its conversation, adapted from Lauren Tan's Dr Eggbot Grok Bot.
-  It asks a few short questions first: what the Bot should do, where it looks, what it must never do, and which workspace it runs in.
+  It interviews you one question at a time: the goal before the steps, how you do it today, the calls you make without thinking, how you check the work, where feedback on it shows up, when it runs, and what it must never do.
+  It then restates the goal and the process in plain words, walks through a real case or two, and waits for your yes.
 - Once the job is clear, it creates the Bot, and the dashboard asks you to approve that first.
   The new Bot shows in the **Bots** tab with its name, its job, its type, and its workspace, the designer's own when it names none, and a shape and color its id picks.
 - The new Bot learns its routines in its own conversation; the designer makes none.
