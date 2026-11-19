@@ -62,7 +62,7 @@ test("a private session does not fork, before any omp starts, since its copy wou
 		}),
 		pathFor: () => join(root, "i1", "--work--", "2026-11-03T10-00-00-000Z_s1.jsonl"),
 		savedFile: () => null,
-		factsFor: () => ({ pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }),
+		factsFor: () => ({ pullRequests: [], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }),
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
@@ -131,7 +131,7 @@ test("a reattached session whose turn ended while no server listened is listed w
 		});
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")), unreadPath);
 		await reattachAll(sessions, () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }), () => false, () => new Set(["s-i-ended", "s-i-prompted", "s-i-working"]));
-		const facts: SessionFacts = { pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false };
+		const facts: SessionFacts = { pullRequests: [], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false };
 		expect(sessions.rows(() => facts).map(row => [row.instanceId, row.unread])).toEqual([
 			["i-ended", { at: Date.parse("2026-11-02T10:00:12.000Z"), reply: "done" }],
 			["i-prompted", { at: Date.parse("2026-11-02T10:00:20.000Z"), reply: null }],
@@ -206,7 +206,7 @@ test("a keeper that never greets is stopped with its job within the bound, then 
 function claimedStarter(
 	sessions: LiveSessions,
 	savedFile: string | null = null,
-	factsFor: () => SessionFacts = () => ({ pullRequests: [], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }),
+	factsFor: () => SessionFacts = () => ({ pullRequests: [], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }),
 	admit: (cwd: string) => Promise<void> = async () => {},
 	restoreWorktree: (sessionIds: readonly string[]) => Promise<void> = async () => {},
 ) {
@@ -325,7 +325,7 @@ test("resuming a saved session on a pull request claims the same task and refuse
 		const file = join(dir, "saved.jsonl");
 		writeFileSync(file, `${JSON.stringify({ type: "session", cwd: dir })}\n`);
 		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")));
-		const start = claimedStarter(sessions, file, () => ({ pullRequests: [{ owner: "acme", repo: "app", number: 7, link: "worked" }], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }));
+		const start = claimedStarter(sessions, file, () => ({ pullRequests: [{ owner: "acme", repo: "app", number: 7, link: "worked" }], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }));
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
 		expect(await sessions.reserveTask("pr:acme/app#7", "already-working", dir, () => { throw new Error("no running sessions"); })).toBeNull();
 		const resume = spyOn(DashboardSession, "resume").mockImplementation(async (id) => sessionForStart(id, dir));
@@ -478,7 +478,7 @@ test("an explicit independent task survives reattachment and ended-session resum
 		expect((await afterRestart(newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7", { taskId: "app#7:tests-only" }))).ok).toBe(false);
 		restarted.remove("original");
 		const resumedRegistry = new LiveSessions(() => {}, new TaskClaims(path));
-		const resume = claimedStarter(resumedRegistry, file, () => ({ pullRequests: [{ owner: "acme", repo: "app", number: 7, link: "worked" }], worktree: null, branch: null, ship: null, arenas: [], workspace: null, gone: false }));
+		const resume = claimedStarter(resumedRegistry, file, () => ({ pullRequests: [{ owner: "acme", repo: "app", number: 7, link: "worked" }], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }));
 		spyOn(DashboardSession, "resume").mockImplementation(async id => sessionForStart(id, dir));
 		// The pull request's implementation still has its own live claim, but this saved session owns the independent test slice.
 		expect((await resume({ kind: "resume", sessionId: "s-original" })).ok).toBe(true);
