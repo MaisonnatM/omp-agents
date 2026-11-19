@@ -22,3 +22,8 @@ Both go through omp's `addMCPServer` into the user `mcp.json`.
 `PUT /api/mcp-servers/sign-in` and `PUT /api/mcp-servers/sign-out`, with `{ name }`, sign in and out as the integrations' routes do, with a `createSignIn` per server name; they refuse a local server and an integration's.
 `PUT /api/mcp-servers/enabled`, with `{ name, enabled }`, calls omp's `setMcpServerEnabled`, as `/mcp enable` and `/mcp disable` do, and `PUT /api/mcp-servers/remove`, with `{ name }`, calls `removeMCPServer`, as `/mcp remove` does, keeping omp's sign-in; both refuse a server from any file but omp's user `mcp.json`.
 A refusal, such as a taken name, is `McpServerRejected`, which the routes answer as a 400 with its message.
+
+`GET /api/linear/issue?id=<id or link>` answers a `LinearIssue` from `src/shared/linear.ts` for the session sidebar's **Linear** tab, and a 400 when `linearIssueId` finds no issue id such as `ENG-123` in `id`.
+`readLinearIssue` in `src/linear.ts` calls the `get_issue` tool of the first server omp loads on `mcp.linear.app`, with omp's sign-in, through `callMcpTool` in `src/omp/mcp.ts`, which connects as `listMcpTools` does and throws the tool's own text when the call fails, so the dashboard keeps no Linear token or client.
+Linear answers a failed call as JSON with a `message`, such as `Could not find referenced Issue.`, which `readLinearIssue` throws in its place; it keeps each issue 30 seconds, as the pull request reads do, so switching tabs or views asks Linear once.
+Without such a server, or when the server refuses omp's sign-in, the route answers a 409 whose error names Settings › MCP servers, where the catalog's **Linear** entry adds it and its row signs in again; any other failure is a 500 with its message.

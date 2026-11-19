@@ -573,6 +573,9 @@
 .message-markdown ol { list-style: decimal; padding-left: 1.5em; }
 .message-markdown li { margin-block: .25em; }
 .message-markdown li > p { display: inline; }
+/* A GitHub task list's item shows its checkbox in place of the bullet. */
+.message-markdown li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.25em; }
+.message-markdown li > input[type="checkbox"] { margin-right: .4em; vertical-align: -.1em; }
 .message-markdown blockquote { border-left: 3px solid var(--border); padding-left: .85em; color: var(--muted-foreground); }
 .message-markdown a, .message-markdown .file-link { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
 .message-markdown a:hover, .message-markdown .file-link:hover { color: var(--muted-foreground); }

@@ -225,41 +225,63 @@ function invalidateMcpSignIn(credentialId: string): void {
 }
 
 /**
+ * `run`'s answer over a connection to `server` through omp's client, with its configured transport and headers, and
+ * omp's token when `signedIn`. A 401 forgets the sign-in and throws the error `unauthorized` builds; another refused status throws an {@link ApiError}.
+ */
+async function overConnection<T>(
+	server: McpServer,
+	signedIn: boolean,
+	unauthorized: () => Error,
+	run: (connection: McpConnection, signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+	const { name, config, credentialId } = server;
+	const expanded = discoveryHelpers.expandEnvVarsDeep(config);
+	const headers = { ...expanded.headers, ...(signedIn ? { Authorization: `Bearer ${await tokenOf(credentialId)}` } : {}) };
+	const signal = AbortSignal.timeout(TIMEOUT_MS);
+	let connection: McpConnection | undefined;
+	try {
+		connection = await mcpClient.connectToServer(name, { ...expanded, headers }, { signal });
+		return await run(connection, signal);
+	} catch (err) {
+		// omp's HTTP transport throws `MCPTransportError`, `failure: "http_status"` with the status as `code`, on a refused
+		// request; its legacy SSE transport throws a plain `HTTP 401: <body>` error.
+		const status = isObject(err) && err.failure === "http_status" ? err.code : err instanceof Error && err.message.startsWith("HTTP 401:") ? 401 : null;
+		if (status === 401) {
+			invalidateMcpSignIn(credentialId);
+			throw unauthorized();
+		}
+		if (typeof status === "number") throw new ApiError(`The "${name}" MCP server answered HTTP ${status}`, status);
+		throw err;
+	} finally {
+		if (connection) await mcpClient.disconnectServer(connection).catch(() => {});
+	}
+}
+
+/**
  * Every tool `server` offers through omp's client, with its configured transport and headers.
  * `signedIn` adds omp's token; unsigned discovery still works for public or header-authenticated servers.
  * Equivalent probes share a minute-old list; `fresh` bypasses it and failures are not kept.
  * Throws {@link McpUnauthorized} on discovery 401, not the service API's {@link McpRefused}.
  */
 export const listMcpTools = (server: McpServer, signedIn: boolean, fresh: boolean): Promise<McpToolDefinition[]> => {
-	const { name, config, credentialId } = server;
-	const expanded = discoveryHelpers.expandEnvVarsDeep(config);
-	const key = JSON.stringify([name, credentialId, signedIn, expanded]);
+	const key = JSON.stringify([server.name, server.credentialId, signedIn, discoveryHelpers.expandEnvVarsDeep(server.config)]);
 	return toolLists.get(
 		key,
-		async () => {
-			const headers = { ...expanded.headers, ...(signedIn ? { Authorization: `Bearer ${await tokenOf(credentialId)}` } : {}) };
-			const signal = AbortSignal.timeout(TIMEOUT_MS);
-			let connection: McpConnection | undefined;
-			try {
-				connection = await mcpClient.connectToServer(name, { ...expanded, headers }, { signal });
-				return await mcpClient.listTools(connection, { signal });
-			} catch (err) {
-				// omp's HTTP transport throws `MCPTransportError`, `failure: "http_status"` with the status as `code`, on a refused
-				// request; its legacy SSE transport throws a plain `HTTP 401: <body>` error.
-				const status = isObject(err) && err.failure === "http_status" ? err.code : err instanceof Error && err.message.startsWith("HTTP 401:") ? 401 : null;
-				if (status === 401) {
-					invalidateMcpSignIn(credentialId);
-					throw new McpUnauthorized(`${name} answered 401 Unauthorized`);
-				}
-				if (typeof status === "number") throw new ApiError(`The "${name}" MCP server answered HTTP ${status}`, status);
-				throw err;
-			} finally {
-				if (connection) await mcpClient.disconnectServer(connection).catch(() => {});
-			}
-		},
+		() => overConnection(server, signedIn, () => new McpUnauthorized(`${server.name} answered 401 Unauthorized`), (connection, signal) => mcpClient.listTools(connection, { signal })),
 		fresh,
 	);
 };
+
+/**
+ * The text `tool` answers for `args` on `server`, called with omp's sign-in; the server's own text thrown when the call fails.
+ * Throws {@link McpRefused} when the server refuses the sign-in.
+ */
+export async function callMcpTool(server: McpServer, tool: string, args: Record<string, unknown>): Promise<string> {
+	const result = await overConnection(server, true, () => refusal(server, "MCP servers"), (connection, signal) => mcpClient.callTool(connection, tool, args, { signal }));
+	const text = result.content.find(part => part.type === "text")?.text ?? "";
+	if (result.isError === true) throw new Error(text || `The "${server.name}" MCP server's ${tool} failed`);
+	return text;
+}
 
 /** omp's user-level MCP config path. Slack's app settings live in that file, not in a second store. */
 export const userMcpConfigPath = (): string => dirs.getMCPConfigPath("user");
@@ -299,11 +321,15 @@ export function credentialFor(name: string, config: McpServerConfig): McpServer 
 /** The server refused omp's sign-in, so only a new sign-in helps. */
 export class McpRefused extends Error {}
 
-/** Forgets `server`'s token and tool list once a service refused the token, and the error that says so. */
-function refused(server: McpServer): McpRefused {
-	invalidateMcpSignIn(server.credentialId);
-	return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › Integrations, or run /mcp reauth ${server.name} in omp.`);
-}
+/** The error that says `server` refused omp's sign-in, naming the Settings tab, such as `MCP servers`, that signs in to it again. */
+const refusal = (server: McpServer, settingsTab: string): McpRefused =>
+	new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › ${settingsTab}, or run /mcp reauth ${server.name} in omp.`);
 
 /** omp's sign-in to `server`, for a `signedFetch` to the APIs of the service behind it: a 401 forgets it and throws {@link McpRefused}. */
-export const mcpBearer = async (server: McpServer): Promise<Bearer> => ({ token: await tokenOf(server.credentialId), refused: () => refused(server) });
+export const mcpBearer = async (server: McpServer): Promise<Bearer> => ({
+	token: await tokenOf(server.credentialId),
+	refused: () => {
+		invalidateMcpSignIn(server.credentialId);
+		return refusal(server, "Integrations");
+	},
+});

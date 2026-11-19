@@ -3,7 +3,7 @@
 - **MCP servers** is a section of [Settings](settings.md), at `#settings/mcp-servers`: every MCP server omp loads for you, then **Discover**, a catalog of remote servers to add.
   It lists the servers in omp's user `~/.omp/agent/mcp.json` and the user-level servers omp reads from other tools' configs, but not a project's `.mcp.json`.
   The section checks the servers every minute while it is open, and **Refresh** checks at once.
-- **Installed** shows each server with its vendor's mark, or its initial, its transport, and its host or command.
+- **Installed** shows each server with its vendor's mark, else its site's icon, else its initial, its transport, and its host or command.
   A remote server shows whether omp can use it, by listing its tools with omp's sign-in: **Connected** with the number of tools, which unfolds to their names, each with its description on hover, **Signed out** with **Connect** when it asks for a sign-in omp lacks, **Needs reconnecting** when it refuses omp's sign-in, or **Unreachable** with its error and **Check again**.
   A local server, which runs a command, says **Not checked**, as only an omp session starts it.
   A server whose config lives in another tool's file says **From** that tool, and the section does not change it.

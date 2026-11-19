@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, showDetailsTab } from "./details-tabs";
+import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, newIdsByScope, openDetailsTab, showDetailsTab } from "./details-tabs";
 
 describe("decodeDetailsTabs", () => {
 	test("a tab name stored before tabs could close opens that tab", () => {
@@ -24,6 +24,32 @@ describe("showDetailsTab", () => {
 
 	test("shows the first tab without adding it to the open tabs", () => {
 		expect(showDetailsTab({ open: ["pull-requests"], active: "pull-requests" }, "overview", "overview")).toEqual({ open: ["pull-requests"], active: null });
+	});
+});
+
+describe("openDetailsTab", () => {
+	test("opens a tab as the last one behind the tab on screen", () => {
+		expect(openDetailsTab({ open: ["pull-requests"], active: "pull-requests" }, "linear")).toEqual({ open: ["pull-requests", "linear"], active: "pull-requests" });
+		expect(openDetailsTab({ open: [], active: null }, "linear")).toEqual({ open: ["linear"], active: null });
+	});
+
+	test("leaves an open tab where it is", () => {
+		const tabs = { open: ["linear", "artifacts"], active: "artifacts" };
+		expect(openDetailsTab(tabs, "linear")).toEqual(tabs);
+	});
+});
+
+describe("newIdsByScope", () => {
+	test("names new ids only, per scope, so a view with fewer links or a reloaded transcript adds no tab again", () => {
+		const linked = newIdsByScope();
+		expect(linked("session-1", ["ENG-1", "ENG-2", "ENG-3"])).toBe(true);
+		// A subagent's view of the same session links one of them; the parent's view mounts again with all three.
+		expect(linked("session-1", ["ENG-2"])).toBe(false);
+		expect(linked("session-1", [])).toBe(false);
+		expect(linked("session-1", ["ENG-1", "ENG-2", "ENG-3"])).toBe(false);
+		// A link replaced by another at the same count is new.
+		expect(linked("session-1", ["ENG-1", "ENG-2", "ENG-4"])).toBe(true);
+		expect(linked("session-2", ["ENG-1"])).toBe(true);
 	});
 });
 

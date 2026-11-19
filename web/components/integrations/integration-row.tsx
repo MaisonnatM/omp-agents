@@ -2,10 +2,19 @@
 import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { SiteIcon } from "../site-icon";
 import { type BrandLogo, BrandMark } from "./brand-logos";
 
-/** A row's mark on its tile: a brand's mark in its colors, else `icon`, else `name`'s first letter. */
-export function MarkTile({ logo = null, icon: Icon, name }: { logo?: BrandLogo | null; icon?: IconComponent; name: string }) {
+interface MarkTileProps {
+	logo?: BrandLogo | null;
+	icon?: IconComponent;
+	/** The host whose site icon, fetched by the server, stands in for a missing `logo`, such as a remote MCP server's. */
+	site?: string | null;
+	name: string;
+}
+
+/** A row's mark on its tile: a brand's mark in its colors, else `icon`, else `site`'s icon, else `name`'s first letter. */
+export function MarkTile({ logo = null, icon: Icon, site = null, name }: MarkTileProps) {
 	return (
 		<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 text-foreground shadow-surface-2">
 			{logo ? (
@@ -13,7 +22,7 @@ export function MarkTile({ logo = null, icon: Icon, name }: { logo?: BrandLogo |
 			) : Icon ? (
 				<Icon className="size-4 text-muted-foreground" />
 			) : (
-				<span className="text-sm font-medium text-muted-foreground">{name.charAt(0).toUpperCase()}</span>
+				<SiteIcon hostname={site} className="size-5" fallback={<span className="text-sm font-medium text-muted-foreground">{name.charAt(0).toUpperCase()}</span>} />
 			)}
 		</span>
 	);

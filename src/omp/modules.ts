@@ -373,6 +373,7 @@ export const mcpConfig = await load<McpConfigModule>(join(srcDir, "mcp", "config
 export const mcpClient = await load<McpClientModule>(join(srcDir, "mcp", "client.ts"), {
 	connectToServer: "function",
 	listTools: "function",
+	callTool: "function",
 	disconnectServer: "function",
 });
 export const mcpCredentials = await load<McpCredentialsModule>(join(srcDir, "mcp", "oauth-credentials.ts"), {
