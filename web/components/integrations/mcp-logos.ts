@@ -1,7 +1,7 @@
 import type { BrandLogo } from "./brand-logos";
 
 /** The marks of the MCP catalog's vendors in their brand colors, keyed by catalog id: svgl's (https://svgl.app) unless a comment names another source. */
-export const MCP_LOGOS: Partial<Record<string, BrandLogo>> = {
+const MCP_LOGOS: Partial<Record<string, BrandLogo>> = {
 	"gitlab": { svg: '<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-labelledby="tanukiHomeDesktop"><path d="m31.46 12.78-.04-.12-4.35-11.35A1.14 1.14 0 0 0 25.94.6c-.24 0-.47.1-.66.24-.19.15-.33.36-.39.6l-2.94 9h-11.9l-2.94-9A1.14 1.14 0 0 0 6.07.58a1.15 1.15 0 0 0-1.14.72L.58 12.68l-.05.11a8.1 8.1 0 0 0 2.68 9.34l.02.01.04.03 6.63 4.97 3.28 2.48 2 1.52a1.35 1.35 0 0 0 1.62 0l2-1.52 3.28-2.48 6.67-5h.02a8.09 8.09 0 0 0 2.7-9.36Z" fill="#E24329"/><path d="m31.46 12.78-.04-.12a14.75 14.75 0 0 0-5.86 2.64l-9.55 7.24 6.09 4.6 6.67-5h.02a8.09 8.09 0 0 0 2.67-9.36Z" fill="#FC6D26"/><path d="m9.9 27.14 3.28 2.48 2 1.52a1.35 1.35 0 0 0 1.62 0l2-1.52 3.28-2.48-6.1-4.6-6.07 4.6Z" fill="#FCA326"/><path d="M6.44 15.3a14.71 14.71 0 0 0-5.86-2.63l-.05.12a8.1 8.1 0 0 0 2.68 9.34l.02.01.04.03 6.63 4.97 6.1-4.6-9.56-7.24Z" fill="#FC6D26"/></svg>' },
 	"vercel": { svg: '<svg viewBox="0 0 256 222" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="m128 0 128 221.705H0z"/></svg>' },
 	"netlify": { svg: '<svg viewBox="0 0 256 226" xmlns="http://www.w3.org/2000/svg"><path fill="#05BDBA" d="M69.181 188.087h-2.417l-12.065-12.065v-2.417l18.444-18.444h12.778l1.704 1.704v12.778zM54.699 51.628v-2.417l12.065-12.065h2.417L87.625 55.59v12.778l-1.704 1.704H73.143z"/><path fill="#014847" d="M160.906 149.198h-17.552l-1.466-1.466v-41.089c0-7.31-2.873-12.976-11.689-13.174-4.537-.119-9.727 0-15.274.218l-.833.852v53.173l-1.466 1.466H95.074l-1.466-1.466v-70.19l1.466-1.467h39.503c15.354 0 27.795 12.441 27.795 27.795v43.882l-1.466 1.466Z"/><path fill="#05BDBA" d="M71.677 122.889H1.466L0 121.423V103.83l1.466-1.466h70.211l1.466 1.466v17.593zM254.534 122.889h-70.211l-1.466-1.466V103.83l1.466-1.466h70.211L256 103.83v17.593zM117.876 54.124V1.466L119.342 0h17.593l1.466 1.466v52.658l-1.466 1.466h-17.593zM117.876 223.787v-52.658l1.466-1.466h17.593l1.466 1.466v52.658l-1.466 1.465h-17.593z"/></svg>' },
@@ -61,9 +61,12 @@ export const MCP_LOGOS: Partial<Record<string, BrandLogo>> = {
  * The marks of installed servers outside the catalog whose site icon does not draw on a tile, keyed by host: marked.dev's
  * favicon is white, so its tile would look empty.
  */
-export const SITE_LOGOS: Partial<Record<string, BrandLogo>> = {
+const SITE_LOGOS: Partial<Record<string, BrandLogo>> = {
 	// marked.dev's icon.svg.
 	"marked.dev": {
 		svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M41.7555 0C18.779 0 0 16.8356 0 37.4344V147.588C0 154.781 2.41284 161.439 7.79548 165.922L39.157 194.047L40.2555 195.004C40.3088 195.048 40.3596 195.096 40.4104 195.144C40.47 195.2 40.5296 195.256 40.5935 195.307C48.6398 201.713 59.7586 201.099 69.4939 196.225L111.957 175.013C112.745 174.627 114.295 174.236 116.267 174.236C118.246 174.237 119.748 174.638 120.439 174.984L162.945 196.216C171.389 200.448 180.844 201.533 188.665 197.39C196.471 193.254 200 185.313 200 176.68V66.5259C200.052 56.7318 195.822 47.7929 188.951 41.1277C188.906 41.0849 188.862 41.0437 188.817 41.0024L188.708 40.9004L186.658 39.0822L186.416 38.8644L157.779 13.3525C156.041 11.501 154.114 9.7963 152.012 8.27668C144.87 3.11543 135.768 0 125.9 0H41.7555ZM18.9183 155.344C17.7753 154.434 16.2247 152.183 16.2247 147.588V37.4344C16.2247 24.869 27.7396 14.5457 41.7555 14.5457H125.9C131.799 14.5457 137.242 16.3758 141.586 19.4417L145.811 23.2107C149.119 26.9362 151.152 31.5638 151.315 36.5916C151.323 36.8552 151.327 37.1205 151.325 37.3871V147.588C151.325 153.015 149.219 155.116 147.966 155.78C146.73 156.434 143.685 157.076 138.396 154.425L95.8908 133.184C92.1514 131.309 87.7477 130.6 83.8173 130.599C79.8686 130.599 75.4154 131.34 71.6593 133.184L29.1433 154.435C23.0831 157.472 20.0458 156.239 18.9183 155.344Z"/></svg>',
 	},
 };
+
+/** The mark of a server: its catalog vendor's by `catalogId`, else the one for its `host`; `null` for neither, so the tile draws the site's icon. */
+export const mcpLogo = (catalogId: string | null, host: string | null): BrandLogo | null => (catalogId && MCP_LOGOS[catalogId]) || (host && SITE_LOGOS[host]) || null;

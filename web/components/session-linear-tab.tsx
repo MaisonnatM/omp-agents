@@ -1,15 +1,13 @@
 /** The right sidebar's **Linear** tab: a Linear issue the session links to, or one typed in, read through omp's Linear MCP server. */
 import { IconChevronDownSmall, IconLinear, IconSquareArrowTopRight } from "central-icons";
-import { type FormEvent, useId, useMemo, useState } from "react";
-import { type LinearIssue, linearIssueId, linearIssueIdsIn } from "../../src/shared/linear";
-import type { View } from "../../src/shared/sessions";
+import { type FormEvent, useId, useState } from "react";
+import { type LinearIssue, linearIssueId } from "../../src/shared/linear";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuRadioGroup, MenuRadioItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { age } from "../labels";
-import { useTranscript } from "../pane-store";
 import { useRead } from "../reads";
 import { DetailsEmpty } from "./details-sidebar-frame";
 import { ERROR_TEXT } from "./form-dialog";
@@ -19,14 +17,6 @@ import { LoadNote } from "./sheet-details";
 
 /** Each of Linear's state types in the colors Linear draws them. */
 const STATUS_COLOR: Record<string, BadgeColor> = { triage: "orange", backlog: "gray", unstarted: "gray", started: "amber", completed: "indigo", canceled: "gray" };
-
-/** The ids of the Linear issues `view`'s prompts and replies link to, in the order they first appear. */
-export function useLinkedIssues(view: View): string[] {
-	const items = useTranscript(view);
-	const joined = useMemo(() => linearIssueIdsIn(items.flatMap(item => (item.kind === "user" || item.kind === "assistant" ? [item.text] : []))).join(" "), [items]);
-	// Keyed by the joined ids, so the list keeps its identity while a reply streams and the ids stay the same.
-	return useMemo(() => (joined === "" ? [] : joined.split(" ")), [joined]);
-}
 
 /** The tab: the picked issue, else the first one `linked` names, with a field to open another by id or link. Callers key it by session. */
 export function SessionLinearTab({ linked }: { linked: string[] }) {
@@ -76,7 +66,7 @@ function IssueToolbar({ linked, shown, onPick }: { linked: string[]; shown: stri
 							{shown}
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
-							<MenuRadioGroup aria-label="Linked issues" value={shown ?? ""} onValueChange={(id: string) => onPick(id)}>
+							<MenuRadioGroup aria-label="Linked issues" value={shown ?? ""} onValueChange={onPick}>
 								{linked.map(id => (
 									<MenuRadioItem key={id} value={id} closeOnClick className="font-mono">
 										{id}
@@ -113,7 +103,6 @@ function IssueToolbar({ linked, shown, onPick }: { linked: string[]; shown: stri
 
 /** One issue as the PR header shows a pull request: its id linking to Linear, status, and when it changed, its title, who and where, then labels and description. */
 function IssueDetails({ issue }: { issue: LinearIssue }) {
-	const updated = Date.parse(issue.updatedAt);
 	const where = issue.project ?? issue.team;
 	// Each part after the first carries its own separator, so a part the narrow header hides takes its separator with it.
 	const meta: { key: string; text: string; className?: string }[] = [
@@ -128,12 +117,12 @@ function IssueDetails({ issue }: { issue: LinearIssue }) {
 					{issue.id}
 					<IconSquareArrowTopRight className="size-2.5" />
 				</a>
-				{issue.status && (
-					<Badge variant="dot" size="compact" color={STATUS_COLOR[issue.statusType] ?? "gray"} className="shrink-0">
+				{issue.status !== null && (
+					<Badge variant="dot" size="compact" color={(issue.statusType && STATUS_COLOR[issue.statusType]) || "gray"} className="shrink-0">
 						{issue.status}
 					</Badge>
 				)}
-				{Number.isFinite(updated) && <span className="ml-auto min-w-0 truncate @max-[20rem]/linear-header:hidden">updated {age(updated)} ago</span>}
+				{issue.updatedAt !== null && <span className="ml-auto min-w-0 truncate @max-[20rem]/linear-header:hidden">updated {age(issue.updatedAt)} ago</span>}
 			</div>
 			<h1 className="mt-2 text-base font-semibold">{issue.title}</h1>
 			<div className="mt-2 flex min-h-5 min-w-0 items-center gap-2 text-xs text-muted-foreground">

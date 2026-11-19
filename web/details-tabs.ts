@@ -52,7 +52,22 @@ export function revealDetailsTab(key: string, value: string, first: string): voi
 	updateStored(key, decodeDetailsTabs, encodeDetailsTabs, tabs => showDetailsTab(tabs, value, first));
 }
 
-/** Opens `value` behind the tab on screen in the sidebar stored under `key`, as a session that links a Linear issue does with the Linear tab. */
-export function openStoredDetailsTab(key: string, value: string): void {
+/** Adds `value` behind the tab on screen in the sidebar stored under `key`, as a session that links a new Linear issue does with the Linear tab. */
+export function addDetailsTab(key: string, value: string): void {
 	updateStored(key, decodeDetailsTabs, encodeDetailsTabs, tabs => openDetailsTab(tabs, value));
+}
+
+/**
+ * Remembers the ids each scope named, such as the Linear issues a session linked, so that a tab is added only for an id
+ * the scope had not named before: the function it returns adds `ids` under `scope` and says whether any of them is new.
+ */
+export function newIdsByScope(): (scope: string, ids: readonly string[]) => boolean {
+	const seen = new Map<string, Set<string>>();
+	return (scope, ids) => {
+		const named = seen.get(scope) ?? new Set<string>();
+		seen.set(scope, named);
+		const before = named.size;
+		for (const id of ids) named.add(id);
+		return named.size > before;
+	};
 }

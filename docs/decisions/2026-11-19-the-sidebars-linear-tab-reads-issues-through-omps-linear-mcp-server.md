@@ -23,6 +23,7 @@ The removed Tickets page read Linear through its own loader and is not coming ba
 ## Consequences
 
 The tab works once Linear is in Settings › MCP servers, which now offers it in the catalog, and says so when omp has none.
+The server keeps each issue it read for 30 seconds, as it keeps pull requests, so returning to the tab or the session within that time costs no new connection.
 `parseLinearIssue` in `src/linear.ts` is the one place that follows `get_issue`'s answer; a change there shows as a read error in the tab.
 
 ## Revisit when

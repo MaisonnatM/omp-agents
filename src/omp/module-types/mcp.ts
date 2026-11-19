@@ -41,9 +41,11 @@ export interface McpToolDefinition {
 export interface McpConnection {
 	name: string;
 }
+/** omp's `MCPContent` (pi-tui src/tools/mcp.ts): a text part, or one of the other kinds, whose fields this app does not read. */
+export type McpContent = { type: "text"; text: string } | { type: "image" | "audio" | "resource" | "resource_link" };
 /** Subset of omp's `MCPToolCallResult` (src/mcp/types.ts): the parts the tool answered, text among them, and whether it failed. */
 export interface McpToolCallResult {
-	content: { type: string; text?: unknown }[];
+	content: McpContent[];
 	isError?: boolean;
 }
 export interface McpClientModule {

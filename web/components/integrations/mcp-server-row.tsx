@@ -25,7 +25,7 @@ import {
 	useToolList,
 	WAITING_STATUS,
 } from "./mcp-connection-controls";
-import { MCP_LOGOS, SITE_LOGOS } from "./mcp-logos";
+import { mcpLogo } from "./mcp-logos";
 
 const refresh = (): Promise<void> => mcpServersStore.refresh();
 
@@ -146,11 +146,10 @@ export function McpServerItem({ server }: { server: OwnServer }) {
 	);
 
 	const where = server.transport === "stdio" ? server.command : server.host;
-	const logo = (server.catalogId === null ? undefined : MCP_LOGOS[server.catalogId]) ?? (server.host === null ? undefined : SITE_LOGOS[server.host]) ?? null;
 	return (
 		<IntegrationRow
 			name={name}
-			mark={<MarkTile logo={logo} site={server.host} name={name} />}
+			mark={<MarkTile logo={mcpLogo(server.catalogId, server.host)} site={server.host} name={name} />}
 			status={<StatusBadge {...badge} />}
 			summary={
 				entry?.description ??

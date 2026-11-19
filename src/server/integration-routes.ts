@@ -1,5 +1,5 @@
 import type { Integrations } from "../integrations";
-import { readLinearIssue } from "../linear";
+import { NoLinearServer, readLinearIssue } from "../linear";
 import {
 	addMcpServerFrom,
 	loadMcpServers,
@@ -10,6 +10,7 @@ import {
 	startMcpServerSignIn,
 } from "../mcp-servers";
 import { ClientConfigError } from "../mcp-clients";
+import { McpRefused } from "../omp/mcp";
 import type { IntegrationTarget, McpIntegration } from "../shared/accounts";
 import { linearIssueId } from "../shared/linear";
 import { answer, checked, fail } from "./http";
@@ -64,7 +65,9 @@ export function integrationRoutes({ get, write }: RouteKit, integrations: Integr
 	/** `GET /api/linear/issue?id=`: the Linear issue `id` names, an id such as `ENG-123` or its link, read through omp's Linear MCP server. */
 	const linearIssue = get((params) => {
 		const id = linearIssueId(params.get("id") ?? "");
-		return id === null ? fail(400, "Expected ?id= naming a Linear issue, such as ENG-123") : answer(() => readLinearIssue(id));
+		if (id === null) return fail(400, "Expected ?id= naming a Linear issue, such as ENG-123");
+		// The setups only Settings › MCP servers fixes answer 409, apart from a failed read.
+		return answer(() => readLinearIssue(id), err => (err instanceof NoLinearServer || err instanceof McpRefused ? fail(409, err.message) : null));
 	});
 
 	return {

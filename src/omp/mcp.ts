@@ -4,7 +4,7 @@
  * sign-in, and handing that sign-in to `signedFetch` for the APIs of the service behind a server.
  */
 import { createCache } from "../cache";
-import { isObject, str } from "../json";
+import { isObject } from "../json";
 import { runChecked } from "../proc";
 import { ApiError, type Bearer } from "../signed-fetch";
 import { ompCommand } from "./install";
@@ -226,7 +226,7 @@ function invalidateMcpSignIn(credentialId: string): void {
 
 /**
  * `run`'s answer over a connection to `server` through omp's client, with its configured transport and headers, and
- * omp's token when `signedIn`. A 401 forgets the sign-in and throws `unauthorized()`; another refused status throws an {@link ApiError}.
+ * omp's token when `signedIn`. A 401 forgets the sign-in and throws the error `unauthorized` builds; another refused status throws an {@link ApiError}.
  */
 async function overConnection<T>(
 	server: McpServer,
@@ -272,24 +272,14 @@ export const listMcpTools = (server: McpServer, signedIn: boolean, fresh: boolea
 	);
 };
 
-/** A failed tool call's text is the server's error, sometimes as JSON with a `message`. */
-function toolError(text: string): string {
-	try {
-		const parsed: unknown = JSON.parse(text);
-		const message = isObject(parsed) ? str(parsed.message) : undefined;
-		if (message) return message;
-	} catch {}
-	return text;
-}
-
 /**
- * The text `tool` answers for `args` on `server`, called with omp's sign-in; the server's own message thrown when the call fails.
+ * The text `tool` answers for `args` on `server`, called with omp's sign-in; the server's own text thrown when the call fails.
  * Throws {@link McpRefused} when the server refuses the sign-in.
  */
 export async function callMcpTool(server: McpServer, tool: string, args: Record<string, unknown>): Promise<string> {
-	const result = await overConnection(server, true, () => refused(server), (connection, signal) => mcpClient.callTool(connection, tool, args, { signal }));
-	const text = result.content.map(part => (part.type === "text" ? str(part.text) : undefined)).find(part => part !== undefined) ?? "";
-	if (result.isError === true) throw new Error(toolError(text) || `The "${server.name}" MCP server's ${tool} failed`);
+	const result = await overConnection(server, true, () => refusal(server, "MCP servers"), (connection, signal) => mcpClient.callTool(connection, tool, args, { signal }));
+	const text = result.content.find(part => part.type === "text")?.text ?? "";
+	if (result.isError === true) throw new Error(text || `The "${server.name}" MCP server's ${tool} failed`);
 	return text;
 }
 
@@ -331,11 +321,15 @@ export function credentialFor(name: string, config: McpServerConfig): McpServer 
 /** The server refused omp's sign-in, so only a new sign-in helps. */
 export class McpRefused extends Error {}
 
-/** Forgets `server`'s token and tool list once a service refused the token, and the error that says so. */
-function refused(server: McpServer): McpRefused {
-	invalidateMcpSignIn(server.credentialId);
-	return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › Integrations, or run /mcp reauth ${server.name} in omp.`);
-}
+/** The error that says `server` refused omp's sign-in, naming the Settings tab, such as `MCP servers`, that signs in to it again. */
+const refusal = (server: McpServer, settingsTab: string): McpRefused =>
+	new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › ${settingsTab}, or run /mcp reauth ${server.name} in omp.`);
 
 /** omp's sign-in to `server`, for a `signedFetch` to the APIs of the service behind it: a 401 forgets it and throws {@link McpRefused}. */
-export const mcpBearer = async (server: McpServer): Promise<Bearer> => ({ token: await tokenOf(server.credentialId), refused: () => refused(server) });
+export const mcpBearer = async (server: McpServer): Promise<Bearer> => ({
+	token: await tokenOf(server.credentialId),
+	refused: () => {
+		invalidateMcpSignIn(server.credentialId);
+		return refusal(server, "Integrations");
+	},
+});
