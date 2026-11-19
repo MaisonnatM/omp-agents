@@ -127,6 +127,7 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 		{ id: "browserRestore", scope: "anywhere", key: 0 },
 		{ id: "todoClose", scope: "outside-fields", key: 0 },
 		{ id: "sportJournalClose", scope: "outside-fields", key: 0 },
+		{ id: "memoryProjectClose", scope: "outside-fields", key: 0 },
 		{ id: "memoryBookmarksClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([{ id: "attachFiles", scope: "composer", key: 0 }]);

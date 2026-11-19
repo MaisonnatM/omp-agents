@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-20
 
+- Memory: a project memory now opens in a panel beside the table, as a bookmark does, instead of a sheet over it.
 - Pull requests: a pull request whose only failing check waits for a person to approve it, such as `human-review`, now shows under review instead of Fix CI.
 - A new Memory tab gathers your omp memory, each repository's project memory, and your bookmarks in one page.
 - You can read, add, edit, and delete the project memories your agents wrote, for every repository you work in.

@@ -1,5 +1,5 @@
-/** The Memory page's Project memory tab: one repository's memories in a table grouped by kind, each edited, added, or deleted in a drawer over it. */
-import { IconFolderOpen, IconPlusSmall } from "central-icons";
+/** The Memory page's Project memory tab: one repository's memories in a table grouped by kind, beside the open memory, which is edited, added, or deleted there. */
+import { IconBrain, IconFolderOpen, IconPlusSmall } from "central-icons";
 import { useRef, useState } from "react";
 import { MEMORY_KINDS, type MemoryKind, type RawOp } from "../../../templates/omp/agent/extensions/project-memory/contract";
 import { everyWord } from "../../../src/shared/every-word";
@@ -14,14 +14,14 @@ import { shownRepo } from "./memory-view";
 import { useShortcuts } from "../../shortcuts";
 import { CommandPicker } from "../command-picker";
 import { CountPill } from "../count-pill";
-import { Drawer } from "../drawer";
-import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar } from "../list-split";
+import { useReturnFocus } from "../list-page";
+import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, ListSplit } from "../list-split";
 import { SearchField } from "../search-field";
 import { LoadNote } from "../sheet-details";
 import { type Draft, draftOf, isSaved, KIND_LABELS, KindDot, MemoryEditor, sessionOf } from "./project-memory-editor";
 import { memoryHash } from "./tabs";
 
-/** The memory open in the drawer: one by its slug, or a new one being written. */
+/** The memory open beside the table: one by its slug, or a new one being written. */
 type Open = { slug: string } | "new" | null;
 
 /** The key of a draft: the memory's slug, or `""` for the new one, which no slug can be. */
@@ -81,7 +81,7 @@ function RepoPicker({ repo, repos }: { repo: ProjectMemoryRepo; repos: ProjectMe
 	);
 }
 
-/** The repository picker, kind filter, search, and New memory over the table, and the drawer while a memory is open. */
+/** The repository picker, kind filter, search, and New memory over the table, with the open memory beside it. */
 function RepoMemory({ repo, repos, view }: { repo: ProjectMemoryRepo; repos: ProjectMemoryRepo[]; view: Editable<ProjectMemoryView> }) {
 	const [open, setOpen] = useState<Open>(null);
 	const [query, setQuery] = useState("");
@@ -89,14 +89,13 @@ function RepoMemory({ repo, repos, view }: { repo: ProjectMemoryRepo; repos: Pro
 	const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 	const rows = useRef(new Map<string, HTMLButtonElement>());
 	const newButton = useRef<HTMLButtonElement>(null);
-	const lastOpen = useRef<Open>(null);
 	const matches = everyWord(query);
 	const found = repo.memories.filter(memory => matches(`${memory.slug}\n${memory.line}\n${memory.body}`));
 	const groups = (kind === null ? MEMORY_KINDS : [kind]).map(each => ({ kind: each, memories: found.filter(memory => memory.kind === each) })).filter(group => group.memories.length > 0);
 	const memories = groups.flatMap(group => group.memories);
 	const entry = open !== null && open !== "new" ? (repo.memories.find(memory => memory.slug === open.slug) ?? null) : null;
-	const drawer = open === "new" || entry !== null;
-	if (drawer) lastOpen.current = open;
+	const shown = open === "new" || entry !== null;
+	useReturnFocus(shown ? draftKey(entry) : null, key => key, key => (key === "" ? newButton.current : rows.current.get(key)), memories);
 	const send = (ops: RawOp[]): Promise<ProjectMemoryView> => view.write(() => editProjectMemory({ root: repo.root, ops }));
 	const keepDraft = (of: ProjectMemoryEntry | null, draft: Draft | null): void =>
 		setDrafts(all => {
@@ -113,7 +112,7 @@ function RepoMemory({ repo, repos, view }: { repo: ProjectMemoryRepo; repos: Pro
 		row?.focus();
 		row?.scrollIntoView({ block: "nearest" });
 	};
-	useShortcuts({ memoryProjectNext: () => step(1), memoryProjectPrevious: () => step(-1) });
+	useShortcuts({ memoryProjectNext: () => step(1), memoryProjectPrevious: () => step(-1), memoryProjectClose: () => setOpen(null) });
 	const at = entry === null ? -1 : memories.indexOf(entry);
 	const chips: { value: MemoryKind | null; label: string; count: number }[] = [
 		{ value: null, label: "All", count: found.length },
@@ -139,44 +138,48 @@ function RepoMemory({ repo, repos, view }: { repo: ProjectMemoryRepo; repos: Pro
 					</Button>
 				</div>
 			</div>
-			<Drawer
-				open={drawer}
-				label={entry?.slug ?? "New memory"}
-				onClose={() => setOpen(null)}
-				returnFocus={() => {
-					const last = lastOpen.current;
-					return last === "new" ? newButton.current : last === null ? null : (rows.current.get(last.slug) ?? null);
-				}}
-				content={
-					<div className="@container">
-						<MemoryTable repo={repo} groups={groups} grouped={kind === null} entry={entry} drafts={drafts} rows={rows.current} onOpen={slug => setOpen({ slug })} />
-						{repo.memories.length === 0 && <p className="px-4 py-4 text-sm text-muted-foreground">No memory in {repo.name} yet. An agent records one with its project_memory tool, or click New memory.</p>}
-						{repo.memories.length > 0 && memories.length === 0 && <p className="px-4 py-4 text-sm text-muted-foreground">No memory matches.</p>}
-					</div>
-				}
-			>
-				<DetailBar
-					leading={entry === null ? "New memory" : <span className="font-mono">{entry.slug}</span>}
-					previous={{ label: "Previous memory", icon: CH_PREVIOUS, shortcut: "memoryProjectPrevious", onClick: at > 0 ? () => step(-1) : undefined }}
-					next={{ label: "Next memory", icon: CH_NEXT, shortcut: "memoryProjectNext", onClick: at >= 0 && at < memories.length - 1 ? () => step(1) : undefined }}
-					close={{ label: "Close the memory", icon: CH_CLOSE, onClick: () => setOpen(null) }}
+			<div className="min-h-0 flex-1">
+				<ListSplit
+					widthKey="omp-agents.project-memory-list-width"
+					resizeLabel="Resize the memory list"
+					detailLabel="Open memory"
+					defaultWidth={560}
+					empty={{ icon: IconBrain, title: "No memory open", hint: "Pick a memory to read and edit it here." }}
+					list={
+						<div className="@container">
+							<MemoryTable repo={repo} groups={groups} grouped={kind === null} entry={entry} drafts={drafts} rows={rows.current} onOpen={slug => setOpen({ slug })} />
+							{repo.memories.length === 0 && <p className="px-4 py-4 text-sm text-muted-foreground">No memory in {repo.name} yet. An agent records one with its project_memory tool, or click New memory.</p>}
+							{repo.memories.length > 0 && memories.length === 0 && <p className="px-4 py-4 text-sm text-muted-foreground">No memory matches.</p>}
+						</div>
+					}
+					detail={
+						shown ? (
+							<section key={draftKey(entry)} aria-label={entry?.slug ?? "New memory"}>
+								<DetailBar
+									leading={entry === null ? "New memory" : <span className="font-mono">{entry.slug}</span>}
+									previous={{ label: "Previous memory", icon: CH_PREVIOUS, shortcut: "memoryProjectPrevious", onClick: at > 0 ? () => step(-1) : undefined }}
+									next={{ label: "Next memory", icon: CH_NEXT, shortcut: "memoryProjectNext", onClick: at >= 0 && at < memories.length - 1 ? () => step(1) : undefined }}
+									close={{ label: "Close the memory", icon: CH_CLOSE, shortcut: "memoryProjectClose", onClick: () => setOpen(null) }}
+								/>
+								<MemoryEditor
+									entry={entry}
+									draft={drafts[draftKey(entry)] ?? draftOf(entry)}
+									onDraft={draft => keepDraft(entry, draft)}
+									send={send}
+									onSaved={slug => {
+										keepDraft(entry, null);
+										setOpen({ slug });
+									}}
+									onDeleted={() => {
+										keepDraft(entry, null);
+										setOpen(null);
+									}}
+								/>
+							</section>
+						) : null
+					}
 				/>
-				<MemoryEditor
-					key={draftKey(entry)}
-					entry={entry}
-					draft={drafts[draftKey(entry)] ?? draftOf(entry)}
-					onDraft={draft => keepDraft(entry, draft)}
-					send={send}
-					onSaved={slug => {
-						keepDraft(entry, null);
-						setOpen({ slug });
-					}}
-					onDeleted={() => {
-						keepDraft(entry, null);
-						setOpen(null);
-					}}
-				/>
-			</Drawer>
+			</div>
 		</div>
 	);
 }

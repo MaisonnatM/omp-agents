@@ -18,7 +18,7 @@ export type MemoryControlId =
 	| "memory.bookmarks.open"
 	| "memory.bookmarks.sync";
 
-type MemoryShortcutId = "memoryProjectNext" | "memoryProjectPrevious" | "memoryBookmarksNext" | "memoryBookmarksPrevious" | "memoryBookmarksClose";
+type MemoryShortcutId = "memoryProjectNext" | "memoryProjectPrevious" | "memoryProjectClose" | "memoryBookmarksNext" | "memoryBookmarksPrevious" | "memoryBookmarksClose";
 
 export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, MemoryShortcutId, MemoryControlId> = {
 	id: "memory",
@@ -65,6 +65,7 @@ export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, MemoryShortcutId, Me
 					{ chord: { key: "k" }, scope: "outside-fields" },
 				],
 			},
+			{ id: "memoryProjectClose", label: "Project memory: close the open memory", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 			{
 				id: "memoryBookmarksNext",
 				label: "Bookmarks: focus the next bookmark, or open it while a bookmark is open",
