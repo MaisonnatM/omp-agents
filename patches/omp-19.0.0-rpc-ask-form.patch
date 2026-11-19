@@ -1,5 +1,5 @@
 diff --git a/docs/rpc.md b/docs/rpc.md
-index b7913e8e2c1a1598c97659980bd5ad8df507108e..91927e45da0f7b21676e8ff92a5cc2a761041b24 100644
+index b96ba6db22030109d29a9c9c7b23c3608fcd04d9..1e5d7f6f25b082d756434fdfa6f03fc18521e213 100644
 --- a/docs/rpc.md
 +++ b/docs/rpc.md
 @@ -739,7 +739,8 @@ The corresponding `get_state` result reports the same computed state:
@@ -12,7 +12,7 @@ index b7913e8e2c1a1598c97659980bd5ad8df507108e..91927e45da0f7b21676e8ff92a5cc2a7
  command answer with a failed `response`, so hosts should keep the `select`
  fallback when enabling fails.
  
-@@ -1336,8 +1337,12 @@ Use `--mode rpc --no-ui` for a host without a tool UI surface; use `--mode rpc-u
+@@ -1342,8 +1343,12 @@ Use `--mode rpc --no-ui` for a host without a tool UI surface; use `--mode rpc-u
       host hint from `ExtensionUIDialogOptions.secret`; hosts that support
       masked input should hide typed characters when `secret: true`.
     - `ask` is emitted only after `set_ask_dialog` enables it. It carries every
@@ -28,7 +28,7 @@ index b7913e8e2c1a1598c97659980bd5ad8df507108e..91927e45da0f7b21676e8ff92a5cc2a7
       plus `timeout?: number`. `options` never include an "Other" entry; hosts
       always offer free text.
 diff --git a/packages/coding-agent/src/modes/rpc/rpc-mode.ts b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
-index 4408b13370c5d7448c80da2bfa412dddf784a577..8407726b7c74460c49b4abecf60c9afb61125519 100644
+index bf9791d50ce867d2fe0f1a0d80ae93cbcf9cf48b..60229a1cc6dd42ef2bda2d571a3364e4ec735963 100644
 --- a/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 +++ b/packages/coding-agent/src/modes/rpc/rpc-mode.ts
 @@ -24,7 +24,9 @@ import { clearPluginRootsAndCaches, resolveActiveProjectRegistryPath } from "../
@@ -57,7 +57,7 @@ index 4408b13370c5d7448c80da2bfa412dddf784a577..8407726b7c74460c49b4abecf60c9afb
  import {
  	type BuiltSkillPromptMessage,
  	loadSkillPrompt,
-@@ -1195,6 +1206,104 @@ export async function requestRpcAskDialog(
+@@ -1197,6 +1208,104 @@ export async function requestRpcAskDialog(
  	return timedOut ? timedOutAskDialogResult(questions) : result;
  }
  
@@ -162,7 +162,7 @@ index 4408b13370c5d7448c80da2bfa412dddf784a577..8407726b7c74460c49b4abecf60c9afb
  export function requestRpcEditor(
  	pendingRequests: Map<string, PendingExtensionRequest>,
  	output: RpcOutput,
-@@ -1534,6 +1643,12 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions
+@@ -1536,6 +1645,12 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions
  				requestRpcAskDialog(this.pendingRequests, this.output, questions, dialogOptions);
  		}
  
@@ -176,7 +176,7 @@ index 4408b13370c5d7448c80da2bfa412dddf784a577..8407726b7c74460c49b4abecf60c9afb
  			title: string,
  			options: ExtensionUISelectItem[],
 diff --git a/packages/coding-agent/test/rpc-extension-ui.test.ts b/packages/coding-agent/test/rpc-extension-ui.test.ts
-index c66027b1224520b69c6d3f20c1892a27469b3b4b..3d4ef68597681fc47c437388dccd38e04f5c7989 100644
+index 093689257aaaa51dbb90ccb2077655f88b33761d..62502c2b095acc5eef63ad5e7143cf83d0e258b2 100644
 --- a/packages/coding-agent/test/rpc-extension-ui.test.ts
 +++ b/packages/coding-agent/test/rpc-extension-ui.test.ts
 @@ -7,6 +7,7 @@ import {
@@ -187,7 +187,7 @@ index c66027b1224520b69c6d3f20c1892a27469b3b4b..3d4ef68597681fc47c437388dccd38e0
  	requestRpcInput,
  	requestRpcSelect,
  } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
-@@ -736,7 +737,115 @@ describe("RPC ask dialog", () => {
+@@ -809,7 +810,115 @@ describe("RPC ask dialog", () => {
  		expect(onTimeout).not.toHaveBeenCalled();
  	});
  
@@ -304,7 +304,7 @@ index c66027b1224520b69c6d3f20c1892a27469b3b4b..3d4ef68597681fc47c437388dccd38e0
  		await using temp = await TempDir.create("@rpc-ask-dialog-");
  		const extensionPath = temp.join("scripted-ask.ts");
  		await Bun.write(extensionPath, scriptedAskProvider);
-@@ -797,7 +906,11 @@ describe("RPC ask dialog", () => {
+@@ -870,7 +979,11 @@ describe("RPC ask dialog", () => {
  					await send({ type: "extension_ui_response", id: frame.id, value: "Postgres" });
  				} else if (frame.type === "extension_ui_request" && frame.method === "ask") {
  					askRequests.push(frame);
@@ -317,7 +317,7 @@ index c66027b1224520b69c6d3f20c1892a27469b3b4b..3d4ef68597681fc47c437388dccd38e0
  				} else if (frame.type === "tool_execution_end" && frame.toolName === "ask") {
  					toolResults.push(frame.result);
  				} else if (frame.type === "prompt_result" && frame.id === "fallback") {
-@@ -818,7 +931,7 @@ describe("RPC ask dialog", () => {
+@@ -891,7 +1004,7 @@ describe("RPC ask dialog", () => {
  
  		if (!finished) throw new Error(`RPC ask fixture did not finish: ${await stderr}`);
  		await stderr;
@@ -326,7 +326,7 @@ index c66027b1224520b69c6d3f20c1892a27469b3b4b..3d4ef68597681fc47c437388dccd38e0
  		expect(selectRequests[0]).toMatchObject({ method: "select", title: "Which database?" });
  		expect(optInResponse).toEqual({
  			id: "opt-in",
-@@ -827,7 +940,20 @@ describe("RPC ask dialog", () => {
+@@ -900,7 +1013,20 @@ describe("RPC ask dialog", () => {
  			success: true,
  			data: { enabled: true },
  		});

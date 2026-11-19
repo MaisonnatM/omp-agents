@@ -1,6 +1,6 @@
 /**
  * **Start dev server**: the command a project's `package.json` runs its dev server with, on a port picked here, and its
- * start as a service of omp's project broker that the session owns. `docs/architecture/session-processes.md` says how.
+ * start as a service of omp's daemon that the session owns. `docs/architecture/session-processes.md` says how.
  */
 import { createServer } from "node:net";
 import { join } from "node:path";
@@ -93,7 +93,7 @@ const PORTS = { from: 20_000, to: 39_999 };
 
 /**
  * Starts the dev server of the project in `dir` as a service the omp session `sessionId` owns, through `start`, and
- * answers its port and command, else why it was left to the session: the plan's reason, or the broker's failure or the
+ * answers its port and command, else why it was left to the session: the plan's reason, or the daemon's failure or the
  * output of a server that ended. A failure to read the project or find a port rejects, as the dashboard's own fault.
  */
 export async function startDevServer(sessionId: string, dir: string, start: typeof startOwnedService): Promise<DevServerStart> {
@@ -120,7 +120,7 @@ async function rootFiles(dir: string): Promise<Record<string, string>> {
 	return Object.fromEntries(present.flat());
 }
 
-/** A random port in {@link PORTS} that nothing listens on now on 127.0.0.1, where the broker checks readiness. */
+/** A random port in {@link PORTS} that nothing listens on now on 127.0.0.1, where the daemon checks readiness. */
 async function freePort(): Promise<number> {
 	for (let tries = 0; tries < 20; tries++) {
 		const port = PORTS.from + Math.floor(Math.random() * (PORTS.to - PORTS.from + 1));

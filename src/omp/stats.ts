@@ -112,7 +112,7 @@ export async function readStats(range: AnalyticsRange): Promise<StatsRead> {
 	const db = await openLiveStats();
 	const now = Date.now();
 	const { cutoff, bucketMs } = windowOf(range, now);
-	const dashboard = { overall: statsRollup.getOverallStats(cutoff), byModel: statsRollup.getStatsByModel(cutoff), byAgentType: statsRollup.getStatsByAgentType(cutoff) };
+	const dashboard = { overall: statsRollup.getOverallStats(cutoff), byModel: statsRollup.getStatsByModel(cutoff), byAgentType: statsRollup.getUsageAttribution(cutoff).byAgentType };
 	const tools = { byTool: statsRollup.getToolStats(cutoff) };
 	const rows = db.query<SessionModelRow, [number]>(SESSION_MODEL_ROWS).all(cutoff ?? 0);
 	const window = { cutoff, bucketMs, now };
@@ -138,7 +138,7 @@ export const listPrice: Pricer = (provider, model, { input, output, cacheRead, c
 };
 
 // Anthropic refuses a spent API key with a 400 (or an in-stream error) that says so, which stock omp misses;
-// patches/omp-18.20.0-credit-balance-fallback.patch adds the phrase to omp, so this goes once omp ships it.
+// patches/omp-19.0.0-credit-balance-fallback.patch adds the phrase to omp, so this goes once omp ships it.
 const CREDIT_BALANCE_TOO_LOW = /\bcredit balance is too low\b/i;
 
 // A billing cap is one waiting never clears, so Cursor's plan window, whose usage limits reset with the monthly cycle,

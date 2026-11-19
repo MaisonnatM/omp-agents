@@ -8,23 +8,23 @@ The server lists what every live session runs besides omp, for the Browser's dev
 omp's bash tool runs in omp's own process: each command it runs, foreground or async, is a child of omp that leads its own process group, and so do omp's Python kernels and private browsers.
 Each such group is a job, listed by its top process, the group's leader, and stopped as a whole.
 omp's stdio MCP servers are children of omp in omp's own process group: they are omp's helpers, not something the session started, so the list only counts their memory and CPU with omp's, and they end with the session.
-omp starts its shared workers, whose commands begin with `__omp_worker_`, such as a project's daemon broker, the blob broker, or the LSP multiplexer, as children of whichever omp first needs them, and they serve every omp of the project or the machine.
+omp starts its shared workers, whose commands begin with `__omp_worker_`, such as its per-user daemon, the blob broker, or the LSP multiplexer, as children of whichever omp first needs them, and they serve every omp of the project or the machine.
 `descendants` in `src/process-census.ts` skips them and everything under them, for the list, the keeper's census, and `stopTree` alike; `OMP_WORKER_PREFIX` names the prefix omp's `cli/worker-selectors.ts` gives every worker.
-A service is a daemon the project's broker runs: a dev server the bash tool or the Browser's **Start dev server** started with a `name`, or omp's shared headless browser.
-It runs under the broker, not under omp, and outlives the session that started it while any omp stays in the project, which with sessions the dashboard keeps running is forever.
-`ompDaemons` in `src/omp/daemons.ts` lists them with omp's own `collectReports` from `cli/ps-data.ts`, which never starts a broker, keeps the ones a live broker supervises that have not ended, and stops one generation through the broker's `stop` with its id and a 3-second timeout.
-A service whose snapshot names an owner belongs to the session with that omp session id, and to the live session that took the id over with `/new`.
-A service with no owner, such as the shared browser, is shared: it serves every live session whose directory resolves, through omp's `canonicalProjectDir`, to the broker's project.
+A service is a `proc` unit omp's per-user daemon runs in a project's scope: a dev server the bash tool or the Browser's **Start dev server** started with a `name`, or omp's shared headless browser.
+It runs under the daemon, not under omp; one the bash tool starts ends with its session unless omp's `launch.persist` setting keeps it, the shared browser ends once no omp holds it, and one **Start dev server** starts runs until something stops it.
+`ompDaemons` in `src/omp/daemons.ts` lists them with the daemon's `list` operation over omp's `probeDaemon`, which never starts the daemon, keeps the ones it supervises that have not ended, and stops one generation through the daemon's `stop` with the unit's id, its generation, and a 3-second timeout.
+A service whose unit names an owner belongs to the session with that omp session id, and to the live session that took the id over with `/new`.
+A service with no owner, such as the shared browser, is shared: it serves every live session whose directory resolves, through omp's `canonicalProjectDir`, to the unit's project.
 A Docker container that a session started detached is not listed: Docker Desktop records no client process, and compose's working directory label names the main checkout even for a run from a worktree, so nothing ties a container to a session.
 A foreground `docker compose up` or `docker run` is a process group under omp, so it lists and stops as any job.
 
 ## Sampling
 
-The server that holds the owner lock samples every 15 seconds, whether a page listens or not, and every server samples again for each stop and for each `GET /api/session-processes` that finds no sample under 2 seconds old (`LIST_REUSE_MS`): one `ps -A -o pid=,ppid=,pgid=,rss=,pcpu=,lstart=,args=`, run without blocking the server through `readProcessTable` in `src/process-census.ts`, and one `collectReports`.
+The server that holds the owner lock samples every 15 seconds, whether a page listens or not, and every server samples again for each stop and for each `GET /api/session-processes` that finds no sample under 2 seconds old (`LIST_REUSE_MS`): one `ps -A -o pid=,ppid=,pgid=,rss=,pcpu=,lstart=,args=`, run without blocking the server through `readProcessTable` in `src/process-census.ts`, and one `list` of the daemon's `proc` units.
 Every open window polls the list every 5 seconds, so windows that poll within 2 seconds of each other share one `ps` and one `lsof`; a stop answers from a sample taken after it.
 `pcpu` is `ps`'s percent of one core, which macOS reads as an average that decays over the last minute, and `LC_ALL=C` keeps its decimal point a dot.
 Samples run one at a time.
-A job's id is its process group and its top process's start time, and a service's id is its broker's runtime directory, its name, and its generation, so a stop of an id that no longer runs, or now names another process, stops nothing and answers the current list.
+A job's id is its process group and its top process's start time, and a service's id is its unit's id and generation, so a stop of an id that no longer runs, or now names another process, stops nothing and answers the current list.
 A job stops through `terminate`: SIGTERM to each member, then SIGKILL after 3 seconds to those still running under the same start time, so a reused pid is never hit.
 A `ps` that fails fails the sample rather than reading as nothing running.
 The same sample runs one `lsof` over every TCP listener of the user's processes (`LISTENERS_ARGV` and `parseListeners` in `src/process-census.ts`), beside `ps`, and each job and service gets the ports its processes listen on, which the [Browser](../usage/browser.md) offers as dev servers.
@@ -47,11 +47,11 @@ The Browser's **Start dev server** starts a session's dev server without a model
 `planDevServer` answers a reason instead of a command when the script runs several servers (`SEVERAL_SERVERS`), sets its own port (`PINNED_PORT`), or an env file points a variable at a server on this computer (`LOCAL_SERVER_ENV`), such as an API, which the start would not run and which may be another checkout's.
 Otherwise it turns them and a port into the command: the `dev` script, else `start`, run by the package manager the first lockfile of `LOCKFILES` names, else npm, with `PORT` set and, when the script's last command is a server in `PORT_FLAG_COMMANDS`, `--port`, after `--` for npm.
 The port is a random one from 20000 to 39999 that binds on 127.0.0.1 a moment before.
-`startOwnedService` in `src/omp/daemons.ts` then sends the project's broker, through omp's `createDaemonBrokerClient`, which starts a broker when none runs, a `start` of `dev-<port>`: the command in the shell omp's settings for the directory give its bash tool, from `getShellConfig`, as omp's `startService` builds it, with `PORT` in its environment, in a pseudo-terminal, owned by the session's omp session id, replacing one of the same name, and ready once the port accepts a connection on 127.0.0.1, within 30 seconds.
-The broker answers once the service is ready, its readiness timed out, or it ended; one that ended answers with its last 40 lines of output from a `logs` request, and the client closes either way.
-A broker that fails answers its error as the reason, as a server that ended does; a failure to read the project or find a free port is the dashboard's own, and shows as an error instead of going to the session.
+`startOwnedService` in `src/omp/daemons.ts` then opens, through omp's `daemonClient`, which starts omp's per-user daemon when none runs, a `proc` unit `dev-<port>` in the project's scope: the command in the shell omp's settings for the directory give its bash tool, from `getShellConfig`, as omp's `startService` builds it, with `PORT` in its environment, in a pseudo-terminal, owned by the session's omp session id, replacing one of the same name, kept until stopped rather than on the dashboard's connection, and ready once the port accepts a connection on 127.0.0.1, within 30 seconds.
+The daemon answers once the service is ready, its readiness timed out, or it ended; one that ended answers with its last 40 lines of output from a `logs` request.
+A daemon that fails answers its error as the reason, as a server that ended does; a failure to read the project or find a free port is the dashboard's own, and shows as an error instead of going to the session.
 A service that runs counts as started, ready or not, and the page loads `http://localhost:<port>`.
-No `package.json`, no script, a service that ended, and an error from the broker answer `fallback`, and the page then sends the session its old prompt with that reason appended, so the model starts the server instead.
+No `package.json`, no script, a service that ended, and an error from the daemon answer `fallback`, and the page then sends the session its old prompt with that reason appended, so the model starts the server instead.
 
 ## The idle stop
 

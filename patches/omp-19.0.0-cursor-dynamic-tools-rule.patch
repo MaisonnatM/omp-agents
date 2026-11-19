@@ -1,5 +1,5 @@
 diff --git a/packages/ai/src/providers/cursor.ts b/packages/ai/src/providers/cursor.ts
-index 5c96ba498a8c9a613f45f9f91d2f7a7b3db748c9..999e9056ee8a6b2f4b5d5a2b3bd492a61c13f520 100644
+index c353d1cd3783ad6330acede8901734df1ed0f1d6..5e02a90b8cc88f3746017219f4e35a3b879b414b 100644
 --- a/packages/ai/src/providers/cursor.ts
 +++ b/packages/ai/src/providers/cursor.ts
 @@ -570,6 +570,8 @@ interface CursorGrpcRequest {
@@ -32,7 +32,7 @@ index 5c96ba498a8c9a613f45f9f91d2f7a7b3db748c9..999e9056ee8a6b2f4b5d5a2b3bd492a6
  
  			const baseUrl = model.baseUrl || CURSOR_API_URL;
  			const requestPath = transportMode === "http2" ? CURSOR_RUN_PATH : CURSOR_RUN_SSE_PATH;
-@@ -6444,6 +6440,20 @@ export function buildCursorRequestContextRules(systemPrompt: readonly string[] |
+@@ -6456,6 +6452,20 @@ export function buildCursorRequestContextRules(systemPrompt: readonly string[] |
  	);
  }
  
@@ -53,7 +53,7 @@ index 5c96ba498a8c9a613f45f9f91d2f7a7b3db748c9..999e9056ee8a6b2f4b5d5a2b3bd492a6
  /**
   * Local tools Cursor already drives natively over the exec channel, so
   * advertising them again as MCP tools would give the model two ways to call the
-@@ -7302,7 +7312,19 @@ async function buildGrpcRequestForWireMode(
+@@ -7328,7 +7338,19 @@ async function buildGrpcRequestForWireMode(
  ): Promise<CursorTransportRequest> {
  	const blobStore = state.blobStore;
  
@@ -74,7 +74,7 @@ index 5c96ba498a8c9a613f45f9f91d2f7a7b3db748c9..999e9056ee8a6b2f4b5d5a2b3bd492a6
  		storeCursorBlob(blobStore, new TextEncoder().encode(json)),
  	);
  
-@@ -7367,7 +7389,15 @@ async function buildGrpcRequestForWireMode(
+@@ -7393,7 +7415,15 @@ async function buildGrpcRequestForWireMode(
  				// its turns hold the partial turn the server resumes from, which
  				// `context.messages` cannot rebuild.
  				{ conversationState: state.conversationState, replayed: false }
@@ -91,7 +91,7 @@ index 5c96ba498a8c9a613f45f9f91d2f7a7b3db748c9..999e9056ee8a6b2f4b5d5a2b3bd492a6
  	const { conversationState } = built;
  	// Fingerprints of the history as built, to tell which field the hook below edited.
  	const builtRootHash = built.replayed ? hashCursorBlobIds(conversationState.rootPromptMessagesJson) : undefined;
-@@ -7404,7 +7434,7 @@ async function buildGrpcRequestForWireMode(
+@@ -7430,7 +7460,7 @@ async function buildGrpcRequestForWireMode(
  		if (rootAsBuilt || turnsAsBuilt) {
  			const rebuilt = buildCursorConversationState(
  				model,
@@ -100,7 +100,7 @@ index 5c96ba498a8c9a613f45f9f91d2f7a7b3db748c9..999e9056ee8a6b2f4b5d5a2b3bd492a6
  				state,
  				blobStore,
  				systemPromptIds,
-@@ -7452,7 +7482,15 @@ async function buildGrpcRequestForWireMode(
+@@ -7478,7 +7508,15 @@ async function buildGrpcRequestForWireMode(
  		detail: detail || undefined,
  	});
  

@@ -20,7 +20,7 @@ export interface BrowserCandidate {
 
 /**
  * Session `instanceId`'s dev servers, biggest process first as the CPU card lists them.
- * A shared broker daemon, such as omp's browser, serves every session and is not the session's app.
+ * A shared service, such as omp's browser, serves every session and is not the session's app.
  */
 export function devServers(sessions: readonly LiveSessionProcesses[] | null, instanceId: string): DevServer[] {
 	const session = sessions?.find(listed => listed.instanceId === instanceId);

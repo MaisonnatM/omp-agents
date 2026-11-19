@@ -79,14 +79,12 @@ import type {
 	ServiceTierModule,
 } from "./module-types/models";
 import type {
+	DaemonClientModule,
+	IsolationNativesModule,
 	IsolationOwnershipModule,
-	LaunchClientModule,
-	LaunchPathsModule,
 	OvnfsClientModule,
 	OvnfsTaskModule,
-	PsDataModule,
 	PsTableModule,
-	WorktreeCliModule,
 } from "./module-types/processes";
 import type { RpcClientModule, RpcFrameModule, UtilsModule } from "./module-types/rpc";
 import type {
@@ -400,7 +398,7 @@ export const statsAggregator = await load<StatsAggregatorModule>(join(statsSrc, 
 export const statsRollup = await load<StatsRollupModule>(join(statsSrc, "rollup.ts"), {
 	getOverallStats: "function",
 	getStatsByModel: "function",
-	getStatsByAgentType: "function",
+	getUsageAttribution: "function",
 	getToolStats: "function",
 	getProviderTimeSeries: "function",
 });
@@ -417,14 +415,17 @@ export const fetchRetry = await load<FetchRetryModule>(join(utilsSrc, "fetch-ret
 export const isolationOwnership = await load<IsolationOwnershipModule>(join(srcDir, "task", "isolation-ownership.ts"), {
 	ISOLATION_OWNER_FILE: "string",
 	hasLiveIsolationOwner: "function",
+	readRetainedMountBackend: "function",
 });
-export const worktreeCli = await load<WorktreeCliModule>(join(srcDir, "cli", "worktree-cli.ts"), { stopRetainedMount: "function" });
-export const ovnfsTask = await load<OvnfsTaskModule>(join(srcDir, "task", "ovnfs.ts"), { OVNFS_CHECKOUT_FILE: "string" });
+export const isolationNatives = await load<IsolationNativesModule>(join(dirname(packageDir), "pi-natives", "native", "index.js"), { isoStop: "function" });
+export const ovnfsTask = await load<OvnfsTaskModule>(join(srcDir, "ovnfs", "task-record.ts"), { OVNFS_CHECKOUT_FILE: "string" });
 export const ovnfsClient = await load<OvnfsClientModule>(join(srcDir, "ovnfs", "client.ts"), { callSocket: "function", OvnfsError: "function", PROTOCOL_VERSION: "number" });
-export const psData = await load<PsDataModule>(join(srcDir, "cli", "ps-data.ts"), { collectReports: "function", scopeClient: "function" });
 export const psTable = await load<PsTableModule>(join(dirname(packageDir), "pi-tui", "src", "apps", "ps-data.ts"), { TERMINAL_STATES: "object" });
-export const launchPaths = await load<LaunchPathsModule>(join(srcDir, "launch", "paths.ts"), { canonicalProjectDir: "function" });
-export const launchClient = await load<LaunchClientModule>(join(srcDir, "launch", "client.ts"), { createDaemonBrokerClient: "function" });
+export const daemonClient = await load<DaemonClientModule>(join(srcDir, "daemon", "client.ts"), {
+	daemonClient: "function",
+	probeDaemon: "function",
+	canonicalProjectDir: "function",
+});
 export const memoryBackend = await load<MemoryBackendModule>(join(srcDir, "memory-backend", "index.ts"), { resolveMemoryBackend: "function" });
 export const memoryRedact = await load<MemoryRedactModule>(join(srcDir, "memory-backend", "redact.ts"), { redactMemorySecrets: "function" });
 export const localMemory = await load<LocalMemoryModule>(join(srcDir, "memories", "index.ts"), { getMemoryRoot: "function" });

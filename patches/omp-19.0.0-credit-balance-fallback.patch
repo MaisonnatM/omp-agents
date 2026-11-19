@@ -1,5 +1,5 @@
 diff --git a/packages/ai/src/error/rate-limit.ts b/packages/ai/src/error/rate-limit.ts
-index 8de5873c1a9e2f5b4bd6908ef464d30b3ffee2b5..9b6fffe734d4a93ccd66ce28b98c272db23e7d1a 100644
+index e70d62e2751b3b9bbe76e09432c232118bada5d0..8594fbbd4d8e95ec737a062db84c894db1a88ac7 100644
 --- a/packages/ai/src/error/rate-limit.ts
 +++ b/packages/ai/src/error/rate-limit.ts
 @@ -26,10 +26,12 @@ const ACCOUNT_RATE_LIMIT_PATTERN =
@@ -19,10 +19,10 @@ index 8de5873c1a9e2f5b4bd6908ef464d30b3ffee2b5..9b6fffe734d4a93ccd66ce28b98c272d
  // model" with `error_code: credits_required`. The account cannot serve the model
  // at all, so rotate to a sibling rather than backing off on this one. Bounded to
 diff --git a/packages/ai/test/anthropic-stream-envelope.test.ts b/packages/ai/test/anthropic-stream-envelope.test.ts
-index 01c1f2d7f806efdf8505b4088bd2e0eaabe08e34..d232d561b4f994aef86a6a712a4cac59b03143d1 100644
+index ec564fad5467890734b3ef30bf1993ecd7391d9b..5938fffcd0e4b4fc93d81a773fb2b8c8fb638b56 100644
 --- a/packages/ai/test/anthropic-stream-envelope.test.ts
 +++ b/packages/ai/test/anthropic-stream-envelope.test.ts
-@@ -1721,7 +1721,14 @@ describe("anthropic stream envelope handling", () => {
+@@ -1728,7 +1728,14 @@ describe("anthropic stream envelope handling", () => {
  			expect(result.errorMessage).toBe(`Anthropic stream error (${type}): ${message}`);
  			expect(AIError.isStreamEnvelopeErrorText(result.errorMessage ?? "")).toBe(false);
  			expect(AIError.isStreamEnvelopeTruncationText(result.errorMessage ?? "")).toBe(false);
@@ -72,10 +72,10 @@ index 27a89ec23a9eb84db992fe7bd1cfdf386689ee98..07d51c240f2aaabe170882afc1807078
  
  describe("calculateRateLimitBackoffMs", () => {
 diff --git a/packages/coding-agent/test/agent-session-retry-fallback.test.ts b/packages/coding-agent/test/agent-session-retry-fallback.test.ts
-index 2028970e70eca4fdce08b0006d7b36b89347e0a3..bb967b9c9471e7fadd6612259168d29e6acdc6a7 100644
+index a098555af322c2a42102e5c4cd422270b13c68b6..12791a8abdd6f8fe28c978d25f4d7882e1732a05 100644
 --- a/packages/coding-agent/test/agent-session-retry-fallback.test.ts
 +++ b/packages/coding-agent/test/agent-session-retry-fallback.test.ts
-@@ -3500,6 +3500,86 @@ describe("AgentSession retry fallback", () => {
+@@ -3489,6 +3489,86 @@ describe("AgentSession retry fallback", () => {
  		expect(session.model?.id).toBe(fallbackModel.id);
  	});
  

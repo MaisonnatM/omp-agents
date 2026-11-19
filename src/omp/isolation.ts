@@ -1,9 +1,9 @@
 /** omp's task-isolation sandboxes: where they live, which omp process owns each, the ovnfs checkout an ovnfs-backed one records, and their teardown. */
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { arrayOf, fields, isNonEmpty, isNumber, isString, optional } from "../json";
 import type { IsolationSweepDeps, OvnfsRecord } from "../server/isolation-sweep";
-import { dirs, isolationOwnership, ovnfsClient, ovnfsTask, worktreeCli } from "./modules";
+import { dirs, isolationNatives, isolationOwnership, ovnfsClient, ovnfsTask } from "./modules";
 
 /** omp's `CheckoutRecord`: the ovnfs executable that opened a sandbox's checkout, the checkout's name, and its baseline checkout while one exists. */
 const isRecord = fields<{ command: string; checkout: string; start?: string }>({ command: isNonEmpty, checkout: isNonEmpty, start: optional(isNonEmpty) });
@@ -13,6 +13,8 @@ const isLsReply = fields<{ checkouts: { name: string; path: string }[] }>({ chec
 const isStatus = fields<{ version: number; socket: string }>({ version: isNumber, socket: isNonEmpty });
 /** How long `ovnfs status` may take before the sweep counts no daemon, as omp's own status query allowed. */
 const STATUS_TIMEOUT_MS = 5_000;
+/** The folders a retained sandbox mounts its merged view at, in the order omp's `TASK_ISOLATION_MOUNT_DIRS` checks them. */
+const MOUNT_DIRS = ["m", "merged"];
 
 /** The parts of {@link IsolationSweepDeps} that omp decides, read as omp's `omp worktree clear` reads them. */
 export function ompSandboxes(): Pick<IsolationSweepDeps, "root" | "ownerFile" | "ownerLive" | "ovnfsRecord" | "stopMount" | "releaseOvnfs"> {
@@ -21,11 +23,22 @@ export function ompSandboxes(): Pick<IsolationSweepDeps, "root" | "ownerFile" | 
 		ownerFile: isolationOwnership.ISOLATION_OWNER_FILE,
 		ownerLive: dir => isolationOwnership.hasLiveIsolationOwner(dir),
 		ovnfsRecord,
-		stopMount: async dir => {
-			await worktreeCli.stopRetainedMount(dir);
-		},
+		stopMount,
 		releaseOvnfs,
 	};
+}
+
+/**
+ * Stops the native mount of retained sandbox `dir`, when its record names a backend that needs it, as omp's private
+ * `stopRetainedMount` does before `omp worktree clear` removes it; throws when the record is malformed or teardown fails.
+ */
+async function stopMount(dir: string): Promise<void> {
+	const backend = await isolationOwnership.readRetainedMountBackend(dir);
+	if (backend === undefined) return;
+	for (const name of MOUNT_DIRS) {
+		const merged = join(dir, name);
+		if (await stat(merged).then(entry => entry.isDirectory(), () => false)) return isolationNatives.isoStop(backend, merged);
+	}
 }
 
 /** The ovnfs command, checkout name, and baseline checkout, if any, in the text of an ovnfs sandbox's record; throws when it names no checkout. */

@@ -40,7 +40,8 @@ export interface StatsProviderPoint {
 export interface StatsRollupModule {
 	getOverallStats(cutoff: number | null): StatsDashboard["overall"];
 	getStatsByModel(cutoff: number | null): StatsDashboard["byModel"];
-	getStatsByAgentType(cutoff: number | null): StatsDashboard["byAgentType"];
+	/** Conversation turns by agent type; omp's side-channel calls, such as title generation, are not in it. */
+	getUsageAttribution(cutoff: number | null): { byAgentType: StatsDashboard["byAgentType"] };
 	getToolStats(cutoff: number | null): StatsToolDashboard["byTool"];
 	getProviderTimeSeries(window: { cutoff: number | null; bucketMs: number }): StatsProviderPoint[];
 }
