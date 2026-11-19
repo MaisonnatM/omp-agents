@@ -33,6 +33,9 @@ Each server also reads the file and sends the list on its minute tick, so pages 
 A send is at most a minute late, and one whose time passed while no server ran goes at the first tick after one starts.
 A message whose session runs live on a server that does not own the unattended work goes to a resumed copy on the owner, since each server reaches only the dashboard sessions it started.
 
+`SessionFollowUps` in `src/server/session-follow-ups.ts` lets an agent schedule a message to itself: `join` gives every dashboard-started main session but a Bot's conversation the strict host tool `schedule_follow_up`, which takes a message and a delay of 1 to 10,080 minutes.
+It closes over its caller's instance id from the join, as `SessionWaits` in [Dashboard sessions](dashboard-sessions.md) does, reads the caller's current session id from the roster rows, and adds a `message` send through the list registry's `scheduled` list, so every page hears it and the runner sends it like a page's.
+
 `src/server/auto-continue.ts` schedules a `{ kind: "continue", sessionId, provider, cause }` send when a dashboard session's `turn-ended` carries a `failure` ([Dashboard sessions](dashboard-sessions.md)); the runner delivers it as the message `continue`.
 `Dashboard` hands each `turn-ended` of a session it started to `AutoContinue.turnEnded`.
 A usage limit's continue has `cause` `usage-limit`, and a transient fault's `transient`; `parseScheduledSpec` reads a continue that `scheduled.json` kept without a `cause`, from before transient retries, as `usage-limit`.

@@ -87,6 +87,7 @@ import { createRoutes } from "./routes";
 import type { SelfUpdate } from "./self-update";
 import { EndedWorktrees, endSession, restoreEndedWorktree } from "./session-end";
 import { ProjectTrustFile } from "./project-trust-file";
+import { SessionFollowUps } from "./session-follow-ups";
 import { SessionMoves } from "./session-moves";
 import { SessionWaits } from "./session-waits";
 import { SessionFiles } from "./session-files";
@@ -145,6 +146,12 @@ export class Dashboard {
 		hosts: () => this.#sessions.rows(this.#files.factsOf),
 		reply: sessionId => this.#sessions.lastReply(sessionId, this.#files.pathOf),
 		isBot: request => this.#bots.botOf(request) !== null,
+	});
+	readonly #followUps = new SessionFollowUps({
+		hosts: () => this.#sessions.rows(this.#files.factsOf),
+		isBot: request => this.#bots.botOf(request) !== null,
+		schedule: change => this.#lists.apply("scheduled", change),
+		now: Date.now,
 	});
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
@@ -858,9 +865,16 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads what the modules the user left on join with, and any but a Bot's can wait on another session and move itself. */
+	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads what the modules the user left on join with, and any but a Bot's can wait on another session, move itself, and schedule follow-ups to itself. */
 	#joinFor(request: StartRequest, instanceId: string): SessionJoin {
-		const joins = [this.#reviewDrafts.join(request), this.#bots.join(request), this.#moves.join(request, instanceId), this.#waits.join(request, instanceId), ...moduleJoins(this.#preferences.value)];
+		const joins = [
+			this.#reviewDrafts.join(request),
+			this.#bots.join(request),
+			this.#moves.join(request, instanceId),
+			this.#waits.join(request, instanceId),
+			this.#followUps.join(request, instanceId),
+			...moduleJoins(this.#preferences.value),
+		];
 		return {
 			rpc: { args: joins.flatMap(join => join.rpc.args), tools: joins.flatMap(join => join.rpc.tools) },
 			attach: session => {
