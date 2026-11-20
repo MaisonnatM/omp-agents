@@ -32,6 +32,7 @@ export default function endSession(pi: ExtensionAPI) {
 		description: [
 			"Ends this session once your reply is done, as the omp-agents dashboard's End session does, and removes the git worktree you run in; its branch stays, and a dirty worktree stays too.",
 			"Call it last, only when the user asked you to end the session and the work is merged or pushed.",
+			"Before you call it, if this session settled a decision, found a fact the code does not show, or learned a lesson from a mistake, and no project memory holds it yet, record it with project_memory; with nothing worth keeping, call it right away.",
 			"Then give your final reply; it stays in the transcript.",
 		].join(" "),
 		parameters: params,
