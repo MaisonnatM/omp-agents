@@ -1056,6 +1056,17 @@ describe("user_todo Workspace", () => {
 	test("list names each todo's Workspace by its folder", () => {
 		expect(call({ action: "list" }).text?.split("\n").slice(0, 2)).toEqual(["- Ship the release (id t1, Workspace app)", "  - Tag it (id c1)"]);
 	});
+
+	test("add-section adds a section once, and a todo can be filed in it before the dashboard applies it", () => {
+		clear();
+		const added = call({ action: "add-section", section: "Website" });
+		const again = call({ action: "add-section", section: "website" });
+		const filed = call({ action: "edit", id: "t1", section: "Website" });
+		const [section, ...rest] = left();
+		expect([added.run.isError, again.text, filed.run.isError]).toEqual([false, 'The section "website" already exists.', false]);
+		expect(section).toMatchObject({ op: "add-category", name: "Website" });
+		expect(rest).toEqual([{ op: "categorize", id: "t1", categoryId: section.id }]);
+	});
 });
 
 describe("headless-mark", () => {

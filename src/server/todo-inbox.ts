@@ -1,8 +1,8 @@
 /**
  * The changes omp's `user_todo` tool leaves for the Todo page's list, one JSON file each in a directory, so the server
  * stays the only writer of `todos.json` and a session can file a todo while the dashboard is down. An agent may add a
- * todo, check one, which marks it Done, edit one's title, notes, due day, section, or Workspace, or delete one; the inbox
- * sets aside any other change, such as unchecking, another status, a move, or a change to the sections.
+ * todo, check one, which marks it Done, edit one's title, notes, due day, section, or Workspace, delete one, or add a
+ * section; the inbox sets aside any other change, such as unchecking, another status, a move, or renaming or removing a section.
  */
 import { errorText } from "../json";
 import { parseAgentChange } from "../user-todos-parse";
@@ -18,6 +18,7 @@ const AGENT_OPS: Partial<Record<UserTodoChange["op"], true>> = {
 	categorize: true,
 	"set-workspace": true,
 	remove: true,
+	"add-category": true,
 };
 
 /** `value` as a change an agent may make, or why not. */
@@ -31,7 +32,7 @@ function parseTodoChange(value: unknown): InboxEntry<UserTodoChange> {
 	if (!change) return { invalid: "it is not a change to the todo list" };
 	if (AGENT_OPS[change.op] || (change.op === "set-status" && change.status === "done")) return { item: change };
 	return {
-		invalid: `an agent may only add, check, edit, or delete a todo, not ${change.op === "set-status" ? `mark one ${change.status}` : change.op}`,
+		invalid: `an agent may only add, check, edit, or delete a todo, or add a section, not ${change.op === "set-status" ? `mark one ${change.status}` : change.op}`,
 	};
 }
 

@@ -103,7 +103,7 @@
 
 ## Todos from agents
 
-- The `user_todo` tool lets an omp session list your todos, add one, check one off, which marks it **Done**, edit one's title, notes, due day, category, or workspace, or delete one; it cannot set another status, move a todo, or add, rename, or remove a category.
+- The `user_todo` tool lets an omp session list your todos, add one, check one off, which marks it **Done**, edit one's title, notes, due day, category, or workspace, delete one, or add a category when you ask for one; it cannot set another status, move a todo, or rename or remove a category.
   It comes from `~/.omp/agent/extensions/todos.ts`, which `bun run omp-template` installs.
 - An agent adds a todo when it stops on a step outside the session that only you can take, such as setting up an account or a credential, running something on your machine, or reviewing a pull request.
   It asks for an approval or an answer in its reply, not in a todo.
