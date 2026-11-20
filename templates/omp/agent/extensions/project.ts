@@ -46,7 +46,8 @@ export default function project(pi: ExtensionAPI) {
 		projectId: z.string().max(MAX_NAME).optional().describe("the project's id or name, from project_list; defaults to this session's project"),
 		name: z.string().max(MAX_NAME).optional().describe("create, rename: the project's name"),
 		goal: z.string().max(MAX_TEXT).optional().describe("create, set_goal: the project's goal; empty clears it"),
-		step: z.string().max(MAX_TEXT).optional().describe("edit_step, tick, untick, remove_step: the step's number in the brief's plan, or its exact text"),
+		step: z.string().max(MAX_TEXT).optional().describe("edit_step, tick, untick, remove_step: the step's number in the brief's plan, such as 2 or 2.1, or its exact text"),
+		parent: z.string().max(MAX_TEXT).optional().describe("add_step: the top-level step to add it under as a sub-step, by number or exact text; a plan nests two levels at most"),
 		text: z.string().max(MAX_TEXT).optional().describe("add_step, edit_step, add_decision, log: one line; remove_decision: the decision's number in the brief, or its exact text"),
 		join: z.boolean().optional().describe("create: also put this session in the new project"),
 		sessionId: z.string().max(MAX_NAME).optional().describe("join, leave: the session to move; defaults to this session"),
@@ -106,8 +107,11 @@ export default function project(pi: ExtensionAPI) {
 					return reply(`Restored ${target.name}.`);
 				case "add_step": {
 					if (!line) return reply("add_step needs text.", true);
-					INBOX.leave({ op: "add-step", projectId, stepId: randomUUID(), text: line });
-					return reply(`Added the step "${line}" to ${target.name}.`);
+					const parent = input.parent ? findStep(target, input.parent) : undefined;
+					if (parent === null) return reply(`No step "${input.parent}" in the plan of ${target.name}.`, true);
+					if (parent?.parentId !== undefined) return reply(`"${parent.text}" is a sub-step, which holds no steps of its own: a plan nests two levels at most.`, true);
+					INBOX.leave({ op: "add-step", projectId, stepId: randomUUID(), text: line, ...(parent ? { parentId: parent.id } : {}) });
+					return reply(`Added the step "${line}" to ${target.name}${parent ? ` under "${parent.text}"` : ""}.`);
 				}
 				case "edit_step":
 				case "tick":

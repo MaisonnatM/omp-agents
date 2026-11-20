@@ -145,3 +145,23 @@ test("a brief credits a log line with no session to the user, and names no cut w
 	const brief = briefText({ ...launch, log: [{ at: "2026-11-20T09:00:00.000Z", text: "Picked the vendor" }] }, "me");
 	expect(brief).toContain("Latest log, oldest first:\n- 2026-11-20 the user: Picked the vendor");
 });
+
+test("sub-steps fold as the dashboard's reducer folds them, and the brief numbers and finds them under their step", () => {
+	const changes: ProjectChange[] = [
+		{ op: "create", id: "p1", name: "Migration", goal: "", at: "2026-11-20T10:00:00.000Z" },
+		{ op: "add-step", projectId: "p1", stepId: "s1", text: "Schema" },
+		{ op: "add-step", projectId: "p1", stepId: "s2", text: "Backfill" },
+		{ op: "add-step", projectId: "p1", stepId: "s1a", text: "Tables", parentId: "s1" },
+		{ op: "add-step", projectId: "p1", stepId: "deep", text: "Too deep", parentId: "s1a" },
+		{ op: "add-step", projectId: "p1", stepId: "s1b", text: "Indexes", parentId: "s1" },
+	];
+	const [kit] = withWaiting([], changes);
+	const dashboard = changes.reduce<ProjectList>((list, change) => {
+		const next = applyProjectChange(list, change);
+		return "ok" in next ? next.ok : list;
+	}, EMPTY_PROJECTS);
+	expect(kit!.steps).toEqual(dashboard.projects[0]!.steps);
+	expect(briefText(kit!, "me")).toContain("sub-step of step 2):\n1. [ ] Schema\n   1.1. [ ] Tables\n   1.2. [ ] Indexes\n2. [ ] Backfill");
+	expect(findStep(kit!, "1.2")?.id).toBe("s1b");
+	expect(findStep(kit!, "2")?.id).toBe("s2");
+});
