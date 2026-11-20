@@ -172,6 +172,7 @@ describe("pull request sections", () => {
 				pr(11, { review: "approved", checks: "pending" }),
 				pr(12, { review: "none", checks: "none" }),
 				pr(13, { review: "approved", checks: "failing" }),
+				pr(14, { review: "approved", labels: ["ask-human"] }),
 			],
 			DEFAULT_ORDER,
 			agent,
@@ -180,7 +181,7 @@ describe("pull request sections", () => {
 			["Your move", [[1, "review"], [12, "merge"], [13, "fix-ci"], [2, "reply"]]],
 			["Agent on it", [[10, "answer"], [9, "agent"]]],
 			["Approved", [[3, "merge"], [11, "checks-running"], [6, "draft"]]],
-			["Waiting on others", [[4, "in-review"], [5, "checks-running"]]],
+			["Waiting on others", [[14, "merge"], [4, "in-review"], [5, "checks-running"]]],
 			["Recently merged", [[8, "merged"], [7, "merged"]]],
 		]);
 		expect(pullRequestSections([pr(1, { state: "draft" })], DEFAULT_ORDER, noAgent).map(section => section.title)).toEqual(["Drafts"]);
