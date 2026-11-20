@@ -5,13 +5,18 @@ export interface Section {
 	name: string;
 }
 
+/** The section named `name`, matched case-insensitively, if the list has one. */
+export function findSection(sections: Section[] | undefined, name: string): Section | undefined {
+	return sections?.find(section => section.name.toLowerCase() === name.toLowerCase());
+}
+
 /**
  * Where a todo filed under section `name` goes: that section, matched case-insensitively, none when `name` is empty,
  * and none with `missing` naming the sections that exist when the list has no such section.
  */
 export function sectionFor(sections: Section[] | undefined, name: string | undefined): { categoryId: string | null; missing?: string } {
 	if (!name) return { categoryId: null };
-	const section = sections?.find(section => section.name.toLowerCase() === name.toLowerCase());
+	const section = findSection(sections, name);
 	if (section) return { categoryId: section.id };
 	const names = (sections ?? []).map(section => section.name).join(", ") || "none";
 	return { categoryId: null, missing: `No section named ${JSON.stringify(name)}; the sections are: ${names}.` };

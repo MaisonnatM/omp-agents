@@ -11,7 +11,7 @@ import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { CONFIG_DIR, inbox, readJson, reply } from "./inbox/client";
-import { type Section, sectionFor } from "./todos/sections";
+import { findSection, type Section, sectionFor } from "./todos/sections";
 
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
 const INBOX_DIR = join(CONFIG_DIR, "todo-inbox");
@@ -59,9 +59,9 @@ function readList(): List {
 	return (readJson(TODOS_FILE) as List | null) ?? {};
 }
 
-/** The list's sections, then the ones added but not yet applied, so a todo can be filed in a section added just before. */
-function sectionsOf(list: List): Section[] {
-	const added = INBOX.waiting().flatMap(change => (change.op === "add-category" ? [{ id: change.id, name: change.name }] : []));
+/** The list's sections, then the ones `waiting` adds, so a todo can be filed in a section added just before. */
+function sectionsOf(list: List, waiting: Change[]): Section[] {
+	const added = waiting.flatMap(change => (change.op === "add-category" ? [{ id: change.id, name: change.name }] : []));
 	return [...(list.categories ?? []), ...added];
 }
 
@@ -153,7 +153,7 @@ export default function todos(pi: ExtensionAPI) {
 			if (!parsed.success) return reply("Invalid user_todo input.", true);
 			const { action, text, notes, due, section, workspace, id } = parsed.data;
 			const title = text?.replace(/\s+/g, " ").trim();
-			const sectionName = section?.trim();
+			const sectionName = section?.replace(/\s+/g, " ").trim();
 			switch (action) {
 				case "list":
 					return reply(listText(readList()));
@@ -162,7 +162,7 @@ export default function todos(pi: ExtensionAPI) {
 					const named = workspaceNamed(workspace ?? ctx.cwd, ctx.cwd);
 					if ("error" in named) return reply(named.error, true);
 					const list = readList();
-					const { categoryId, missing } = sectionFor(sectionsOf(list), sectionName);
+					const { categoryId, missing } = sectionFor(sectionsOf(list, INBOX.waiting()), sectionName);
 					const sessionId = ctx.sessionManager.getSessionId();
 					const same = todosOf(list, sessionId).added.find(todo => todo.text === title);
 					if (same) return reply(`This session already added it (id ${same.id}).`);
@@ -197,7 +197,7 @@ export default function todos(pi: ExtensionAPI) {
 					let categoryId: string | null | undefined;
 					if (section !== undefined) {
 						if (!found.topLevel) return reply("Only a top-level todo has a section.", true);
-						const resolved = sectionFor(sectionsOf(list), sectionName);
+						const resolved = sectionFor(sectionsOf(list, INBOX.waiting()), sectionName);
 						if (resolved.missing) return reply(resolved.missing, true);
 						categoryId = resolved.categoryId;
 					}
@@ -224,7 +224,7 @@ export default function todos(pi: ExtensionAPI) {
 				}
 				case "add-section": {
 					if (!sectionName) return reply("add-section needs the section's name.", true);
-					if (!sectionFor(sectionsOf(readList()), sectionName).missing) return reply(`The section ${JSON.stringify(sectionName)} already exists.`);
+					if (findSection(sectionsOf(readList(), INBOX.waiting()), sectionName)) return reply(`The section ${JSON.stringify(sectionName)} already exists.`);
 					INBOX.leave({ op: "add-category", id: randomUUID(), name: sectionName });
 					return reply(`Added the section ${JSON.stringify(sectionName)}; todos can be filed in it now.`);
 				}

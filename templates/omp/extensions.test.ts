@@ -1056,16 +1056,29 @@ describe("user_todo Workspace", () => {
 	test("list names each todo's Workspace by its folder", () => {
 		expect(call({ action: "list" }).text?.split("\n").slice(0, 2)).toEqual(["- Ship the release (id t1, Workspace app)", "  - Tag it (id c1)"]);
 	});
+});
 
-	test("add-section adds a section once, and a todo can be filed in it before the dashboard applies it", () => {
-		clear();
-		const added = call({ action: "add-section", section: "Website" });
+describe("user_todo sections", () => {
+	const root = mkdtempSync(join(tmpdir(), "todos-sections-"));
+	afterAll(() => rmSync(root, { recursive: true, force: true }));
+	const env = { XDG_CONFIG_HOME: join(root, "config"), HOME: root };
+	const config = join(root, "config", "omp-agents");
+	const inbox = join(config, "todo-inbox");
+	mkdirSync(config, { recursive: true });
+	writeFileSync(join(config, "todos.json"), JSON.stringify({ todos: [{ id: "t1", text: "Ship the release" }] }));
+	const call = (params: object) => exercise("todos", { run: true, params, cwd: root }, env);
+	const left = () => (existsSync(inbox) ? readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8"))) : []);
+
+	test("add-section adds a section once, and add and edit file a todo in it before the dashboard applies it", () => {
+		const added = call({ action: "add-section", section: " Website " });
 		const again = call({ action: "add-section", section: "website" });
-		const filed = call({ action: "edit", id: "t1", section: "Website" });
-		const [section, ...rest] = left();
-		expect([added.run.isError, again.text, filed.run.isError]).toEqual([false, 'The section "website" already exists.', false]);
+		const edited = call({ action: "edit", id: "t1", section: "Website" });
+		const filed = call({ action: "add", text: "Review the page", section: "website" });
+		const [section, categorized, add] = left();
+		expect([added.run.isError, again.text, edited.run.isError, filed.text]).toEqual([false, 'The section "website" already exists.', false, `Added to the user's todo list (id ${add.id}).`]);
 		expect(section).toMatchObject({ op: "add-category", name: "Website" });
-		expect(rest).toEqual([{ op: "categorize", id: "t1", categoryId: section.id }]);
+		expect(categorized).toEqual({ op: "categorize", id: "t1", categoryId: section.id });
+		expect(add).toMatchObject({ op: "add", text: "Review the page", categoryId: section.id });
 	});
 });
 

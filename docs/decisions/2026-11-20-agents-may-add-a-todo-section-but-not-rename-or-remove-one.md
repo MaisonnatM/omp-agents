@@ -20,7 +20,7 @@ The tool and the dashboard share no lock: the tool leaves a change in the inbox 
 
 ## Consequences
 
-`add-section` refuses a name that matches an existing or waiting section, case-insensitively.
+The tool refuses an `add-section` whose name matches an existing or waiting section, case-insensitively; the list itself does not, so two sessions adding the same name at the same moment can still make two sections.
 Renaming, removing, and reordering sections stay on the Todo page; the inbox still sets those changes aside.
 
 ## Revisit when
