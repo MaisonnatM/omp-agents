@@ -13,7 +13,7 @@ import type { StartOf } from "../starts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { LiveSessionsMenu } from "./session-chip";
 
-const ICON: Record<QuickActionId, IconComponent> = {
+export const QUICK_ACTION_ICON: Record<QuickActionId, IconComponent> = {
 	"fix-ci-and-conflicts": IconToolbox,
 	"fix-ci": IconCircleX,
 	"resolve-conflicts": IconMerged,
@@ -47,7 +47,7 @@ export function QuickActionsMenu({ actions, pending, onRun, label, open, onOpenC
 			</Tooltip>
 			<DropdownMenuContent align="end">
 				{actions.map(id => {
-					const Icon: IconComponent = ICON[id];
+					const Icon: IconComponent = QUICK_ACTION_ICON[id];
 					return (
 						<MenuItem key={id} title={QUICK_ACTIONS[id].description} onClick={() => onRun(id)}>
 							<Icon />
@@ -64,7 +64,7 @@ export function QuickActionsMenu({ actions, pending, onRun, label, open, onOpenC
 export function QuickActionButton({ action, pending, onRun, primary = false }: { action: QuickActionId; primary?: boolean } & Omit<QuickActionsProps, "actions">) {
 	return (
 		<Tooltip content={QUICK_ACTIONS[action].description}>
-			<Button variant={primary ? "primary" : "secondary"} size="compact" leadingIcon={ICON[action]} loading={pending === action} disabled={pending !== null} onClick={() => onRun(action)}>
+			<Button variant={primary ? "primary" : "secondary"} size="compact" leadingIcon={QUICK_ACTION_ICON[action]} loading={pending === action} disabled={pending !== null} onClick={() => onRun(action)}>
 				{QUICK_ACTIONS[action].label}
 			</Button>
 		</Tooltip>

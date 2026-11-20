@@ -117,6 +117,8 @@
   One toast with a spinner and a running clock counts the run, such as `Rebasing 2 of 5 pull requests`, and names the branch rebasing now with its step, such as `me/fix: Pushing through the pre-push checks`; when the last one ends, it sums up the run, such as `Rebased 3 of 5 pull requests`, with how many already had their base, stopped at a conflict, failed, or were skipped.
   A conflict or a failure also toasts on its own as it happens.
   The button reads **Rebasing…** beside a spinner and waits while any rebase is queued or running.
+- A **Your move** table's heading ends with one button per fix its pull requests wait on, such as **Reply 3**, **Fix CI 2**, and **Rebase 1**, counting those with no session starting.
+  The first click arms **Confirm N?**, and a second within three seconds starts the move's quick action on each of them, one session per pull request, as clicking each row's move badge does: **Address comments**, **Fix CI**, and **Fix CI and conflicts** or **Resolve conflicts**.
 - Tabs above the list show part of it: **Open** every section but **Recently merged**, **Your move**, **Approved**, and **Merged** that one section, and **All**, the default, every section.
   A tab reads as picked only while the sections shown are exactly its own, so sections you switch one by one leave no tab picked.
 - **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section** lists the sections, **Repository** and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.

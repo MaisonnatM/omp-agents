@@ -11,6 +11,8 @@ import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { filters, NO_FILTER, type PullRequestFilter } from "../../pull-requests-filter";
+import { bulkMoves, MOVES } from "../../pull-requests-model";
+import { QUICK_ACTIONS } from "../../quick-actions";
 import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsDisplay, usePullRequestsFilter, usePullRequestsFolds } from "../../pull-requests-state";
 import { activityControl } from "../../activity";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
@@ -23,14 +25,14 @@ import { Separator, useDragSeparator } from "../drag-separator";
 import { FoldButton } from "../fold";
 import { ListPage } from "../list-page";
 import { NothingMatches } from "../list-filter-bar";
-import { QuickStartNotice } from "../quick-actions";
+import { QUICK_ACTION_ICON, QuickStartNotice } from "../quick-actions";
 import { SearchField } from "../search-field";
 import { Spinner } from "../spinner";
 import { type GroupView, type PullRequests, RepoReadError, type TableView, UnmatchedTip, usePullRequestKeys, usePullRequests, usePullRequestsList, workspacesLabel } from "./pull-requests-list";
 import type { PullRequestDetailTab } from "./pr-details";
 import { NewPullRequestButton } from "./pr-new";
 import { PullRequestDetailPage, PullRequestDetails, usePullRequestCopyShortcuts } from "./pr-page";
-import { PullRequestTableRow } from "./pr-row";
+import { PullRequestTableRow, type RowProps } from "./pr-row";
 import { PullRequestViewBar } from "./pr-view-bar";
 
 const note = (text: string) => <p className="text-sm text-muted-foreground">{text}</p>;
@@ -59,7 +61,37 @@ function TableCount({ length, yours, summary }: { length: number; yours: boolean
 	return summary ? <Tooltip content={summary}>{count}</Tooltip> : count;
 }
 
-/** A table of pull requests under a heading that folds it. */
+/**
+ * A **Your move** table's buttons that each hand one move to agents on every pull request waiting on it, such as
+ * **Reply 3**: the first click arms **Confirm 3?**, and a second within three seconds starts one session per pull request.
+ */
+function BulkMoveButtons({ scope, rows }: { scope: string; rows: RowProps[] }) {
+	const confirm = useInlineConfirm(scope);
+	const moves = bulkMoves(rows);
+	if (moves.length === 0) return null;
+	return (
+		<div className="ml-auto flex items-center gap-1">
+			{moves.map(({ move, items }) => {
+				const action = items[0]!.action;
+				const armed = confirm.isArmed(move);
+				const count = items.length;
+				const label = armed ? `Confirm ${count}?` : `${MOVES[move].label} ${count}`;
+				const start = () => {
+					for (const { row, action } of items) row.onQuickAction(row.row.pr, row.cwd, action);
+				};
+				return (
+					<Tooltip key={move} content={`${QUICK_ACTIONS[action].label} on ${count} pull request${count === 1 ? "" : "s"}, one agent session each`} forceOpen={armed ? false : undefined}>
+						<Button size="compact" variant="ghost" leadingIcon={QUICK_ACTION_ICON[action]} aria-label={armed ? `Confirm ${QUICK_ACTIONS[action].label} on ${count}?` : `${MOVES[move].label} all ${count}`} {...confirm.props(move, start)}>
+							{label}
+						</Button>
+					</Tooltip>
+				);
+			})}
+		</div>
+	);
+}
+
+/** A table of pull requests under a heading that folds it; a **Your move** heading ends with its {@link BulkMoveButtons}. */
 function TableCard({ title, section, listId, open, toggle, summary, rows, drag, moveId }: Omit<TableView, "key">) {
 	const headingId = `${listId}-heading`;
 	return (
@@ -69,12 +101,15 @@ function TableCard({ title, section, listId, open, toggle, summary, rows, drag, 
 			data-move={moveId}
 			className={cn("relative rounded-md border border-border", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
 		>
-			<h3 id={headingId} {...drag.handle} className={cn("flex items-center gap-2 bg-muted/50 px-3 py-1.5 text-sm font-medium", open && rows.length > 0 ? "rounded-t-md" : "rounded-md")}>
-				<FoldButton open={open} onToggle={toggle} controls={listId} className="items-center">
-					{title}
-				</FoldButton>
-				<TableCount length={rows.length} yours={section === "Your move"} summary={summary} />
-			</h3>
+			<div {...drag.handle} className={cn("flex items-center gap-2 bg-muted/50 px-3 py-1.5", open && rows.length > 0 ? "rounded-t-md" : "rounded-md")}>
+				<h3 id={headingId} className="flex items-center gap-2 text-sm font-medium">
+					<FoldButton open={open} onToggle={toggle} controls={listId} className="items-center">
+						{title}
+					</FoldButton>
+					<TableCount length={rows.length} yours={section === "Your move"} summary={summary} />
+				</h3>
+				{section === "Your move" && <BulkMoveButtons scope={`bulk-${listId}`} rows={rows} />}
+			</div>
 			{open && rows.length > 0 && (
 				<ul id={listId} aria-label={title} className="divide-y divide-border border-t border-border">
 					{rows.map(row => (

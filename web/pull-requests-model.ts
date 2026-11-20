@@ -113,6 +113,26 @@ export function moveAction(pr: PullRequestSummary, move: MoveId): PullRequestAct
 	return MOVES[move].actions.find(action => applying.includes(action)) ?? null;
 }
 
+/** The moves a **Your move** table's heading hands to agents for all its pull requests at once, in the order its buttons show. */
+const BULK_MOVES: MoveId[] = ["reply", "fix-ci", "rebase"];
+
+/** A move a table's heading hands to agents at once: each of its rows with the quick action that makes it. */
+export interface BulkMove<R> {
+	move: MoveId;
+	items: { row: R; action: PullRequestActionId }[];
+}
+
+/** The {@link BULK_MOVES} that some of `rows` wait on with a quick action that applies, leaving out the rows whose session is starting. */
+export function bulkMoves<R extends { row: SectionRow; pending: unknown }>(rows: R[]): BulkMove<R>[] {
+	return BULK_MOVES.flatMap(move => {
+		const items = rows.flatMap(row => {
+			const action = row.pending === null && row.row.move === move ? moveAction(row.row.pr, move) : null;
+			return action ? [{ row, action }] : [];
+		});
+		return items.length > 0 ? [{ move, items }] : [];
+	});
+}
+
 /** Where a pull request sits in a stack of two or more that the list holds: `position` 1 is the bottom, which merges first. */
 export interface StackPlace {
 	position: number;
