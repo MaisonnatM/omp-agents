@@ -83,6 +83,8 @@ try {
 		hostname: HOSTNAME,
 		port: PORT,
 		development: false,
+		// Bun closes a request idle for 10 seconds by default, which cut off the pull request list's reads of a large repository.
+		idleTimeout: 120,
 		routes: dashboard.routes(guards, served, { phones, tailscale: tailscaleOver(), port: PORT }),
 		fetch(req, srv) {
 			const { pathname } = new URL(req.url);

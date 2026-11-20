@@ -69,7 +69,8 @@ One change goes per call, so two changes made at once each keep the other.
 The details send their changes one at a time through `useEditableRead` in `web/editable-read.ts`, which the issue detail's fields share.
 Each answer carries how many writes had answered when it was asked, so an answer to an earlier change, or a read sent before a write answered, never hides a later change.
 
-`GET /api/pull-requests` answers the `PullRequestList` of `?cwd=<dir>`'s repository, else of every workspace sessions ran in; `fresh` skips the server's cache.
+`GET /api/pull-requests` answers the `PullRequestList` of `?cwd=<dir>`'s repository, else of every workspace sessions ran in; `fresh` skips the server's cache, and each `skip=<owner/repo>`, a repository the page hides, answers with no pull requests and no GitHub read.
+`pullRequestsStore` adds the hidden repositories to each read's query outside its scope key, and the list reads again when you show a hidden one.
 The page asks for its window's workspace, else every workspace, through `pullRequestsStore` in `web/reads.ts`, which keys each answer by the query `pullRequestsScope` builds.
 The reads the dashboard makes on its own go through `ghPolledGraphql` in `src/github.ts`: the pull request list of `GET /api/pull-requests`, which the page polls every minute and the notices check, the stack of `GET /api/pull-request/stack`, every open pull request of the repository, which a session's header and **PRs** sidebar read again as the session works, and the merge cleanup's look at the live sessions' pull requests.
 They share the user's `gh` token, and its 5000 GraphQL points an hour, with every agent's `gh` calls, so `githubQuota`, a `GithubQuota` from `src/github-quota.ts`, reads `gh api rate_limit`, which costs no points, at most every 30 seconds, before `GitHubAccess` sees the call.

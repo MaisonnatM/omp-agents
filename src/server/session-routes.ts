@@ -17,6 +17,7 @@ import { editModelProfile, loadOmpSettings, readExtraUsage, Rejected, saveAgentS
 import { answerExtensionApproval, readExtensionContribution, readExtensionOperation, startExtensionChange } from "../extensions";
 import { discoverExtensions, loadExtensions } from "../omp/extensions";
 import { isAnalyticsRange } from "../shared/analytics";
+import { repoKey } from "../shared/github";
 import type { ConversationSearchAnswer } from "../shared/sessions";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { answer, checked, fail } from "./http";
@@ -146,16 +147,18 @@ export function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): 
 	});
 
 	/**
-	 * `GET /api/pull-requests[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's.
+	 * `GET /api/pull-requests[?cwd=<dir>][&fresh][&skip=<owner/repo>…]`: the pull requests of that workspace's repository, else of every workspace's,
+	 * leaving each `skip` repository, one the page hides, unread.
 	 * Each answer also tells the pull-request index which branch heads which PR, which links the sessions that pushed them.
 	 */
 	const pullRequests = get((params) => {
 		const cwd = workspaceCwd(params);
 		if (cwd instanceof Response) return cwd;
 		const fresh = params.has("fresh");
+		const skip = new Set(params.getAll("skip").map(key => key.toLowerCase()));
 		return answer(async () => {
-			const loaded = await loadPullRequests(cwd !== null ? [cwd] : env.knownWorkspaces(), fresh);
-			for (const repo of loaded.repos) if ("pullRequests" in repo) env.learnHeads(repo, repo.pullRequests);
+			const loaded = await loadPullRequests(cwd !== null ? [cwd] : env.knownWorkspaces(), fresh, skip);
+			for (const repo of loaded.repos) if ("pullRequests" in repo && !skip.has(repoKey(repo))) env.learnHeads(repo, repo.pullRequests);
 			return loaded;
 		});
 	});

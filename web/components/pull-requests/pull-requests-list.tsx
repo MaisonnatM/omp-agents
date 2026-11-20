@@ -1,6 +1,6 @@
 /** What the Pull requests page's list and its details page share: the pull requests' state, their keys, and the list's headings, tables, and rows. */
 import { IconCloudSimpleDisconnected } from "central-icons";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
 import { type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, samePullRequest } from "../../../src/shared/github";
 import { type AgentOn, agentOn, moveOf } from "../../../src/shared/moves";
@@ -293,6 +293,13 @@ export function usePullRequests({ hosts, past, route, query = "" }: PullRequests
 	const poll = pullRequestsStore.use(scope);
 	const read = poll.read?.data ?? null;
 	const [hidden] = useHiddenRepos();
+	const shownBefore = useRef(hidden);
+	// A hidden repository is never read, so showing one again reads the list for it.
+	useEffect(() => {
+		const unhid = [...shownBefore.current].some(key => !hidden.has(key));
+		shownBefore.current = hidden;
+		if (unhid) void pullRequestsStore.refresh(scope);
+	}, [hidden, scope]);
 	const [filter] = usePullRequestsFilter();
 	const [display] = usePullRequestsDisplay();
 	const [order, setOrder] = usePullRequestsOrder();
