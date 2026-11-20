@@ -155,7 +155,7 @@ function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo
 				))}
 				<Tooltip content="Open a new-session draft from this todo, to edit its prompt or pick its directory">
 					<Button variant={main === "draft" ? "primary" : actions.length > 0 ? "ghost" : "secondary"} size="compact" leadingIcon={IconPlay} asChild>
-						<a href={hashForNewSession(todoCwd(todo, newSessionCwd), todo.id)}>{sessionId === null ? "Start session" : "Start another session"}</a>
+						<a href={hashForNewSession({ cwd: todoCwd(todo, newSessionCwd), todoId: todo.id })}>{sessionId === null ? "Start session" : "Start another session"}</a>
 					</Button>
 				</Tooltip>
 			</div>

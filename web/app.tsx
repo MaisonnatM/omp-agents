@@ -13,12 +13,15 @@ import {
 	type DashboardStatus,
 	DashboardStatusContext,
 	MentionListsContext,
+	OpenProjectsContext,
 	UserTodosContext,
 } from "./components/dashboard-context";
 import { LinkPreviewCard } from "./components/link-preview-card";
 import { FileDialog } from "./components/file-dialog";
 import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
+import { useModulesOff } from "./modules-off";
+import { openProjects, type Project } from "../src/shared/projects";
 import { PageList, PageListColumn, useWidth } from "./components/page-list";
 import { listPageOf, listPlacement } from "./page-list";
 import { NO_PLANS, Plans } from "./components/plan-usage";
@@ -58,6 +61,8 @@ import { useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
 
+const NO_PROJECTS: readonly Project[] = [];
+
 /**
  * The dashboard: the socket's state, sliced into what each part reads, and the parts. Each hook it calls owns one
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
@@ -71,7 +76,10 @@ export function App() {
 	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds, pullRequestsScope } = scope;
 	const windowScope = useMemo((): WindowScope => ({ workspace }), [workspace]);
 	const focused = useFocusedSession(state, page, scope);
-	const sessions = useSessionLists(scope, state.pins, changePins);
+	const [modulesOff] = useModulesOff();
+	const projectList = state.modules.projects;
+	const projects = useMemo((): readonly Project[] => (projectList === null || modulesOff.has("projects") ? NO_PROJECTS : openProjects(projectList)), [projectList, modulesOff]);
+	const sessions = useSessionLists(scope, state.pins, changePins, projects);
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
@@ -241,6 +249,7 @@ export function App() {
 			<DashboardStatusContext.Provider value={status}>
 				<ScheduledSends.Provider value={state.scheduled}>
 					<UserTodosContext.Provider value={state.userTodos}>
+					<OpenProjectsContext.Provider value={projects}>
 						<div className="flex h-svh flex-col bg-sidebar">
 							{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
 							<SidebarProvider
@@ -395,6 +404,7 @@ export function App() {
 							</SidebarProvider>
 							<LinkPreviewCard />
 						</div>
+					</OpenProjectsContext.Provider>
 					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>
 			</DashboardStatusContext.Provider>

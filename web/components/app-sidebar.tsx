@@ -50,7 +50,7 @@ interface AppSidebarProps {
  */
 export const AppSidebar = memo(function AppSidebar({
 	scope: { visible, workspaces, workspace },
-	sessions: { lists, groups, query, setQuery, togglePin },
+	sessions: { lists, projects, pinned, groups, query, setQuery, togglePin },
 	page,
 	panes,
 	row,
@@ -109,6 +109,8 @@ export const AppSidebar = memo(function AppSidebar({
 				<Roster
 					workspaces={workspaces}
 					lists={lists}
+					projects={projects}
+					pinnedIds={pinned}
 					groups={groups}
 					query={query}
 					onQuery={setQuery}
@@ -116,6 +118,7 @@ export const AppSidebar = memo(function AppSidebar({
 					open={page ? NO_VIEWS : panes}
 					scheduled={scheduled}
 					scheduledOpen={page?.kind === "scheduled" ? page.id : null}
+					projectOpen={page?.kind === "projects" ? page.open : null}
 					onPickWorkspace={onPickWorkspace}
 				/>
 			</SidebarContent>

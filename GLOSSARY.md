@@ -63,6 +63,10 @@ _Avoid_: Workspace (see **Workspace**), worktree
 The detached process that holds one dashboard session's omp and lends its stdio to one server at a time.
 _Avoid_: Daemon, supervisor
 
+**Project**:
+A named effort that spans sessions and workspaces, with a goal, a checklist plan, decisions, and a dated log that every session in it receives at start.
+_Avoid_: Epic, initiative, workspace
+
 **Project memory**:
 The decisions, facts, and lessons the sessions of one git repository share through the starter kit's `project_memory` tool, kept on `refs/omp/memory`, with the brief and catch-ups that tell each session what other sessions landed and remembered.
 It is separate from omp's own memory and from a Bot's memory.
@@ -108,7 +112,7 @@ _Avoid_: Session list, inbox
 
 **Workspace**:
 A repository's main checkout, or a directory outside git, that sessions run in, which the sidebar's **Workspaces** label filters by; a session in a linked git worktree counts in its repository's workspace.
-_Avoid_: Project, repo, folder
+_Avoid_: repo, folder
 
 **Project code**:
 The extensions, hooks, tools, TypeScript slash commands, MCP servers, settings, and language server configs a repository commits for its own sessions, which omp would run with your permissions; skills, agents, and rules are prompt text, not project code.

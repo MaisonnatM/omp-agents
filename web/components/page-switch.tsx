@@ -113,7 +113,7 @@ export const PageSwitch = memo(function PageSwitch({
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	if (page && isModulePage(page)) {
 		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
-		const core = { routines, bots, todos: userTodos, listed, workspace, workspaces, onPickWorkspace: pickWorkspace, hosts: visible.hosts, section: sectionTarget };
+		const core = { routines, bots, todos: userTodos, listed, workspace, workspaces, onPickWorkspace: pickWorkspace, hosts: visible.hosts, sessions: { hosts, past }, section: sectionTarget };
 		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
 	}
 	switch (page?.kind) {
@@ -135,10 +135,10 @@ export const PageSwitch = memo(function PageSwitch({
 					onPickCwd={next => {
 						// A failed start's error is about the directory left behind.
 						dismissStart("new");
-						location.hash = hashForNewSession(next, page.todoId);
+						location.hash = hashForNewSession({ cwd: next, todoId: page.todoId, projectId: page.projectId });
 					}}
-					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId })}
-					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
+					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId, projectId: page.projectId })}
+					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId, projectId: page.projectId }) }, when)}
 					todo={seed}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
 				/>

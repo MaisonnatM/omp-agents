@@ -155,6 +155,8 @@ function restOfBotRoutine(routine: BotRoutineRoute): string {
 export interface NewSessionRoute {
 	cwd: string | null;
 	todoId: string | null;
+	/** The project the session joins as it starts; `null` for none. */
+	projectId: string | null;
 }
 
 /** A scheduled new session's start, `id` of the scheduled sends, opened to view and edit; `null` names none. */
@@ -190,8 +192,8 @@ const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : 
  * what follows a `?` after it.
  * - `#settings/<section>` opens that section of the settings page, whose workspace sections follow the sidebar's workspace.
  *   `#settings` and an unknown section open Analytics; a segment after the section is ignored.
- * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?todo=<id>` with that todo's
- *   title and notes as its first message. No omp runs until its first message.
+ * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, `?todo=<id>` with that todo's
+ *   title and notes as its first message, and `?project=<id>` joining the session to that project as it starts. No omp runs until its first message.
  * - `#scheduled/<id>` opens scheduled send `id`, a new session's start, as an editable draft.
  * - `#pull-requests` shows the sidebar's Pull requests tab, which lists the pull requests of the sidebar's workspace, beside the panes,
  *   and `#pull-requests/<owner>/<repo>/<number>` shows that pull request's details in the main content.
@@ -210,7 +212,7 @@ const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : 
 const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	"get-started": () => ({ kind: "get-started" }),
 	settings: rest => ({ kind: "settings", section: settingsSection(rest?.split("/")[0] ?? null) }),
-	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
+	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null, projectId: query.get("project") || null }),
 	scheduled: rest => ({ kind: "scheduled", id: rest ? decodeSegment(rest) : null }),
 	"pull-requests": rest => {
 		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)(\/files(?:\/(.+))?)?$/.exec(rest);
@@ -260,11 +262,15 @@ function restOfPage(page: CorePage): string | null {
 	}
 }
 
-/** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo its page opens; `null` for none. */
+/** The `?name=value` that follows `page`'s path: the todo and the project a new session starts with, or the todo its page opens; `null` for none. */
 function queryOfPage(page: CorePage): string | null {
 	switch (page.kind) {
-		case "new":
-			return page.todoId === null ? null : `todo=${encodeURIComponent(page.todoId)}`;
+		case "new": {
+			const query = new URLSearchParams();
+			if (page.todoId !== null) query.set("todo", page.todoId);
+			if (page.projectId !== null) query.set("project", page.projectId);
+			return query.size === 0 ? null : query.toString();
+		}
 		case "todo":
 			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
 		case "settings":
@@ -301,8 +307,9 @@ export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: n
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
 export const hashForNotifications = (): string => hashForPage({ kind: "notifications" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
-export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
+export const hashForNewSession = ({ cwd = null, todoId = null, projectId = null }: Partial<NewSessionRoute> = {}): string => hashForPage({ kind: "new", cwd, todoId, projectId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });
+export const hashForProject = (open: string | null): string => hashForPage({ kind: "projects", open });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives

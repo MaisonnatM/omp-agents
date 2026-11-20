@@ -1,7 +1,8 @@
 import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
 import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn, View } from "../src/shared/sessions";
-import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, rosterFolders, rowPlacement, searchSessions, sidebarSessions, waitingCount, workspaceGroups, workspaceSession, workspaceSwitch } from "./sessions";
+import type { Project } from "../src/shared/projects";
+import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, projectGroups, rosterFolders, rowPlacement, searchSessions, sidebarSessions, waitingCount, workspaceGroups, workspaceSession, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
 const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(status => fromPartial<AgentRow>({ status }));
@@ -206,7 +207,7 @@ describe("sidebarSessions", () => {
 		const delegating = fromPartial<RosterHost>({ ...host("h9", "~/a"), status: "idle", agents: subagents("running") });
 		const live = [delegating, { ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
 		const lists = sidebarSessions(live, sessions, "~/a", new Set(["h2", "p3"]));
-		expect(listedViews(lists, workspaceGroups(lists, []))).toEqual([
+		expect(listedViews(lists, [], workspaceGroups(lists, []))).toEqual([
 			{ kind: "live", instanceId: "i-h2", agentId: null },
 			{ kind: "past", sessionId: "p3" },
 			{ kind: "live", instanceId: "i-h0", agentId: null },
@@ -224,12 +225,31 @@ describe("sidebarSessions", () => {
 		const groups = workspaceGroups(lists, [workspace("~/a"), workspace("~/quiet"), workspace("~/b")]);
 		expect(groups.map(group => group.workspace.cwd)).toEqual(["~/a", "~/b", "~/c", "~/quiet"]);
 		expect(groups.map(group => [ids(group.hosts), ids(group.interrupted)])).toEqual([[[], ["p1"]], [["h1"], []], [["h2"], []], [[], []]]);
-		expect(listedViews(lists, groups)).toEqual([
+		expect(listedViews(lists, [], groups)).toEqual([
 			{ kind: "past", sessionId: "p1" },
 			{ kind: "live", instanceId: "i-h1", agentId: null },
 			{ kind: "live", instanceId: "i-h2", agentId: null },
 			{ kind: "past", sessionId: "p2" },
 		]);
+	});
+
+	test("a session in a project leaves Pinned and its workspace's folder for its project's, across workspaces, and its rows walk first", () => {
+		const workspace = (cwd: string) => ({ cwd, cwdDisplay: cwd });
+		const live = [{ ...host("h1", "~/a"), status: "idle" as const }, { ...host("h2", "~/b"), status: "working" as const }, { ...host("h3", "~/a"), status: "idle" as const }];
+		const lists = sidebarSessions(live, [past("p1", "~/a", true), past("p2", "~/b", false)], null, new Set(["h3"]));
+		const project = fromPartial<Project>({ id: "x", name: "Launch", sessionIds: ["h2", "p1", "p2", "h3"] });
+		const { groups: projects, rest } = projectGroups(lists, [project]);
+		expect(projects.map(group => [ids(group.hosts), ids(group.past)])).toEqual([[["h3", "h2"], ["p1"]]]);
+		expect(ids(rest.pinned.hosts)).toEqual([]);
+		expect(ids(rest.ended)).toEqual(["p2"]);
+		const groups = workspaceGroups(rest, [workspace("~/a"), workspace("~/b")]);
+		expect(groups.map(group => [group.workspace.cwd, ids(group.hosts), ids(group.interrupted)])).toEqual([["~/a", ["h1"], []], ["~/b", [], []]]);
+		expect(listedViews(rest, projects, groups).slice(0, 3)).toEqual([
+			{ kind: "live", instanceId: "i-h3", agentId: null },
+			{ kind: "live", instanceId: "i-h2", agentId: null },
+			{ kind: "past", sessionId: "p1" },
+		]);
+		expect(projectGroups(lists, []).rest).toBe(lists);
 	});
 
 	test("the roster's workspace order stays put while a session's turn ends, though the idle sessions list first", () => {

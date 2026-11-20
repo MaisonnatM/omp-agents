@@ -1,4 +1,5 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
+import type { Project } from "../src/shared/projects";
 import { awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import { inAppData, inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
@@ -234,10 +235,55 @@ export function rosterFolders(groups: readonly WorkspaceGroup[], { limit, all, f
 	return { shown, more: matching.length - shown.length, foldable: matching.length > limit };
 }
 
-/** Every row of the sessions tab in its order, which the previous and next session keys walk: pinned, then each workspace's, then the ended ones. */
-export function listedViews(lists: SidebarSessions, groups: readonly WorkspaceGroup[]): View[] {
+/** One project of the roster: its sessions the sidebar lists, live and pinned past ones, wherever they ran. */
+export interface ProjectGroup {
+	project: Project;
+	/** Its pinned live sessions, then its other live ones in the sidebar's order. */
+	hosts: RosterHost[];
+	/** Its pinned past sessions, then its interrupted ones. */
+	past: PastSession[];
+}
+
+/**
+ * The roster's projects, one per project of `projects` in its order, each with the pinned, live, and interrupted sessions
+ * of `lists` in it, and `lists` without them, so a session in a project leaves Pinned and its workspace's folder. Ended
+ * sessions stay in Past.
+ */
+export function projectGroups(lists: SidebarSessions, projects: readonly Project[]): { groups: ProjectGroup[]; rest: SidebarSessions } {
+	const groups = projects.map((project): ProjectGroup => ({ project, hosts: [], past: [] }));
+	const bySession = new Map(groups.flatMap(group => group.project.sessionIds.map(id => [id, group] as const)));
+	if (bySession.size === 0) return { groups, rest: lists };
+	const take = <Row extends RosterHost | PastSession>(rows: Row[], into: (group: ProjectGroup) => Row[]): Row[] =>
+		rows.filter(row => {
+			const group = bySession.get(row.sessionId);
+			if (group) into(group).push(row);
+			return !group;
+		});
+	const hosts = (group: ProjectGroup) => group.hosts;
+	const past = (group: ProjectGroup) => group.past;
+	return {
+		groups,
+		rest: {
+			pinned: { hosts: take(lists.pinned.hosts, hosts), past: take(lists.pinned.past, past) },
+			idle: take(lists.idle, hosts),
+			running: take(lists.running, hosts),
+			awaitingSubagents: take(lists.awaitingSubagents, hosts),
+			interrupted: take(lists.interrupted, past),
+			ended: lists.ended,
+		},
+	};
+}
+
+/** Every row of the sessions tab in its order, which the previous and next session keys walk: each project's, pinned, then each workspace's, then the ended ones. */
+export function listedViews(lists: SidebarSessions, projects: readonly ProjectGroup[], groups: readonly WorkspaceGroup[]): View[] {
 	const { pinned, ended } = lists;
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
 	const saved = (sessions: PastSession[]): View[] => sessions.map(({ sessionId }) => ({ kind: "past", sessionId }));
-	return [...live(pinned.hosts), ...saved(pinned.past), ...groups.flatMap(group => [...live(group.hosts), ...saved(group.interrupted)]), ...saved(ended)];
+	return [
+		...projects.flatMap(group => [...live(group.hosts), ...saved(group.past)]),
+		...live(pinned.hosts),
+		...saved(pinned.past),
+		...groups.flatMap(group => [...live(group.hosts), ...saved(group.interrupted)]),
+		...saved(ended),
+	];
 }
