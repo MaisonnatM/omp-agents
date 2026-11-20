@@ -18,6 +18,9 @@ export type ProjectsControlId =
 	| "projects.step.add"
 	| "projects.step.edit"
 	| "projects.step.remove"
+	| "projects.step.add-sub"
+	| "projects.step.select"
+	| "projects.step.start"
 	| "projects.decision.add"
 	| "projects.decision.remove"
 	| "projects.log.add"
@@ -58,6 +61,9 @@ export const PROJECTS_PAGE: StoredPageModule<"projects", ProjectsRoute, ProjectL
 		{ id: "projects.step.add", label: "Project Add step field", area: "Projects" },
 		{ id: "projects.step.edit", label: "Project step text", area: "Projects" },
 		{ id: "projects.step.remove", label: "Project step Remove button", area: "Projects" },
+		{ id: "projects.step.add-sub", label: "Project step Add a sub-step button", area: "Projects" },
+		{ id: "projects.step.select", label: "Project plan Select button, or a step's box or text while selecting", area: "Projects" },
+		{ id: "projects.step.start", label: "Project plan Start session button", area: "Projects" },
 		{ id: "projects.decision.add", label: "Project Add decision field", area: "Projects" },
 		{ id: "projects.decision.remove", label: "Project decision Remove button", area: "Projects" },
 		{ id: "projects.log.add", label: "Project Add log line field", area: "Projects" },

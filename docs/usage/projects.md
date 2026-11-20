@@ -22,9 +22,12 @@ Every session in it gets that brief when it starts, so a new session knows where
 - Edit the project's name and goal in place: Enter or leaving the field saves, Escape drops your edit.
 - A strip of four figures sums it up: steps done and left, sessions running out of all, linked pull requests and Linear issues, and its last update, green while it moved today and red once it has been quiet longer.
 - **Plan** is a checklist with **To do**, **Done**, and **All** tabs, each with its count: tick a step's box, click its text to edit it, remove it, or add one in the field at the card's foot.
+- A step can hold sub-steps, one level deep: the plus button on a step's row opens a field under it, where Enter adds one and Escape closes it.
+- Sub-steps are numbered under their step, such as 2.1, and a tab that hides a step still shows it above its sub-steps.
+- **Select** turns the boxes into a selection: picking a step picks its sub-steps too, and **Start session** opens a new session in the project with the picked steps already written in its prompt.
 - **Sessions** is a table of the project's sessions, running first, each with its status, the pull requests it links, and its last update; hover a name to read it whole.
 - **Decisions** lists what was settled, and **Recent activity** lists log lines newest first, each with the session that wrote it, or You; each card adds a line from the field at its foot.
-- Removing a step or a decision offers **Undo**; an undone step comes back at the end of the plan.
+- Removing a step removes its sub-steps too; removing a step or a decision offers **Undo**, and an undone step comes back at the end of the plan, with its sub-steps under it.
 - **New session** starts a session already in the project, in the directory you pick; **New project** is on the table's page only.
 - **Archive** hides the project from the sidebar and stops its brief; an archived project reads as it was left, and **Restore** brings it back.
 

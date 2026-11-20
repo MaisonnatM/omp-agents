@@ -6,10 +6,13 @@
  */
 import { arrayOf, decoder, fields, type Guard, isBoolean, isNonEmpty, isObject, isString, optional, type Parsed, type Shape, tagged } from "../json";
 
+/** A step of a plan, which keeps each sub-step right after its parent's earlier ones, so its order is the order the plan shows. */
 export interface ProjectStep {
 	id: string;
 	text: string;
 	done: boolean;
+	/** The top-level step it sits under; a sub-step has none of its own, so a plan nests two levels at most. */
+	parentId?: string;
 }
 
 /** One dated line of a project's log, signed with the session that wrote it; one the page wrote has no session. */
@@ -51,7 +54,7 @@ export type ProjectChange =
 	| { op: "set-goal"; projectId: string; goal: string }
 	| { op: "archive"; projectId: string; at: string }
 	| { op: "restore"; projectId: string }
-	| { op: "add-step"; projectId: string; stepId: string; text: string }
+	| { op: "add-step"; projectId: string; stepId: string; text: string; parentId?: string }
 	| { op: "set-step"; projectId: string; stepId: string; done: boolean }
 	| { op: "edit-step"; projectId: string; stepId: string; text: string }
 	| { op: "remove-step"; projectId: string; stepId: string }
@@ -75,7 +78,7 @@ const isName = textUpTo(MAX_PROJECT_NAME);
 const isLine = textUpTo(MAX_PROJECT_TEXT);
 const isGoal = textUpTo(MAX_PROJECT_TEXT, true);
 
-const isStep: Guard<ProjectStep> = fields<ProjectStep>({ id: isNonEmpty, text: isString, done: isBoolean });
+const isStep: Guard<ProjectStep> = fields<ProjectStep>({ id: isNonEmpty, text: isString, done: isBoolean, parentId: optional(isNonEmpty) });
 const isLogEntry: Guard<ProjectLogEntry> = fields<ProjectLogEntry>({ at: isNonEmpty, sessionId: optional(isNonEmpty), text: isString });
 const isProject: Guard<Project> = fields<Project>({
 	id: isNonEmpty,
@@ -99,7 +102,7 @@ const CHANGE_SHAPES: { [Op in ProjectChange["op"]]: Shape<Omit<Extract<ProjectCh
 	"set-goal": { projectId: isNonEmpty, goal: isGoal },
 	archive: { projectId: isNonEmpty, at: isNonEmpty },
 	restore: { projectId: isNonEmpty },
-	"add-step": { projectId: isNonEmpty, stepId: isNonEmpty, text: isLine },
+	"add-step": { projectId: isNonEmpty, stepId: isNonEmpty, text: isLine, parentId: optional(isNonEmpty) },
 	"set-step": { projectId: isNonEmpty, stepId: isNonEmpty, done: isBoolean },
 	"edit-step": { projectId: isNonEmpty, stepId: isNonEmpty, text: isLine },
 	"remove-step": { projectId: isNonEmpty, stepId: isNonEmpty },
@@ -150,6 +153,34 @@ function editStep(project: Project, stepId: string, edit: (step: ProjectStep) =>
 	return edited === step ? project : { ...project, steps: project.steps.with(index, edited) };
 }
 
+/** `steps` with `step` added: a top-level step at the end, a sub-step after its parent's last one; or why not, when its parent is missing or a sub-step itself. */
+function withStep(steps: readonly ProjectStep[], step: ProjectStep): ProjectStep[] | { error: string } {
+	if (step.parentId === undefined) return [...steps, step];
+	const parent = steps.find(each => each.id === step.parentId);
+	if (!parent) return { error: `No step has id ${step.parentId} to hold a sub-step.` };
+	if (parent.parentId !== undefined) return { error: "A sub-step holds no steps of its own: a plan nests two levels at most." };
+	const after = steps.findLastIndex(each => each.id === parent.id || each.parentId === parent.id);
+	return steps.toSpliced(after + 1, 0, step);
+}
+
+/** Each step's number in the plan: `2` for its second top-level step, `2.1` for the first sub-step under that one. */
+export function stepNumbers(steps: readonly ProjectStep[]): Map<string, string> {
+	const numbers = new Map<string, string>();
+	const subSteps = new Map<string, number>();
+	let top = 0;
+	for (const step of steps) {
+		if (step.parentId === undefined) {
+			top += 1;
+			numbers.set(step.id, String(top));
+			continue;
+		}
+		const count = (subSteps.get(step.parentId) ?? 0) + 1;
+		subSteps.set(step.parentId, count);
+		numbers.set(step.id, `${numbers.get(step.parentId)}.${count}`);
+	}
+	return numbers;
+}
+
 /** `list` after `change`, the same object when the change changes nothing, or why the list refuses it. */
 export function applyProjectChange(list: ProjectList, change: ProjectChange): Parsed<ProjectList, { error: string }> {
 	switch (change.op) {
@@ -171,16 +202,18 @@ export function applyProjectChange(list: ProjectList, change: ProjectChange): Pa
 				return open;
 			});
 		case "add-step":
-			return editProject(list, change.projectId, project =>
-				project.steps.some(step => step.id === change.stepId) ? project : { ...project, steps: [...project.steps, { id: change.stepId, text: change.text, done: false }] },
-			);
+			return editProject(list, change.projectId, project => {
+				if (project.steps.some(step => step.id === change.stepId)) return project;
+				const steps = withStep(project.steps, { id: change.stepId, text: change.text, done: false, ...(change.parentId ? { parentId: change.parentId } : {}) });
+				return "error" in steps ? steps : { ...project, steps };
+			});
 		case "set-step":
 			return editProject(list, change.projectId, project => editStep(project, change.stepId, step => set(step, "done", change.done)));
 		case "edit-step":
 			return editProject(list, change.projectId, project => editStep(project, change.stepId, step => set(step, "text", change.text)));
 		case "remove-step":
 			return editProject(list, change.projectId, project =>
-				project.steps.some(step => step.id === change.stepId) ? { ...project, steps: project.steps.filter(step => step.id !== change.stepId) } : project,
+				project.steps.some(step => step.id === change.stepId) ? { ...project, steps: project.steps.filter(step => step.id !== change.stepId && step.parentId !== change.stepId) } : project,
 			);
 		case "add-decision":
 			return editProject(list, change.projectId, project => (project.decisions.includes(change.text) ? project : { ...project, decisions: [...project.decisions, change.text] }));

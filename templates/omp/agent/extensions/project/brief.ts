@@ -8,6 +8,7 @@ export interface Step {
 	id: string;
 	text: string;
 	done: boolean;
+	parentId?: string;
 }
 
 export interface LogEntry {
@@ -34,7 +35,7 @@ export type ProjectChange =
 	| { op: "set-goal"; projectId: string; goal: string }
 	| { op: "archive"; projectId: string; at: string }
 	| { op: "restore"; projectId: string }
-	| { op: "add-step"; projectId: string; stepId: string; text: string }
+	| { op: "add-step"; projectId: string; stepId: string; text: string; parentId?: string }
 	| { op: "set-step"; projectId: string; stepId: string; done: boolean }
 	| { op: "edit-step"; projectId: string; stepId: string; text: string }
 	| { op: "remove-step"; projectId: string; stepId: string }
@@ -83,14 +84,21 @@ function editProject(project: Project, change: Exclude<ProjectChange, { op: "cre
 			const { archivedAt: _, ...open } = project;
 			return open;
 		}
-		case "add-step":
-			return project.steps.some(step => step.id === change.stepId) ? project : { ...project, steps: [...project.steps, { id: change.stepId, text: change.text, done: false }] };
+		case "add-step": {
+			if (project.steps.some(step => step.id === change.stepId)) return project;
+			const step: Step = { id: change.stepId, text: change.text, done: false, ...(change.parentId ? { parentId: change.parentId } : {}) };
+			if (step.parentId === undefined) return { ...project, steps: [...project.steps, step] };
+			const parent = project.steps.find(each => each.id === step.parentId);
+			if (!parent || parent.parentId !== undefined) return project;
+			const after = project.steps.findLastIndex(each => each.id === parent.id || each.parentId === parent.id);
+			return { ...project, steps: project.steps.toSpliced(after + 1, 0, step) };
+		}
 		case "set-step":
 			return { ...project, steps: project.steps.map(step => (step.id === change.stepId ? { ...step, done: change.done } : step)) };
 		case "edit-step":
 			return { ...project, steps: project.steps.map(step => (step.id === change.stepId ? { ...step, text: change.text } : step)) };
 		case "remove-step":
-			return { ...project, steps: project.steps.filter(step => step.id !== change.stepId) };
+			return { ...project, steps: project.steps.filter(step => step.id !== change.stepId && step.parentId !== change.stepId) };
 		case "add-decision":
 			return project.decisions.includes(change.text) ? project : { ...project, decisions: [...project.decisions, change.text] };
 		case "remove-decision":
@@ -149,8 +157,30 @@ function findItem<T>(items: readonly T[], named: string, textOf: (item: T) => st
 	return items[index] ?? items.find(item => textOf(item) === wanted) ?? null;
 }
 
-/** Step `named` of `project`: its 1-based number in the brief's plan, or its exact text. */
-export const findStep = (project: Project, named: string): Step | null => findItem(project.steps, named, step => step.text);
+/** Each step's number in the brief's plan: `2` for the second top-level step, `2.1` for the first sub-step under that one. */
+export function stepNumbers(steps: readonly Step[]): Map<string, string> {
+	const numbers = new Map<string, string>();
+	const subSteps = new Map<string, number>();
+	let top = 0;
+	for (const step of steps) {
+		if (step.parentId === undefined) {
+			top += 1;
+			numbers.set(step.id, String(top));
+			continue;
+		}
+		const count = (subSteps.get(step.parentId) ?? 0) + 1;
+		subSteps.set(step.parentId, count);
+		numbers.set(step.id, `${numbers.get(step.parentId)}.${count}`);
+	}
+	return numbers;
+}
+
+/** Step `named` of `project`: its number in the brief's plan, such as `2` or `2.1`, or its exact text. */
+export function findStep(project: Project, named: string): Step | null {
+	const wanted = named.trim().replace(/\.$/, "");
+	const numbers = stepNumbers(project.steps);
+	return project.steps.find(step => numbers.get(step.id) === wanted) ?? project.steps.find(step => step.text === named.trim()) ?? null;
+}
 
 /** Decision `named` of `project`: its 1-based number in the brief's decisions, or its exact text. */
 export const findDecision = (project: Project, named: string): string | null => findItem(project.decisions, named, decision => decision);
@@ -174,8 +204,10 @@ export function briefText(project: Project, sessionId: string): string {
 	const lines = [`This session is part of the project "${project.name}" (id ${project.id}), which other sessions work on too.`];
 	lines.push(`Goal: ${project.goal.trim() || "not set yet"}`);
 	if (project.steps.length > 0) {
-		lines.push("", `Plan (${project.steps.filter(step => step.done).length} of ${project.steps.length} done):`);
-		lines.push(...project.steps.map((step, index) => `${index + 1}. [${step.done ? "x" : " "}] ${step.text}`));
+		const nested = project.steps.some(step => step.parentId !== undefined) ? "; a step numbered like 2.1 is a sub-step of step 2" : "";
+		lines.push("", `Plan (${project.steps.filter(step => step.done).length} of ${project.steps.length} done${nested}):`);
+		const numbers = stepNumbers(project.steps);
+		lines.push(...project.steps.map(step => `${step.parentId === undefined ? "" : "   "}${numbers.get(step.id)}. [${step.done ? "x" : " "}] ${step.text}`));
 	} else lines.push("", "Plan: no steps yet.");
 	if (project.decisions.length > 0) lines.push("", "Decisions:", ...project.decisions.map((decision, index) => `${index + 1}. ${decision}`));
 	const recent = project.log.slice(-BRIEF_LOG_LINES);
