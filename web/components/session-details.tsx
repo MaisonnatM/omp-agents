@@ -1,5 +1,5 @@
 /** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, its artifacts once it has any, and a Linear issue. */
-import { IconAiBotHead, IconBranch, IconBulletList, IconLinear, IconPlusSmall, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
+import { IconAiBotHead, IconBranch, IconBulletList, IconEyeOpen, IconLinear, IconPlusSmall, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
@@ -9,11 +9,13 @@ import { activityControl } from "../activity";
 import { isPhonePage } from "../api";
 import type { Artifact } from "../artifacts-model";
 import { addDetailsTab, newIdsByScope, revealDetailsTab } from "../details-tabs";
-import { useArtifacts, useLinkedIssues, useShowConversation } from "../pane-store";
+import { latestBeforeAfter, type BeforeAfter, sameChanges } from "../before-after";
+import { type PaneData, useArtifacts, useLinkedIssues, usePaneSelect, useShowConversation } from "../pane-store";
 import type { ModelList } from "../reads";
 import { requestNewTerminal } from "../terminal-requests";
 import { ArtifactsPanel } from "./artifacts-panel";
 import { BROWSER_AVAILABLE, BrowserPanel } from "./browser-panel";
+import { ReviewPanel } from "./review-panel";
 import { type DetailsTab, DetailsSidebarFrame, menuMatches } from "./details-sidebar-frame";
 import type { ChangesSession } from "./overview-changes";
 import { ViewConversation } from "./pane";
@@ -46,10 +48,12 @@ export interface SessionWork {
 	artifacts: Artifact[];
 	/** The ids of the Linear issues the view's prompts and replies link to, in the order they first appear. */
 	linearIssues: string[];
+	/** The screen changes the view's latest `before-after` list names, which the **Review** tab compares; empty leaves it out. */
+	changes: BeforeAfter[];
 }
 
-/** The **PRs** tab, the **Browser** tab for a live session in the desktop app, the **Artifacts** tab once the session saved any, and the **Linear** tab. */
-export function sessionWorkTabs({ scope, working, pullRequests, hosts, live, view, sessionId, artifacts, linearIssues }: SessionWork): DetailsTab<"diffs" | "pull-requests" | "browser" | "artifacts" | "linear">[] {
+/** The **PRs** tab, the **Browser** tab for a live session in the desktop app, the **Artifacts** tab once the session saved any, the **Review** tab once a reply listed screen changes, and the **Linear** tab. */
+export function sessionWorkTabs({ scope, working, pullRequests, hosts, live, view, sessionId, artifacts, linearIssues, changes }: SessionWork): DetailsTab<"diffs" | "pull-requests" | "browser" | "artifacts" | "review" | "linear">[] {
 	return [
 		...(sessionId !== null
 			? [
@@ -98,6 +102,19 @@ export function sessionWorkTabs({ scope, working, pullRequests, hosts, live, vie
 						count: artifacts.length,
 						scrollsItself: true,
 						content: <ArtifactsPanel key={sessionId} view={view} sessionId={sessionId} artifacts={artifacts} />,
+					} as const,
+				]
+			: []),
+		...(changes.length > 0
+			? [
+					{
+						value: "review",
+						icon: IconEyeOpen,
+						name: "Review",
+						control: "session-details.tab.review",
+						count: changes.length,
+						scrollsItself: true,
+						content: <ReviewPanel key={scope} scope={scope} changes={changes} live={live} />,
 					} as const,
 				]
 			: []),
@@ -212,6 +229,18 @@ function useOpenLinearOnLink(scope: string, linked: readonly string[]): void {
 	}, [scope, linked]);
 }
 
+/** The screen changes each session listed while the page is open, by screenshot pair, kept as {@link linkedBefore} is. */
+const listedBefore = newIdsByScope();
+
+/** Adds the **Review** tab behind the tab on screen once a reply of `scope` lists a change it had not listed before. */
+function useOpenReviewOnList(scope: string, changes: readonly BeforeAfter[]): void {
+	useEffect(() => {
+		if (listedBefore(scope, changes.map(change => `${change.before}\n${change.after}`))) addDetailsTab(TAB_KEY, "review");
+	}, [scope, changes]);
+}
+
+const changesOf = (pane: PaneData): BeforeAfter[] => latestBeforeAfter(pane.items);
+
 /** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, its artifacts when it has any, and its Linear issue. */
 export function SessionDetails({ view, sessionId, working, cwd, hosts, host, lastHost, row, models, workspaces }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(each => each.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
@@ -223,6 +252,8 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 	// The issue a /ship run works on, those the session saved through Linear, then those the user's prompts link.
 	const linearIssues = useMemo(() => [...new Set([...(shipIssue ? [shipIssue] : []), ...(savedIssues ?? []), ...promptIssues])], [shipIssue, savedIssues, promptIssues]);
 	useOpenLinearOnLink(scope, linearIssues);
+	const changes = usePaneSelect(view, changesOf, sameChanges);
+	useOpenReviewOnList(scope, changes);
 	const opened = useSubagentLinks(view, host);
 	// A plain click on a subagent shows it in the **Subagent** tab; a split or a new window still opens it as a pane.
 	const links = useMemo<SubagentLinksValue | null>(
@@ -263,7 +294,7 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 					} as const,
 				]
 			: []),
-		...sessionWorkTabs({ scope, working, pullRequests, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts, linearIssues }),
+		...sessionWorkTabs({ scope, working, pullRequests, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts, linearIssues, changes }),
 	];
 	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} menuSections={query => sessionMenuSections(links, query)} />;
 }

@@ -4,7 +4,7 @@
   It follows a live session, one of its subagents, or a past session.
   It hides for a pull request's details, **Settings**, and the new-session page, and while two or more panes sit side by side; a maximized pane brings it back.
 - It works as Capy's side panel: its header shows the tabs you opened, and **+** after them lists every tab the view can show, the one on screen checked, with its item count.
-  The tabs are **Overview**, the subagent you opened from it, **Diffs**, which a subagent's view leaves out, **PRs**, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, **Artifacts**, which shows only once the agent saved an artifact, and **Linear**.
+  The tabs are **Overview**, the subagent you opened from it, **Diffs**, which a subagent's view leaves out, **PRs**, **Browser**, which shows only in the [desktop app](desktop-app.md) for a live session or subagent, **Artifacts**, which shows only once the agent saved an artifact, **Review**, which shows only once a reply listed screen changes to compare, and **Linear**.
   Pick one in the **+** menu to open it as a tab, or to show it when it is already open; **Overview** is always open.
   The menu opens on a **Search** field: typing keeps only the tabs, subagents, and **New terminal** whose name holds the text, Enter opens the first matching tab, and the arrow keys move down to the rows.
   Below the tabs, the menu lists a running session's subagents, each opening in the sidebar as **Overview**'s rows do, then **New terminal**, which opens the [terminal](terminal.md) panel on a new shell; a paired phone leaves **New terminal** out.
@@ -13,7 +13,7 @@
   ⇧⌘G shows **Overview** while the sidebar shows, and pressed again on **Overview** it reviews the session's changes from its first changed file.
   ⇧⌘L opens **Browser**, and opens the sidebar too when it is closed; the **+** menu lists both keys.
   The sidebar remembers the tabs you opened and the one you chose, for every view; a tab the view cannot show, such as **Browser** for a past session, stays open but hidden until it can.
-  **Review visuals** opens and shows the **Browser** tab, and saving an artifact the **Artifacts** tab.
+  **Review visuals** opens and shows the **Browser** tab, and saving an artifact the **Artifacts** tab; a reply that lists new screen changes opens the **Review** tab behind the one on screen.
 - **Overview** lists the view's **Subagents**, then the **Files**, **Images**, and **Sources** of [Changed files and images](changed-files-and-images.md), each under a filled header with its count that folds on a click; see [Conversations](conversations.md) for the **Subagents** section.
   A section shows once it has something to list, and the tab says **Nothing yet** once the session's lists have loaded and none has.
   A past session's view shows its files, images, and sources but no subagents.
@@ -32,6 +32,12 @@
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - **Browser** shows the app the session runs and adds an element you pick in it to the session's composer; see [Browser](browser.md).
 - **Artifacts** shows the pages, documents, and drawings the agent saved for you to look at, each version kept; see [Artifacts](artifacts.md).
+- **Review** compares each screen change the agent's latest reply listed, its before screenshot over its after one, split by a line you drag or move with the arrow keys.
+  Pick another change from the toolbar's menu once there are two.
+  Click the after side to pin a spot, and type what should change there; edit the change's **Description**, and type a **Quick edit** below it.
+  **Add to composer**, or ⌘↵ in the quick edit, adds one request naming the change, its description, each pin, and what you typed to the session's composer, and **Ask to revert** adds a request to undo it; you still send it yourself.
+  A past session's tab shows the comparison but takes no requests.
+  The agent lists the changes in a `before-after` block, a JSON array of `{"title", "before", "after", "description"}` with absolute screenshot paths, which the reply then hides.
 - **Linear** shows a Linear issue: its id, which opens it in Linear, its status, when it last changed, its title, priority, assignee, project, and labels, then its description.
   It opens on the first issue the conversation links to, as `https://linear.app/<workspace>/issue/ENG-123`, and its count is the number of issues linked; with more than one, a menu beside the field picks another.
   The tab opens by itself, behind the tab on screen, when the session's conversation links an issue it had not linked before, so its chip with the count shows in the tab row; once you close it, it stays closed until the session links another issue or you reload the page.
