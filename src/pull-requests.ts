@@ -34,6 +34,7 @@ const REVIEW_FIELDS = `author { login ${AVATAR} }
 
 const PR_FIELDS = `... on PullRequest {
 	number title isDraft state reviewDecision mergeable viewerCanUpdateBranch headRefName baseRefName createdAt updatedAt mergedAt additions deletions
+	labels(first: 20) { nodes { name } }
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state ${CONTEXTS(30)} } } } }
@@ -161,6 +162,7 @@ function parsePullRequestHead(node: Record<string, unknown>, botStarted: Readonl
 		deletions: num(node.deletions) ?? 0,
 		unresolved: parseUnresolved(node.reviewThreads, botStarted),
 		viewerApproved: isObject(node.viewerLatestReview) && node.viewerLatestReview.state === "APPROVED",
+		labels: nodesOf(node.labels).flatMap(label => (isObject(label) && typeof label.name === "string" ? [label.name] : [])),
 	};
 }
 

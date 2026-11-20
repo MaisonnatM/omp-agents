@@ -54,8 +54,14 @@ export const GROUP_TITLES = Object.keys(GROUPS) as MoveGroup[];
 /** The moves, in rank order, that leave an approved pull request of yours in **Approved**: none asks you to fix anything. */
 const APPROVED_MOVES: MoveId[] = ["merge", "checks-running", "draft"];
 
+/** The label that holds a pull request's merge until a person approves it, so an approval alone leaves it **Waiting on others**. */
+const ASK_HUMAN = "ask-human";
+
 /** The section `pr` goes in while it waits on `move`. */
-const groupOf = (pr: PullRequestSummary, move: MoveId): MoveGroup => (pr.review === "approved" && APPROVED_MOVES.includes(move) ? "Approved" : MOVES[move].group);
+function groupOf(pr: PullRequestSummary, move: MoveId): MoveGroup {
+	if (pr.review !== "approved" || !APPROVED_MOVES.includes(move)) return MOVES[move].group;
+	return pr.labels?.includes(ASK_HUMAN) ? "Waiting on others" : "Approved";
+}
 
 const AND = new Intl.ListFormat("en", { type: "conjunction" });
 
