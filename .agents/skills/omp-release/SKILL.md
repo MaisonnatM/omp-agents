@@ -25,7 +25,8 @@ The script deletes its installs, so an omp line comes from a diff's `+` side, wh
 For a file without a diff, run `bun add --linker hoisted @oh-my-pi/pi-coding-agent@<target>` in an empty temporary directory and read it under `node_modules/@oh-my-pi/`.
 
 Then compare Claude Code: omp sends `DEFAULT_CLAUDE_CODE_VERSION` from `@oh-my-pi/pi-ai`'s `src` (grep `CLAUDE_CODE_VERSION` in the target install) to Anthropic.
-When it is newer than `claude --version`, put "update Claude Code to at least <version> (`npm view @anthropic-ai/claude-code version` is the latest)" under MUST change; otherwise list it under No impact with both versions.
+When it is newer than `claude --version`, put "update Claude Code to at least <version>" under MUST change; otherwise list it under No impact with both versions.
+This update never blocks the version bump: step 5 makes it.
 
 ## 3. Check the patch
 
@@ -60,12 +61,13 @@ The step is done when every changed file in the report sits in a bucket or on th
 
 Write the report as Markdown: the versions, the test and module check results, the patch result, the three buckets, and the No impact list.
 
-When MUST change holds only the version pins, and both the tests and the module check passed, open the version bump:
+When MUST change holds only the version pins, and at most a Claude Code update, and both the tests and the module check passed, open the version bump:
 
-1. Create a worktree off `origin/main` on a branch named `omp-<target>`, outside this checkout, and run `bun install --frozen-lockfile` there.
-2. In it, change the tested version to the target at every pin site listed under MUST change.
-3. Run `bun test` and `bun run typecheck` there.
-4. Add a `CHANGELOG.md` line under today's heading, as [Changelog](../../../CODING_STANDARDS.md#changelog) says, such as "Behind the scenes: tested with omp <target>.", and commit with the message `Test with omp <target>`.
-5. Land it with the `land` tool, passing the worktree as `path`, and deliver your report in the reply.
+1. When MUST change names a Claude Code update, run `claude update`, then check that `claude --version` reaches the version omp needs; if it does not, stop and report that.
+2. Create a worktree off `origin/main` on a branch named `omp-<target>`, outside this checkout, and run `bun install --frozen-lockfile` there.
+3. In it, change the tested version to the target at every pin site listed under MUST change.
+4. Run `bun install -g --ignore-scripts @oh-my-pi/pi-coding-agent@<target>`, so the land checks import the target, then run `bun test` and `bun run typecheck` in the worktree with `OMP_PACKAGE_DIR` unset.
+5. Add a `CHANGELOG.md` line under today's heading, as [Changelog](../../../CODING_STANDARDS.md#changelog) says, such as "Behind the scenes: tested with omp <target>.", and commit with the message `Test with omp <target>`.
+6. Land it with the `land` tool, passing the worktree as `path`, and deliver your report in the reply, naming the Claude Code update when you made one.
 
 In every other case, deliver the report and leave the repository as it is.

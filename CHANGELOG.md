@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-20
 
+- Behind the scenes: when a new omp release needs a newer Claude Code, the omp release check now updates Claude Code itself and bumps the tested omp version, instead of stopping.
 - Behind the scenes: tested with omp 19.0.1.
 - Behind the scenes: the omp release check runs again; it stopped at its first step after the dashboard started loading one of omp's native `.js` files.
 - Pull requests: an approved pull request labeled `ask-human` now waits under **Waiting on others** instead of **Approved**, since a person still has to approve it.
