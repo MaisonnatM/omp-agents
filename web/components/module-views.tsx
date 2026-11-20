@@ -13,8 +13,10 @@ import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../mod
 import type { SectionTarget } from "../section";
 import { useDashboardActions } from "./dashboard-context";
 import { MemoryPage } from "./memory/page";
+import { ProjectsPage } from "./projects/page";
 import { SportNav } from "./sport/nav";
 import { SportPage } from "./sport/page";
+import type { KnownSessions } from "./todo/links";
 
 /** The core's data a module's page reads but does not own. */
 export interface CoreData {
@@ -34,6 +36,8 @@ export interface CoreData {
 	onPickWorkspace: (cwd: string | null) => void;
 	/** The running sessions in the sidebar's workspace. */
 	hosts: RosterHost[];
+	/** Every live and past session, in any workspace, which a project's page names and links. */
+	sessions: KnownSessions;
 	/** The page section a sidebar link last chose, to unfold, scroll to, and focus. */
 	section: SectionTarget | null;
 }
@@ -63,6 +67,7 @@ interface ModuleViews<I extends WebModuleId> {
 const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
 	memory: { Page: MemoryPage },
 	sport: { Page: SportPage, Nav: SportNav },
+	projects: { Page: ProjectsPage },
 };
 
 /** Any module's page as {@link ModulePageView} draws it: a stored module's gets its state, any other's none. */

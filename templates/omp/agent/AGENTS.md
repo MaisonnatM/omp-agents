@@ -52,6 +52,13 @@ Then update with the same command plus `-X PUT -H "Origin: http://127.0.0.1:4317
 A `current` answer means origin had nothing new and the dashboard did not restart; when it still needs a restart, ask the user rather than kill its processes.
 A 409 answer says why the checkout stayed as it was, such as uncommitted changes or local commits; report it rather than stash, reset, or retry.
 
+## Projects
+
+A session in an omp-agents dashboard project gets the project's brief before its first prompt: the goal, the plan, the decisions, and the newest log lines.
+When you finish a step of that plan, call `project_update` to tick it, and log one line on what you did, so the next session knows where the work stands.
+Record a decision the user settles with `project_update` too; add a step only for work the plan is missing.
+List projects with `project_list`; create, rename, archive, or join one with `project_update` only when the user asks.
+
 ## Presenting a plan
 
 Present every plan, proposal, or recommendation in the final-answer format, in plain words with no jargon.

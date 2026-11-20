@@ -42,6 +42,10 @@
   `src/server/sport-thumbs.ts` serves `GET /api/sport/thumb`, each demo's YouTube thumbnail, fetched once and kept in `sportThumbsDir` from `src/paths.ts`.
   `src/sport-fixtures.ts` holds the sample plan and the builders the Sport tests share.
   See [Sport](../architecture/sport.md).
+- `src/shared/projects.ts` holds the Projects module's state, `ProjectList`, its changes, their parsers, and its reducer `applyProjectChange`, which the server applies to its file and the page to what it shows before the server answers.
+  `src/server/projects-file.ts` keeps `project-list.json` with `ReducerFile`, and `src/server/projects-inbox.ts` drains `project-inbox/`, the changes the starter kit's `project` extension leaves, any change the page makes; `PROJECTS_MODULE` in `src/projects-module.ts` opens both.
+  A `start` of kind `new` may name a `projectId`; once omp starts, `src/server/start.ts` puts the new session in that project through `StartEnv.joinProject`.
+  See [Projects](../architecture/projects.md).
 - `src/shared/memory-page.ts` holds the Memory module's shapes, which the page shares: project memory, its edit, the bookmarks, and the X sync's state.
   `MEMORY_MODULE` in `src/memory-module.ts` serves its routes, `GET` and `PUT /api/project-memory`, `GET /api/bookmarks`, `POST /api/bookmarks/x-sync`, and `GET /api/bookmarks/x-video`, and joins every session with the `bookmarks` tool; see [Modules](../architecture/modules.md).
   `src/project-memory.ts` reads each workspace repository's `refs/omp/memory` and applies the page's edits as source `#dashboard`, with the `project_memory` tool's code in `templates/omp/agent/extensions/project-memory/`, tested in `src/project-memory.test.ts` against temp repositories.

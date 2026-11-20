@@ -338,7 +338,7 @@ export function useDashboard(): Dashboard {
 
 	const openNewSession = useCallback((cwd?: string) => {
 		dispatch({ t: "dismiss-start", kind: "new" });
-		navigate({ kind: "new", cwd: cwd ?? null, todoId: null });
+		navigate({ kind: "new", cwd: cwd ?? null, todoId: null, projectId: null });
 	}, [navigate]);
 
 	const nextReqId = useRef(0);

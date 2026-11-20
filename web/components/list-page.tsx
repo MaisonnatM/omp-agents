@@ -14,15 +14,17 @@ interface PageFrameProps {
 	meta: string;
 	/** The header's buttons. */
 	actions?: ReactNode;
+	/** Before the title, such as a link back to the page's index. */
+	leading?: ReactNode;
 	/** The page's scrolling content. */
 	children: ReactNode;
 }
 
 /** A page's frame: its header, then its content, which scrolls under it. */
-export function PageFrame({ title, meta, actions, children }: PageFrameProps) {
+export function PageFrame({ title, meta, actions, leading, children }: PageFrameProps) {
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<Header title={title} meta={meta}>
+			<Header title={title} meta={meta} leading={leading}>
 				{actions}
 			</Header>
 			{/* Relative, so an absolute child such as a row's `sr-only` text stays in this scroll and never makes the document scroll. */}

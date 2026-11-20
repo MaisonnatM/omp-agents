@@ -48,6 +48,8 @@ export interface StartEnv {
 	workspaceOf(cwd: string): Promise<string>;
 	/** Links todo `todoId` to session `sessionId`, which a new session started for it, and moves a todo not started yet to In Progress. */
 	linkTodo(todoId: string, sessionId: string): void;
+	/** Joins session `sessionId`, which a new session started for project `projectId`, to that project; throws when the project refuses it. */
+	joinProject(projectId: string, sessionId: string): void;
 	/** How a start, or the resume of an attached session, joins the server as session `instanceId`. */
 	joinFor(request: StartRequest, instanceId: string): SessionJoin;
 	/**
@@ -212,8 +214,16 @@ export function createStarter(env: StartEnv): Starter {
 			const cleanup = await Promise.resolve(outcome.started.discard?.()).then(() => "", error => `; ${errorText(error)}`);
 			return { ok: false, error: `omp exited as the session started.${cleanup}` };
 		}
-		// The todo links first, so the session's first turn already knows the todo it works on.
+		// The todo links and the project joins first, so the session's first turn already knows the todo it works on and gets the project's brief.
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
+		if (request.kind === "new" && request.projectId) {
+			// A project deleted since the page asked refuses the join, and the session starts in none.
+			try {
+				env.joinProject(request.projectId, session.sessionId);
+			} catch (error) {
+				console.error(`omp-agents: session ${session.sessionId} joins no project: ${errorText(error)}`);
+			}
+		}
 		outcome.join.attach(session);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
 		if (first) void session.prompt(null, first.text, first.images, "steer").catch(skipRefused);

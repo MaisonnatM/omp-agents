@@ -1,9 +1,9 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { IconLayoutColumn, IconPause } from "central-icons";
-import { Fragment, memo, type ReactElement, type ReactNode } from "react";
+import { IconFlag1, IconFolderDelete, IconLayoutColumn, IconPause } from "central-icons";
+import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
 import { awaitsSubagents, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { PrivateChip } from "./private-chip";
@@ -15,7 +15,7 @@ import { sessionActions, type SessionEntry, type SessionRun } from "../session-a
 import { isPrivateHost, type RowPlacement, workspaceCwd, workspaceOf } from "../sessions";
 import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
-import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { OpenProjectsContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Spinner } from "./spinner";
 import { type RowStatus, StatusDot, statusLabel } from "./status-dot";
 
@@ -135,6 +135,44 @@ function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProp
 					))}
 				</Fragment>
 			))}
+			<ProjectItems sessionId={entry.kind === "live" ? entry.host.sessionId : entry.session.sessionId} />
+		</>
+	);
+}
+
+/** Move to project, a submenu of the open projects the session is not in, and Remove from project while it is in one; nothing while Projects is off or no project is open. */
+function ProjectItems({ sessionId }: { sessionId: string }) {
+	const projects = useContext(OpenProjectsContext);
+	const { changeModule } = useDashboardActions();
+	const { connected } = useDashboardStatus();
+	if (projects.length === 0) return null;
+	const current = projects.find(project => project.sessionIds.includes(sessionId));
+	const others = projects.filter(project => project !== current);
+	return (
+		<>
+			<MenuSeparator />
+			{others.length > 0 && (
+				<MenuSubmenu>
+					<MenuSubmenuTrigger disabled={!connected}>
+						<IconFlag1 />
+						Move to project
+					</MenuSubmenuTrigger>
+					<MenuSubmenuContent>
+						{others.map(project => (
+							<MenuItem key={project.id} onClick={() => changeModule("projects", { op: "join", projectId: project.id, sessionId })}>
+								<IconFlag1 />
+								<span className="truncate">{project.name}</span>
+							</MenuItem>
+						))}
+					</MenuSubmenuContent>
+				</MenuSubmenu>
+			)}
+			{current && (
+				<MenuItem disabled={!connected} onClick={() => changeModule("projects", { op: "leave", sessionId })}>
+					<IconFolderDelete />
+					Remove from project
+				</MenuItem>
+			)}
 		</>
 	);
 }

@@ -42,6 +42,7 @@ test("a Claude Code or Codex session neither resumes nor forks, before any omp s
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
+		joinProject: () => {},
 		admit: async () => { throw new Error("A read-only start must not take a census."); },
 		restoreWorktree: async () => { throw new Error("A read-only resume must not add a worktree back."); },
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
@@ -66,6 +67,7 @@ test("a private session does not fork, before any omp starts, since its copy wou
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
+		joinProject: () => {},
 		admit: async () => {},
 		restoreWorktree: async () => {},
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
@@ -218,6 +220,7 @@ function claimedStarter(
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
 		linkTodo: () => {},
+		joinProject: () => {},
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		admit,
 		restoreWorktree,
@@ -276,6 +279,46 @@ test("a failed spawn releases its claim, while distinct explicit tasks may inten
 		expect((await start(newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7", { taskId: "app#7:tests-only" }))).ok).toBe(true);
 		expect((await start(newSessionRequest(dir, "/ship https://github.com/acme/app/pull/7", { taskId: "app#7:server-only" }))).ok).toBe(true);
 		expect((await start(newSessionRequest(dir, "Explain the unrelated architecture"))).ok).toBe(true);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a new session for a project joins it before its first message, and starts in no project when the project refuses the join", async () => {
+	const dir = mkdtempSync("/tmp/omp-start-project-");
+	try {
+		const heard: string[] = [];
+		let refuse = false;
+		const start = createStarter({
+			sessions: new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json"))),
+			pathFor: () => null,
+			savedFile: () => null,
+			factsFor: () => ({ pullRequests: [], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }),
+			onStarted: () => {},
+			workspaceOf: async cwd => cwd,
+			linkTodo: () => {},
+			joinProject: (projectId, sessionId) => {
+				if (refuse) throw new Error(`No project has id ${projectId}.`);
+				heard.push(`join ${projectId} ${sessionId}`);
+			},
+			joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
+			admit: async () => {},
+			restoreWorktree: async () => {},
+			privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
+		});
+		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
+		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
+		spyOn(DashboardSession, "start").mockImplementation(async (id, cwd) =>
+			Object.setPrototypeOf(fromPartial<DashboardSession>({ ...sessionForStart(id, cwd), prompt: async (_queue: unknown, text: string) => void heard.push(`prompt ${text}`) }), DashboardSession.prototype),
+		);
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		const request = newSessionRequest(dir, "Backfill the rows", { projectId: "p1" });
+		const joined = await start(request);
+		expect(joined.ok).toBe(true);
+		refuse = true;
+		expect((await start(request)).ok).toBe(true);
+		expect(heard).toEqual([expect.stringMatching(/^join p1 s-/), "prompt Backfill the rows", "prompt Backfill the rows"]);
+		expect(logged).toHaveBeenCalledWith(expect.stringContaining("joins no project: No project has id p1."));
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

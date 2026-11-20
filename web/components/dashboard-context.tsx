@@ -1,6 +1,7 @@
 /** The React contexts that hand the dashboard's stable actions and changing status to the sidebar, panes, and pages. */
 import { createContext, useContext } from "react";
 import type { QueuedMerge } from "../../src/shared/merge-queue";
+import type { Project } from "../../src/shared/projects";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { FileTarget } from "../file-paths";
@@ -93,3 +94,6 @@ export function useMentionLists(): MentionLists {
 
 /** The Todo page's list as the server last sent it, `null` until it arrives, for a prompt's todo chips to find where each todo is now. */
 export const UserTodosContext = createContext<UserTodoList | null>(null);
+
+/** The open projects, oldest first, which a session row's menu offers to move the session to; none while Projects is off or the list has not arrived. */
+export const OpenProjectsContext = createContext<readonly Project[]>([]);

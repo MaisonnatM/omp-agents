@@ -116,6 +116,16 @@ export const headKey = (repo: Repo, branch: string): string => `${repoKey(repo)}
 
 export const samePullRequest = (a: PullRequest, b: PullRequest): boolean => prKey(a) === prKey(b);
 
+/** Each pull request of `prs` once, as just its owner, repository, and number, in the order it first appears. */
+export function uniquePullRequests(prs: Iterable<PullRequest>): PullRequest[] {
+	const unique = new Map<string, PullRequest>();
+	for (const { owner, repo, number } of prs) {
+		const pr = { owner, repo, number };
+		if (!unique.has(prKey(pr))) unique.set(prKey(pr), pr);
+	}
+	return [...unique.values()];
+}
+
 /**
  * How a session touched a pull request: it submitted it with `gh pr create`, or it worked on it with
  * `gh pr checkout`, `edit`, `comment`, `review`, `merge`, or `ready`, a `git push` to its branch, a link in its own

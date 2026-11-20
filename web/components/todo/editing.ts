@@ -126,7 +126,7 @@ export function useTodoEditing({ list, kind, day, frozen, categories, onChange, 
 					const top = parentId === null ? list.todos.find(({ id }) => id === todo.id) : undefined;
 					if (!top || !text.trim()) return false;
 					commit(todo, text);
-					location.hash = hashForNewSession(todoCwd(top, newSessionCwd), todo.id);
+					location.hash = hashForNewSession({ cwd: todoCwd(top, newSessionCwd), todoId: todo.id });
 					return true;
 				}
 				case "escape":
@@ -159,7 +159,7 @@ export function useTodoEditing({ list, kind, day, frozen, categories, onChange, 
 					const added = add(draft, text);
 					if (!added) return false;
 					setEditing(NOT_EDITING);
-					location.hash = hashForNewSession(todoCwd(added.change, newSessionCwd), added.change.id);
+					location.hash = hashForNewSession({ cwd: todoCwd(added.change, newSessionCwd), todoId: added.change.id });
 					return true;
 				}
 				case "escape":

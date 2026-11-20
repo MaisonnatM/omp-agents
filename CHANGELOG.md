@@ -9,6 +9,15 @@ The dashboard shows the same lines in Settings › What's new.
 - Session sidebar: a new Review tab compares each screen change the agent lists, its before and after screenshots split by a line you drag; pin spots on it, edit its description, and add a tweak or a revert request to the composer.
 - Pull requests: the list refreshes about twice as fast in a busy repository, and a slow refresh no longer fails and leaves the list a minute out of date.
 - Pull requests: a repository you hide under Display, then Repositories, is no longer read from GitHub, so the rest of the list refreshes sooner.
+- Projects: a new Projects page follows one effort across sessions and workspaces, with its goal, a checklist plan, decisions, and a log.
+- Projects: each session in a project gets the project's goal, plan, decisions, and latest log when it starts.
+- Projects: a session in a project ticks steps and logs what it did as it goes.
+- Projects: an agent can list every project, create one, and make any change the Projects page makes, on any project.
+- Projects: Move to project in a session's menu puts it in a project.
+- Projects: the sidebar lists each project as a folder of its sessions, above the workspaces.
+- Projects: New session on a project's page starts a session already in it.
+- Projects: the Projects page lists every project with its status, progress, sessions, and last update.
+- Projects: an open project shows its figures, plan, sessions, decisions, and recent activity.
 - Pull requests: each Your move heading now ends with buttons such as Reply 3, Fix CI 2, and Rebase 1, which hand that fix to an agent on every pull request waiting on it, after you click again to confirm.
 - Behind the scenes: when a new omp release needs a newer Claude Code, the omp release check now updates Claude Code itself and bumps the tested omp version, instead of stopping.
 - Behind the scenes: tested with omp 19.0.1.

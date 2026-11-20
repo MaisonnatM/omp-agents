@@ -15,7 +15,8 @@ export interface KnownSessions {
 	past: PastSession[];
 }
 
-function sessionLabel(sessionId: string, { hosts, past }: KnownSessions): { name: string; host: RosterHost | null } {
+/** What session `sessionId` reads as, and its live host while it runs. */
+export function sessionLabel(sessionId: string, { hosts, past }: KnownSessions): { name: string; host: RosterHost | null } {
 	const host = hosts.find(h => h.sessionId === sessionId) ?? null;
 	const saved = host ? undefined : past.find(session => session.sessionId === sessionId);
 	return { name: host ? hostLabel(host) : saved ? pastLabel(saved) : "Session", host };

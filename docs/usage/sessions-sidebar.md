@@ -60,6 +60,9 @@
   The selected workspace applies to the group too.
   The server keeps the pins in `pins.json` beside its access token, by session id, so every window of the app shows the same ones.
   Pins that an older version kept in the page move to the server the first time its page connects.
+- **Projects**, its own section at the top of the roster above the **Workspaces** label, holds a folder per open project with its live, interrupted, and pinned sessions from every workspace; such a session leaves **Pinned** and its workspace's folder.
+  Click a project's name to open its page, and **+** beside **Projects** to start a new one; see [Projects](projects.md).
+  **Move to project** in a row's menu puts the session in an open project, and **Remove from project** takes it out.
 - Under the **Workspaces** label each workspace is a folder that holds its live and interrupted sessions, its idle ones first, then those running, then those waiting on subagents, and then the interrupted ones.
   The folders that hold a session come first, then the others, each in the picker's order, so opening a session never moves a folder; eight show, or as many as hold a session, and **N more workspaces** shows the rest.
   Hovering a folder shows its **New session in** button, and a blue count after its name says how many of its sessions need you.

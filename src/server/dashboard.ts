@@ -26,7 +26,7 @@ import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { activityDb, botInboxDir, botsDir, botsFile, directoryOf, displayPath, endedWorktreesFile, HOME, interruptedFile, machineFile, mergesFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
-import { moduleInboxes, moduleJoins, openModules } from "../modules";
+import { type ModuleChanges, moduleInboxes, moduleJoins, openModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -341,14 +341,12 @@ export class Dashboard {
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
 		const workspaceOf = (cwd: string): Promise<string> => placement.workspaceOf(cwd, worktreeAt);
 		const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
-		const modulesInboxes = moduleInboxes(
-			modules,
-			(id, change) => {
-				lists.applyModule(id, change);
-				return modules[id].flush();
-			},
-			{ active: () => ownerLock.held },
-		);
+		// Applies a module change and writes it now, so an inbox file is deleted, and a new session's first turn reads it, only once it is on disk; a refused change throws.
+		const applyModuleNow = <I extends StoredModuleId>(id: I, change: ModuleChanges[I]): boolean => {
+			lists.applyModule(id, change);
+			return modules[id].flush();
+		};
+		const modulesInboxes = moduleInboxes(modules, applyModuleNow, { active: () => ownerLock.held });
 		const routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
 		const botInbox = new BotInbox(
 			botInboxDir,
@@ -365,6 +363,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
+			joinProject: (projectId, sessionId) => applyModuleNow("projects", { op: "join", projectId, sessionId }),
 			joinFor: (request, instanceId) => this.#joinFor(request, instanceId),
 			admit: this.#admit,
 			restoreWorktree: sessionIds => this.#worktrees.checkout(() => restoreEndedWorktree(this.#endedWorktrees.of(sessionIds))),

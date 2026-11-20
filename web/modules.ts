@@ -8,6 +8,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import type { ModuleChanges, ModuleValues, StoredModuleId } from "../src/modules";
 import { MEMORY_PAGE } from "./components/memory/module";
 import { SPORT_PAGE } from "./components/sport/module";
+import { PROJECTS_PAGE } from "./components/projects/module";
 import type { Binding } from "./shortcuts";
 
 /** How a module's page reads and writes its address, `#<id>/<rest>?<query>`. */
@@ -66,7 +67,7 @@ export type StoredPageModule<Id extends string, Route, Value, Change, Shortcut e
 };
 
 /** Every module: adding one is adding its definition here and its server half to `SERVER_MODULES` in `src/modules.ts`. */
-export const WEB_MODULES = { memory: MEMORY_PAGE, sport: SPORT_PAGE };
+export const WEB_MODULES = { memory: MEMORY_PAGE, sport: SPORT_PAGE, projects: PROJECTS_PAGE };
 
 type WebModules = typeof WEB_MODULES;
 export type WebModuleId = keyof WebModules;
