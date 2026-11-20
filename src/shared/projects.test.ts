@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { applyProjectChange, EMPTY_PROJECTS, parseProjectChange, parseProjectList, type ProjectChange, type ProjectList } from "./projects";
+import { applyProjectChange, stepNumbers, EMPTY_PROJECTS, parseProjectChange, parseProjectList, type ProjectChange, type ProjectList } from "./projects";
 
 function applyAll(list: ProjectList, changes: ProjectChange[]): ProjectList {
 	return changes.reduce((current, change) => {
@@ -150,5 +150,34 @@ describe("applyProjectChange, the page's edits", () => {
 
 	test("restoring an open project changes nothing", () => {
 		expect(applyProjectChange(twoProjects, { op: "restore", projectId: "p1" })).toEqual({ ok: twoProjects });
+	});
+});
+
+describe("sub-steps", () => {
+	const nested = applyAll(twoProjects, [
+		{ op: "add-step", projectId: "p1", stepId: "s1", text: "Schema" },
+		{ op: "add-step", projectId: "p1", stepId: "s2", text: "Backfill" },
+		{ op: "add-step", projectId: "p1", stepId: "s1a", text: "Tables", parentId: "s1" },
+		{ op: "add-step", projectId: "p1", stepId: "s1b", text: "Indexes", parentId: "s1" },
+	]);
+	const steps = nested.projects[0]!.steps;
+
+	test("a sub-step lands after its parent's last sub-step and is numbered under it", () => {
+		expect(steps.map(step => step.id)).toEqual(["s1", "s1a", "s1b", "s2"]);
+		expect([...stepNumbers(steps).values()]).toEqual(["1", "1.1", "1.2", "2"]);
+	});
+
+	test("a plan nests two levels at most, and a sub-step needs a parent that exists", () => {
+		expect(applyProjectChange(nested, { op: "add-step", projectId: "p1", stepId: "x", text: "Deeper", parentId: "s1a" })).toEqual({ error: expect.stringContaining("two levels at most") });
+		expect(applyProjectChange(nested, { op: "add-step", projectId: "p1", stepId: "x", text: "Orphan", parentId: "gone" })).toEqual({ error: expect.stringContaining("gone") });
+	});
+
+	test("removing a step removes its sub-steps", () => {
+		expect(applyAll(nested, [{ op: "remove-step", projectId: "p1", stepId: "s1" }]).projects[0]!.steps.map(step => step.id)).toEqual(["s2"]);
+	});
+
+	test("a sub-step's parent survives the file's round trip", () => {
+		expect(parseProjectList(JSON.parse(JSON.stringify(nested)))).toEqual(nested);
+		expect(parseProjectChange({ op: "add-step", projectId: "p1", stepId: "x", text: "Tables", parentId: "s1" })).toEqual({ ok: { op: "add-step", projectId: "p1", stepId: "x", text: "Tables", parentId: "s1" } });
 	});
 });
