@@ -141,7 +141,7 @@ if (input.subToolStart) {
 }
 `;
 
-function exercise(name: "artifact" | "ship" | "todos" | "project" | "worktree-guard" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page", input: object, env: Record<string, string> = {}): {
+function exercise(name: "artifact" | "ship" | "todos" | "project" | "worktree-guard" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page" | "end-session", input: object, env: Record<string, string> = {}): {
 	result: { block?: boolean; reason?: string; input?: Record<string, unknown> } | null;
 	confirmations: number;
 	valid: boolean;
@@ -1366,5 +1366,11 @@ describe("artifact", () => {
 		for (const path of ["/tmp/page.html", "local://../page.html", "local:///tmp/page.html", "local://a/../page.html", "local://missing.html"]) expect(save(path).isError).toBe(true);
 		expect(save("local://page.html", { artifactsDir: null }).isError).toBe(true);
 		expect(save("local://page.html", { agent: "sub" }).isError).toBe(true);
+	});
+});
+
+describe("end_session", () => {
+	test("ends the session on its first call", () => {
+		expect(exercise("end-session", { runs: [{}] }).runs[0]).toMatchObject({ isError: false, text: "When this turn ends, the dashboard ends this session and removes its worktree. Give your final reply now." });
 	});
 });

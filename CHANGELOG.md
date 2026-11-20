@@ -33,7 +33,7 @@ The dashboard shows the same lines in Settings › What's new.
 - Session sidebar: the Linear tab now lists only the ticket a session works on, the tickets it created or updated, and the ones your prompts link, not every ticket the agent read or mentioned.
 - Session sidebar: a pull request a subagent only reviewed or commented on no longer shows; one a subagent opened still does.
 - Memory: a project memory now opens in a panel beside the table, as a bookmark does, instead of a sheet over it.
-- Agents now get one reminder to save a project memory before they end a session that recorded none.
+- Agents now end a session on the first try when you ask; they save a project memory beforehand only when the session learned something worth keeping.
 - Pull requests: a pull request whose only failing check waits for a person to approve it, such as `human-review`, now shows under review instead of Fix CI.
 - A new Memory tab gathers your omp memory, each repository's project memory, and your bookmarks in one page.
 - You can read, add, edit, and delete the project memories your agents wrote, for every repository you work in.

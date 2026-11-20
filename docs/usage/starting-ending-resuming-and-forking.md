@@ -83,6 +83,7 @@
   On a private session, **Archive session** in the header and in the row's menu asks again in place, since ending deletes it; Cmd+W ends it without asking.
 - An agent ends its own session through the `end_session` tool, when you ask it to, for example "Merge on main, then end the session".
   It comes from `~/.omp/agent/extensions/end-session.ts`, which `bun run omp-template` installs.
+  The tool ends the session on its first call; its description tells the agent to record a project memory first only when the session settled a decision, found a fact the code does not show, or learned a lesson.
   The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **Archive session**, not as interrupted, its worktree removed the same way.
   The tool leaves its request as `<session id>.json` in `end-inbox/` beside `todos.json`; a message sent before the dashboard acts withdraws it, and a request waits while the dashboard is down.
 - **Resume** in a past session's header starts omp on that session's file from the dashboard, as `omp --resume <session id>` does in a terminal.

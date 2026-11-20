@@ -9,8 +9,6 @@ const text = (value: string, isError?: boolean) => ({ content: [{ type: "text" a
 
 export default function projectMemory(pi: ExtensionAPI) {
 	const z = pi.zod;
-	let wrote = false;
-	let nudged = false;
 	const params = z.object({
 		repo: z.string().optional().describe("A folder in another git repository, for a session that keeps several repositories' memory; omitted, the session's own."),
 		read: z.string().optional().describe("A memory's slug: returns its line, source, and body."),
@@ -62,7 +60,6 @@ export default function projectMemory(pi: ExtensionAPI) {
 				const domain = parseOps(ops);
 				const plan = domain.ok ? applyMemoryOps(commonDir, ctx.sessionManager.getSessionId(), domain.ops, new Date().toISOString().slice(0, 10)) : domain;
 				if (!plan.ok) return text(`Refused, nothing written: ${plan.reasons.join(" ")}`, true);
-				wrote = true;
 				return text(`${plan.summary}. ${Object.keys(plan.doc.memories).length} of ${MEMORY_LIMIT} memories.`);
 			} catch (error) {
 				return text(`Project memory failed: ${error instanceof Error ? error.message : String(error)}`, true);
@@ -82,16 +79,5 @@ export default function projectMemory(pi: ExtensionAPI) {
 		const news = newsFor(place, session, lastSeen(entries), now);
 		if (!news) return;
 		return { message: { customType: NOTE_TYPE, content: news.text, display: false, details: { seen: news.seen } } };
-	});
-
-	// The first end_session of a session that wrote no memory is turned back once, so what it learned is not lost with it.
-	pi.on("tool_call", (event, ctx) => {
-		if (event.toolName !== "end_session" || wrote || nudged || !placeOf(ctx.cwd)) return;
-		nudged = true;
-		return {
-			block: true,
-			reason:
-				"Before ending, record in project_memory any decision the user settled, fact the code does not show, or lesson a mistake taught in this session; update an existing memory rather than add a near-duplicate. Then call end_session again; with nothing worth keeping, call it again right away.",
-		};
 	});
 }
