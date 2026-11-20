@@ -13,6 +13,7 @@ import type { UserTodoList } from "../../src/user-todos-shared";
 import { linkedFile, remarkFilePaths } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
 import { useRead } from "../reads";
+import { parseBeforeAfter } from "../before-after";
 import { parseReviewPages } from "../review-pages";
 import { hashForPullRequests, hashForTodoId } from "../routing";
 import { UserTodosContext } from "./dashboard-context";
@@ -262,12 +263,17 @@ export function FencedCode({ language, text }: { language: string | null; text: 
 const codeBlock: Components["pre"] = ({ node }) => <FencedCode {...fenceOf(node)} />;
 
 /**
- * In a session's message, a `mermaid` or `chart` fence draws as a diagram or a chart, and a valid `review-pages` list
- * draws nothing, since the reply's **Review visuals** button opens it; any other is a code block.
+ * In a session's message, a `mermaid` or `chart` fence draws as a diagram or a chart, and a valid `review-pages` or
+ * `before-after` list draws nothing, since the **Review visuals** button and the **Review** tab open it; any other is a code block.
  */
+const HIDDEN_LISTS = new Map<string, (source: string) => unknown[] | null>([
+	["review-pages", parseReviewPages],
+	["before-after", parseBeforeAfter],
+]);
+
 const sessionCodeBlock: Components["pre"] = ({ node }) => {
 	const { language, text } = fenceOf(node);
-	if (language === "review-pages" && parseReviewPages(text)) return null;
+	if (language !== null && HIDDEN_LISTS.get(language)?.(text)) return null;
 	if (!isVisualLanguage(language)) return <FencedCode language={language} text={text} />;
 	return <SessionVisual language={language} source={text} code={<CodeLines text={text} language={language} />} />;
 };

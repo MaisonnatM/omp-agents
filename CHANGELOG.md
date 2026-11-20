@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-20
 
+- Session sidebar: a new Review tab compares each screen change the agent lists, its before and after screenshots split by a line you drag; pin spots on it, edit its description, and add a tweak or a revert request to the composer.
 - Pull requests: each Your move heading now ends with buttons such as Reply 3, Fix CI 2, and Rebase 1, which hand that fix to an agent on every pull request waiting on it, after you click again to confirm.
 - Behind the scenes: when a new omp release needs a newer Claude Code, the omp release check now updates Claude Code itself and bumps the tested omp version, instead of stopping.
 - Behind the scenes: tested with omp 19.0.1.
