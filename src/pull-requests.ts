@@ -32,25 +32,27 @@ const REVIEW_FIELDS = `author { login ${AVATAR} }
 	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }
 	viewerLatestReview { state }`;
 
-const PR_FIELDS = `... on PullRequest {
-	number title isDraft state reviewDecision mergeable viewerCanUpdateBranch headRefName baseRefName createdAt updatedAt mergedAt additions deletions
+/** A row's fields; a merged pull request's skip its checks list, mergeability, and thread ids, which cost most of the search's time and a merged row does not use. */
+const prFields = (merged: boolean): string => `... on PullRequest {
+	number title isDraft state reviewDecision ${merged ? "" : "mergeable"} viewerCanUpdateBranch headRefName baseRefName createdAt updatedAt mergedAt additions deletions
 	labels(first: 20) { nodes { name } }
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
-	commits(last: 1) { nodes { commit { statusCheckRollup { state ${CONTEXTS(30)} } } } }
+	commits(last: 1) { nodes { commit { statusCheckRollup { state ${merged ? "" : CONTEXTS(30)} } } } }
 	comments { totalCount }
-	reviewThreads(first: ${THREADS}) { totalCount nodes { id isResolved } }
-}`;
-
-const QUERY = `query($authored: String!, $reviewing: String!, $merged: String!) {
-	authored: search(type: ISSUE, query: $authored, first: 50) { nodes { ${PR_FIELDS} } }
-	reviewing: search(type: ISSUE, query: $reviewing, first: 50) { nodes { ${PR_FIELDS} } }
-	merged: search(type: ISSUE, query: $merged, first: 20) { nodes { ${PR_FIELDS} } }
+	reviewThreads(first: ${merged ? 0 : THREADS}) { totalCount ${merged ? "" : "nodes { id isResolved }"} }
 }`;
 
 /**
+ * One of the list's searches. GitHub runs the searches inside one query one after another, so each is its own call, and
+ * the three run in parallel: the list takes as long as the slowest rather than their sum.
+ */
+const searchQuery = (alias: string, first: number, merged = false): string =>
+	`query($q: String!) { ${alias}: search(type: ISSUE, query: $q, first: ${first}) { nodes { ${prFields(merged)} } } }`;
+
+/**
  * The author of each listed thread's first comment. GitHub bills a connection inside the search's for every node the
- * search may return: reading each thread's first comment in `QUERY` cost 125 points a call, against 5 without it, so the
+ * search may return: reading each thread's first comment in a search cost 125 points a call, against 5 without it, so the
  * list reads a thread's starter once, here, a point for each 100 threads.
  */
 const startersQuery = (ids: readonly string[]): string =>
@@ -59,7 +61,7 @@ const startersQuery = (ids: readonly string[]): string =>
 /** The most thread ids one {@link startersQuery} asks for, GitHub's limit for `nodes`. */
 const STARTERS_PAGE = 100;
 
-/** Each search's alias in `QUERY`, with the viewer's role in what it finds. */
+/** Each search's alias in {@link searchQuery}, with the viewer's role in what it finds. */
 const SEARCHES: [alias: string, role: PullRequestRole][] = [
 	["authored", "author"],
 	["reviewing", "reviewer"],
@@ -102,7 +104,7 @@ function parseUnresolved(threads: unknown, botStarted: ReadonlyMap<string, boole
 	return { count: open.length, exact: total <= nodes.length, bots };
 }
 
-/** The ids of the unresolved threads in `gh api graphql`'s answer to `QUERY`, each once. */
+/** The ids of the unresolved threads in the searches' merged answer, each once. */
 export function openThreadIds(answer: unknown): string[] {
 	const data = dataOf(answer);
 	const ids = SEARCHES.flatMap(([alias]) =>
@@ -191,7 +193,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 	};
 }
 
-/** The pull requests in `gh api graphql`'s answer to `QUERY`, each once, in search order; `botStarted` says which threads a bot started, by id. */
+/** The pull requests in the searches' merged answer, each once, in search order; `botStarted` says which threads a bot started, by id. */
 export function parseListAnswer(answer: unknown, repo: Repo, botStarted: ReadonlyMap<string, boolean>): PullRequestSummary[] {
 	const data = dataOf(answer);
 	const found = new Map<number, PullRequestSummary>();
@@ -223,11 +225,12 @@ async function readThreadStarters(repo: Repo, ids: readonly string[]): Promise<R
 async function queryRepo(repo: Repo): Promise<PullRequestSummary[]> {
 	const scope = `repo:${repo.owner}/${repo.repo} is:pr`;
 	const since = new Date(Date.now() - MERGED_DAYS * 86_400_000).toISOString().slice(0, 10);
-	const answer = await ghPolledGraphql(QUERY, {
-		authored: `${scope} is:open author:@me sort:updated-desc`,
-		reviewing: `${scope} is:open review-requested:@me sort:updated-desc`,
-		merged: `${scope} is:merged author:@me merged:>=${since} sort:updated-desc`,
-	});
+	const answers = await Promise.all([
+		ghPolledGraphql(searchQuery("authored", 50), { q: `${scope} is:open author:@me sort:updated-desc` }),
+		ghPolledGraphql(searchQuery("reviewing", 50), { q: `${scope} is:open review-requested:@me sort:updated-desc` }),
+		ghPolledGraphql(searchQuery("merged", 20, true), { q: `${scope} is:merged author:@me merged:>=${since} sort:updated-desc` }),
+	]);
+	const answer = { data: Object.assign({}, ...answers.map(dataOf)) };
 	return parseListAnswer(answer, repo, await readThreadStarters(repo, openThreadIds(answer)));
 }
 
