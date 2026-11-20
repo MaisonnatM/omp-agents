@@ -495,10 +495,11 @@ export async function branchPullRequest(repo: Repo, branch: string): Promise<Pul
 
 /**
  * The pull request list for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
+ * A repository in `skip`, by `repoKey`, which the page hides, keeps its entry with no pull requests and asks GitHub nothing.
  * A workspace removed since a session ran there is left out, as a quick action starts its session in a repository's first workspace.
  * While GitHub's quota is low, or spent, it throws {@link GithubQuotaPaused} or `GitHubQuotaError` rather than answer a repository with no list, so the page keeps the list it has.
  */
-export async function loadPullRequests(cwds: string[], fresh: boolean): Promise<PullRequestList> {
+export async function loadPullRequests(cwds: string[], fresh: boolean, skip: ReadonlySet<string> = new Set()): Promise<PullRequestList> {
 	const byRepo = new Map<string, Repo & { cwds: string[] }>();
 	const unmatched: string[] = [];
 	const present = await Promise.all(cwds.map(async cwd => ((await directoryOf(cwd)) === null ? null : cwd)));
@@ -516,6 +517,7 @@ export async function loadPullRequests(cwds: string[], fresh: boolean): Promise<
 	const repos = await Promise.all(
 		[...byRepo.values()].map(async (entry): Promise<RepoPullRequests> => {
 			try {
+				if (skip.has(repoKey(entry))) return { ...entry, pullRequests: [] };
 				const pullRequests = await loaded.get(repoKey(entry), () => queryRepo(entry), fresh);
 				return { ...entry, pullRequests };
 			} catch (err) {

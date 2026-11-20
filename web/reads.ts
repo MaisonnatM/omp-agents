@@ -17,6 +17,7 @@ import { errorText } from "../src/json";
 import { getJson, putJson } from "./api";
 import { createPolledStore } from "./polled-store";
 import { withPullRequestReviewers, withPullRequestState } from "./pull-requests-model";
+import { hiddenRepoKeys } from "./pull-requests-state";
 
 export interface ReadState<T> {
 	data: T | null;
@@ -91,6 +92,7 @@ export const pullRequestsStore = createPolledStore<PullRequestList>({
 	url: (scope, fresh) => {
 		const params = new URLSearchParams(scope ?? "");
 		if (fresh) params.set("fresh", "");
+		for (const key of hiddenRepoKeys()) params.append("skip", key);
 		return `/api/pull-requests${params.size ? `?${params}` : ""}`;
 	},
 	cache: { key: "omp-agents.inbox-cache", decode: decodePullRequestList },

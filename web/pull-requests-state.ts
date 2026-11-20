@@ -1,4 +1,5 @@
 /** What the browser keeps of the Pull requests page: its folds, its order, the repositories you hid, its filter and display, and where a pull request's details show. */
+import { parseStrings } from "../src/json";
 import { type Folds, useFolds } from "./components/fold";
 import { decodeDisplay, decodeFilter, encodeDisplay, encodeFilter } from "./pull-requests-filter";
 import { decodeOrder, foldedByDefault } from "./pull-requests-model";
@@ -21,6 +22,9 @@ export const usePullRequestsOrder = () => useStoredState(ORDER_KEY, decodeOrder,
 
 /** The repositories you hid from the Pull requests page and its tab's count, by `repoKey`, kept apart from their order. */
 export const useHiddenRepos = () => useStoredKeys(HIDDEN_KEY);
+
+/** The hidden repositories as they are stored now, which the list's reads skip on the server. */
+export const hiddenRepoKeys = (): string[] => parseStrings(localStorage.getItem(HIDDEN_KEY));
 
 /** What the list keeps: a tab's sections, or what you picked under **Filter**. */
 export const usePullRequestsFilter = () => useStoredState(FILTER_KEY, decodeFilter, encodeFilter);
