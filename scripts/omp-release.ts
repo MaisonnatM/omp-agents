@@ -57,7 +57,7 @@ function loadedFiles(): string[] {
 	const bases: Record<string, string> = { srcDir: "pi-coding-agent/src", utilsSrc: "pi-utils/src", statsSrc: "omp-stats/src", "dirname(packageDir)": "" };
 	const files = [...source.matchAll(/join\((srcDir|utilsSrc|statsSrc|dirname\(packageDir\)),((?:\s*"[^"]+",?)+)\s*\)/g)]
 		.map(([, base, parts]) => [bases[base!], ...[...parts!.matchAll(/"([^"]+)"/g)].map(([, part]) => part)].filter(Boolean).join("/"))
-		.filter(file => file.endsWith(".ts"));
+		.filter(file => /\.(?:ts|js)$/.test(file));
 	const loads = source.match(/await load</g)?.length ?? 0;
 	if (files.length !== loads) throw new Error(`src/omp/modules.ts makes ${loads} loads but ${files.length} read as join(<base>, "...") paths; update loadedFiles()`);
 	return files;
