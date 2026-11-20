@@ -8,6 +8,10 @@ import { isObject, type Parsed } from "../json";
 export const MAX_MERMAID_SOURCE = 20_000;
 export const MAX_CHART_SERIES = 5;
 export const MAX_CHART_ROWS = 500;
+/** The most pages one `review-pages` list opens, each a Browser tab kept loaded in memory. */
+export const MAX_REVIEW_PAGES = 8;
+/** The most changes one `before-after` list holds. */
+export const MAX_BEFORE_AFTER = 8;
 
 type Checked<T> = Parsed<T, { error: string }>;
 

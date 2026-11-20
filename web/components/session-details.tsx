@@ -1,4 +1,4 @@
-/** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, its artifacts once it has any, and a Linear issue. */
+/** The right sidebar for a session: its overview, the subagent picked there, its pull requests, its running app in the desktop app, its artifacts once it has any, the screen changes to review once a reply lists any, and a Linear issue. */
 import { IconAiBotHead, IconBranch, IconBulletList, IconEyeOpen, IconLinear, IconPlusSmall, IconPullRequest, IconSparklesTwo, IconWindowApp } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
@@ -9,7 +9,7 @@ import { activityControl } from "../activity";
 import { isPhonePage } from "../api";
 import type { Artifact } from "../artifacts-model";
 import { addDetailsTab, newIdsByScope, revealDetailsTab } from "../details-tabs";
-import { latestBeforeAfter, type BeforeAfter, sameChanges } from "../before-after";
+import { type BeforeAfter, changeKey, latestBeforeAfter, sameChanges } from "../before-after";
 import { type PaneData, useArtifacts, useLinkedIssues, usePaneSelect, useShowConversation } from "../pane-store";
 import type { ModelList } from "../reads";
 import { requestNewTerminal } from "../terminal-requests";
@@ -29,7 +29,7 @@ import { SessionLinearTab } from "./session-linear-tab";
 /** The right sidebar's open tabs, kept across views; the key keeps its old name, and a single tab name stored before tabs could close opens that tab. */
 export const TAB_KEY = "omp-agents.plan-tab";
 
-/** What a session worked on, runs, saved, and linked, which its **PRs**, **Browser**, **Artifacts**, and **Linear** tabs show. */
+/** What a session worked on, runs, saved, and linked, which its **PRs**, **Browser**, **Artifacts**, **Review**, and **Linear** tabs show. */
 export interface SessionWork {
 	/** The session the tabs show; a change starts the PRs and Browser tabs afresh. */
 	scope: string;
@@ -114,7 +114,7 @@ export function sessionWorkTabs({ scope, working, pullRequests, hosts, live, vie
 						control: "session-details.tab.review",
 						count: changes.length,
 						scrollsItself: true,
-						content: <ReviewPanel key={scope} scope={scope} changes={changes} live={live} />,
+						content: <ReviewPanel scope={scope} changes={changes} live={live} />,
 					} as const,
 				]
 			: []),
@@ -219,29 +219,22 @@ const SUBAGENT_TAB = "subagent";
 /** The Linear issues each session linked while the page is open, kept across its views, which mount the sidebar afresh, and its transcript's reloads. */
 const linkedBefore = newIdsByScope();
 
-/**
- * Adds the **Linear** tab behind the tab on screen once the session `scope` links an issue it had not linked before, as when
- * its conversation first loads or a reply links a new one; a closed tab stays closed until the session links another.
- */
-function useOpenLinearOnLink(scope: string, linked: readonly string[]): void {
-	useEffect(() => {
-		if (linkedBefore(scope, linked)) addDetailsTab(TAB_KEY, "linear");
-	}, [scope, linked]);
-}
-
-/** The screen changes each session listed while the page is open, by screenshot pair, kept as {@link linkedBefore} is. */
+/** The screen changes each session listed while the page is open, by {@link changeKey}, kept as {@link linkedBefore} is. */
 const listedBefore = newIdsByScope();
 
-/** Adds the **Review** tab behind the tab on screen once a reply of `scope` lists a change it had not listed before. */
-function useOpenReviewOnList(scope: string, changes: readonly BeforeAfter[]): void {
+/**
+ * Adds tab `tab` behind the tab on screen once the session `scope` names an id `seen` had not seen for it, as when its
+ * conversation first loads or a reply links a new issue or lists a new change; a closed tab stays closed until another.
+ */
+function useOpenTabOnNew(seen: ReturnType<typeof newIdsByScope>, scope: string, ids: readonly string[], tab: string): void {
 	useEffect(() => {
-		if (listedBefore(scope, changes.map(change => `${change.before}\n${change.after}`))) addDetailsTab(TAB_KEY, "review");
-	}, [scope, changes]);
+		if (seen(scope, ids)) addDetailsTab(TAB_KEY, tab);
+	}, [seen, scope, ids, tab]);
 }
 
 const changesOf = (pane: PaneData): BeforeAfter[] => latestBeforeAfter(pane.items);
 
-/** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, its artifacts when it has any, and its Linear issue. */
+/** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, its artifacts when it has any, the screen changes to review, and its Linear issue. */
 export function SessionDetails({ view, sessionId, working, cwd, hosts, host, lastHost, row, models, workspaces }: SessionDetailsProps) {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(each => each.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const artifacts = useArtifacts(view);
@@ -251,9 +244,10 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 	const savedIssues = row?.issues;
 	// The issue a /ship run works on, those the session saved through Linear, then those the user's prompts link.
 	const linearIssues = useMemo(() => [...new Set([...(shipIssue ? [shipIssue] : []), ...(savedIssues ?? []), ...promptIssues])], [shipIssue, savedIssues, promptIssues]);
-	useOpenLinearOnLink(scope, linearIssues);
+	useOpenTabOnNew(linkedBefore, scope, linearIssues, "linear");
 	const changes = usePaneSelect(view, changesOf, sameChanges);
-	useOpenReviewOnList(scope, changes);
+	const changeKeys = useMemo(() => changes.map(changeKey), [changes]);
+	useOpenTabOnNew(listedBefore, scope, changeKeys, "review");
 	const opened = useSubagentLinks(view, host);
 	// A plain click on a subagent shows it in the **Subagent** tab; a split or a new window still opens it as a pane.
 	const links = useMemo<SubagentLinksValue | null>(

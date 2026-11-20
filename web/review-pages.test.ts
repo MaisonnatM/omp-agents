@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared/transcript";
-import { latestReviewPages, MAX_REVIEW_PAGES, parseReviewPages, samePages } from "./review-pages";
+import { MAX_REVIEW_PAGES } from "../src/shared/session-visuals";
+import { latestReviewPages, parseReviewPages, samePages } from "./review-pages";
 
 const reply = (id: string, text: string, streaming = false): Item => ({ id, kind: "assistant", text, streaming, suggestions: [] });
 const fence = (pages: unknown): string => `Done.\n\n\`\`\`review-pages\n${JSON.stringify(pages)}\n\`\`\``;
