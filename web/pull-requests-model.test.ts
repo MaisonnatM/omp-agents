@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { type LinkedPullRequest, type PullRequestSummary, type PullRequestComment, type PullRequestDetail, type PullRequestThread, type RepoPullRequests, type Reviewer, type StackedPullRequest, repoKey } from "../src/shared/github";
-import { type AgentOn, actionFacts, agentOn, moveOf } from "../src/shared/moves";
+import { type AgentOn, actionFacts, agentOn, type MoveId, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
 import type { ReviewDraft } from "../src/shared/review-drafts";
 import {
+	bulkMoves,
 	commentCount,
 	DEFAULT_ORDER,
 	decodeOrder,
@@ -151,6 +152,21 @@ describe("next move", () => {
 			moveAction(pr(4, { conflicts: true, state: "merged" }), "rebase"),
 			moveAction(pr(5, { review: "approved" }), "merge"),
 		]).toEqual(["fix-ci-and-conflicts", "resolve-conflicts", "fix-ci", null, null]);
+	});
+
+	test("a Your move table's bulk moves list each fix with the rows waiting on it, leaving out reviews and rows whose session is starting", () => {
+		const row = (pull: PullRequestSummary, move: MoveId, pending: string | null = null) => ({ row: { pr: pull, move, stack: null, unit: String(pull.number) }, pending });
+		const rows = [
+			row(pr(1, { unresolved: { count: 1, exact: true, bots: 0 } }), "reply"),
+			row(pr(2, { conflicts: true }), "rebase"),
+			row(pr(3, { unresolved: { count: 2, exact: true, bots: 2 } }), "reply"),
+			row(pr(4, { unresolved: { count: 1, exact: true, bots: 0 } }), "reply", "address-comments"),
+			row(pr(5, { role: "reviewer", author: { login: "them", avatarUrl: null } }), "review"),
+		];
+		expect(bulkMoves(rows).map(({ move, items }) => [move, items.map(({ row, action }) => [row.row.pr.number, action])])).toEqual([
+			["reply", [[1, "address-comments"], [3, "address-comments"]]],
+			["rebase", [[2, "resolve-conflicts"]]],
+		]);
 	});
 });
 
