@@ -1,6 +1,6 @@
 // The `user_todo` tool: lets an agent read the omp-agents dashboard's Todo list, add a todo for a step outside the
-// session that only the user can take, check one off, edit one's title, notes, due day, section, or Workspace, and
-// delete one. A todo added here starts its sessions in this session's Workspace unless the agent names another.
+// session that only the user can take, check one off, edit one's title, notes, due day, section, or Workspace, delete
+// one, and add a section. A todo added here starts its sessions in this session's Workspace unless the agent names another.
 // A session is told at each prompt which open todo links to it and which open todos it added, so it checks them off
 // once done and does not add them twice.
 // Changes go to the dashboard's todo inbox, one file each, which the dashboard server applies and deletes, so it
@@ -11,7 +11,7 @@ import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { CONFIG_DIR, inbox, readJson, reply } from "./inbox/client";
-import { type Section, sectionFor } from "./todos/sections";
+import { findSection, type Section, sectionFor } from "./todos/sections";
 
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
 const INBOX_DIR = join(CONFIG_DIR, "todo-inbox");
@@ -43,7 +43,8 @@ type Change =
 	| { op: "set-due"; id: string; due: string | null }
 	| { op: "categorize"; id: string; categoryId: string | null }
 	| { op: "set-workspace"; id: string; workspace: string | null }
-	| { op: "remove"; id: string };
+	| { op: "remove"; id: string }
+	| { op: "add-category"; id: string; name: string };
 
 const isDone = (todo: Leaf): boolean => (todo.doneAt ?? null) !== null;
 
@@ -56,6 +57,12 @@ function todosOf(list: List, sessionId: string): { linked: Todo | undefined; add
 
 function readList(): List {
 	return (readJson(TODOS_FILE) as List | null) ?? {};
+}
+
+/** The list's sections, then the ones `waiting` adds, so a todo can be filed in a section added just before. */
+function sectionsOf(list: List, waiting: Change[]): Section[] {
+	const added = waiting.flatMap(change => (change.op === "add-category" ? [{ id: change.id, name: change.name }] : []));
+	return [...(list.categories ?? []), ...added];
 }
 
 /** How a todo names itself to an agent: its id, then its Workspace's folder, section, and due day when it has them. */
@@ -109,8 +116,8 @@ export default function todos(pi: ExtensionAPI) {
 	const z = pi.zod;
 	const params = z.object({
 		action: z
-			.enum(["list", "add", "check", "edit", "delete"])
-			.describe("list the todos left, add one, check one off, edit one, or delete one"),
+			.enum(["list", "add", "check", "edit", "delete", "add-section"])
+			.describe("list the todos left, add one, check one off, edit one, delete one, or add the section that `section` names"),
 		text: z.string().max(2000).optional().describe("add, edit: the todo's title, one line, an action the user takes"),
 		notes: z.string().max(100_000).optional().describe("add, edit: markdown notes, such as the PR or command it needs; edit replaces them"),
 		due: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).optional().describe("add, edit: the day it is due, YYYY-MM-DD; edit: empty clears it"),
@@ -118,7 +125,7 @@ export default function todos(pi: ExtensionAPI) {
 			.string()
 			.max(200)
 			.optional()
-			.describe("add, edit: the name of an existing Todo page section to file it in; omit for none; add: an unknown one files it in none; edit: empty moves it out of its section"),
+			.describe("add, edit: the name of an existing Todo page section to file it in; omit for none; add: an unknown one files it in none; edit: empty moves it out of its section; add-section: the new section's name"),
 		workspace: z
 			.string()
 			.max(4096)
@@ -137,7 +144,7 @@ export default function todos(pi: ExtensionAPI) {
 			"Never add your own work items; use your todo tool for those.",
 			"When you finish the work a todo asks for, or the user has done the step it names, check it off.",
 			"Edit or delete a todo only when the user asks, or to fix or drop one this session added; prefer check over delete for a step that was done.",
-			"Sections must already exist; you cannot create, rename, or remove one. An add naming a section that does not exist files the todo in no section.",
+			"Add a section with add-section only when the user asks for one; no tool renames or removes one. An add naming a section that does not exist files the todo in no section.",
 			"A todo starts its sessions in its Workspace, a directory; add files it in this session's unless you name another or none, and a todo under another shares its parent's.",
 		].join(" "),
 		parameters: params,
@@ -146,7 +153,7 @@ export default function todos(pi: ExtensionAPI) {
 			if (!parsed.success) return reply("Invalid user_todo input.", true);
 			const { action, text, notes, due, section, workspace, id } = parsed.data;
 			const title = text?.replace(/\s+/g, " ").trim();
-			const sectionName = section?.trim();
+			const sectionName = section?.replace(/\s+/g, " ").trim();
 			switch (action) {
 				case "list":
 					return reply(listText(readList()));
@@ -155,7 +162,7 @@ export default function todos(pi: ExtensionAPI) {
 					const named = workspaceNamed(workspace ?? ctx.cwd, ctx.cwd);
 					if ("error" in named) return reply(named.error, true);
 					const list = readList();
-					const { categoryId, missing } = sectionFor(list.categories, sectionName);
+					const { categoryId, missing } = sectionFor(sectionsOf(list, INBOX.waiting()), sectionName);
 					const sessionId = ctx.sessionManager.getSessionId();
 					const same = todosOf(list, sessionId).added.find(todo => todo.text === title);
 					if (same) return reply(`This session already added it (id ${same.id}).`);
@@ -190,7 +197,7 @@ export default function todos(pi: ExtensionAPI) {
 					let categoryId: string | null | undefined;
 					if (section !== undefined) {
 						if (!found.topLevel) return reply("Only a top-level todo has a section.", true);
-						const resolved = sectionFor(list.categories, sectionName);
+						const resolved = sectionFor(sectionsOf(list, INBOX.waiting()), sectionName);
 						if (resolved.missing) return reply(resolved.missing, true);
 						categoryId = resolved.categoryId;
 					}
@@ -214,6 +221,12 @@ export default function todos(pi: ExtensionAPI) {
 					if (!found) return reply(`No todo with id ${id} in the list.`, true);
 					INBOX.leave({ op: "remove", id });
 					return reply(`Deleted todo ${id}: ${found.todo.text}`);
+				}
+				case "add-section": {
+					if (!sectionName) return reply("add-section needs the section's name.", true);
+					if (findSection(sectionsOf(readList(), INBOX.waiting()), sectionName)) return reply(`The section ${JSON.stringify(sectionName)} already exists.`);
+					INBOX.leave({ op: "add-category", id: randomUUID(), name: sectionName });
+					return reply(`Added the section ${JSON.stringify(sectionName)}; todos can be filed in it now.`);
 				}
 			}
 		},

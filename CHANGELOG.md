@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-20
 
+- Todo: when you ask an agent to file todos under a category that does not exist yet, it can now add that category itself; it still cannot rename or remove one.
 - Session sidebar: a new Review tab compares each screen change the agent lists, its before and after screenshots split by a line you drag; pin spots on it, edit its description, and add a tweak or a revert request to the composer.
 - Pull requests: the list refreshes about twice as fast in a busy repository, and a slow refresh no longer fails and leaves the list a minute out of date.
 - Pull requests: a repository you hide under Display, then Repositories, is no longer read from GitHub, so the rest of the list refreshes sooner.

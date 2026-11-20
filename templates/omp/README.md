@@ -145,7 +145,7 @@ Files, in `agent/`:
   Reads, files outside git, and the clones omp makes for `isolated: true` subagents pass, and a change in a directory that a variable names is blocked until the command writes the directory out.
   If a session's process dies and you know its work is done, delete the claim file it names; the guard also replaces a claim whose process has ended.
   It reads HEAD and `origin/HEAD` from their files in the git dir and keeps each directory's checkout for a minute, so an edit or write in a checkout another session does not hold starts no `git`.
-- `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add, check, edit, and delete changes; `add` and `edit` take the name of an existing section, and an `add` naming one that does not exist files the todo in none.
+- `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add, check, edit, delete, and add-section changes; `add` and `edit` take the name of an existing section, including one added but not yet applied, and an `add` naming one that does not exist files the todo in none.
   On `add`, an omitted or empty `due` value means no due date, and on `edit` an empty one clears it; a nonempty value must use `YYYY-MM-DD`.
 - `extensions/inbox/client.ts`: what `todos.ts` uses to read its inbox and leave a change there, one file each, for the dashboard to apply; the dashboard's own extensions import it too.
 - `skills/design-workflow/SKILL.md`: the steps `AGENTS.md` sends every UI change through: references before the first edit, five structurally different variants for a structural ask, a screenshot check every round, and the `design-critic` agent once the user approves the direction.
