@@ -19,14 +19,18 @@ import { parseArgs } from "node:util";
 import { git, sh } from "./replay";
 
 export interface EvalTask {
-	/** The landed branch's name, unique in the set. */
+	/** Unique in the set: the landed branch's name, or `pr-<number>` for a merged pull request. */
 	id: string;
+	/** The repository the task comes from, when it is not the one `run.ts` sits in, such as yampa's checkout. */
+	repo?: string;
 	base: string;
 	landed: string;
 	landedAt: string;
 	prompt: string;
 	/** Test files, relative to the repository, that the runner writes from `landed` after the run. */
 	hiddenTests: string[];
+	/** The test ids the hidden tests hold, such as pytest node ids, for reading a run's failures against. */
+	testIds?: string[];
 	/** The command that must exit 0 once the hidden tests are in place. */
 	check: string;
 }
