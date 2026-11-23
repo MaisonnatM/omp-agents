@@ -45,7 +45,7 @@ export function Composer({ members, tokenize, channel, picker, prompts, onPost, 
 	});
 
 	return (
-		<div className="shrink-0 pt-2 pb-[max(1.25rem,var(--toasts-clearance,0px))] transition-[padding] duration-200 max-phone:pb-5">
+		<div className="shrink-0 pt-2 pb-3">
 			<div className="relative mx-auto max-w-3xl px-6">
 				{completion.popup}
 				<InputMessage
