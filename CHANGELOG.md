@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-23
+
+- Projects: when an agent in no project changes a project without naming it, the error now lists the open projects with their ids, so it can retry in one step instead of listing them first.
+
 ## 2026-11-20
 
 - Projects: a plan step can now hold sub-steps, one level deep, and agents see and tick them by number, such as 2.1.

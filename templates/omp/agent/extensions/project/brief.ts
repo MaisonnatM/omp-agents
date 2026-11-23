@@ -139,6 +139,13 @@ export const withWaiting = (projects: readonly Project[], waiting: readonly Proj
 export const projectOfSession = (projects: readonly Project[], sessionId: string): Project | null =>
 	projects.find(project => project.archivedAt === undefined && project.sessionIds.includes(sessionId)) ?? null;
 
+/** Why a change naming no project fails in a session in none: lists the open projects, so the agent can retry with one. */
+export function noProjectError(projects: readonly Project[]): string {
+	const open = projects.filter(project => project.archivedAt === undefined);
+	if (open.length === 0) return "This session is in no open project, and no project is open; create one, or name an archived one with projectId, from project_list.";
+	return `This session is in no open project; name one with projectId: ${open.map(project => `${project.name} (id ${project.id})`).join(", ")}.`;
+}
+
 /** The project `named` names, archived ones included: by id, else by its name, ignoring case; an error when none or several match. */
 export function findProject(projects: readonly Project[], named: string): { project: Project } | { error: string } {
 	const wanted = named.trim();
