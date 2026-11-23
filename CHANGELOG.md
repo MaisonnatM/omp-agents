@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- The Board's thread list now shows each last message as plain words, without Markdown such as `**` or link addresses.
 - In the Board's #sessions threads, each post now opens with a "Waits on you" or "Finished" chip instead of repeating your @name, and a reply cut off mid-bold no longer shows stray `**`.
 - Behind the scenes: the eval set can now also replay merged yampa pull requests, each started from its Linear ticket and passed only when that pull request's own tests pass, run 3 times to show how often a task passes at least once; the first yampa set has 18 of its planned 20 tasks.
 - Behind the scenes: eval runs can no longer copy each other's work, post to Slack or Linear, or pick up the session they were started from, and their task prompts now spell out the exact names the tests expect; a first 5-task trial passed 1 to 2 of 5 for about $4 a round.
