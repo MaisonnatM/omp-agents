@@ -1,23 +1,11 @@
 /** The Board: channels and threads where people, omp sessions, and remote agents post, with an inbox per member; a message for a session wakes it. */
-import {
-	IconArrowUp,
-	IconBell,
-	IconBubble2,
-	IconCalendar1,
-	IconCheckmark1,
-	IconClock,
-	IconPullRequest as IconGitPullRequest,
-	IconHashtag,
-	IconLock,
-	IconMagnifyingGlass,
-	IconShieldCheck,
-} from "central-icons";
+import { IconArrowUp, IconCalendar1, IconCheckmark1, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconShieldCheck } from "central-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { type Attachment, type BoardChange, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
-import { BotAvatar } from "../bots/bot-avatar";
 import type { CoreData } from "../module-views";
-import type { BoardRoute } from "./module";
+import { type BoardRoute, type BoardView, resolveBoardView } from "./module";
+import { Avatar, MIN, PRESENCE_COLOR, relTime, UNITS, useNow } from "./parts";
 
 const COMMANDS = [
 	{ name: "review", about: "Run the review panel on this thread and post the verdict here" },
@@ -34,37 +22,14 @@ const WORKFLOW_STEPS: Record<string, string[]> = {
 	implement: ["Claim task", "Implement", "Open PR", "Report back"],
 };
 
-const MIN = 60_000;
-const UNITS: Record<string, number> = { m: MIN, h: 60 * MIN, d: 24 * 60 * MIN };
-
-function relTime(at: number, now: number): string {
-	const delta = at - now;
-	const abs = Math.abs(delta);
-	if (abs < MIN) return "now";
-	const unit = abs < UNITS.h! ? `${Math.round(abs / MIN)}m` : abs < UNITS.d! ? `${Math.round(abs / UNITS.h!)}h` : `${Math.round(abs / UNITS.d!)}d`;
-	return delta > 0 ? `in ${unit}` : unit;
-}
-
 const lastIn = (state: BoardState, threadId: string): Message | undefined => state.messages.findLast(msg => msg.thread === threadId);
 
-function useNow(ms = 15_000) {
-	const [now, setNow] = useState(Date.now);
-	useEffect(() => {
-		const id = setInterval(() => setNow(Date.now()), ms);
-		return () => clearInterval(id);
-	}, [ms]);
-	return now;
-}
-
-type View = { kind: "inbox" } | { kind: "scheduled" } | { kind: "channel"; id: string } | { kind: "member"; id: string };
-
-export function BoardPage({ core, state, onChange }: { route: BoardRoute; core: CoreData; state: BoardState | null; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+export function BoardPage({ route, core, state, onChange }: { route: BoardRoute; core: CoreData; state: BoardState | null; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	if (!state) return <div className="grid h-full place-items-center text-sm text-muted-foreground">Loading the board…</div>;
-	return <Board core={core} state={state} onChange={change => void onChange(change)} />;
+	return <Board view={route.view} core={core} state={state} onChange={change => void onChange(change)} />;
 }
 
-function Board({ core, state, onChange }: { core: CoreData; state: BoardState; onChange: (change: BoardChange) => void }) {
-	const [view, setView] = useState<View>({ kind: "inbox" });
+function Board({ view: asked, core, state, onChange }: { view: BoardView; core: CoreData; state: BoardState; onChange: (change: BoardChange) => void }) {
 	const [open, setOpen] = useState<string | null>(null);
 	/** Inbox items you read this visit, which stay listed until you leave the page, as a mail inbox keeps a message you just opened. */
 	const [lingering, setLingering] = useState<Message[]>([]);
@@ -72,6 +37,7 @@ function Board({ core, state, onChange }: { core: CoreData; state: BoardState; o
 
 	const members = useMemo(() => boardMembers(state, core.hosts), [state, core.hosts]);
 	const byId = useMemo(() => new Map(members.map(member => [member.id, member])), [members]);
+	const view = resolveBoardView(state, byId, asked);
 	const me = byId.get(state.me)!;
 	const myQueue = queueOf(state, me);
 
@@ -125,10 +91,8 @@ function Board({ core, state, onChange }: { core: CoreData; state: BoardState; o
 	const thread = state.threads.find(item => item.id === open) ?? null;
 	const inboxItems = [...lingering.filter(kept => !myQueue.some(msg => msg.id === kept.id)), ...myQueue].toSorted((a, b) => b.at - a.at);
 	const working = thread ? members.find(member => member.sessionId && member.presence === "working" && state.messages.some(msg => msg.thread === thread.id && msg.author === member.id)) : undefined;
-
 	return (
-		<div className="grid h-full min-h-0 grid-cols-[15rem_minmax(20rem,26rem)_minmax(0,1fr)] max-phone:grid-cols-1">
-			<Rail state={state} members={members} view={view} onView={setView} me={me} now={now} inboxCount={myQueue.length} />
+		<div className="grid h-full min-h-0 grid-cols-[minmax(20rem,26rem)_minmax(0,1fr)] max-phone:grid-cols-1">
 			<ListColumn state={state} members={members} byId={byId} view={view} open={open} onOpen={setOpen} now={now} queue={inboxItems} />
 			{thread ? (
 				<ThreadView
@@ -151,149 +115,9 @@ function Board({ core, state, onChange }: { core: CoreData; state: BoardState; o
 	);
 }
 
-
-/* ───────────────────────────── Rail ───────────────────────────── */
-
-function Rail({ state, members, view, onView, me, now, inboxCount }: { state: BoardState; members: Member[]; view: View; onView: (view: View) => void; me: Member; now: number; inboxCount: number }) {
-	const sel = (other: View) => view.kind === other.kind && ("id" in view ? "id" in other && view.id === other.id : true);
-	const humans = members.filter(member => member.kind === "human");
-	const agents = members.filter(member => member.kind !== "human");
-	return (
-		<nav aria-label="Board" className="flex min-h-0 flex-col border-r border-border bg-sidebar/40 max-phone:hidden">
-			<div className="flex h-(--page-header-height) shrink-0 items-center gap-2.5 border-b border-border px-4">
-				<span className="grid size-6 place-items-center rounded-md bg-foreground text-background">
-					<IconBubble2 className="size-3.5" />
-				</span>
-				<div className="min-w-0">
-					<p className="text-sm font-semibold leading-tight">Board</p>
-					<p className="truncate text-2xs text-muted-foreground">
-						{members.filter(member => member.presence === "working").length} working · {members.length} members
-					</p>
-				</div>
-			</div>
-			<div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
-				<RailRow icon={<IconBell className="size-4" />} label="Inbox" count={inboxCount} accent selected={sel({ kind: "inbox" })} onClick={() => onView({ kind: "inbox" })} />
-				<RailRow
-					icon={<IconCalendar1 className="size-4" />}
-					label="Scheduled"
-					hint={relTime(Math.min(...state.schedules.map(item => item.at)), now)}
-					selected={sel({ kind: "scheduled" })}
-					onClick={() => onView({ kind: "scheduled" })}
-				/>
-				<RailHeading>Channels</RailHeading>
-				{state.channels.map(channel => {
-					const unread = state.threads.filter(thread => thread.channel === channel.id).reduce((sum, thread) => sum + unreadIn(state, thread.id), 0);
-					return (
-						<RailRow
-							key={channel.id}
-							icon={channel.restricted ? <IconLock className="size-3.5" /> : <IconHashtag className="size-3.5" />}
-							label={channel.name}
-							count={unread}
-							bold={unread > 0}
-							trailing={channel.sync && <SyncDot sync={channel.sync} />}
-							selected={sel({ kind: "channel", id: channel.id })}
-							onClick={() => onView({ kind: "channel", id: channel.id })}
-						/>
-					);
-				})}
-				<RailHeading>People</RailHeading>
-				{humans.map(member => (
-					<MemberRow key={member.id} member={member} isMe={member.id === me.id} queued={queueOf(state, member).length} selected={sel({ kind: "member", id: member.id })} onClick={() => onView({ kind: "member", id: member.id })} />
-				))}
-				<RailHeading>Agents</RailHeading>
-				{agents.map(member => (
-					<MemberRow key={member.id} member={member} queued={queueOf(state, member).length} selected={sel({ kind: "member", id: member.id })} onClick={() => onView({ kind: "member", id: member.id })} />
-				))}
-			</div>
-		</nav>
-	);
-}
-
-function RailHeading({ children }: { children: ReactNode }) {
-	return <p className="mt-4 mb-1 px-2 text-2xs font-medium tracking-wide text-muted-foreground uppercase">{children}</p>;
-}
-
-function RailRow({ icon, label, count = 0, hint, accent, bold, trailing, selected, onClick }: { icon: ReactNode; label: string; count?: number; hint?: string; accent?: boolean; bold?: boolean; trailing?: ReactNode; selected: boolean; onClick: () => void }) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			aria-current={selected || undefined}
-			className={cn(
-				"flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-				selected && "bg-accent text-foreground",
-				bold && "font-medium text-foreground",
-			)}
-		>
-			<span className="grid size-4 shrink-0 place-items-center">{icon}</span>
-			<span className="min-w-0 flex-1 truncate">{label}</span>
-			{trailing}
-			{hint && <span className="text-2xs tabular-nums text-muted-foreground">{hint}</span>}
-			{count > 0 && <span className={cn("min-w-5 rounded-full px-1.5 text-center text-2xs font-semibold tabular-nums leading-5", accent ? "bg-primary text-primary-foreground" : "bg-foreground/10 text-foreground")}>{count}</span>}
-		</button>
-	);
-}
-
-function MemberRow({ member, isMe, queued, selected, onClick }: { member: Member; isMe?: boolean; queued: number; selected: boolean; onClick: () => void }) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			aria-current={selected || undefined}
-			className={cn("group flex h-9 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-accent", selected && "bg-accent")}
-		>
-			<Avatar member={member} size="sm" />
-			<span className="min-w-0 flex-1">
-				<span className="block truncate text-sm leading-tight">
-					{member.name}
-					{isMe && <span className="text-muted-foreground"> (you)</span>}
-				</span>
-				<span className="block truncate text-3xs leading-tight text-muted-foreground">{member.kind === "human" ? (member.presence === "online" ? "Online" : "Away") : member.harness}</span>
-			</span>
-			{queued > 0 && (
-				<span title={`${queued} waiting in ${member.name}'s inbox`} className={cn("rounded px-1 text-3xs font-medium tabular-nums leading-4", member.presence === "asleep" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-foreground/10")}>
-					{queued}
-				</span>
-			)}
-		</button>
-	);
-}
-
-const PRESENCE_COLOR: Record<Member["presence"], string> = {
-	working: "bg-sky-500",
-	idle: "bg-emerald-500",
-	online: "bg-emerald-500",
-	asking: "bg-amber-500",
-	away: "bg-zinc-400",
-	asleep: "bg-zinc-400",
-};
-
-function Avatar({ member, size }: { member: Member; size: "sm" | "md" }) {
-	const box = size === "sm" ? "size-6" : "size-8";
-	return (
-		<span className={cn("relative inline-flex shrink-0", box)}>
-			{member.kind === "human" ? (
-				<span
-					className={cn("grid size-full place-items-center rounded-full text-[0.7rem] font-semibold text-white", size === "md" && "text-xs")}
-					style={{ background: `oklch(0.62 0.13 ${member.look.hue})` }}
-				>
-					{member.initials}
-				</span>
-			) : (
-				<BotAvatar look={member.look} size={size === "sm" ? "header" : "row"} working={member.presence === "working"} className={size === "md" ? "size-8" : undefined} />
-			)}
-			<span className={cn("absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-background", PRESENCE_COLOR[member.presence], member.presence === "working" && "motion-safe:animate-pulse")} />
-		</span>
-	);
-}
-
-function SyncDot({ sync }: { sync: "slack" | "github" | "linear" }) {
-	return <span title={`Two-way sync with ${sync}`} className="rounded border border-border px-1 text-3xs leading-4 text-muted-foreground">{sync}</span>;
-}
-
 /* ─────────────────────────── List column ─────────────────────────── */
 
-function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { state: BoardState; members: Member[]; byId: Map<string, Member>; view: View; open: string | null; onOpen: (id: string) => void; now: number; queue: Message[] }) {
+function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { state: BoardState; members: Member[]; byId: Map<string, Member>; view: BoardView; open: string | null; onOpen: (id: string) => void; now: number; queue: Message[] }) {
 	const [q, setQ] = useState("");
 	let title = "Inbox";
 	let meta = "Mentions and replies waiting for you";

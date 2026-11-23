@@ -4,6 +4,8 @@ import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
+import { BOARD_PAGE } from "./components/board/module";
+import { BoardNav } from "./components/board/nav";
 import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import { HeaderTabs } from "./components/header-tabs";
@@ -224,6 +226,8 @@ export function App() {
 		[state.connected, fork, resume, quick, pullRequestNew, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
+	const boardRoute = page?.kind === "board" ? page : BOARD_PAGE.home;
+	const boardList = useMemo(() => <BoardNav state={state.modules.board} hosts={visible.hosts} route={boardRoute} />, [state.modules.board, visible.hosts, boardRoute]);
 
 	const listPage = listPageOf(page, row);
 	const pageArea = useRef<HTMLDivElement>(null);
@@ -270,6 +274,7 @@ export function App() {
 										unreadNotices={unreadNotices}
 										onPickWorkspace={switchWorkspace}
 										onSearch={showSearch}
+										boardList={boardList}
 									/>
 									<SidebarFoot usage={state.usage} />
 								</DashboardSidebar>

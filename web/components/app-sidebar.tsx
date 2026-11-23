@@ -5,13 +5,15 @@ import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";
 import { SidebarContent } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
+import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
+import { SizeProvider } from "@/lib/size-context";
 import { activityControl } from "../activity";
 import { type BotRow, botsNeedingYou } from "../bots-model";
 import { folderName, sessionsWaiting } from "../labels";
 import { withoutHidden, yourMoveCount } from "../pull-requests-model";
 import { useHiddenRepos } from "../pull-requests-state";
 import { pullRequestsStore } from "../reads";
-import type { Page, SettingsRoute, SidebarTab } from "../routing";
+import { hashForPage, type Page, type SettingsRoute, type SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import type { NavRow } from "../sidebar-tabs";
 import type { SessionLists } from "../use-session-lists";
@@ -42,6 +44,8 @@ interface AppSidebarProps {
 	unreadNotices: number;
 	onPickWorkspace: (cwd: string | null) => void;
 	onSearch: () => void;
+	/** The Board's own list, which the sidebar shows in its Board mode. */
+	boardList: ReactNode;
 }
 
 /**
@@ -62,6 +66,7 @@ export const AppSidebar = memo(function AppSidebar({
 	unreadNotices,
 	onPickWorkspace,
 	onSearch,
+	boardList,
 }: AppSidebarProps) {
 	const { openNewSession } = useDashboardActions();
 	const { connected, pullRequestsScope } = useDashboardStatus();
@@ -94,34 +99,61 @@ export const AppSidebar = memo(function AppSidebar({
 				</Tooltip>
 			</div>
 			{!connected && <p className="mx-3 mb-1 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">Lost the dashboard server. Retrying…</p>}
-			<SidebarNav
-				tabs={tabs}
-				current={row}
-				counts={counts}
-				list={list}
-				newSessionLabel={newSessionLabel}
-				onNewSession={() => openNewSession()}
-				onTab={onTab}
-				settingsRoute={settings}
-				unreadNotices={unreadNotices}
-			/>
-			<SidebarContent>
-				<Roster
-					workspaces={workspaces}
-					lists={lists}
-					projects={projects}
-					pinnedIds={pinned}
-					groups={groups}
-					query={query}
-					onQuery={setQuery}
-					onTogglePin={togglePin}
-					open={page ? NO_VIEWS : panes}
-					scheduled={scheduled}
-					scheduledOpen={page?.kind === "scheduled" ? page.id : null}
-					projectOpen={page?.kind === "projects" ? page.open : null}
-					onPickWorkspace={onPickWorkspace}
+			<SidebarModes board={page?.kind === "board"} boardList={boardList}>
+				<SidebarNav
+					tabs={tabs}
+					current={row}
+					counts={counts}
+					list={list}
+					newSessionLabel={newSessionLabel}
+					onNewSession={() => openNewSession()}
+					onTab={onTab}
+					settingsRoute={settings}
+					unreadNotices={unreadNotices}
 				/>
-			</SidebarContent>
+				<SidebarContent>
+					<Roster
+						workspaces={workspaces}
+						lists={lists}
+						projects={projects}
+						pinnedIds={pinned}
+						groups={groups}
+						query={query}
+						onQuery={setQuery}
+						onTogglePin={togglePin}
+						open={page ? NO_VIEWS : panes}
+						scheduled={scheduled}
+						scheduledOpen={page?.kind === "scheduled" ? page.id : null}
+						projectOpen={page?.kind === "projects" ? page.open : null}
+						onPickWorkspace={onPickWorkspace}
+					/>
+				</SidebarContent>
+			</SidebarModes>
 		</div>
 	);
 });
+
+/** The Sessions | Board switch and the list it picks: the Board's while the Board is open, else `children`; picking a side opens the Board or leaves it for the panes. */
+function SidebarModes({ board, boardList, children }: { board: boolean; boardList: ReactNode; children: ReactNode }) {
+	const mode = board ? "board" : "sessions";
+	function pick(next: string) {
+		if (next === mode) return;
+		if (next === "board") location.hash = hashForPage({ kind: "board", view: { kind: "inbox" } });
+		else if (next === "sessions") location.hash = "";
+	}
+	return (
+		<>
+			<div className="mx-3 mt-1 mb-1 shrink-0">
+				<SizeProvider size="compact">
+					<Tabs value={mode} onValueChange={pick}>
+						<TabsList aria-label="Sidebar" className="w-full *:flex-1">
+							<TabItem value="sessions" label="Sessions" />
+							<TabItem value="board" label="Board" />
+						</TabsList>
+					</Tabs>
+				</SizeProvider>
+			</div>
+			{board ? <SidebarContent className="px-1">{boardList}</SidebarContent> : children}
+		</>
+	);
+}
