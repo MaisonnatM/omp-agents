@@ -47,6 +47,9 @@ bun scripts/evals/pull-candidates.ts --tickets ~/.cache/omp-evalset/yampa-ticket
 bun scripts/evals/run.ts --tasks ~/.cache/omp-evalset/yampa-20.json --runs 3 --out ~/.cache/omp-evals/yampa
 ```
 
+The set built on 2026-11-23 holds 18 of its 20 tasks: the disk filled up during `--verify` after the 18th was kept.
+The next candidates, `pr-7317` (ENG-2811) and `pr-7271` (ENG-2838), are not verified yet; rerun the `--verify` command above to fill the set to 20.
+
 ## A run
 
 `bun scripts/evals/run.ts` runs each task 3 times by default.
