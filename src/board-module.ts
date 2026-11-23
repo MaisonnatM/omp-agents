@@ -6,7 +6,7 @@ import { BOARD_FLAGS } from "./omp/board-extension";
 import { configDir } from "./paths";
 import { JsonInboxDir } from "./server/json-inbox";
 import { shippedFile } from "./server/resources";
-import { applyBoardChange, type BoardChange, type BoardState, parseBoardChange, parseBoardState, seed } from "./shared/board";
+import { applyBoardChange, type BoardChange, type BoardState, emptyBoard, parseBoardChange, parseBoardState } from "./shared/board";
 
 /** Channels, threads, messages, members, schedules, and read marks. */
 const BOARD_FILE = join(configDir, "board.json");
@@ -20,7 +20,7 @@ export function openBoardFile(path: string): ReducerFile<BoardState, [BoardChang
 	return new ReducerFile<BoardState, [BoardChange]>(path, {
 		parse: parseBoardState,
 		holds: "a board",
-		empty: seed(Date.now()),
+		empty: emptyBoard(),
 		reduce(state, change) {
 			const applied = applyBoardChange(state, change);
 			if ("error" in applied) throw new Error(applied.error);

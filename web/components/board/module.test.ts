@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { seed } from "../../../src/shared/board";
+import { emptyBoard } from "../../../src/shared/board";
 import { BOARD_PAGE, type BoardRoute, resolveBoardView } from "./module";
 
 const { parse, rest, query } = BOARD_PAGE.address;
@@ -26,7 +26,7 @@ describe("Board address", () => {
 });
 
 describe("resolveBoardView", () => {
-	const state = seed(0);
+	const state = emptyBoard();
 	const members = new Set(["u-maxence"]);
 
 	test("a channel or member that no longer exists opens the inbox", () => {
@@ -35,7 +35,7 @@ describe("resolveBoardView", () => {
 	});
 
 	test("a live channel or member is kept", () => {
-		expect(resolveBoardView(state, members, { kind: "channel", id: "c-dev" })).toEqual({ kind: "channel", id: "c-dev" });
+		expect(resolveBoardView(state, members, { kind: "channel", id: "c-general" })).toEqual({ kind: "channel", id: "c-general" });
 		expect(resolveBoardView(state, members, { kind: "member", id: "u-maxence" })).toEqual({ kind: "member", id: "u-maxence" });
 	});
 });

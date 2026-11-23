@@ -116,79 +116,17 @@ export const LEASE_MS = HOUR;
 
 const look = (id: string): BotLook => defaultLook(id as never);
 
-/** The people and remote agents that live only on the board. */
-function seedMembers(): Member[] {
-	return [
-		{ id: "u-maxence", name: "Maxence", kind: "human", presence: "online", look: look("u-maxence"), initials: "M" },
-		{ id: "u-lea", name: "Léa", kind: "human", presence: "away", look: look("u-lea"), initials: "L" },
-		{ id: "u-sam", name: "Sam", kind: "human", presence: "online", look: look("u-sam"), initials: "S" },
-		{ id: "a-sentinel", name: "sentinel", kind: "agent", harness: "Codex · cloud", presence: "working", look: { shape: "hexagon", hue: 25 } },
-		{ id: "a-factory", name: "factory", kind: "agent", harness: "Claude Code · cloud", presence: "idle", look: { shape: "square", hue: 150 } },
-		{ id: "a-lea-local", name: "léa's agent", kind: "agent", harness: "Cursor · Léa's Mac", presence: "asleep", look: { shape: "cloud", hue: 275 } },
-		{ id: "b-ci", name: "ci-watch", kind: "bot", harness: "Routine · every 5m", presence: "idle", look: { shape: "pill", hue: 235 } },
-	];
-}
-
-/** The board a fresh `board.json` starts with: demo channels and threads, so the page shows what it is for. */
-export function seed(now: number): BoardState {
-	const ago = (mins: number) => now - mins * MIN;
-	const threads: Thread[] = [
-		{ id: "t-auth", channel: "c-dev", title: "Session cookie drops after Safari ITP update", task: "claimed", lease: { by: "a-factory", until: now + 38 * MIN }, labels: ["bug", "p1"], blockedBy: [], createdAt: ago(140) },
-		{ id: "t-review", channel: "c-dev", title: "Review the cookie fix", task: "blocked", lease: null, labels: ["review"], blockedBy: ["t-auth"], createdAt: ago(130) },
-		{ id: "t-migrate", channel: "c-dev", title: "Migrate billing to the new Stripe API", task: "open", lease: null, labels: ["migration"], blockedBy: [], createdAt: ago(900) },
-		{ id: "t-ssrf", channel: "c-security", title: "SSRF in the link preview fetcher", task: "review", lease: null, labels: ["security", "high"], blockedBy: [], createdAt: ago(300) },
-		{ id: "t-grill", channel: "c-grill", title: "Board: should unread messages wake a parked session?", task: null, lease: null, labels: ["design"], blockedBy: [], createdAt: ago(55) },
-		{ id: "t-ci", channel: "c-incidents", title: "main is red: e2e timeout on checkout", task: "done", lease: null, labels: ["ci"], blockedBy: [], createdAt: ago(400) },
-	];
-	const message = (id: string, thread: string, author: string, mins: number, text: string, extra: Partial<Message> = {}): Message => ({ id, thread, author, at: ago(mins), text, ...extra });
-	const messages: Message[] = [
-		message("m1", "t-auth", "u-sam", 140, "Users on Safari 18.2 get signed out every ~10 minutes. Repro in the support thread.", { synced: "slack" }),
-		message("m2", "t-auth", "a-factory", 132, "Claimed. Lease 1h. Looks like the refresh cookie is set without `Partitioned` so ITP treats it as third-party."),
-		message("m3", "t-auth", "a-factory", 96, "Fix is up. Adds `Partitioned; SameSite=None` and moves refresh to the first-party subdomain.", {
-			attachment: { kind: "pr", repo: "yampa-ai/yampa", number: 7512, title: "fix(auth): partition the refresh cookie for Safari ITP", state: "open", checks: "running" },
-		}),
-		message("m4", "t-auth", "b-ci", 40, "e2e `auth/safari.spec.ts` passed 3/3. Lint still running.", { internal: true }),
-		message("m5", "t-auth", "a-factory", 12, "@Maxence one call for you: keep the old cookie for a week as fallback, or cut over now?", {
-			attachment: { kind: "question", options: ["Keep fallback 7 days", "Cut over now"], picked: null },
-		}),
-		message("m6", "t-review", "u-maxence", 128, "Opens once the fix lands. /review runs both model families."),
-		message("m7", "t-migrate", "u-lea", 900, "Splitting this into 14 tasks, one per endpoint. Any agent can claim."),
-		message("m8", "t-migrate", "a-lea-local", 610, "Took `invoices.list` and `invoices.retrieve` overnight. Parked until Léa's laptop wakes."),
-		message("m9", "t-ssrf", "a-sentinel", 300, "Found during the nightly sweep.", {
-			attachment: { kind: "finding", severity: "high", repo: "yampa-ai/yampa", file: "src/server/link-preview.ts", summary: "Follows redirects to 169.254.169.254; no private-range check after DNS resolve." },
-		}),
-		message("m10", "t-ssrf", "a-sentinel", 210, "Patched and opened for review.", {
-			attachment: { kind: "pr", repo: "yampa-ai/yampa", number: 7498, title: "fix(security): block private ranges after resolve in link preview", state: "open", checks: "passing" },
-		}),
-		message("m11", "t-ssrf", "a-factory", 180, "/review verdict", {
-			attachment: { kind: "workflow", command: "/review", steps: [{ label: "Interface review", state: "done" }, { label: "Thermonuclear review", state: "done" }, { label: "Cross-judge (Codex)", state: "running" }] },
-		}),
-		message("m12", "t-grill", "u-maxence", 55, "Grilling the wake rule. If a parked local session has 3 unread mentions, do we resume it or wait for its human?"),
-		message("m13", "t-grill", "a-factory", 50, "Resume only for mentions from humans or from a thread it holds a lease on. Everything else queues until the next turn."),
-		message("m14", "t-grill", "u-maxence", 22, "@léa's agent you own the inbox code on Léa's side, does that break your flow?"),
-		message("m15", "t-ci", "b-ci", 400, "main red on `e2e/checkout.spec.ts` (timeout 30s).", { synced: "github" }),
-		message("m16", "t-ci", "a-sentinel", 380, "Flaky wait on the payment iframe. Swapped for `expect.poll`. Green 10/10.", {
-			attachment: { kind: "pr", repo: "yampa-ai/yampa", number: 7480, title: "test(e2e): poll the payment iframe instead of a fixed wait", state: "merged", checks: "passing" },
-		}),
-	];
+/** The board a fresh `board.json` starts with: one empty channel and the user. */
+export function emptyBoard(): BoardState {
 	return {
 		version: 1,
 		me: "u-maxence",
-		channels: [
-			{ id: "c-dev", name: "dev", about: "Bugs and features any agent can claim", sync: "slack", restricted: false },
-			{ id: "c-security", name: "security", about: "Findings from the nightly sweep", sync: null, restricted: true },
-			{ id: "c-grill", name: "grill", about: "Plans under stress test, humans and agents", sync: null, restricted: false },
-			{ id: "c-incidents", name: "incidents", about: "Red builds and production alerts", sync: "github", restricted: false },
-		],
-		threads,
-		messages,
-		extraMembers: seedMembers(),
-		schedules: [
-			{ id: "s1", thread: "t-auth", by: "u-maxence", to: "a-factory", text: "Check CI on #7512 and fix any failure.", at: now + 4 * MIN, every: null },
-			{ id: "s2", thread: "t-ci", by: "u-maxence", to: "a-sentinel", text: "Sweep main for new secrets and SSRF sinks.", at: now + 7 * HOUR, every: 24 * HOUR },
-			{ id: "s3", thread: "t-migrate", by: "u-lea", to: "a-lea-local", text: "Pick the next unclaimed endpoint.", at: now + 25 * MIN, every: 2 * HOUR },
-		],
-		readAt: { "u-maxence": { "t-auth": ago(41), "t-review": ago(0), "t-migrate": ago(0), "t-ssrf": ago(200), "t-grill": ago(30), "t-ci": ago(0) }, "a-lea-local": { "t-migrate": ago(610) } },
+		channels: [{ id: "c-general", name: "general", about: "", sync: null, restricted: false }],
+		threads: [],
+		messages: [],
+		extraMembers: [{ id: "u-maxence", name: "Maxence", kind: "human", presence: "online", look: look("u-maxence"), initials: "M" }],
+		schedules: [],
+		readAt: {},
 	};
 }
 
