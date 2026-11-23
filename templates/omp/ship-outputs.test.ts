@@ -67,14 +67,16 @@ function session(exec: Exec) {
 	};
 }
 
-/** git names the branch `feat`; `gh pr list` lists `open`, and every other gh call fails. */
-const github = (open: object[]): Exec => (command, args) => {
+/** git names the branch `feat`, which left `main` at `base0` and changes `changed`; `gh pr list` lists `open`, and every other gh call fails. */
+const github = (open: object[], changed = ["src/a.ts"]): Exec => (command, args) => {
 	if (command === "git" && args[0] === "branch") return { code: 0, stdout: "feat\n", stderr: "" };
+	if (command === "git" && args[0] === "merge-base") return { code: 0, stdout: "base0\n", stderr: "" };
+	if (command === "git" && args.includes("diff")) return { code: 0, stdout: changed.map(path => `${path}\n`).join(""), stderr: "" };
 	if (basename(command) === "gh" && args[0] === "pr" && args[1] === "list") return { code: 0, stdout: JSON.stringify(open), stderr: "" };
 	return { code: 1, stdout: "", stderr: "offline" };
 };
 
-const CONTRACT = { goal: "Ship it.", done_when: ["bun test passes"] };
+const CONTRACT = { goal: "Ship it.", files_to_change: ["src/a.ts"], done_when: ["bun test passes"] };
 const IMPLEMENTED = { implement: { files_changed: ["src/a.ts"], checks_run: [{ command: "bun test", result: "3 pass, 0 fail" }] } };
 
 async function implementing(exec: Exec) {
@@ -187,5 +189,25 @@ describe("check before create", () => {
 	test("a post with no PR to name is refused", async () => {
 		const ship = await implementing(github([]));
 		expect((await ship.call({ posted: { kind: "slack", ref: "https://example.com/p" } })).isError).toBe(true);
+	});
+});
+
+describe("contract checks", () => {
+	test("a run on an issue refuses a contract that does not name it as its source", async () => {
+		const ship = session(github([]));
+		await ship.call({ stage: "plan", issue: "ENG-1" });
+		const refused = await ship.call({ stage: "implement", contract: CONTRACT });
+		expect(refused.isError).toBe(true);
+		expect(refused.text).toContain("this run ships ENG-1, but the contract names no source");
+		expect((await ship.call({ stage: "implement", contract: { ...CONTRACT, source: "ENG-1" } })).state?.stage).toBe("implement");
+	});
+
+	test("draft_pr is refused while the branch changes a file outside files_to_change", async () => {
+		const ship = await implementing(github([], ["src/a.ts", "bun.lock", "web/b.ts"]));
+		const refused = await ship.call({ stage: "draft_pr", output: IMPLEMENTED });
+		expect(refused.isError).toBe(true);
+		expect(refused.text).toStartWith("draft_pr is not recorded: the branch changes `web/b.ts` against base0, outside the contract's files_to_change.");
+		await ship.call({ contract: { ...CONTRACT, constraints: ["scope-change: the web client shows the new field"] } });
+		expect((await ship.call({ stage: "draft_pr", output: IMPLEMENTED })).state?.stage).toBe("draft_pr");
 	});
 });
