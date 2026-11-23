@@ -40,6 +40,29 @@ A prompt whose workspace differs starts with **Work in** and that workspace, and
 The pin goes, since a Bot's conversation is never ended.
 The Routines Bot is created only when it is missing, through the lists so pages hear of it, so a migration that runs again reuses it, and a file already migrated changes nothing.
 
+## Routine heartbeat
+
+`earlyRuns` in `src/routine-health.ts` lists the runs that exited early, as `EarlyRun`s: the routine's Bot, id, and name, the run's key, and why, one of `EARLY_EXITS`.
+It judges the runs claimed in the day before the last half hour (`HEALTH_WINDOW_MS`, `SETTLE_MS`), so a run still under way waits for the next look.
+
+- `errored`: the run has errors, its outcome is `failed`, its command did not exit 0, or its Bot's turn ended on a provider's error.
+- `no-reply`: its Bot's turn ended with no text reply and without `stay_quiet`.
+- `short`: it took less than `SHORT_SHARE`, a quarter, of the median of the routine's other runs, once at least `MIN_USUAL_RUNS` of them have a time; a command's time is its run's, and a message's is its Bot's turn.
+- `missed`: a slot's run was claimed `LATE_AFTER_MS`, an hour, or more after the slot the previous scheduled run gave, or stayed queued that long.
+  A routine that `runsHere` and whose next slot is that overdue with no claim is listed at that slot too.
+
+`routineTurn` in `src/live-session.ts` finds a message run's turn in its Bot's session file: the messages between the prompt whose routine stamp names the routine and the run's key, and the next prompt, read as `turnUpdate` reads an `agent_end`'s.
+A run whose session file or prompt is not found has no turn, so it is judged on its outcome alone.
+The `Dashboard` checks `HEALTH_KINDS` on the owner at startup and on the daily tick, and the bell shows one `routine-health` notice for what it found; see [Notifications](notifications.md).
+
+## Built-in routines
+
+`BUILT_IN_ROUTINES` in `src/server/built-in-routines.ts` holds the routines the dashboard adds by itself, each with the Bot that runs it.
+As the owner takes ownership, right after it migrates the routines from before Bots, `addBuiltInRoutines` saves each one that `built-in-routines.json` beside the access token does not list yet, and its Bot unless that Bot exists, through the lists so pages hear of them, then lists its id there.
+A routine you delete is not added again, and one listed changes nothing.
+The one built-in routine is **Weekly harness review** of the **Harness review** Bot, a `routines` Bot that works in the omp-agents checkout (`sourceDir`), disabled, on Mondays at 9:00.
+Its prompt, `HARNESS_REVIEW_PROMPT`, reads the last week of `ship-trace.jsonl`, `LEARNINGS.md`, the failed merges in `merges.json`, and the failed runs in `routines.json`, then asks for the failures grouped by cause, exactly one harness change as a decision for the user, and five past failures to replay against it, and forbids editing, committing, or pushing.
+
 ## The runner
 
 `src/server/routine-runner.ts` runs on a 60 s tick in `src/server/loops.ts`, whether or not a page is connected, and only on the server that owns routines; see [One server runs the unattended work](#one-server-runs-the-unattended-work).

@@ -10,7 +10,9 @@ import type { FailedUpdate } from "../shared/dashboard-update";
 import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
 import { InterruptedSessions } from "./interrupted";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, Notices, type NoticeSources, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import type { EarlyRun } from "../routine-health";
+import type { BotId } from "../shared/bots";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, HEALTH_KINDS, Notices, type NoticeSources, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -84,6 +86,8 @@ interface State {
 	interrupted?: InterruptedSessions;
 	/** What each listed session file gives the stopped check. */
 	listed?: Record<string, { title: string | null; cwdDisplay: string }>;
+	/** The routine runs the heartbeat finds exited early. */
+	earlyRuns?: EarlyRun[];
 	now?: number;
 }
 
@@ -128,6 +132,7 @@ function sources(state: State): NoticeSources {
 		},
 		creditRuns: async () => state.creditRuns ?? [],
 		stoppedSessions: () => (state.interrupted?.midTurn() ?? []).map(sessionId => ({ sessionId, title: state.listed?.[sessionId]?.title ?? null, cwdDisplay: state.listed?.[sessionId]?.cwdDisplay ?? null })),
+		earlyRuns: () => state.earlyRuns ?? [],
 		now: () => state.now ?? 0,
 	};
 }
@@ -450,5 +455,19 @@ describe("Notices", () => {
 		state.now = 3 * MINUTE;
 		await notices.check(STOPPED_KINDS);
 		expect(marks(notices)).toEqual([{ id: "stopped:s-b,s-c", seen: false, read: false }]);
+	});
+
+	test("the heartbeat lists the routine runs that exited early in one notice, and a heartbeat that finds none takes it away", async () => {
+		const errored: EarlyRun = { botId: "b1" as BotId, routineId: "r1", name: "Digest", at: 1_000, exit: "errored" };
+		const missed: EarlyRun = { botId: "b1" as BotId, routineId: "r2", name: "Prune", at: 2_000, exit: "missed" };
+		const state: State = { latest: null, installed: "18.8.0", models: [], earlyRuns: [errored, missed], now: 5 * MINUTE };
+		const notices = new Notices(noticesPath(), sources(state), () => {});
+
+		await notices.check(HEALTH_KINDS);
+		expect(notices.list).toEqual([{ id: "routine-health:r1@1000:errored,r2@2000:missed", at: 5 * MINUTE, seen: false, read: false, kind: "routine-health", runs: [errored, missed] }]);
+
+		state.earlyRuns = [];
+		await notices.check(HEALTH_KINDS);
+		expect(notices.list).toEqual([]);
 	});
 });

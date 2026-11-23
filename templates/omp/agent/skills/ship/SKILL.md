@@ -60,17 +60,18 @@ flowchart TD
    With an issue, post the chosen plan on it with `save_comment`, with one line for each rejected approach that says why it lost; without one, keep the same text for the PR body in step 4.
    Record each approach the arena, the critic, or the user rejected with `ship_stage({rejected:"<approach>: <why>"})`, one call each.
    Then record the chosen plan's contract and move on in one call: `ship_stage({stage:"implement", contract:{goal, constraints, files_to_change, test_first, done_when}})`.
-   `goal` is one sentence, `files_to_change` lists repository-relative paths, `test_first` names the test written before the code or is `null`, and `done_when` lists at least one check that shows the change is done.
+   `goal` is one sentence, `files_to_change` lists repository-relative paths, `test_first` names the test path written and committed before the code, which a bug fix always has, or is `null`, and `done_when` lists at least one check that shows the change is done.
    A test file HEAD already has goes in `files_to_change` only with a constraint `test-change: <why the behavior changes on purpose>`; `ship_stage` refuses implement without a valid contract.
    The contract and the rejected list show on every `ship_stage` read and come back into context after a compaction or a resume, so implement, reviews, and fixes follow them.
 3. **Implement.** Delegate to `poteto-agent`, isolated or in place per the Git safety rule in `AGENTS.md`.
    Give it the chosen plan and the contract, and tell it to implement the change in this session's checkout but stop before opening a PR.
+   For a bug fix, tell it to write the failing test first, run it to see it fail, and commit only that test before it writes the fix.
    Integrate its changes.
    When the change adds more than about 500 hand-written lines, not counting tests and generated files, run a duplication pass before the checks.
    Give a fresh `poteto-agent-codex` the plan, the diff, and one job: find what the diff rebuilds that the repository already has, such as a copied model, a second enum for one concept, a repeated component, or a fetch a parent already makes, and replace it with the existing one without changing behavior.
    Keep its edits only when the same tests pass and the diff gets smaller or loses a concept; otherwise discard them, and say in one line of the report which you did.
-   Run smoke checks and required tests once in the parent.
-   Commit, then call `ship_stage({stage:"draft_pr"})`.
+   Run smoke checks and required tests once in the parent, with bash in this session, and quote each check's result line in the report: `ship_stage` refuses `draft_pr` and `ready_gate` until a test, typecheck, or lint command exits 0 here after the last edit, write, or subagent.
+   Commit, then call `ship_stage({stage:"draft_pr"})`; with a `test_first`, it refuses until a branch commit changing only that test comes before the first commit changing code, and says how to reorder the commits.
    If a PR already exists for the branch, reuse it.
 4. **Draft PR.** Push the branch, then open a DRAFT PR with `gh pr create --draft`.
    With an issue the user named, put `Fixes <issue ID>` in the body and the issue ID in the title; with one you found by search, put `Refs <issue ID>` instead, so merging does not close a ticket the user never confirmed; without one, put the chosen plan under `## Plan` in the body.
@@ -80,13 +81,15 @@ flowchart TD
 5. **Interface review.** If the repository commits no `.omp/ui-paths`, or the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"thermonuclear"})` and say in one line of the report that the review was skipped and why.
    Otherwise wait until the user approves the direction, as `# Before any pull request` in `APPEND_SYSTEM.md` says, since interface findings can redesign the UI.
    Then run `interface-reviewer` on `pr <number>` with `task`.
+   Pass it the contract's `done_when` list from `ship_stage`, and resolve every line and bullet it marks `BLOCKING` before you move on.
    If it reports a missing `interface-review` or `better-interface` skill, stop and tell the user to install it.
    Apply valid findings in a fresh `task` agent, isolated or in place per the Git safety rule in `AGENTS.md`, integrate and verify once, commit and push.
    Once all findings are resolved and pushed, call `ship_stage({stage:"thermonuclear"})`, which checks `- [x] Interface review` in the PR body, ticking the template's box or appending it.
 6. **Thermonuclear.** If the repository commits `.omp/review-paths` and the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"ready_gate"})` and say in one line of the report that the review was skipped and why.
    Otherwise wait until the user approves the direction, as `# Before any pull request` in `APPEND_SYSTEM.md` says, then run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`.
+   Pass it the contract's `done_when` list from `ship_stage`, and resolve every line and bullet it marks `BLOCKING` before you move on.
    Review the actual PR including tests.
-   Apply valid findings in a fresh `task` agent, isolated or in place per the same rule, integrate and verify once, commit and push.
+   Apply valid findings in a fresh `task` agent, isolated or in place per the same rule, integrate and verify once with bash in this session, commit and push.
    Repeat the review if substantial changes invalidate it.
    Once all findings are resolved and pushed, call `ship_stage({stage:"ready_gate"})`, which checks `- [x] Thermo-nuclear code quality review` in the PR body without touching the rest; never add the box yourself before the fixes are pushed.
 7. **Put live for review.** Show the issue if there is one, the PR URL, checks, findings and dispositions before promotion.
@@ -95,6 +98,7 @@ flowchart TD
    The extension asks the user for approval and blocks the command if they decline or no UI is available.
    Request the named reviewer, if any, only after promotion succeeds.
    A successful `gh pr ready` records `live`; never call `ship_stage({stage:"live"})` while the PR is still a draft.
+   Then call `watch_pull_request` with the PR's URL and end your turn instead of polling CI or scheduling follow-ups; when the tool is missing, as in a terminal session, fall back to `schedule_follow_up` or polling.
    Never merge as part of this workflow.
 8. **Live review.** On later `/ship` calls, read `ship_stage` again, inspect the PR and its review threads, and address the first need.
    Record `ship_stage({stage:"rebase"})` before rebasing the owned branch, `ship_stage({stage:"fix_comments", count:<open review comments>})` before addressing comments, and `ship_stage({stage:"fix_ci", count:<failing checks>})` before fixing a CI failure.

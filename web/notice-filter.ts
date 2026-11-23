@@ -6,13 +6,14 @@ import { type DayRange, type FilterOption, type GroupingDisplay, groupingDisplay
 import { type NoticeSource, presentNotice } from "./notice-model";
 
 /** Every source, in menu and group order. */
-export const NOTICE_SOURCES = ["github", "slack", "providers", "sessions", "updates"] as const satisfies readonly NoticeSource[];
+export const NOTICE_SOURCES = ["github", "slack", "providers", "sessions", "routines", "updates"] as const satisfies readonly NoticeSource[];
 
 export const SOURCE_LABELS: Record<NoticeSource, string> = {
 	github: "GitHub",
 	slack: "Slack",
 	providers: "Providers",
 	sessions: "Sessions",
+	routines: "Routines",
 	updates: "Updates",
 };
 

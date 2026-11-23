@@ -60,14 +60,15 @@ Spawn `task` with `agent: "design-critic"`; the builder never grades its own scr
 The assignment holds:
 
 - the user's request in their words, and step 1's sentence;
+- in `/ship`, the contract's `done_when` list from `ship_stage`, which the critic judges line by line;
 - the URL of each changed page, variant, and step 4 page, and how to reach each state a URL cannot open;
 - the sibling screens from step 2, with their URLs;
 - for an app behind sign-in, the repository's smoke or verify guide that says how to sign in.
 
-Fix every finding marked `bug`, then spawn a fresh critic with the same assignment.
+Fix every finding and criterion marked `BLOCKING`, then spawn a fresh critic with the same assignment.
 Stop after the second critique.
 
-Output: each round, the checked screenshots; once approved, a critic report with no `bug`, or the second report's open findings.
+Output: each round, the checked screenshots; once approved, a critic report with no `BLOCKING` line, or the second report's open findings.
 
 ## 6. Hand off
 

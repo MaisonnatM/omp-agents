@@ -5,6 +5,10 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- /ship now refuses to open or ready a pull request until the agent has run the tests after its last edit, and for a bug fix, until the failing test was committed before the fix.
+- Reviewers now answer with one "blocking" or "approve" line per goal of the change, then at most five short findings.
+- Agents can now watch a pull request: the dashboard wakes the session once when its checks, reviews, or comments change, or when it merges, instead of the agent checking again and again.
+- Once a day the dashboard warns you about routines that failed, stopped early, or missed their time, and a new weekly routine, off by default, suggests one improvement to how agents work.
 - /ship now asks the agent to write down, before coding, the goal, the files it will change, and how it will know it is done, and it refuses to start coding without that.
 - /ship now remembers approaches you or a reviewer turned down, and reminds the agent of them and of the plan after its memory is compacted or the session resumes.
 - Agents are now stopped before risky shell commands, such as pushing straight to main, skipping git hooks, stopping the dashboard, using a default server port, or reading secret files.
