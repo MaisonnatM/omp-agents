@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { formatTable, parseGitLog, readSpend, report, type TraceLine } from "./harness-metrics";
+import { type CheckRun, firstPass, formatTable, type MergedPr, parseGitLog, parseMergedPrs, readSpend, report, type TraceLine } from "./harness-metrics";
 
 const NOW = Date.parse("2026-11-23T00:00:00Z");
 const A = "01a20000-0000-7000-8000-00000000000a";
@@ -150,5 +150,88 @@ describe("readSpend", () => {
 				[B, 4],
 			]),
 		);
+	});
+});
+
+describe("GitHub metrics", () => {
+	const run = (name: string, suite: number, minute: number, conclusion: string | null): CheckRun => ({ name, suite, startedAt: `2026-11-10T10:${String(minute).padStart(2, "0")}:00Z`, conclusion });
+	const prs: MergedPr[] = [
+		{ number: 1, mergedAt: Date.parse("2026-11-14T12:00:00Z"), changesRequested: 1, commits: [{ sha: "a", sessions: [D] }], firstCi: [run("lint", 1, 1, "success"), run("test", 1, 0, "cancelled"), run("test", 1, 2, "skipped")] },
+		{
+			number: 2,
+			mergedAt: Date.parse("2026-11-19T12:00:00Z"),
+			changesRequested: 2,
+			commits: [
+				{ sha: "b", sessions: [E] },
+				{ sha: "c", sessions: [] },
+			],
+			firstCi: [run("test", 1, 3, "success"), run("test", 1, 1, "failure")],
+		},
+		{ number: 3, mergedAt: Date.parse("2026-11-20T12:00:00Z"), changesRequested: 0, commits: [{ sha: "d", sessions: [E] }] },
+		{ number: 4, mergedAt: Date.parse("2026-11-08T12:00:00Z"), changesRequested: 5, commits: [{ sha: "e", sessions: [] }] },
+	];
+	const githubTrace = [line("13T10:00:00", D, 1, "fix_comments", true, 1), line("14T10:00:00", D, 1, "merged", true), line("18T10:00:00", E, 2, "fix_comments", false, 1)];
+	const periods = report({ trace: githubTrace, repos: [], spend: new Map([[E, 3]]) }, NOW, 7, 2, 7, { repo: "o/r", prs });
+
+	test("judges a commit's checks by each check's earliest run that was not cancelled", () => {
+		expect([
+			firstPass([run("test", 1, 0, "cancelled")]),
+			firstPass([run("test", 1, 0, "cancelled"), run("test", 1, 1, "success")]),
+			firstPass([run("test", 1, 1, "failure"), run("test", 1, 2, "success")]),
+			firstPass([run("test", 1, 1, "success"), run("test", 2, 1, "timed_out")]),
+			firstPass([run("test", 1, 1, null)]),
+			firstPass([run("test", 1, 1, "neutral"), run("deploy", 1, 1, "skipped")]),
+		]).toEqual([undefined, true, false, false, false, true]);
+	});
+
+	test("prices, CI-rates, counts review rounds of, and checks for a person's commit in the PRs merged in each period", () => {
+		expect(periods.map(p => p.github)).toEqual([
+			{
+				repo: "o/r",
+				merged: 1,
+				cost: { priced: 1, usd: 2, perPr: 2 },
+				ciFirstPass: { judged: 1, passed: 1, rate: 1 },
+				reviewRounds: { changesRequested: 1, fixRounds: 1, perPr: 2 },
+				humanEdits: { edited: 0, rate: 0 },
+			},
+			{
+				repo: "o/r",
+				merged: 2,
+				cost: { priced: 1, usd: 3, perPr: 3 },
+				ciFirstPass: { judged: 1, passed: 0, rate: 0 },
+				reviewRounds: { changesRequested: 2, fixRounds: 0, perPr: 1 },
+				humanEdits: { edited: 1, rate: 0.5 },
+			},
+		]);
+	});
+
+	test("adds the GitHub rows to the table", () => {
+		expect(formatTable(periods).split("\n").slice(7)).toEqual([
+			"Merged PRs in o/r                   1                                         2",
+			"Cost per merged PR                  $2.00 (1 priced)                          $3.00 (1 priced)",
+			"CI first-pass rate                  100% (1/1)                                0% (0/1)",
+			"Review rounds per merged PR         2.00 (1 changes requested, 1 fix rounds)  1.00 (2 changes requested, 0 fix rounds)",
+			"Merged PRs with a person's commit   0% (0/1)                                  50% (1/2)",
+		]);
+	});
+
+	test("reads merged PRs from gh's GraphQL search, one per line", () => {
+		const node = {
+			number: 7609,
+			mergedAt: "2026-11-23T13:28:15Z",
+			reviews: { nodes: [{ state: "APPROVED" }, { state: "CHANGES_REQUESTED" }] },
+			commits: { nodes: [{ commit: { oid: "539b", message: `fix: x\n\n- body\n\nOmp-Session: ${A}\nOmp-Session: ${B}\n` } }, { commit: { oid: "77aa", message: "fix: by hand" } }] },
+		};
+		expect(parseMergedPrs(`${JSON.stringify(node)}\n`)).toEqual([
+			{
+				number: 7609,
+				mergedAt: Date.parse("2026-11-23T13:28:15Z"),
+				changesRequested: 1,
+				commits: [
+					{ sha: "539b", sessions: [A, B] },
+					{ sha: "77aa", sessions: [] },
+				],
+			},
+		]);
 	});
 });
