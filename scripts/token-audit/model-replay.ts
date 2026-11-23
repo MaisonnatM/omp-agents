@@ -4,7 +4,8 @@
  *
  * - `candidates` lists recent worker subagent sessions as task entries: the prompt they got, the repository,
  *   and the main commit at that time as the base, leaving out tasks `--out` already holds, so a weekly run
- *   gets only new ones. Save them to a file and keep the ones worth replaying.
+ *   gets only new ones. Save them to a file and keep the ones worth replaying. `--sessions` lists the sessions
+ *   it names instead, main sessions too, each with the first request it got, as the weekly harness review replays failures.
  * - `run` replays each task on each model in a fresh repository holding only the base's history, with no remote,
  *   in a macOS sandbox that hides the task's checkouts and their sessions and leaves git and gh no way to reach a remote,
  *   so a replay cannot copy later work, push, or land. It prices the run from its session files, saves its diff, and
@@ -13,12 +14,13 @@
  *   fails the replay instead of handing it to another model; `answeredBy` counts the requests per model as proof.
  * - `judge` shows a judge model the task, the `--baseline` model's diff, and another model's diff in random order,
  *   per task and model, and keeps its verdict. A replay another model answered part of is not judged.
- * - `summary` prints the comparison per model; `run` and `judge` end with it.
+ * - `summary` prints the comparison per model, and with `--by-task` one row per task and model; `run` and `judge` end with it.
  *
  * Usage:
- *   bun scripts/token-audit/model-replay.ts candidates [--days 14] [--agents poteto-agent,task] [--repo <path>] > tasks.json
+ *   bun scripts/token-audit/model-replay.ts candidates [--days 14] [--agents poteto-agent,task] [--repo <path>] [--sessions <id,...>] > tasks.json
  *   bun scripts/token-audit/model-replay.ts run --tasks tasks.json --models anthropic/claude-opus-5-5:auto,anthropic/claude-sonnet-5-5:auto [--out <dir>]
  *   bun scripts/token-audit/model-replay.ts judge [--out <dir>] [--judge anthropic/claude-opus-5-5] [--baseline anthropic/claude-opus-5-5:auto]
+ *   bun scripts/token-audit/model-replay.ts summary [--out <dir>] [--by-task]
  * `--out` defaults to `~/.cache/omp-model-replay` and must sit outside every checkout: a replay nested in one read it.
  */
 import { Database } from "bun:sqlite";
@@ -28,6 +30,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { bare, changeSize, confined, endedOnError, git, jsonLines, landConfig, pinnedConfig, prepare, price, sh, type Usage } from "../evals/replay";
+import { firstRequest, namedSessionFiles, survivingCheckout } from "./replay-sessions";
 
 interface Task {
 	id: string;
@@ -66,6 +69,8 @@ const { positionals, values } = parseArgs({
 		days: { type: "string", default: "14" },
 		agents: { type: "string", default: "poteto-agent,task" },
 		repo: { type: "string" },
+		sessions: { type: "string" },
+		"by-task": { type: "boolean", default: false },
 		tasks: { type: "string" },
 		models: { type: "string" },
 		out: { type: "string", default: join(homedir(), ".cache", "omp-model-replay") },
@@ -82,34 +87,56 @@ const pinned = (result: Result) => Object.keys(result.answeredBy).every(model =>
 
 function candidates(): void {
 	const agents = new Set(values.agents.split(","));
+	const named = values.sessions?.split(",").flatMap(id => (id.trim() ? [id.trim()] : []));
 	const db = new Database(values.db, { readonly: true });
-	const files = db
-		.query<{ file: string; requests: number; total: number }, [number]>(
-			`SELECT session_file AS file, COUNT(*) AS requests, TOTAL(cost_total) AS total
-			FROM messages WHERE timestamp >= ? AND agent_type = 'subagent' GROUP BY session_file ORDER BY total DESC`,
-		)
-		.all(Date.now() - Number(values.days) * 86_400_000);
+	const spend = db.query<{ requests: number; total: number }, [string]>("SELECT COUNT(*) AS requests, TOTAL(cost_total) AS total FROM messages WHERE session_file = ?");
+	const files = named
+		? namedSessionFiles(join(homedir(), ".omp", "agent", "sessions"), named).map(file => ({ file, ...(spend.get(file) ?? { requests: 0, total: 0 }) }))
+		: db
+				.query<{ file: string; requests: number; total: number }, [number]>(
+					`SELECT session_file AS file, COUNT(*) AS requests, TOTAL(cost_total) AS total
+					FROM messages WHERE timestamp >= ? AND agent_type = 'subagent' GROUP BY session_file ORDER BY total DESC`,
+				)
+				.all(Date.now() - Number(values.days) * 86_400_000);
 	const tasks: Task[] = [];
 	let unreadable = 0;
+	/** Says why a session `--sessions` named is left out; a listing of recent workers leaves them out silently. */
+	const leaveOut = (id: string, why: string) => {
+		if (named) console.error(`left out ${id}: ${why}`);
+	};
 	for (const { file, requests, total } of files) {
 		if (!existsSync(file)) continue;
 		const entries = jsonLines(file);
 		const header = entries.find(e => e.type === "session");
 		const init = entries.find(e => e.type === "session_init");
-		if (!header || !init || !agents.has(String(init.agent)) || typeof init.task !== "string") continue;
+		if (!header) continue;
+		if (!named && (!init || !agents.has(String(init.agent)))) continue;
 		const id = String(header.id).slice(-8);
-		if (existsSync(join(out, id))) continue;
-		const prompt = init.task;
-		if (/\b(local|agent):\/\//.test(prompt)) {
-			unreadable += 1;
+		if (existsSync(join(out, id))) {
+			leaveOut(id, `${join(out, id)} already holds it`);
 			continue;
 		}
-		const cwd = String(header.cwd);
-		if (!existsSync(cwd)) continue;
+		const request = named ? firstRequest(entries) : typeof init?.task === "string" ? { prompt: init.task, written: init.task } : null;
+		if (request === null) {
+			leaveOut(id, "its session file holds no request");
+			continue;
+		}
+		const { prompt, written } = request;
+		if (/\b(local|agent):\/\//.test(written)) {
+			unreadable += 1;
+			leaveOut(id, "its request points at local:// or agent:// files");
+			continue;
+		}
+		const cwd = named ? survivingCheckout(String(header.cwd)) : existsSync(String(header.cwd)) ? String(header.cwd) : null;
+		if (!cwd) {
+			leaveOut(id, `its checkout ${String(header.cwd)} is gone`);
+			continue;
+		}
 		let repo: string;
 		try {
 			repo = dirname(git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"));
 		} catch {
+			leaveOut(id, `${cwd} is not a git checkout`);
 			continue;
 		}
 		if (values.repo && resolve(values.repo) !== repo) continue;
@@ -117,23 +144,26 @@ function candidates(): void {
 		const target = existsSync(join(repo, ".omp", "land.json"))
 			? (JSON.parse(readFileSync(join(repo, ".omp", "land.json"), "utf8")) as { target?: string }).target ?? "main"
 			: "main";
-		// A commit the prompt names, such as "head `bf45e…`", is the state the worker started from; else main at that time.
-		const named = (prompt.match(/\b[0-9a-f]{7,40}\b/g) ?? []).find(sha => {
+		// A commit the request names, such as "head `bf45e…`", is the state the worker started from; else main at that time.
+		const commit = (written.match(/\b[0-9a-f]{7,40}\b/g) ?? []).find(sha => {
 			try {
 				return git(repo, "rev-parse", "--verify", "--quiet", `${sha}^{commit}`) !== "";
 			} catch {
 				return false;
 			}
 		});
-		const base = named ? git(repo, "rev-parse", `${named}^{commit}`) : git(repo, "rev-list", "-1", "--first-parent", `--before=${at}`, target);
-		if (!base) continue;
+		const base = commit ? git(repo, "rev-parse", `${commit}^{commit}`) : git(repo, "rev-list", "-1", "--first-parent", `--before=${at}`, target);
+		if (!base) {
+			leaveOut(id, `${target} has no commit before ${at}`);
+			continue;
+		}
 		// The repository and its worktrees: `omp-agents`, `omp-agents-wt-x`, `omp-agents-wt/x`, `hameau-9.4`.
 		const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 		const checkout = new RegExp(`${escape(dirname(repo))}/${escape(basename(repo))}(?:-wt/[\\w.-]*\\w|[\\w.-]*\\w)?`, "g");
 		const paths = [...new Set(prompt.match(checkout) ?? [])].sort((a, b) => b.length - a.length);
 		tasks.push({
 			id,
-			agent: String(init.agent),
+			agent: init ? String(init.agent) : "main",
 			repo,
 			base,
 			at,
@@ -144,6 +174,10 @@ function candidates(): void {
 		});
 	}
 	if (unreadable > 0) console.error(`skipped ${unreadable} tasks whose prompt points at local:// or agent:// files a replay cannot read`);
+	if (named) {
+		for (const id of named) if (!files.some(({ file }) => basename(file, ".jsonl").endsWith(id))) console.error(`left out ${id}: no session file has that id`);
+		console.error(`${tasks.length} of ${named.length} sessions became tasks`);
+	}
 	console.log(JSON.stringify(tasks, null, "\t"));
 }
 
@@ -237,15 +271,19 @@ function results(): Result[] {
 		.map(file => JSON.parse(readFileSync(file, "utf8")) as Result);
 }
 
+/** The land checks a task's base got, before any replay. */
+function baseChecks(task: string): Result["checks"] {
+	const file = join(out, task, "base-checks.json");
+	return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [];
+}
+
 /**
  * Whether a replay breaks nothing that worked at its base: a check that passed still passes, and a test suite
  * that failed at the base fails only on cases that already failed there. A check that failed at the base
  * without naming cases, such as the changelog check, says nothing about the replay and is skipped.
  */
 function keepsBaseChecks(result: Result): boolean {
-	const file = join(out, result.task, "base-checks.json");
-	const base: Result["checks"] = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [];
-	return base.every(before => {
+	return baseChecks(result.task).every(before => {
 		const after = result.checks.find(c => c.command === before.command);
 		if (!after) return !before.passed;
 		if (after.passed) return true;
@@ -314,6 +352,23 @@ function summary(): void {
 		};
 	});
 	console.table(rows);
+	if (!values["by-task"]) return;
+	// One row per replay, so a weekly harness review can say which failure its change fixed.
+	console.table(
+		results().map(result => {
+			const failedAtBase = baseChecks(result.task).filter(check => !check.passed);
+			return {
+				task: result.task,
+				model: result.model,
+				"keeps base checks": keepsBaseChecks(result),
+				"failed at base, now pass": `${failedAtBase.filter(before => result.checks.some(after => after.command === before.command && after.passed)).length}/${failedAtBase.length}`,
+				"checks passed": `${result.checks.filter(check => check.passed).length}/${result.checks.length}`,
+				"files changed": result.filesChanged,
+				$: result.cost.toFixed(2),
+				"other model answered": !pinned(result),
+			};
+		}),
+	);
 }
 
 switch (positionals[0]) {

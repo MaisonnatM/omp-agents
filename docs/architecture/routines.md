@@ -59,9 +59,14 @@ The `Dashboard` checks `HEALTH_KINDS` on the owner at startup and on the daily t
 
 `BUILT_IN_ROUTINES` in `src/server/built-in-routines.ts` holds the routines the dashboard adds by itself, each with the Bot that runs it.
 As the owner takes ownership, right after it migrates the routines from before Bots, `addBuiltInRoutines` saves each one that `built-in-routines.json` beside the access token does not list yet, and its Bot unless that Bot exists, through the lists so pages hear of them, then lists its id there.
-A routine you delete is not added again, and one listed changes nothing.
+A routine you delete is not added again, and adding one listed changes nothing but a past prompt, as the end of this section says.
 The one built-in routine is **Weekly harness review** of the **Harness review** Bot, a `routines` Bot that works in the omp-agents checkout (`sourceDir`), disabled, on Mondays at 9:00.
-Its prompt, `HARNESS_REVIEW_PROMPT`, reads the last week of `ship-trace.jsonl`, `LEARNINGS.md`, the failed merges in `merges.json`, and the failed runs in `routines.json`, then asks for the failures grouped by cause, exactly one harness change as a decision for the user, and five past failures to replay against it, and forbids editing, committing, or pushing.
+Its prompt, `HARNESS_REVIEW_PROMPT`, first judges last week's change: it finds the newest `~/.cache/omp-harness-review/<date>-review.md` before today and, when its folder `<date>/` holds replay results, runs `model-replay.ts summary --by-task` there and says per replayed failure whether the replay kept its base's checks and now passes the ones that failed; with no results it says in one line that the replay was never run.
+It then reads the last week of `ship-trace.jsonl` for every repository, with the fixes refused at their round budget or stall limit, which need `moreRounds`, `LEARNINGS.md`, the failed merges in `merges.json`, and the failed runs in `routines.json`, and asks for the failures grouped by cause, exactly one harness change as a decision for the user, and five past failures to replay against it.
+It saves those five with `model-replay.ts candidates --sessions` as `<today>-tasks.json` and its reply as `<today>-review.md` in that folder, and ends with the `model-replay.ts run` command, on the `task` role's model and out to `<today>/`, to run once the change lands; see [Worker model replay](token-cost.md#worker-model-replay).
+It forbids editing, committing, or pushing in any repository and running `run` or `judge`, and writes only under `~/.cache/omp-harness-review/`.
+Since a replay loads no extension but `cache-tail.ts`, a proposed extension change names instead the [Evals](evals.md) run that would measure it with the full harness, such as its `--disable-extensions` arm, which the review does not run.
+Each entry of `BUILT_IN_ROUTINES` lists its `pastPrompts`, every prompt an earlier version saved; on each start `addBuiltInRoutines` gives a listed routine whose stored prompt is one of them the current prompt, keeping its runs and settings, and leaves a prompt the user edited alone.
 
 ## The runner
 
