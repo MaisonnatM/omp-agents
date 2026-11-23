@@ -5,23 +5,16 @@
  * A Bot's conversation posts nothing: its routine runs would bury the rest.
  */
 import { randomUUID } from "node:crypto";
-import { type BoardChange, type BoardState, sessionMember } from "../shared/board";
-import type { Bot } from "../shared/bots";
+import type { BoardEnv } from "../board-module";
+import { sessionMember } from "../shared/board";
 import type { RosterHost } from "../shared/sessions";
 
-export const SESSIONS_CHANNEL = { id: "c-sessions", name: "sessions", about: "Each session's thread: what it asks you and when it finishes.", sync: null, restricted: false } as const;
+export const SESSIONS_CHANNEL = { id: "c-sessions", name: "sessions", about: "Each session's thread: what it asks you and when it finishes." } as const;
 
 export const sessionThreadId = (sessionId: string): string => `t-session-${sessionId}`;
 
-export interface BoardFeedDeps {
-	state(): BoardState;
-	hosts(): readonly RosterHost[];
-	bots(): readonly Bot[];
-	apply(change: BoardChange): void;
-	/** Whether this server posts at all: only the one that owns the files does. */
-	active(): boolean;
-	now(): number;
-}
+/** What the feed reads and does. */
+export type BoardFeedDeps = Omit<BoardEnv, "stopping" | "wake" | "wakeBot">;
 
 type Phase = "asking" | "working" | "idle";
 
@@ -81,7 +74,7 @@ export class BoardFeed {
 			this.#deps.apply({ op: "channel", channel: { ...SESSIONS_CHANNEL } });
 		}
 		if (!state.threads.some(item => item.id === thread)) {
-			this.#deps.apply({ op: "thread", thread: { id: thread, channel, title: sessionMember(host).name, task: null, lease: null, labels: [], blockedBy: [], createdAt: at } });
+			this.#deps.apply({ op: "thread", thread: { id: thread, channel, title: sessionMember(host).name, task: null, lease: null, createdAt: at } });
 		}
 		this.#deps.apply({ op: "post", message: { id: randomUUID(), thread, author: sessionMember(host).id, at, text } });
 	}

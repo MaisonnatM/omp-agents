@@ -9,7 +9,7 @@ const host = (sessionId: string, over: Partial<RosterHost> = {}): RosterHost =>
 const asking = (sessionId: string) => host(sessionId, { status: "needs-input", requests: [{ id: "r1", title: "Which branch?", deadline: null, kind: "confirm", message: "" }] as RosterHost["requests"] });
 
 function feedWith(bots: Bot[] = []) {
-	let state: BoardState = emptyBoard();
+	let state: BoardState = emptyBoard("Maxence");
 	let hosts: RosterHost[] = [];
 	const apply = (change: BoardChange) => {
 		const applied = applyBoardChange(state, change);

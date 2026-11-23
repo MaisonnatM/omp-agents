@@ -6,23 +6,11 @@
  * forever.
  */
 import { randomUUID } from "node:crypto";
-import { type BoardChange, type BoardState, boardMembers, isMention, type Member, type Message } from "../shared/board";
-import type { Bot, BotId } from "../shared/bots";
-import type { RosterHost } from "../shared/sessions";
+import { type BoardState, boardMembers, isMention, type Member, type Message } from "../shared/board";
+import type { BoardEnv } from "../board-module";
 
-export interface BoardWakeDeps {
-	state(): BoardState;
-	hosts(): readonly RosterHost[];
-	bots(): readonly Bot[];
-	apply(change: BoardChange): void;
-	/** Sends `text` to session `sessionId` as a follow-up, resuming it when it ended. */
-	wake(sessionId: string, text: string): Promise<void>;
-	/** Sends `text` into Bot `botId`'s conversation, resuming or starting it. */
-	wakeBot(botId: BotId, text: string): Promise<void>;
-	/** Whether this server wakes at all: only the one that owns the files does. */
-	active(): boolean;
-	now(): number;
-}
+/** What waking reads and does. */
+export type BoardWakeDeps = Omit<BoardEnv, "stopping">;
 
 /** The sessions and Bots `msg` wakes, among `members`. */
 export function wakeTargets(state: BoardState, members: readonly Member[], msg: Message): Member[] {

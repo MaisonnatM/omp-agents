@@ -1,8 +1,8 @@
-/** The pieces the Board's page and its sidebar list share: times, a ticking clock, member avatars, and the dialog that names a new channel or thread. */
-import { useEffect, useState } from "react";
+/** The pieces the Board's page and its sidebar list share: times, a ticking clock, member avatars, chips, and the dialog that names a new channel or thread. */
+import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Member } from "../../../src/shared/board";
+import { DAY, HOUR, type Member, MIN, type Thread } from "../../../src/shared/board";
 import { BotAvatar } from "../bots/bot-avatar";
 import { useDashboardStatus } from "../dashboard-context";
 import { FormDialog, FormDialogHeader } from "../form-dialog";
@@ -39,15 +39,43 @@ export function NameDialog({ title, label, refuse, onSave, onClose }: { title: s
 	);
 }
 
-export const MIN = 60_000;
-export const UNITS: Record<string, number> = { m: MIN, h: 60 * MIN, d: 24 * 60 * MIN };
-
 export function relTime(at: number, now: number): string {
 	const delta = at - now;
 	const abs = Math.abs(delta);
 	if (abs < MIN) return "now";
-	const unit = abs < UNITS.h! ? `${Math.round(abs / MIN)}m` : abs < UNITS.d! ? `${Math.round(abs / UNITS.h!)}h` : `${Math.round(abs / UNITS.d!)}d`;
+	const unit = abs < HOUR ? `${Math.round(abs / MIN)}m` : abs < DAY ? `${Math.round(abs / HOUR)}h` : `${Math.round(abs / DAY)}d`;
 	return delta > 0 ? `in ${unit}` : unit;
+}
+
+/** The session feed's `@you waits on you: ` or `@you finished: ` lead, which `src/server/board-feed.ts` writes so the post counts as a mention. */
+const FEED_LEAD = /^@.+? (waits on you|finished): /;
+
+/** A session feed post's status and the text after its lead, `null` for any other message; a reply the feed cut mid-bold drops its unpaired `**`, which would show raw. */
+export function feedLead(text: string): { label: string; tone: "green" | "amber"; body: string } | null {
+	const lead = FEED_LEAD.exec(text);
+	if (!lead) return null;
+	const rest = text.slice(lead[0].length);
+	const body = (rest.match(/\*\*/g)?.length ?? 0) % 2 === 0 ? rest : rest.replaceAll("**", "");
+	return lead[1] === "finished" ? { label: "Finished", tone: "green", body } : { label: "Waits on you", tone: "amber", body };
+}
+
+export function Chip({ children, tone }: { children: ReactNode; tone?: "blue" | "green" | "amber" | "violet" }) {
+	const tones = { blue: "bg-sky-500/12 text-sky-700 dark:text-sky-300", green: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300", amber: "bg-amber-500/15 text-amber-800 dark:text-amber-300", violet: "bg-violet-500/12 text-violet-700 dark:text-violet-300" };
+	return <span className={cn("inline-block h-5 min-w-0 truncate rounded px-1.5 text-2xs leading-5 font-medium", tone ? tones[tone] : "bg-foreground/[0.06] text-muted-foreground")}>{children}</span>;
+}
+
+/** Who holds a lease and for how long, or that it ran out. */
+export function leaseLabel(lease: NonNullable<Thread["lease"]>, byId: ReadonlyMap<string, Member>, now: number, sep: string) {
+	const name = byId.get(lease.by)?.name ?? lease.by;
+	return lease.until <= now ? `${name}${sep}lease expired` : `${name}${sep}${relTime(lease.until, now).replace("in ", "")} left`;
+}
+
+const TASK_TONE = { open: "blue", claimed: "violet", review: "amber", done: "green" } as const;
+
+export function TaskChip({ thread, byId, now }: { thread: Thread; byId: ReadonlyMap<string, Member>; now: number }) {
+	if (!thread.task) return null;
+	const label = thread.task === "claimed" && thread.lease && byId.has(thread.lease.by) ? leaseLabel(thread.lease, byId, now, " · ") : thread.task;
+	return <Chip tone={TASK_TONE[thread.task]}>{label}</Chip>;
 }
 
 export function useNow(ms = 15_000) {

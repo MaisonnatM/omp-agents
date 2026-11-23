@@ -1,12 +1,12 @@
 /** The left sidebar's Board mode: the inbox, schedules, channels, and members, in the Sessions list's rows. */
-import { IconBell, IconCalendar1, IconHashtag, IconLock, IconPlusSmall } from "central-icons";
+import { IconBell, IconCalendar1, IconHashtag, IconPlusSmall } from "central-icons";
 import { useMemo, useState, type ReactNode } from "react";
 import { SidebarGroup, SidebarGroupAction, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { IconComponent } from "@/lib/icon-context";
 import type { RosterHost } from "../../../src/shared/sessions";
 import type { Bot } from "../../../src/shared/bots";
-import { type BoardState, boardMembers, type Member, queueOf, unreadIn } from "../../../src/shared/board";
+import { type BoardIndex, boardIndex, type BoardState, boardMembers, type Member } from "../../../src/shared/board";
 import { CountPill } from "../count-pill";
 import { hashForPage } from "../../routing";
 import { type BoardRoute, type BoardView, resolveBoardView } from "./module";
@@ -17,35 +17,36 @@ import { Avatar, NameDialog, relTime, useNow } from "./parts";
 export function BoardNav({ state, hosts, bots, route }: { state: BoardState | null; hosts: RosterHost[]; bots: Bot[] | null; route: BoardRoute }) {
 	const now = useNow();
 	const members = useMemo(() => (state ? boardMembers(state, hosts, bots ?? []) : []), [state, hosts, bots]);
-	if (!state) return null;
-	const me = members.find(member => member.id === state.me)!;
-	const view = resolveBoardView(state, new Map(members.map(member => [member.id, member])), route.view);
-	return <Rail state={state} members={members} me={me} now={now} inboxCount={queueOf(state, me).length} view={view} onView={next => (location.hash = hashForPage({ kind: "board", view: next, thread: null }))} />;
+	const index = useMemo(() => (state ? boardIndex(state, members) : null), [state, members]);
+	if (!state || !index) return null;
+	const view = resolveBoardView(state, index.memberById, route.view);
+	return <Rail state={state} members={members} index={index} now={now} view={view} onView={next => (location.hash = hashForPage({ kind: "board", view: next, thread: null }))} />;
 }
 
 /** A channel's name as the rail shows it after `#`: lower case, words joined by hyphens. */
 const channelName = (typed: string) => typed.toLowerCase().replace(/^#+/, "").replace(/\s+/g, "-");
 
-function Rail({ state, members, view, onView, me, now, inboxCount }: { state: BoardState; members: Member[]; view: BoardView; onView: (view: BoardView) => void; me: Member; now: number; inboxCount: number }) {
+function Rail({ state, members, index, view, onView, now }: { state: BoardState; members: Member[]; index: BoardIndex; view: BoardView; onView: (view: BoardView) => void; now: number }) {
 	const { changeModule } = useDashboardActions();
 	const [naming, setNaming] = useState(false);
 	function createChannel(typed: string) {
 		const id = `c-${crypto.randomUUID()}`;
-		void changeModule("board", { op: "channel", channel: { id, name: channelName(typed), about: "", sync: null, restricted: false } });
+		void changeModule("board", { op: "channel", channel: { id, name: channelName(typed), about: "" } });
 		onView({ kind: "channel", id });
 	}
 	const sel = (other: BoardView) => view.kind === other.kind && ("id" in view ? "id" in other && view.id === other.id : true);
 	const humans = members.filter(member => member.kind === "human");
-	// Named agents, Bots, and bots, then the omp sessions on the board, which carry a session id.
+	// Named agents and Bots, then the omp sessions on the board, which carry a session id.
 	const agents = members.filter(member => member.kind !== "human" && (!member.sessionId || member.botId));
 	const sessions = members.filter(member => member.kind !== "human" && member.sessionId && !member.botId);
+	const unreadIn = (channel: string) => state.threads.filter(thread => thread.channel === channel).reduce((sum, thread) => sum + (index.unreadByThread.get(thread.id) ?? 0), 0);
 	const memberRow = (member: Member) => (
 		<RailRow
 			key={member.id}
-			icon={avatarIcon(member)}
-			label={member.id === me.id ? `${member.name} (you)` : member.name}
+			leading={<Avatar member={member} size="xs" />}
+			label={member.id === state.me ? `${member.name} (you)` : member.name}
 			hint={member.kind === "human" ? `${member.name} · ${member.presence === "online" ? "Online" : "Away"}` : member.harness ? `${member.name} · ${member.harness}` : member.name}
-			count={queueOf(state, member).length}
+			count={index.queueByMember.get(member.id)?.length}
 			selected={sel({ kind: "member", id: member.id })}
 			onClick={() => onView({ kind: "member", id: member.id })}
 		/>
@@ -53,7 +54,7 @@ function Rail({ state, members, view, onView, me, now, inboxCount }: { state: Bo
 	return (
 		<nav aria-label="Board" className="pb-2">
 			<RailGroup>
-				<RailRow icon={IconBell} label="Inbox" count={inboxCount} selected={sel({ kind: "inbox" })} onClick={() => onView({ kind: "inbox" })} />
+				<RailRow icon={IconBell} label="Inbox" count={index.queueByMember.get(state.me)?.length} selected={sel({ kind: "inbox" })} onClick={() => onView({ kind: "inbox" })} />
 				<RailRow
 					icon={IconCalendar1}
 					label="Scheduled"
@@ -73,15 +74,7 @@ function Rail({ state, members, view, onView, me, now, inboxCount }: { state: Bo
 				}
 			>
 				{state.channels.map(channel => (
-					<RailRow
-						key={channel.id}
-						icon={channel.restricted ? IconLock : IconHashtag}
-						label={channel.name}
-						hint={channel.sync ? `Synced to ${channel.sync}` : undefined}
-						count={state.threads.filter(thread => thread.channel === channel.id).reduce((sum, thread) => sum + unreadIn(state, thread.id), 0)}
-						selected={sel({ kind: "channel", id: channel.id })}
-						onClick={() => onView({ kind: "channel", id: channel.id })}
-					/>
+					<RailRow key={channel.id} icon={IconHashtag} label={channel.name} count={unreadIn(channel.id)} selected={sel({ kind: "channel", id: channel.id })} onClick={() => onView({ kind: "channel", id: channel.id })} />
 				))}
 			</RailGroup>
 			<RailGroup label="People">{humans.map(memberRow)}</RailGroup>
@@ -110,28 +103,11 @@ function RailGroup({ label, action, children }: { label?: string; action?: React
 	);
 }
 
-/** Each member's latest row, which its avatar icon reads, so the icon stays one component per member and never remounts. */
-const latestMember = new Map<string, Member>();
-const avatarIcons = new Map<string, IconComponent>();
-
-/** A member's avatar, shrunk to the icon slot of a sidebar row. */
-function avatarIcon(member: Member): IconComponent {
-	latestMember.set(member.id, member);
-	let icon = avatarIcons.get(member.id);
-	if (!icon) {
-		icon = function MemberAvatar() {
-			return <Avatar member={latestMember.get(member.id)!} size="xs" />;
-		};
-		avatarIcons.set(member.id, icon);
-	}
-	return icon;
-}
-
-/** One Board row, a Sessions-list row: `hint` is its tooltip, `count` its badge. */
-function RailRow({ icon, label, count = 0, hint, selected, onClick }: { icon: IconComponent; label: string; count?: number; hint?: string; selected: boolean; onClick: () => void }) {
+/** One Board row, a Sessions-list row: `icon` or `leading` its mark, `hint` its tooltip, `count` its badge. */
+function RailRow({ icon, leading, label, count = 0, hint, selected, onClick }: { icon?: IconComponent; leading?: ReactNode; label: string; count?: number; hint?: string; selected: boolean; onClick: () => void }) {
 	return (
 		<SidebarMenuItem>
-			<SidebarMenuButton size="short" icon={icon} isActive={selected} title={hint} aria-current={selected || undefined} aria-label={count > 0 ? `${label}, ${count}` : undefined} onClick={onClick}>
+			<SidebarMenuButton size="short" icon={icon} leading={leading} isActive={selected} title={hint} aria-current={selected || undefined} aria-label={count > 0 ? `${label}, ${count}` : undefined} onClick={onClick}>
 				{label}
 			</SidebarMenuButton>
 			{count > 0 && (

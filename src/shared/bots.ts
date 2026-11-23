@@ -22,8 +22,8 @@ export interface BotLook {
 	hue: BotHue;
 }
 
-/** The look a Bot saved before you could pick one gets, from its id, so it keeps the face it had. */
-export function defaultLook(id: BotId): BotLook {
+/** The look a Bot saved before you could pick one gets, from its id or any other key, so it keeps the face it had. */
+export function defaultLook(id: string): BotLook {
 	let hash = 0;
 	for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
 	return { shape: BOT_SHAPES[hash % BOT_SHAPES.length]!, hue: BOT_HUES[Math.floor(hash / BOT_SHAPES.length) % BOT_HUES.length]! };

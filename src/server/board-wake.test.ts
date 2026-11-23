@@ -10,7 +10,7 @@ const host = (sessionId: string): RosterHost => ({ sessionId, sessionName: "scou
 const message = (id: string, author: string, text: string): Message => ({ id, thread: "t-grill", author, at: 1, text });
 
 function wakeWith(bots: Bot[], hosts: RosterHost[] = []) {
-	let state: BoardState = { ...emptyBoard(), threads: [{ id: "t-grill", channel: "c-general", title: "Wake rule", task: null, lease: null, labels: [], blockedBy: [], createdAt: 0 }] };
+	let state: BoardState = { ...emptyBoard("Maxence"), threads: [{ id: "t-grill", channel: "c-general", title: "Wake rule", task: null, lease: null, createdAt: 0 }] };
 	const woken: { bot: BotId | null; session: string | null; text: string }[] = [];
 	const apply = (change: BoardChange) => {
 		const applied = applyBoardChange(state, change);
@@ -56,7 +56,7 @@ describe("BoardWake and Bots", () => {
 	});
 
 	test("a Bot's live conversation is listed once, as the Bot", () => {
-		const members = boardMembers(emptyBoard(), [host("s-1"), host("s-2")], [bot("s-1")]);
+		const members = boardMembers(emptyBoard("Maxence"), [host("s-1"), host("s-2")], [bot("s-1")]);
 		expect(members.filter(member => member.sessionId === "s-1").map(member => member.id)).toEqual([botMemberId(scout)]);
 		expect(members.find(member => member.id === botMemberId(scout))?.presence).toBe("idle");
 		expect(members.some(member => member.id === "s-s-2")).toBe(true);

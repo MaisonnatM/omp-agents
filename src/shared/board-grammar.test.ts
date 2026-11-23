@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { emptyBoard, isMention, mentions, parseCommand } from "./board";
 
 describe("the mention and command grammar", () => {
-	const member = (id: string, name: string) => ({ ...emptyBoard().extraMembers[0]!, id, name });
+	const member = (id: string, name: string) => ({ ...emptyBoard("Maxence").extraMembers[0]!, id, name });
 	const max = member("u-max", "Max");
 	const power = member("s-1", "Max Power");
 
