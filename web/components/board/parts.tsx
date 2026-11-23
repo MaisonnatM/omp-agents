@@ -33,7 +33,8 @@ export const PRESENCE_COLOR: Record<Member["presence"], string> = {
 	asleep: "bg-zinc-400",
 };
 
-export function Avatar({ member, size }: { member: Member; size: "xs" | "sm" | "md" }) {
+/** `dot: false` leaves out the presence dot, as in an overlapping stack, where it would sit on the next avatar. */
+export function Avatar({ member, size, dot = true }: { member: Member; size: "xs" | "sm" | "md"; dot?: boolean }) {
 	const box = size === "xs" ? "size-4" : size === "sm" ? "size-6" : "size-8";
 	return (
 		<span className={cn("relative inline-flex shrink-0", box)}>
@@ -45,9 +46,10 @@ export function Avatar({ member, size }: { member: Member; size: "xs" | "sm" | "
 					{member.initials}
 				</span>
 			) : (
-				<BotAvatar look={member.look} size={size === "md" ? "row" : "header"} working={member.presence === "working"} className={size === "md" ? "size-8" : size === "xs" ? "size-4" : undefined} />
+				// No bob in the 16px sidebar slot, where it reads as the icon sitting off its row.
+				<BotAvatar look={member.look} size={size === "md" ? "row" : "header"} working={size !== "xs" && member.presence === "working"} className={size === "md" ? "size-8" : size === "xs" ? "size-4" : undefined} />
 			)}
-			<span className={cn("absolute -right-0.5 -bottom-0.5 rounded-full", size === "xs" ? "size-1.5 ring-1 ring-sidebar" : "size-2.5 ring-2 ring-background", PRESENCE_COLOR[member.presence], member.presence === "working" && "motion-safe:animate-pulse")} />
+			{dot && <span className={cn("absolute -right-0.5 -bottom-0.5 rounded-full", size === "xs" ? "size-1.5 ring-1 ring-sidebar" : "size-2.5 ring-2 ring-background", PRESENCE_COLOR[member.presence], member.presence === "working" && "motion-safe:animate-pulse")} />}
 		</span>
 	);
 }

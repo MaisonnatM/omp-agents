@@ -23,13 +23,15 @@ export function BoardNav({ state, hosts, route }: { state: BoardState | null; ho
 function Rail({ state, members, view, onView, me, now, inboxCount }: { state: BoardState; members: Member[]; view: BoardView; onView: (view: BoardView) => void; me: Member; now: number; inboxCount: number }) {
 	const sel = (other: BoardView) => view.kind === other.kind && ("id" in view ? "id" in other && view.id === other.id : true);
 	const humans = members.filter(member => member.kind === "human");
-	const agents = members.filter(member => member.kind !== "human");
+	// Named agents and bots, then the omp sessions on the board, which carry a session id.
+	const agents = members.filter(member => member.kind !== "human" && !member.sessionId);
+	const sessions = members.filter(member => member.kind !== "human" && member.sessionId);
 	const memberRow = (member: Member) => (
 		<RailRow
 			key={member.id}
 			icon={avatarIcon(member)}
 			label={member.id === me.id ? `${member.name} (you)` : member.name}
-			hint={member.kind === "human" ? `${member.name} · ${member.presence === "online" ? "Online" : "Away"}` : `${member.name} · ${member.harness}`}
+			hint={member.kind === "human" ? `${member.name} · ${member.presence === "online" ? "Online" : "Away"}` : member.harness ? `${member.name} · ${member.harness}` : member.name}
 			count={queueOf(state, member).length}
 			selected={sel({ kind: "member", id: member.id })}
 			onClick={() => onView({ kind: "member", id: member.id })}
@@ -62,6 +64,7 @@ function Rail({ state, members, view, onView, me, now, inboxCount }: { state: Bo
 			</RailGroup>
 			<RailGroup label="People">{humans.map(memberRow)}</RailGroup>
 			<RailGroup label="Agents">{agents.map(memberRow)}</RailGroup>
+			{sessions.length > 0 && <RailGroup label="Sessions">{sessions.map(memberRow)}</RailGroup>}
 		</nav>
 	);
 }

@@ -1,5 +1,5 @@
 /** The Board: channels and threads where people, omp sessions, and remote agents post, with an inbox per member; a message for a session wakes it. */
-import { IconArrowUp, IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconShieldCheck } from "central-icons";
+import { IconArrowUp, IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconShieldCheck, IconSidebarSimpleRightWide } from "central-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -96,15 +96,18 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 	const working = thread ? members.find(member => member.sessionId && member.presence === "working" && state.messages.some(msg => msg.thread === thread.id && msg.author === member.id)) : undefined;
 	if (!thread && view.kind === "inbox" && inboxItems.length === 0)
 		return (
-			<Empty className="h-full">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<IconBell />
-					</EmptyMedia>
-					<EmptyTitle>Inbox zero</EmptyTitle>
-					<EmptyDescription>Agents will ping you here.</EmptyDescription>
-				</EmptyHeader>
-			</Empty>
+			<section aria-label="Inbox" className="flex h-full min-h-0 flex-col">
+				<ListHeader title="Inbox" meta={INBOX_META} />
+				<Empty>
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<IconBell />
+						</EmptyMedia>
+						<EmptyTitle>Inbox zero</EmptyTitle>
+						<EmptyDescription>Agents will ping you here.</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			</section>
 		);
 	return (
 		<div className="@container h-full min-h-0">
@@ -141,7 +144,7 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { state: BoardState; members: Member[]; byId: Map<string, Member>; view: BoardView; open: string | null; onOpen: (id: string) => void; now: number; queue: Message[] }) {
 	const [q, setQ] = useState("");
 	let title = "Inbox";
-	let meta = "Mentions and replies waiting for you";
+	let meta = INBOX_META;
 	let body: ReactNode;
 	if (view.kind === "inbox") {
 		const me = byId.get(state.me)!;
@@ -167,7 +170,7 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 							</span>
 						</span>
 						<span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">{item.text}</span>
-						<span className="mt-1.5 flex gap-1.5">
+						<span className="mt-1.5 flex min-w-0 gap-1.5">
 							<Chip>{item.every ? repeatLabel(item.every) : "once"}</Chip>
 							<Chip>{state.threads.find(thread => thread.id === item.thread)?.title}</Chip>
 						</span>
@@ -206,22 +209,36 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 		);
 	}
 	return (
-		<section aria-label={title} className="flex min-h-0 flex-col border-r border-border">
-			<header className="flex h-(--page-header-height) shrink-0 items-center gap-3 border-b border-border px-4">
-				<div className="min-w-0 flex-1">
-					<h2 className="truncate text-sm font-semibold">{title}</h2>
-					<p className="truncate text-xs text-muted-foreground">{meta}</p>
-				</div>
-			</header>
+		<section aria-label={title} className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-border">
+			<ListHeader title={title} meta={meta} />
 			{view.kind === "channel" && (
 				<label className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-4 text-sm text-muted-foreground">
 					<IconMagnifyingGlass className="size-3.5" />
 					<input value={q} onChange={event => setQ(event.target.value)} placeholder="Filter threads" className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground" />
 				</label>
 			)}
-			<div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
+			<div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">{body}</div>
 		</section>
 	);
+}
+
+const INBOX_META = "Mentions and replies waiting for you";
+
+function ListHeader({ title, meta }: { title: string; meta: string }) {
+	return (
+		<header className="flex h-(--page-header-height) shrink-0 items-center gap-3 border-b border-border px-4">
+			<div className="min-w-0 flex-1">
+				<h2 className="truncate text-sm font-semibold">{title}</h2>
+				<p className="truncate text-xs text-muted-foreground">{meta}</p>
+			</div>
+		</header>
+	);
+}
+
+/** Who holds a lease and for how long, or that it ran out. */
+function leaseLabel(lease: NonNullable<Thread["lease"]>, byId: Map<string, Member>, now: number, sep: string) {
+	const name = byId.get(lease.by)?.name ?? lease.by;
+	return lease.until <= now ? `${name}${sep}lease expired` : `${name}${sep}${relTime(lease.until, now).replace("in ", "")} left`;
 }
 
 function presenceLine(member: Member) {
@@ -241,8 +258,7 @@ const TASK_TONE = { open: "blue", claimed: "violet", review: "amber", done: "gre
 
 function TaskChip({ thread, byId, now }: { thread: Thread; byId: Map<string, Member>; now: number }) {
 	if (!thread.task) return null;
-	const holder = thread.lease ? byId.get(thread.lease.by) : undefined;
-	const label = thread.task === "claimed" && holder ? `${holder.name} · ${relTime(thread.lease!.until, now).replace("in ", "")} left` : thread.task;
+	const label = thread.task === "claimed" && thread.lease && byId.has(thread.lease.by) ? leaseLabel(thread.lease, byId, now, " · ") : thread.task;
 	return <Chip tone={TASK_TONE[thread.task]}>{label}</Chip>;
 }
 
@@ -280,8 +296,8 @@ function ThreadCard({ thread, state, byId, now, selected, onOpen, preview, menti
 				))}
 				<span className="ml-auto flex shrink-0 -space-x-1.5">
 					{people.map(member => (
-						<span key={member.id} className="rounded-full ring-2 ring-background">
-							<Avatar member={member} size="sm" />
+						<span key={member.id} className="flex rounded-full ring-2 ring-background">
+							<Avatar member={member} size="sm" dot={false} />
 						</span>
 					))}
 				</span>
@@ -317,8 +333,26 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 	const channel = state.channels.find(item => item.id === thread.channel)!;
 	const scroller = useRef<HTMLDivElement>(null);
 	const [showInternal, setShowInternal] = useState(true);
+	const [details, setDetails] = useState(false);
+	/** Whether the reader is at the latest message, so the list follows new ones and any resize, as the composer lifting over a toast. */
+	const pinned = useRef(true);
 	useEffect(() => {
-		scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
+		const list = scroller.current!;
+		list.scrollTop = list.scrollHeight;
+		const onScroll = () => (pinned.current = list.scrollHeight - list.scrollTop - list.clientHeight < 48);
+		const follow = new ResizeObserver(() => {
+			if (pinned.current) list.scrollTop = list.scrollHeight;
+		});
+		follow.observe(list);
+		if (list.firstElementChild) follow.observe(list.firstElementChild);
+		list.addEventListener("scroll", onScroll, { passive: true });
+		return () => {
+			follow.disconnect();
+			list.removeEventListener("scroll", onScroll);
+		};
+	}, []);
+	useEffect(() => {
+		if (pinned.current) scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
 	}, [messages.length, typing]);
 	const deps = thread.blockedBy.map(id => state.threads.find(item => item.id === id)!);
 	const dependents = state.threads.filter(item => item.blockedBy.includes(thread.id));
@@ -332,7 +366,7 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 					<IconChevronLeft />
 				</Button>
 				<div className="min-w-0 flex-1">
-					<h2 className="truncate text-sm font-semibold">{thread.title}</h2>
+					<h2 title={thread.title} className="truncate text-sm font-semibold">{thread.title}</h2>
 					<p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
 						<IconHashtag className="size-3" />
 						{channel.name}
@@ -344,8 +378,11 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 					<input type="checkbox" checked={showInternal} onChange={event => setShowInternal(event.target.checked)} className="accent-current" />
 					Internal notes
 				</label>
+				<Button variant="ghost" size="icon-compact" aria-label="Details" aria-expanded={details} className="-mr-2 shrink-0 min-[1400px]:hidden" onClick={() => setDetails(open => !open)}>
+					<IconSidebarSimpleRightWide />
+				</Button>
 			</header>
-			<div className="flex min-h-0 flex-1">
+			<div className="relative flex min-h-0 flex-1">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 				<div ref={scroller} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
 					<ol className="mx-auto max-w-3xl px-6 py-6">
@@ -371,13 +408,19 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 				</div>
 				<Composer members={members} onPost={onPost} onCommand={onCommand} channel={channel.name} />
 				</div>
-				<aside className="w-64 shrink-0 overflow-y-auto border-l border-border px-4 py-5 text-sm max-[1400px]:hidden">
+				<aside
+					aria-label="Details"
+					className={cn(
+						"w-64 shrink-0 overflow-y-auto border-l border-border bg-background px-4 py-5 text-sm",
+						details ? "max-[1400px]:absolute max-[1400px]:inset-y-0 max-[1400px]:right-0 max-[1400px]:z-20 max-[1400px]:shadow-lg" : "max-[1400px]:hidden",
+					)}
+				>
 					<SideHeading>Task</SideHeading>
 					<div className="space-y-2">
 						<Fact label="State">
 							<span className="capitalize">{thread.task ?? "Discussion"}</span>
 						</Fact>
-						{thread.lease && <Fact label="Lease">{`${byId.get(thread.lease.by)?.name}, ${relTime(thread.lease.until, now).replace("in ", "")} left`}</Fact>}
+						{thread.lease && <Fact label="Lease">{leaseLabel(thread.lease, byId, now, ", ")}</Fact>}
 						<Fact label="Labels">{thread.labels.join(", ")}</Fact>
 					</div>
 					{(deps.length > 0 || dependents.length > 0) && (
@@ -617,10 +660,10 @@ function Composer({ members, onPost, onCommand, channel }: { members: Member[]; 
 	}
 
 	return (
-		<div className="shrink-0 px-6 pt-2 pb-5">
-			<div className="relative mx-auto max-w-3xl">
+		<div className="shrink-0 pt-2 pb-[max(1.25rem,var(--toasts-clearance,0px))] transition-[padding] duration-200 max-phone:pb-5">
+			<div className="relative mx-auto max-w-3xl px-6">
 				{suggestions.length > 0 && (
-					<ul role="listbox" className="absolute right-0 bottom-full left-0 mb-2 overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-lg">
+					<ul role="listbox" className="absolute right-6 bottom-full left-6 mb-2 overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-lg">
 						{suggestions.map((suggestion, i) => (
 							<li key={suggestion.kind === "member" ? suggestion.member.id : suggestion.name} role="option" aria-selected={i === active}>
 								<button type="button" onMouseDown={event => event.preventDefault()} onClick={() => pick(suggestion)} className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm", i === active && "bg-accent")}>

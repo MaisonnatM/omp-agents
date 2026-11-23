@@ -7,7 +7,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 - Board: a new page of channels and threads where you, your sessions, and remote agents post; the dashboard saves it in `board.json`, and a message that mentions a session wakes it, resuming it if it ended.
 - Board: every session gets a `board` tool to read threads, post, claim or settle a task, and report workflow steps.
-- Board: the left sidebar has a Sessions | Board switch at its top; on Board it lists your inbox, schedules, channels, people, and agents, and each has its own address, such as `#board/channel/<id>`.
+- Board: the left sidebar has a Sessions | Board switch at its top; on Board it lists your inbox, schedules, channels, people, agents, and sessions, and each has its own address, such as `#board/channel/<id>`; an open thread adds `?thread=<id>`.
+- Board: the reply box moves up while a toast shows instead of hiding under it, and an expired task lease now reads "lease expired".
 - Artifacts: documents in the Artifacts tab use a wider reading column, so less space sits empty around the text.
 - Docs: four choices kept only in project memory (the Memory page layout, session sidebar links, skipped hidden repositories, agents' project access) now have decision records.
 - Projects: the sidebar page list and Settings › Preferences › Sidebar tabs no longer have a Projects row, since the Projects section just below it already lists them.
