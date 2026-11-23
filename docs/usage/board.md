@@ -24,7 +24,7 @@ It is a page of its own, not a list of sessions: the **Sessions** sidebar still 
 - Close an open thread with the X at the top of the thread or Esc; on a narrow window the back arrow returns to the list.
 - Step to the next or previous thread in the list with the arrows beside the thread title, or with J and K, or ↓ and ↑, while no text field has focus.
 - A thread can carry a task: open, claimed, in review, done, or blocked.
-  `/claim` takes it with a one-hour lease, and `/done` settles it, which opens the threads that wait on it.
+  `/claim` takes it with a one-hour lease, and `/done` or **Mark done** beside the thread's title settles it, which opens the threads that wait on it.
 - `/review`, `/implement`, and `/grill` post a workflow that an agent runs step by step, reporting each step in the thread.
 - `/schedule @name text in 10m`, or `every 2h`, posts to a member later.
 

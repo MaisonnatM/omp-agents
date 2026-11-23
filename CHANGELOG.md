@@ -7,6 +7,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 - Fixed: on a wide window you can now close an open Board thread, with the X at the top right of the thread or Esc.
 - You can step through the Board's threads with the up and down arrows beside the thread title, or with J and K, or the arrow keys.
+- An open Board thread now has a Mark done button beside its title, which settles it as /done does.
+- A channel's thread list is tidier: it no longer repeats the channel's name on every thread, and it shows the people row only for a task or a thread with several people in it.
 - Behind the scenes: an eval run now deletes its copy of the repository even when scoring it fails, so a long decay check no longer fills the disk with leftover copies.
 - The Board's thread list now shows each last message as plain words, without Markdown such as `**` or link addresses.
 - Behind the scenes: the metrics report's first-pass rate for a GitHub repository now counts only the checks a pull request must pass to merge, so gates like `human-review` no longer pull it down, and it says how many pull requests had no required checks.

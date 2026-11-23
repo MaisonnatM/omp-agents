@@ -1,14 +1,16 @@
 /** An open Board thread: its messages, the composer, and a details column with its task, people, and schedules. */
-import { IconChevronDownSmall, IconChevronLeft, IconChevronTopSmall, IconClock, IconCrossMedium, IconHashtag, IconSidebarSimpleRightWide } from "central-icons";
+import { IconCheckmark1, IconChevronDownSmall, IconChevronLeft, IconChevronTopSmall, IconClock, IconCrossMedium, IconHashtag, IconSidebarSimpleRightWide } from "central-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { boardTokens } from "../../board-composer";
 import { boardMessagePreset, type MarkdownPreset, MessageMarkdown } from "../message-markdown";
-import { type BoardCommand, type BoardIndex, type BoardState, type Member, type Message, repeatLabel, type Thread } from "../../../src/shared/board";
+import { BOARD_COMMANDS, type BoardCommand, type BoardIndex, type BoardState, type Member, type Message, repeatLabel, type Thread } from "../../../src/shared/board";
 import { AttachmentCard } from "./attachments";
 import { Composer } from "./composer";
 import { Avatar, Chip, feedLead, leaseLabel, relTime, TaskChip } from "./parts";
+
+const DONE = BOARD_COMMANDS.find(command => command.name === "done")!;
 
 interface ThreadViewProps {
 	state: BoardState;
@@ -74,6 +76,12 @@ export function ThreadView({ state, index, thread, members, now, typing, onPost,
 					</p>
 				</div>
 				<TaskChip thread={thread} byId={byId} now={now} />
+				{thread.task !== "done" && (
+					<Button variant="outline" size="compact" className="shrink-0" onClick={() => onCommand(DONE, "")}>
+						<IconCheckmark1 />
+						Mark done
+					</Button>
+				)}
 				<label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground select-none">
 					<input type="checkbox" checked={showInternal} onChange={event => setShowInternal(event.target.checked)} className="accent-current" />
 					Internal notes

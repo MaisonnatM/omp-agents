@@ -140,7 +140,7 @@ function ChannelList({ channel: id, query: q, onQuery, onCreateThread, ...props 
 				</label>
 			}
 		>
-			{threads.length === 0 ? <ListEmpty>{q ? "No thread matches." : "No threads yet. Start one with New thread."}</ListEmpty> : threads.map(thread => <ThreadCard key={thread.id} thread={thread} index={index} now={now} selected={open === thread.id} onOpen={onOpen} />)}
+			{threads.length === 0 ? <ListEmpty>{q ? "No thread matches." : "No threads yet. Start one with New thread."}</ListEmpty> : threads.map(thread => <ThreadCard key={thread.id} thread={thread} index={index} now={now} selected={open === thread.id} onOpen={onOpen} inChannel />)}
 			{naming && <NameDialog title={`New thread in ${title}`} label="Thread title" onSave={name => onCreateThread(id, name)} onClose={() => setNaming(false)} />}
 		</ListFrame>
 	);
@@ -210,12 +210,14 @@ function ListEmpty({ children }: { children: ReactNode }) {
 	return <p className="px-4 py-10 text-center text-sm text-muted-foreground">{children}</p>;
 }
 
-function ThreadCard({ thread, index, now, selected, onOpen, preview, mention }: { thread: Thread; index: BoardIndex; now: number; selected: boolean; onOpen: (id: string) => void; preview?: Message; mention?: boolean }) {
+/** `inChannel` drops the channel label, which the list's own header already names. */
+function ThreadCard({ thread, index, now, selected, onOpen, preview, mention, inChannel }: { thread: Thread; index: BoardIndex; now: number; selected: boolean; onOpen: (id: string) => void; preview?: Message; mention?: boolean; inChannel?: boolean }) {
 	const byId = index.memberById;
 	const last = preview ?? index.lastByThread.get(thread.id);
 	const author = last ? byId.get(last.author) : undefined;
 	const unread = index.unreadByThread.get(thread.id) ?? 0;
 	const people = [...new Set((index.messagesByThread.get(thread.id) ?? []).map(msg => msg.author))].slice(0, 4).flatMap(id => byId.get(id) ?? []);
+	const time = <span className="ml-auto shrink-0 text-2xs tabular-nums text-muted-foreground">{last && relTime(last.at, now)}</span>;
 	return (
 		<button
 			type="button"
@@ -223,30 +225,40 @@ function ThreadCard({ thread, index, now, selected, onOpen, preview, mention }: 
 			aria-current={selected || undefined}
 			className={cn("relative block w-full border-b border-border px-4 py-3 text-left transition-colors hover:bg-accent/60", selected && "bg-accent hover:bg-accent")}
 		>
-			{unread > 0 && <span className="absolute top-4.5 left-1.5 size-1.5 rounded-full bg-primary" />}
-			<span className="flex items-center gap-1.5 text-2xs text-muted-foreground">
-				<IconHashtag className="size-3" />
-				{index.channelById.get(thread.channel)?.name}
-				{mention && <span className="font-medium text-primary">· mentioned you</span>}
-				<span className="ml-auto tabular-nums">{last && relTime(last.at, now)}</span>
+			{unread > 0 && <span className={cn("absolute left-1.5 size-1.5 rounded-full bg-primary", inChannel ? "top-5" : "top-4.5")} />}
+			{!inChannel && (
+				<span className="mb-1 flex items-center gap-1.5 text-2xs text-muted-foreground">
+					<IconHashtag className="size-3" />
+					{index.channelById.get(thread.channel)?.name}
+					{mention && <span className="font-medium text-primary">· mentioned you</span>}
+					{time}
+				</span>
+			)}
+			<span className="flex items-baseline gap-2">
+				<span className={cn("line-clamp-2 min-w-0 flex-1 text-sm leading-snug", unread > 0 ? "font-semibold" : "font-medium")}>{thread.title}</span>
+				{inChannel && time}
 			</span>
-			<span className={cn("mt-1 line-clamp-2 block text-sm leading-snug", unread > 0 ? "font-semibold" : "font-medium")}>{thread.title}</span>
 			{last && (
 				<span className="mt-1 line-clamp-2 block text-[0.8125rem] leading-snug text-muted-foreground">
 					<span className="text-foreground/80">{(last.text && feedLead(last.text)?.label) || author?.name}: </span>
 					{last.text ? plainMarkdown(feedLead(last.text)?.body ?? last.text) : attachmentLabel(last.attachment)}
 				</span>
 			)}
-			<span className="mt-2 flex min-w-0 items-center gap-1.5">
-				<TaskChip thread={thread} byId={byId} now={now} />
-				<span className="ml-auto flex shrink-0 -space-x-1.5">
-					{people.map(member => (
-						<span key={member.id} className="flex rounded-full ring-2 ring-background">
-							<Avatar member={member} size="sm" dot={false} />
+			{/* One author is already named in the preview, so the row shows only a task or a conversation between several. */}
+			{(thread.task || people.length > 1) && (
+				<span className="mt-2 flex min-w-0 items-center gap-1.5">
+					<TaskChip thread={thread} byId={byId} now={now} />
+					{people.length > 1 && (
+						<span className="ml-auto flex shrink-0 -space-x-1.5">
+							{people.map(member => (
+								<span key={member.id} className="flex rounded-full ring-2 ring-background">
+									<Avatar member={member} size="sm" dot={false} />
+								</span>
+							))}
 						</span>
-					))}
+					)}
 				</span>
-			</span>
+			)}
 		</button>
 	);
 }
