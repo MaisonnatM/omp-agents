@@ -6,6 +6,7 @@ import { boardMessagePreset, type MarkdownPreset, MessageMarkdown } from "../mes
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
+import { plainMarkdown } from "../../labels";
 import { hashForPage } from "../../routing";
 import { type Attachment, type BoardChange, type BoardCommand, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, mentions, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
 import type { CoreData } from "../module-views";
@@ -294,7 +295,7 @@ function ThreadCard({ thread, state, byId, now, selected, onOpen, preview, menti
 			{last && (
 				<span className="mt-1 line-clamp-2 block text-[0.8125rem] leading-snug text-muted-foreground">
 					<span className="text-foreground/80">{(last.text && feedLead(last.text)?.label) || author?.name}: </span>
-					{last.text ? (feedLead(last.text)?.body ?? last.text) : attachmentLabel(last.attachment)}
+					{last.text ? plainMarkdown(feedLead(last.text)?.body ?? last.text) : attachmentLabel(last.attachment)}
 				</span>
 			)}
 			<span className="mt-2 flex min-w-0 items-center gap-1.5">
