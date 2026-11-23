@@ -42,8 +42,9 @@
   `src/server/sport-thumbs.ts` serves `GET /api/sport/thumb`, each demo's YouTube thumbnail, fetched once and kept in `sportThumbsDir` from `src/paths.ts`.
   `src/sport-fixtures.ts` holds the sample plan and the builders the Sport tests share.
   See [Sport](../architecture/sport.md).
-- `src/shared/projects.ts` holds the Projects module's state, `ProjectList`, its changes, their parsers, and its reducer `applyProjectChange`, which the server applies to its file and the page to what it shows before the server answers.
-  `src/server/projects-file.ts` keeps `project-list.json` with `ReducerFile`, and `src/server/projects-inbox.ts` drains `project-inbox/`, the changes the starter kit's `project` extension leaves, any change the page makes; `PROJECTS_MODULE` in `src/projects-module.ts` opens both.
+- A Project is a Board channel whose `project` field, `ChannelProject` in `src/shared/board.ts`, holds its goal, decisions, session ids, and dates; its plan steps are the channel's task threads, a sub-step naming its step in `parent`, and its log is the channel's messages.
+  `src/shared/board.ts` exports `isProjectChannel`, `openProjectChannels`, `projectOfSession`, `planOf`, and `stepNumbers`, and its `BoardChange` ops `rename`, `retitle`, `remove-thread`, `set-goal`, `archive`, `decision`, `join`, and `leave` cover every project change, all kept in `board.json` by the Board module.
+  At startup the server moves an old `project-list.json` into the Board once and renames it `project-list.json.migrated`.
   A `start` of kind `new` may name a `projectId`; once omp starts, `src/server/start.ts` puts the new session in that project through `StartEnv.joinProject`.
   See [Projects](../architecture/projects.md).
 - `src/shared/memory-page.ts` holds the Memory module's shapes, which the page shares: project memory, its edit, the bookmarks, and the X sync's state.

@@ -2,7 +2,7 @@
 import { IconArchive, IconArrowLeft, IconArrowLoopDownLeft, IconPlusSmall } from "central-icons";
 import { type ChangeEvent, type FocusEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { collapseSpaces } from "../../../src/shared/collapse-spaces";
-import type { Project } from "../../../src/shared/projects";
+import { type BoardState, channelName, planOf, type ProjectChannel } from "../../../src/shared/board";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../../activity";
@@ -14,26 +14,30 @@ import { takeJustCreated } from "./new-project";
 import { Decisions, RecentActivity } from "./notes";
 import type { OnProjectChange } from "./parts";
 import { Plan } from "./plan";
-import { projectWork } from "./project-work";
+import { channelMessages, projectWork } from "./project-work";
 import { SessionsTable } from "./sessions-table";
 import { ProjectStats } from "./stats";
 
 interface ProjectDetailProps {
-	project: Project;
+	project: ProjectChannel;
+	board: BoardState;
 	sessions: KnownSessions;
 	disabled: boolean;
 	onChange: OnProjectChange;
 }
 
-export function ProjectDetail({ project, sessions, disabled, onChange }: ProjectDetailProps) {
-	const projectId = project.id;
+export function ProjectDetail({ project: channel, board, sessions, disabled, onChange }: ProjectDetailProps) {
+	const { project } = channel;
+	const projectId = channel.id;
 	const work = projectWork(project, sessions);
+	const plan = planOf(board, projectId);
+	const log = channelMessages(board, projectId);
 	const archived = project.archivedAt !== undefined;
 	const readOnly = disabled || archived;
-	const name = useInlineDraft(project.name, collapseSpaces, text => {
-		if (text) onChange({ op: "rename", projectId, name: text });
+	const name = useInlineDraft(channel.name, collapseSpaces, text => {
+		if (text) onChange({ op: "rename", channel: projectId, name: channelName({ ...board, channels: board.channels.filter(each => each.id !== projectId) }, text) });
 	});
-	const goal = useInlineDraft(project.goal, text => text.trim(), text => onChange({ op: "set-goal", projectId, goal: text }));
+	const goal = useInlineDraft(project.goal, text => text.trim(), text => onChange({ op: "set-goal", channel: projectId, goal: text }));
 	const nameField = useRef<HTMLInputElement>(null);
 	useEffect(() => {
 		if (readOnly || !takeJustCreated(projectId)) return;
@@ -43,7 +47,7 @@ export function ProjectDetail({ project, sessions, disabled, onChange }: Project
 	return (
 		<PageFrame
 			title="Projects"
-			meta={`${archived ? "Archived" : "Started"} ${listTime(Date.parse(project.archivedAt ?? project.createdAt))}`}
+			meta={`${archived ? "Archived" : "Started"} ${listTime(project.archivedAt ?? project.createdAt)}`}
 			leading={
 				<Tooltip content="Back to Projects">
 					<Button variant="ghost" size="icon-compact" aria-label="Back to Projects" className="text-muted-foreground" render={<a href={hashForProject(null)} />}>
@@ -60,7 +64,7 @@ export function ProjectDetail({ project, sessions, disabled, onChange }: Project
 							size="compact"
 							leadingIcon={archived ? IconArrowLoopDownLeft : IconArchive}
 							disabled={disabled}
-							onClick={() => onChange(archived ? { op: "restore", projectId } : { op: "archive", projectId, at: new Date().toISOString() })}
+							onClick={() => onChange({ op: "archive", channel: projectId, at: archived ? null : Date.now() })}
 						>
 							{archived ? "Restore" : "Archive"}
 						</Button>
@@ -79,7 +83,7 @@ export function ProjectDetail({ project, sessions, disabled, onChange }: Project
 				</>
 			}
 		>
-			<section aria-label={project.name} className="@container min-w-0">
+			<section aria-label={channel.name} className="@container min-w-0">
 				<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-6">
 					<div className="flex min-w-0 flex-col gap-1">
 						<input
@@ -101,15 +105,15 @@ export function ProjectDetail({ project, sessions, disabled, onChange }: Project
 							className="-mx-1.5 field-sizing-content max-w-prose resize-none rounded-md bg-transparent px-1.5 py-0.5 text-sm leading-relaxed text-muted-foreground outline-none placeholder:text-muted-foreground hover:bg-accent/50 focus-visible:bg-background focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring read-only:hover:bg-transparent"
 						/>
 					</div>
-					<ProjectStats project={project} work={work} />
+					<ProjectStats plan={plan} lastAt={log.at(-1)?.at} work={work} />
 					<div className="grid items-start gap-4 @4xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
 						<div className="flex min-w-0 flex-col gap-4">
-							<Plan project={project} readOnly={readOnly} onChange={onChange} />
-							<SessionsTable project={project} rows={work.sessions} sessions={sessions} archived={archived} />
+							<Plan channel={channel} plan={plan} readOnly={readOnly} onChange={onChange} />
+							<SessionsTable log={log} rows={work.sessions} sessions={sessions} archived={archived} />
 						</div>
 						<div className="flex min-w-0 flex-col gap-4">
-							<Decisions project={project} readOnly={readOnly} onChange={onChange} />
-							<RecentActivity project={project} sessions={sessions} readOnly={readOnly} onChange={onChange} />
+							<Decisions channel={channel} readOnly={readOnly} onChange={onChange} />
+							<RecentActivity channel={channel} board={board} log={log} sessions={sessions} readOnly={readOnly} onChange={onChange} />
 						</div>
 					</div>
 				</div>

@@ -22,7 +22,8 @@ It is a page of its own, not a list of sessions: the **Sessions** sidebar still 
 
 - **New thread** starts a thread in the channel you look at.
 - A thread can carry a task: open, claimed, in review, done, or blocked.
-  `/claim` takes it with a one-hour lease, and `/done` settles it, which opens the threads that wait on it.
+  `/claim` takes it with a one-hour lease, and `/done` settles it.
+- A project is a channel with a goal and decisions above its threads: each task thread is a plan step, and its messages are the project's log; see [Projects](projects.md).
 - `/review`, `/implement`, and `/grill` post a workflow that an agent runs step by step, reporting each step in the thread.
 - `/schedule @name text in 10m`, or `every 2h`, posts to a member later.
 

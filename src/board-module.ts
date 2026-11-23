@@ -1,4 +1,4 @@
-/** The Board module's server half: `board.json`, the `board` tool's inbox and extension. `run` starts `BoardWake`, which wakes the sessions a message is for, and `BoardFeed`. */
+/** The Board module's server half: `board.json`, the `board` tool's inbox and extension. `run` starts `BoardWake`, which wakes the sessions a message is for, and `BoardFeed`. A project is a Board channel. */
 import { userInfo } from "node:os";
 import { join } from "node:path";
 import { ReducerFile } from "./fs";
@@ -8,6 +8,7 @@ import { configDir } from "./paths";
 import { BoardFeed } from "./server/board-feed";
 import { BoardWake } from "./server/board-wake";
 import { JsonInboxDir } from "./server/json-inbox";
+import { migrateProjectList } from "./server/project-migration";
 import { shippedFile } from "./server/resources";
 import { applyBoardChange, type BoardChange, type BoardState, emptyBoard, inBotsName, parseBoardChange, parseBoardState } from "./shared/board";
 
@@ -15,6 +16,8 @@ import { applyBoardChange, type BoardChange, type BoardState, emptyBoard, inBots
 const BOARD_FILE = join(configDir, "board.json");
 /** Where the `board` tool leaves its changes, one JSON file each, so the server stays the only writer of {@link BOARD_FILE}. */
 const BOARD_INBOX = join(configDir, "board-inbox");
+/** The projects an older version kept apart, which the Board takes in once and renames `project-list.json.migrated`. */
+const LEGACY_PROJECTS_FILE = join(configDir, "project-list.json");
 /** The omp extension every session loads, which gives it the `board` tool. */
 const BOARD_EXTENSION = { source: join(import.meta.dir, "omp", "board-extension.ts"), bundle: "board-extension.js" };
 
@@ -41,7 +44,11 @@ export function openBoardFile(path: string): ReducerFile<BoardState, [BoardChang
 export const BOARD_MODULE: StoredModule<"board", BoardState, BoardChange> = {
 	id: "board",
 	store: {
-		open: () => openBoardFile(BOARD_FILE),
+		open() {
+			const file = openBoardFile(BOARD_FILE);
+			migrateProjectList(file, LEGACY_PROJECTS_FILE, Date.now());
+			return file;
+		},
 		parse: parseBoardChange,
 		inbox: (_state, apply, options) =>
 			new JsonInboxDir<BoardChange>(

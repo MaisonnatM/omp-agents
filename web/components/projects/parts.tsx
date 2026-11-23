@@ -2,7 +2,7 @@
 import { IconTrashCan } from "central-icons";
 import { type ReactNode, useState } from "react";
 import { collapseSpaces } from "../../../src/shared/collapse-spaces";
-import type { ProjectChange } from "../../../src/shared/projects";
+import type { BoardChange } from "../../../src/shared/board";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -11,8 +11,8 @@ import { activityControl } from "../../activity";
 /** The toast id of a project's **Undo**, so a later removal replaces the last one's offer. */
 export const PROJECT_UNDO = "project-undo";
 
-/** Sends a change to the open project; the page shows it before the server answers. */
-export type OnProjectChange = (change: ProjectChange) => void;
+/** Sends a Board change to the open project's channel; the page shows it before the server answers. */
+export type OnProjectChange = (change: BoardChange) => void;
 
 export function Card({ title, meta, action, children }: { title: string; meta?: string; action?: ReactNode; children: ReactNode }) {
 	return (

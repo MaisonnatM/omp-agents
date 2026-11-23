@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- A project is now a Board channel: its plan steps are task threads you tick by marking them done, its log is the channel's messages, and your existing projects move there once when the dashboard starts.
+- Agents now manage projects with the board tool's projects, project, goal, decide, join, leave, step, rename, archive, restore, and reopen actions, which replace project_list and project_update.
+- A session in a project now posts its questions and finished turns in the project's channel, and its brief shows the channel's 10 newest messages.
 - The Board's thread list now shows each last message as plain words, without Markdown such as `**` or link addresses.
 - Behind the scenes: the metrics report's first-pass rate for a GitHub repository now counts only the checks a pull request must pass to merge, so gates like `human-review` no longer pull it down, and it says how many pull requests had no required checks.
 - Behind the scenes: after a model upgrade, one command now reruns the eval set with each skill and the ship flow turned off in turn, says which ones still make agents pass more often and which could go, and can first print how many runs that takes and what it would cost.

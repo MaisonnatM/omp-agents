@@ -11,7 +11,6 @@ import { MODULES_OFF_KEY, parseModulesOff } from "./shared/modules-off";
 import type { PagePreferences } from "./shared/preferences";
 import type { Bot, BotId } from "./shared/bots";
 import type { RosterHost } from "./shared/sessions";
-import { PROJECTS_MODULE } from "./projects-module";
 import { SPORT_MODULE } from "./sport-module";
 
 /** A module's state as the server holds it, read from its file once; the server is the file's one writer. */
@@ -90,7 +89,7 @@ export type StoredModule<Id extends string, Value, Change> = Omit<ServerModule<I
 };
 
 /** Every module, by id: adding one is adding its definition here and its page's to `WEB_MODULES` in `web/modules.ts`. */
-export const SERVER_MODULES = { sport: SPORT_MODULE, memory: MEMORY_MODULE, projects: PROJECTS_MODULE, board: BOARD_MODULE };
+export const SERVER_MODULES = { sport: SPORT_MODULE, memory: MEMORY_MODULE, board: BOARD_MODULE };
 SERVER_MODULES satisfies { readonly [I in ModuleId]: ServerModule<I> };
 
 type Modules = typeof SERVER_MODULES;

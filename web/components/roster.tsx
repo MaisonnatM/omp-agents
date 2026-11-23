@@ -14,7 +14,7 @@ import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredKeys, useStoredState } from "../stored-state";
 import { CommandPicker } from "./command-picker";
 import { CountPill } from "./count-pill";
-import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { BoardContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ScheduledGroup } from "./scheduled";
 import { HostRow, PastRow } from "./session-row";
 import { activityControl } from "../activity";
@@ -140,7 +140,7 @@ function ProjectFolder({ group: { project, hosts, past }, current, children }: P
 		<SidebarGroup className="p-0">
 			<SidebarGroupLabel
 				icon={IconFlag1}
-				title={project.goal || project.name}
+				title={project.project.goal || project.name}
 				render={<a href={hashForProject(project.id)} aria-current={current ? "page" : undefined} {...activityControl("projects.open")} />}
 				className={cn("h-7 rounded-md text-[13px] text-foreground/85 hover:bg-sidebar-accent hover:text-foreground", current && "bg-sidebar-accent font-medium text-foreground")}
 			>
@@ -173,10 +173,11 @@ interface ProjectsGroupProps {
 /** The Projects section, its own group above the Workspaces section: one folder per open project, and a button that starts a new one. */
 function ProjectsGroup({ projects, current, open, onOpenChange, row }: ProjectsGroupProps) {
 	const { changeModule } = useDashboardActions();
+	const board = useContext(BoardContext);
 	const newProject = (
 		<SidebarGroupActions className="top-4 h-8">
 			<Tooltip content="New project" side="right">
-				<SidebarGroupAction aria-label="New project" {...activityControl("projects.new")} onClick={() => createProject(changeModule)}>
+				<SidebarGroupAction aria-label="New project" {...activityControl("projects.new")} onClick={() => board && createProject(changeModule, board)}>
 					<IconPlusSmall />
 				</SidebarGroupAction>
 			</Tooltip>
@@ -274,7 +275,7 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, 
 	};
 	return (
 		<>
-			{!modulesOff.has("projects") && (!filtering || projects.length > 0) && (
+			{!modulesOff.has("board") && (!filtering || projects.length > 0) && (
 				<ProjectsGroup projects={projects} current={projectOpen} open={!collapsed.has("projects")} onOpenChange={() => toggleGroup("projects")} row={projectRow} />
 			)}
 			<SidebarGroup className="gap-1 pt-4 pb-1">

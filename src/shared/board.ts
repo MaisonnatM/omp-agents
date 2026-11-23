@@ -54,13 +54,30 @@ export interface Thread {
 	task: TaskState | null;
 	lease: Lease | null;
 	createdAt: number;
+	/** The step this thread is a sub-step of, in the same project channel; a sub-step has none of its own, so a plan nests two levels at most. */
+	parent?: string;
+}
+
+/** What makes a channel a Project: an effort that spans sessions and workspaces, whose task threads are its plan and whose messages are its log. */
+export interface ChannelProject {
+	goal: string;
+	decisions: string[];
+	/** The sessions in the project, in the order they joined; a session is in one project at most. */
+	sessionIds: string[];
+	createdAt: number;
+	/** When the project was archived, which drops it from the roster and from the briefs; absent while it is open. */
+	archivedAt?: number;
 }
 
 export interface Channel {
 	id: string;
 	name: string;
 	about: string;
+	project?: ChannelProject;
 }
+
+/** A project channel: a channel that carries its {@link ChannelProject}. */
+export type ProjectChannel = Channel & { project: ChannelProject };
 
 /** A message the board posts later, in `by`'s name, mentioning `to`; `every` milliseconds later again when it repeats. */
 export interface Schedule {
@@ -99,6 +116,20 @@ export type BoardChange =
 	/** Posts schedule `schedule`'s message as message `message`, then moves it `every` later or drops it. */
 	| { op: "fire"; schedule: string; message: string; at: number }
 	| { op: "member"; member: Member }
+	/** Renames channel `channel`; a project's name is its channel's. */
+	| { op: "rename"; channel: string; name: string }
+	/** Retitles thread `thread`, such as a plan step's text. */
+	| { op: "retitle"; thread: string; title: string }
+	/** Removes thread `thread`, its sub-steps, their messages, and their schedules. */
+	| { op: "remove-thread"; thread: string }
+	| { op: "set-goal"; channel: string; goal: string }
+	/** Archives project channel `channel` at `at`, or restores it when `at` is null. */
+	| { op: "archive"; channel: string; at: number | null }
+	/** Adds decision `text` to project channel `channel`, or removes it. */
+	| { op: "decision"; channel: string; text: string; remove: boolean }
+	/** Puts session `sessionId` in project channel `channel`, out of any other. */
+	| { op: "join"; channel: string; sessionId: string }
+	| { op: "leave"; sessionId: string }
 	/** Every change in `changes`, in order, or none of them when one is refused. */
 	| { op: "all"; changes: BoardChange[] };
 
@@ -343,6 +374,11 @@ export function applyBoardChange(state: BoardState, change: BoardChange): Parsed
 		case "thread": {
 			if (hasThread(change.thread.id)) return { ok: state };
 			if (!state.channels.some(channel => channel.id === change.thread.channel)) return { error: `No channel ${change.thread.channel}.` };
+			if (change.thread.parent !== undefined) {
+				const parent = state.threads.find(thread => thread.id === change.thread.parent);
+				if (!parent || parent.channel !== change.thread.channel) return { error: `No step ${change.thread.parent} in that channel to hold a sub-step.` };
+				if (parent.parent !== undefined) return { error: "A sub-step holds no steps of its own: a plan nests two levels at most." };
+			}
 			return { ok: { ...state, threads: [...state.threads, change.thread] } };
 		}
 		case "post": {
@@ -381,7 +417,119 @@ export function applyBoardChange(state: BoardState, change: BoardChange): Parsed
 			const others = state.extraMembers.filter(member => member.id !== change.member.id);
 			return { ok: { ...state, extraMembers: [...others, change.member] } };
 		}
+		case "rename": {
+			if (state.channels.some(channel => channel.name === change.name && channel.id !== change.channel)) return { error: `#${change.name} already exists.` };
+			return editChannel(state, change.channel, channel => (channel.name === change.name ? channel : { ...channel, name: change.name }));
+		}
+		case "retitle":
+			if (!hasThread(change.thread)) return { error: `No thread ${change.thread}.` };
+			return { ok: { ...state, threads: state.threads.map(thread => (thread.id === change.thread && thread.title !== change.title ? { ...thread, title: change.title } : thread)) } };
+		case "remove-thread": {
+			if (!hasThread(change.thread)) return { ok: state };
+			const gone = new Set(state.threads.filter(thread => thread.id === change.thread || thread.parent === change.thread).map(thread => thread.id));
+			return {
+				ok: {
+					...state,
+					threads: state.threads.filter(thread => !gone.has(thread.id)),
+					messages: state.messages.filter(msg => !gone.has(msg.thread)),
+					schedules: state.schedules.filter(item => !gone.has(item.thread)),
+				},
+			};
+		}
+		case "set-goal":
+			return editProject(state, change.channel, project => (project.goal === change.goal ? project : { ...project, goal: change.goal }));
+		case "archive":
+			return editProject(state, change.channel, project => {
+				if (change.at === null) {
+					if (project.archivedAt === undefined) return project;
+					const { archivedAt: _, ...open } = project;
+					return open;
+				}
+				return project.archivedAt === undefined ? { ...project, archivedAt: change.at } : project;
+			});
+		case "decision":
+			return editProject(state, change.channel, project => {
+				const has = project.decisions.includes(change.text);
+				if (has !== change.remove) return project;
+				return { ...project, decisions: change.remove ? project.decisions.filter(text => text !== change.text) : [...project.decisions, change.text] };
+			});
+		case "join": {
+			const target = state.channels.find(channel => channel.id === change.channel);
+			if (!target?.project) return { error: `No project channel ${change.channel}.` };
+			if (target.project.sessionIds.includes(change.sessionId)) return { ok: state };
+			return editProject(leaveProjects(state, change.sessionId), change.channel, project => ({ ...project, sessionIds: [...project.sessionIds, change.sessionId] }));
+		}
+		case "leave":
+			return { ok: leaveProjects(state, change.sessionId) };
 	}
+}
+
+function editChannel(state: BoardState, id: string, edit: (channel: Channel) => Channel | { error: string }): Parsed<BoardState, { error: string }> {
+	const index = state.channels.findIndex(channel => channel.id === id);
+	const channel = state.channels[index];
+	if (!channel) return { error: `No channel ${id}.` };
+	const edited = edit(channel);
+	if ("error" in edited) return edited;
+	return { ok: edited === channel ? state : { ...state, channels: state.channels.with(index, edited) } };
+}
+
+function editProject(state: BoardState, id: string, edit: (project: ChannelProject) => ChannelProject): Parsed<BoardState, { error: string }> {
+	return editChannel(state, id, channel => {
+		if (!channel.project) return { error: `#${channel.name} is no project.` };
+		const project = edit(channel.project);
+		return project === channel.project ? channel : { ...channel, project };
+	});
+}
+
+/** `state` with session `sessionId` in no project, the same object when it was in none. */
+function leaveProjects(state: BoardState, sessionId: string): BoardState {
+	if (!state.channels.some(channel => channel.project?.sessionIds.includes(sessionId))) return state;
+	return {
+		...state,
+		channels: state.channels.map(channel =>
+			channel.project?.sessionIds.includes(sessionId) ? { ...channel, project: { ...channel.project, sessionIds: channel.project.sessionIds.filter(id => id !== sessionId) } } : channel,
+		),
+	};
+}
+
+/** A channel name made from `text`, such as a project's name, lowercase with hyphens, and suffixed `-2`, `-3`… past the names `state` already has. */
+export function channelName(state: BoardState, text: string): string {
+	const base = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "project";
+	const taken = new Set(state.channels.map(channel => channel.name));
+	let name = base;
+	for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
+	return name;
+}
+
+export const isProjectChannel = (channel: Channel): channel is ProjectChannel => channel.project !== undefined;
+
+/** The open projects, oldest first, which the roster and the briefs show. */
+export const openProjectChannels = (state: BoardState): ProjectChannel[] => state.channels.filter(isProjectChannel).filter(channel => channel.project.archivedAt === undefined);
+
+/** The project session `sessionId` is in, or `undefined`. */
+export const projectOfSession = (state: BoardState, sessionId: string): ProjectChannel | undefined =>
+	state.channels.filter(isProjectChannel).find(channel => channel.project.sessionIds.includes(sessionId));
+
+/** A project channel's plan: its task threads, each step followed by its sub-steps, oldest first. */
+export function planOf(state: BoardState, channel: string): Thread[] {
+	const steps = state.threads.filter(thread => thread.channel === channel && thread.task !== null);
+	return steps.filter(step => step.parent === undefined).flatMap(step => [step, ...steps.filter(sub => sub.parent === step.id)]);
+}
+
+/** Each step's number in a plan from {@link planOf}: `2` for its second step, `2.1` for the first sub-step under it. */
+export function stepNumbers(plan: readonly Thread[]): Map<string, string> {
+	const numbers = new Map<string, string>();
+	const subs = new Map<string, number>();
+	let top = 0;
+	for (const step of plan) {
+		if (step.parent === undefined) numbers.set(step.id, String(++top));
+		else {
+			const count = (subs.get(step.parent) ?? 0) + 1;
+			subs.set(step.parent, count);
+			numbers.set(step.id, `${numbers.get(step.parent)}.${count}`);
+		}
+	}
+	return numbers;
 }
 
 const isLook: Guard<BotLook> = fields<BotLook>({ shape: oneOf(BOT_SHAPES), hue: oneOf(BOT_HUES) });
@@ -405,8 +553,9 @@ const isAttachment = tagged<Attachment, "kind">("kind", {
 });
 const isMessage: Guard<Message> = fields<Message>({ id: isNonEmpty, thread: isNonEmpty, author: isNonEmpty, at: isNumber, text: isString, internal: optional(isBoolean), attachment: optional(isAttachment) });
 const isSchedule: Guard<Schedule> = fields<Schedule>({ id: isNonEmpty, thread: isNonEmpty, by: isNonEmpty, to: isNonEmpty, toName: optional(isNonEmpty), text: isString, at: isNumber, every: nullable(isNumber) });
-const isChannel: Guard<Channel> = fields<Channel>({ id: isNonEmpty, name: isNonEmpty, about: isString });
-const isThread: Guard<Thread> = fields<Thread>({ id: isNonEmpty, channel: isNonEmpty, title: isString, task: nullable(isTask), lease: nullable(isLease), createdAt: isNumber });
+const isChannelProject: Guard<ChannelProject> = fields<ChannelProject>({ goal: isString, decisions: arrayOf(isString), sessionIds: arrayOf(isNonEmpty), createdAt: isNumber, archivedAt: optional(isNumber) });
+const isChannel: Guard<Channel> = fields<Channel>({ id: isNonEmpty, name: isNonEmpty, about: isString, project: optional(isChannelProject) });
+const isThread: Guard<Thread> = fields<Thread>({ id: isNonEmpty, channel: isNonEmpty, title: isString, task: nullable(isTask), lease: nullable(isLease), createdAt: isNumber, parent: optional(isNonEmpty) });
 
 const isChanges = (value: unknown): value is BoardChange[] => arrayOf(isChange)(value);
 
@@ -420,6 +569,14 @@ const CHANGE_SHAPES: { [Op in BoardChange["op"]]: Shape<Omit<Extract<BoardChange
 	schedule: { schedule: isSchedule },
 	fire: { schedule: isNonEmpty, message: isNonEmpty, at: isNumber },
 	member: { member: isMember },
+	rename: { channel: isNonEmpty, name: isNonEmpty },
+	retitle: { thread: isNonEmpty, title: isNonEmpty },
+	"remove-thread": { thread: isNonEmpty },
+	"set-goal": { channel: isNonEmpty, goal: isString },
+	archive: { channel: isNonEmpty, at: nullable(isNumber) },
+	decision: { channel: isNonEmpty, text: isNonEmpty, remove: isBoolean },
+	join: { channel: isNonEmpty, sessionId: isNonEmpty },
+	leave: { sessionId: isNonEmpty },
 	all: { changes: isChanges },
 };
 
