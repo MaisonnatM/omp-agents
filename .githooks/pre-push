@@ -21,5 +21,6 @@ unset $(git rev-parse --local-env-vars)
 bun install --frozen-lockfile
 bun test
 bun run typecheck
+bun run lint
 bun install --cwd desktop --frozen-lockfile
 bun run --cwd desktop typecheck

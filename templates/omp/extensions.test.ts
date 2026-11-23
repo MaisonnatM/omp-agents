@@ -23,7 +23,8 @@ let confirmations = 0;
 const executed = [];
 let activeTools = ["artifact", "read"];
 const entries = [];
-const sessionManager = { getSessionId: () => input.sessionId ?? "session", getArtifactsDir: () => input.artifactsDir ?? null };
+// input.usage lists the session's cumulative usage each read returns, as omp's usage statistics report it.
+const sessionManager = { getSessionId: () => input.sessionId ?? "session", getArtifactsDir: () => input.artifactsDir ?? null, getUsageStatistics: () => input.usage?.shift() ?? { totalTokens: 0, cost: 0 } };
 // Loads an extension as one omp session does and returns its handlers by event name.
 function load(extension) {
 	const hooks = {};
@@ -153,10 +154,11 @@ function exercise(name: "artifact" | "ship" | "todos" | "project" | "worktree-gu
 	entries: { customType: string; data: unknown }[];
 	activeTools: string[];
 } {
+	// A config directory of the call's own unless the test passes one, so what an extension records there, such as the ship trace, reaches no other test or the user's.
 	const child = Bun.spawnSync([
 		process.execPath, "run", "-", packageDir,
 		join(import.meta.dir, `agent/extensions/${name}.ts`), JSON.stringify(input),
-	], { stdin: Buffer.from(loader), stdout: "pipe", stderr: "pipe", env: { ...Bun.env, ...env } });
+	], { stdin: Buffer.from(loader), stdout: "pipe", stderr: "pipe", env: { ...Bun.env, ...quotaConfig(), ...env } });
 	if (child.exitCode !== 0) throw new Error(child.stderr.toString());
 	return JSON.parse(child.stdout.toString());
 }
@@ -581,6 +583,38 @@ describe("ship_stage review gates", () => {
 		expect(result.text).toContain("GraphQL quota exhausted");
 		expect(result.executed).toHaveLength(2);
 		expect(result.executed[1]).toEqual(["api", "rate_limit"]);
+	});
+
+	// A PR under review whose checks fail, so each fix_ci round is live work GitHub has not shown done.
+	const failing = prRead(THERMONUCLEAR_BOX, "README.md", false, { state: "FAILURE" });
+	const fixCi = { stage: "fix_ci", pr: 7, repo: "owner/name" };
+
+	test("each call naming a stage appends a trace line with what the session spent since the previous one", () => {
+		const env = quotaConfig();
+		exercise("ship", {
+			runs: [{ stage: "live", pr: 7, repo: "owner/name" }, { ...fixCi, count: 2 }, {}],
+			usage: [{ totalTokens: 100, cost: 0.5 }, { totalTokens: 250, cost: 1.25 }],
+			cwd: checkout(), response: failing,
+		}, env);
+		const lines = readFileSync(join(env.XDG_CONFIG_HOME!, "omp-agents/ship-trace.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line));
+		expect(lines.map(({ ts, ...line }) => (expect(Date.parse(ts)).not.toBeNaN(), line))).toEqual([
+			{ session: "session", repo: "owner/name", pr: 7, stage: "live", tokens: 100, cost: 0.5, checks: "fail", recorded: true },
+			{ session: "session", repo: "owner/name", pr: 7, stage: "fix_ci", tokens: 150, cost: 0.75, round: 1, checks: "fail", recorded: true },
+		]);
+	});
+
+	test("a sixth fix_ci round on one PR is refused, traced, and sends the agent to the user", () => {
+		const env = quotaConfig();
+		const { runs } = exercise("ship", { runs: Array(6).fill(fixCi), cwd: checkout(), response: failing }, env);
+		expect(runs.map(run => run.isError)).toEqual([false, false, false, false, false, true]);
+		expect(runs[5]!.text).toContain("ask them with `ask`");
+		const last = JSON.parse(readFileSync(join(env.XDG_CONFIG_HOME!, "omp-agents/ship-trace.jsonl"), "utf8").trim().split("\n").at(-1)!);
+		expect(last).toMatchObject({ stage: "fix_ci", round: 6, recorded: false, refusal: runs[5]!.text });
+	});
+
+	test("the user's approval of more rounds starts the fix over", () => {
+		const { runs } = exercise("ship", { runs: [...Array(6).fill(fixCi), { ...fixCi, moreRounds: true }], cwd: checkout(), response: failing });
+		expect(runs.map(run => run.isError)).toEqual([false, false, false, false, false, true, false]);
 	});
 });
 

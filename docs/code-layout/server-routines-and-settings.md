@@ -44,6 +44,9 @@
   `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`, `~/.claude`, or `~/.codex`.
 - `.env.test`: `bun test` loads it before any test, so every child a test starts, even through Bun's default spawn environment, runs git without the developer's global and system config, with a test identity and no auto-maintenance.
   A test's commit never signs through the developer's gpg-agent, which stalls past Bun's 5-second test timeout or fails while other sessions sign; `src/git.test.ts` checks it.
+- `src/serve-idle-timeout.test.ts`: fails a `Bun.serve` call in `src/` that sets no `idleTimeout`, since Bun's 10-second default cut off the pull request list's slow GitHub reads.
+- `src/extension-zod-defaults.test.ts`: fails a kit extension under `templates/omp/` that passes an object or array literal to `.default()`, which omp's `pi.zod` refuses, failing the extension's load.
+- `biome.json`: the lint rules `bun run lint` runs with Biome on every tracked `.ts` and `.tsx` file, with Biome's formatter off; [Tests and lint](../../CODING_STANDARDS.md#tests-and-lint) says how to add one.
 - `.githooks/pre-push`: refuses a push to `main` that leaves `CHANGELOG.md` unchanged, then runs the checks `.github/workflows/checks.yml` runs; the `prepare` script points `core.hooksPath` at `.githooks/` on `bun install`.
 - `.githooks/pre-merge-commit`: refuses a merge commit on `main` that leaves `CHANGELOG.md` unchanged, so a branch gets its lines before the merge rather than at the push; `src/githooks.test.ts` tests it.
 - `.githooks/post-merge`: warns after a fast-forward into `main` that leaves `CHANGELOG.md` unchanged, which pre-merge-commit never sees; `src/githooks.test.ts` tests it.

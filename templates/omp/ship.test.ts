@@ -6,6 +6,8 @@ import { commands } from "./agent/extensions/shell/commands";
 type Review = { label: string; box: string; pathsFile: string; withoutPaths: boolean };
 type Reviews = Record<string, { needed: boolean; done: boolean }>;
 // Imported by path, not statically: a static import pulls the extension into `tsc`, where its `@oh-my-pi/pi-coding-agent` import does not resolve.
+type FixWork = "fix_ci" | "fix_comments";
+type Fixes = Partial<Record<FixWork, { rounds: number; counts: number[] }>>;
 const extension: {
 	ghPr(words: string[], sub: "create" | "ready"): string[] | undefined;
 	prSelector(args: string[]): string[];
@@ -20,6 +22,9 @@ const extension: {
 	renderLines(state: { stage: string; issue?: string; updatedAt: string }): string[];
 	STAGES: readonly string[];
 	LIVE_WORK: readonly string[];
+	FIX_BUDGET: number;
+	startFix(fixes: Fixes | undefined, work: FixWork, count: number | undefined): { fixes: Fixes; round: number } | { round: number; refusal: string };
+	settleFixes(fixes: Fixes | undefined, status: object | undefined): Fixes | undefined;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
 const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, reviewsOf, reviewNeeded, authDiagnosis, REVIEWS, PROOF_BOX, renderLines } = extension;
 const THERMONUCLEAR = REVIEWS.thermonuclear.box;
@@ -221,5 +226,42 @@ describe("GitHub auth diagnosis", () => {
 		const diagnosis = authDiagnosis([token], { GITHUB_TOKEN: "/repo/.env" });
 		expect(diagnosis).toContain("/repo/.env");
 		expect(diagnosis).toContain("gh auth login");
+	});
+});
+
+describe("fix rounds", () => {
+	const { startFix, settleFixes, FIX_BUDGET } = extension;
+	/** Starts a round of `work` for each count, carrying the rounds a started one returns; the outcome of each. */
+	function rounds(counts: (number | undefined)[], work: FixWork = "fix_ci", fixes?: Fixes) {
+		return counts.map(count => {
+			const next = startFix(fixes, work, count);
+			if ("fixes" in next) fixes = next.fixes;
+			return next;
+		});
+	}
+	const refused = (outcomes: ReturnType<typeof rounds>) => outcomes.map(outcome => "refusal" in outcome);
+	/** GitHub's status of an open PR under review whose checks read `checks`, with `threads` unresolved review threads. */
+	const status = (checks: string, threads = 0) => ({ state: "OPEN", draft: false, conflicts: false, behind: false, unresolvedThreads: threads, changesRequested: false, moreThreads: false, approved: false, checks, reviews: {} });
+
+	test(`the round after ${FIX_BUDGET} is refused and sends the agent to the user`, () => {
+		const outcomes = rounds(Array(FIX_BUDGET + 1).fill(undefined));
+		expect(refused(outcomes)).toEqual([false, false, false, false, false, true]);
+		expect(outcomes.at(-1)).toMatchObject({ round: 6, refusal: expect.stringContaining("ask them with `ask`") });
+	});
+
+	test("a count that did not shrink for two rounds in a row stalls the third", () => {
+		expect(refused(rounds([3, 3, 4], "fix_comments"))).toEqual([false, false, true]);
+		expect(rounds([3, 3, 3]).at(-1)).toMatchObject({ refusal: expect.stringContaining("3 → 3 → 3") });
+		expect(refused(rounds([4, 4, 3, 3, 3]))).toEqual([false, false, false, false, true]);
+		expect(refused(rounds([5, 4, 3]))).toEqual([false, false, false]);
+		expect(refused(rounds([3, undefined, 3, undefined]))).toEqual([false, false, false, false]);
+	});
+
+	test("a fix GitHub shows done starts over, and one it does not keeps its rounds", () => {
+		const spent: Fixes = { fix_ci: { rounds: FIX_BUDGET, counts: [2, 2] }, fix_comments: { rounds: 2, counts: [1] } };
+		expect(settleFixes(spent, status("pass", 1))).toEqual({ fix_comments: spent.fix_comments });
+		expect(settleFixes(spent, status("pending", 1))).toEqual(spent);
+		expect(settleFixes(spent, status("pass"))).toBeUndefined();
+		expect(rounds([2], "fix_ci", settleFixes(spent, status("pass", 1)))).toEqual([{ round: 1, fixes: { ...settleFixes(spent, status("pass", 1)), fix_ci: { rounds: 1, counts: [2] } } }]);
 	});
 });

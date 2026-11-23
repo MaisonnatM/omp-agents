@@ -102,7 +102,6 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 	const lists = useMentionLists();
 
 	const token = menu?.trigger.kind === "mention" ? menu.trigger.token : null;
-	const query = token && mentionQuery(token);
 	const { pullRequestsScope } = useDashboardStatus();
 	const pullRequestRepos = useSearchedPullRequests(pullRequestsScope);
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;

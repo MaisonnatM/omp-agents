@@ -1,14 +1,14 @@
 # Coding standards
 
 Every change meets [Every change](#every-change).
-Then read the section for the work: [Changelog](#changelog), [omp imports](#omp-imports), [omp internals](#omp-internals), [Where changes go](#where-changes-go), [Markdown](#markdown), or [Template sync](#template-sync).
+Then read the section for the work: [Changelog](#changelog), [Tests and lint](#tests-and-lint), [omp imports](#omp-imports), [omp internals](#omp-internals), [Where changes go](#where-changes-go), [Markdown](#markdown), or [Template sync](#template-sync).
 
 ## Every change
 
 - Keep each pull request to one change, and explain why it is needed.
 - Add or update tests for behavior you change.
 - Add lines to `CHANGELOG.md` in every change that reaches `main`, as [Changelog](#changelog) says.
-- Run `bun test` and `bun run typecheck` and fix what they report.
+- Run `bun test`, `bun run typecheck`, and `bun run lint` and fix what they report.
   After you change `desktop/`, run `bun install --cwd desktop --frozen-lockfile` once and `bun run --cwd desktop typecheck`.
 - Update `docs/usage/` when the interface changes, `docs/architecture/` when the server or a protocol changes, and `docs/code-layout/` when you add, move, or remove a file, or change what one does, including its [Interface map](docs/code-layout.md#interface-map) entry.
   Each of `docs/usage.md`, `docs/architecture.md`, and `docs/code-layout.md` lists its directory's files, one per feature; add a file there when you add one, and split a file before it reaches the 32 KiB that `src/docs.test.ts` allows.
@@ -39,6 +39,19 @@ The pre-push hook refuses a push to `main` whose commits leave `CHANGELOG.md` un
 `.gitattributes` merges `CHANGELOG.md` with git's union driver, which keeps both sides' lines instead of conflicting, so the same day heading can appear twice; What's new reads both as one day.
 The pre-commit hook drops `CHANGELOG.md`'s oldest days, whole, when a commit grows it past the 32 KB every doc stays under, so What's new lists fewer old days and git history keeps them.
 A merge commit skips that hook: when a merge leaves the file too large, run `bun scripts/trim-changelog.ts` and commit the result.
+
+## Tests and lint
+
+A test that already exists guards behavior, so change or delete one only when that behavior changed on purpose, never to make a failing check pass.
+When you do, add a line `test-change: <reason>` to one of the branch's commit messages; the landing check `scripts/check-test-edits.ts` fails without it, and adding a new test needs none.
+
+`bun run lint` runs Biome with only the rules `biome.json` turns on, and Biome's formatter stays off.
+When the same mistake shows up a second time and a Biome rule catches it, turn that rule on rather than writing the lesson down again:
+
+1. Look the rule up in [Biome's rule list](https://biomejs.dev/linter/rules/) and run `bunx biome lint --only=<group>/<rule>` to count its hits on today's tree.
+2. Add it to its group in `biome.json` as `"error"` only when it has a handful of hits or none, and fix those hits in the same change; `--write` fixes the ones the rule marks safe.
+3. If a hit is deliberate, put `// biome-ignore lint/<group>/<rule>: <reason>` on the line above it.
+4. Run `bun run lint`, then point the lesson's line in `LEARNINGS.md` at the rule.
 
 ## omp imports
 
