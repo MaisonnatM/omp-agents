@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- Behind the scenes: a new eval set replays 20 real past tasks and checks each result with that task's own tests, so a change to the agents' setup can be measured instead of guessed, and it can switch off one part at a time to see which parts still earn their cost.
 - /ship now skips the plan contest and both code reviews for a small change, up to 50 changed lines in 3 files that touch no shared or schema file, so quick fixes ship faster and cost less.
 - Edits the plan already spelled out now go to a cheaper worker agent, while planning, design calls, and reviews stay on the strongest model.
 - Behind the scenes: the note about a session's todos now comes as a message instead of changing the agent's standing instructions, so those instructions stay the same in every session and are read from the cache, which costs less.
