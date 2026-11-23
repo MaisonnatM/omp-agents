@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- Behind the scenes: an eval run now deletes its copy of the repository even when scoring it fails, so a long decay check no longer fills the disk with leftover copies.
 - The Board's thread list now shows each last message as plain words, without Markdown such as `**` or link addresses.
 - Behind the scenes: the metrics report's first-pass rate for a GitHub repository now counts only the checks a pull request must pass to merge, so gates like `human-review` no longer pull it down, and it says how many pull requests had no required checks.
 - Behind the scenes: after a model upgrade, one command now reruns the eval set with each skill and the ship flow turned off in turn, says which ones still make agents pass more often and which could go, and can first print how many runs that takes and what it would cost.

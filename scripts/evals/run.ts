@@ -275,11 +275,19 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 	}
 	const minutes = (Date.now() - started) / 60_000;
 	const error = dryRun ? null : endedOnError(sessions);
-	const { diff, filesChanged, linesChanged } = changeSize(clone, task.base);
-	writeFileSync(join(dir, "change.diff"), diff);
-	const { passed, failures } = error ? { passed: false, failures: [] } : hiddenCheck(repo, task, clone, dir);
-	// Each clone holds its own node_modules or .venv; 60 runs of them fill a disk, and change.diff keeps what the agent did.
-	rmSync(clone, { recursive: true, force: true });
+	// Each clone holds its own node_modules or .venv; hundreds of decay runs fill a disk, so it goes even when scoring throws.
+	let filesChanged = 0;
+	let linesChanged = 0;
+	let check: { passed: boolean; failures: string[] } = { passed: false, failures: [] };
+	try {
+		const change = changeSize(clone, task.base);
+		writeFileSync(join(dir, "change.diff"), change.diff);
+		({ filesChanged, linesChanged } = change);
+		if (!error) check = hiddenCheck(repo, task, clone, dir);
+	} finally {
+		rmSync(clone, { recursive: true, force: true });
+	}
+	const { passed, failures } = check;
 	return {
 		at: new Date().toISOString(),
 		task: task.id,
