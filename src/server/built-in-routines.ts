@@ -1,6 +1,6 @@
 /**
  * The routines the dashboard adds by itself, each with the Bot that runs it, disabled until you turn one on. Each is
- * added once: one you delete stays deleted.
+ * added once: one you delete stays deleted. A routine whose prompt is still a past built-in version gets the current one.
  */
 import { join } from "node:path";
 import { JsonFile } from "../fs";
@@ -14,12 +14,17 @@ import { sourceDir } from "./resources";
 export interface BuiltInRoutine {
 	bot: BotSpec;
 	routine: RoutineSpec;
+	/** The prompts earlier versions of the dashboard saved for this routine, oldest first; a stored one of these is replaced. */
+	pastPrompts: readonly string[];
 }
 
 const HARNESS_BOT_ID = "harness-review" as BotId;
 
-/** What the weekly harness review reads, groups, and proposes; it changes no file. */
-export const HARNESS_REVIEW_PROMPT = [
+/** Where the weekly harness review keeps its replay tasks, its reports, and their replays: outside every checkout, as `model-replay.ts run` needs. */
+export const HARNESS_REVIEW_DIR = "~/.cache/omp-harness-review";
+
+/** The weekly harness review's prompt before it saved its replays and judged last week's; kept to upgrade a routine still holding it. */
+const HARNESS_REVIEW_PROMPT_V1 = [
 	"Review how the agent harness failed this past week, and propose one change to it. Do not edit, commit, or push anything: this run only reads and reports.",
 	"",
 	"Read:",
@@ -36,6 +41,46 @@ export const HARNESS_REVIEW_PROMPT = [
 	"If the week holds no failures, say so in one line.",
 ].join("\n");
 
+const replay = "bun scripts/token-audit/model-replay.ts";
+
+/**
+ * What the weekly harness review reads, judges, groups, proposes, and saves for replay. It changes no repository: it
+ * writes only under {@link HARNESS_REVIEW_DIR}.
+ */
+export const HARNESS_REVIEW_PROMPT = [
+	"Review how the agent harness failed this past week, judge whether last week's proposed change fixed what it was meant to, and propose one change.",
+	`Do not edit, commit, or push anything in any repository, and do not run \`${replay} run\` or \`judge\`, which cost money: the only files you may write are under \`${HARNESS_REVIEW_DIR}/\`.`,
+	"Below, `<today>` is today's date as YYYY-MM-DD.",
+	"",
+	"First, last week's verdict:",
+	`- Find the newest \`${HARNESS_REVIEW_DIR}/<date>-review.md\` dated before today, the review that proposed last week's change and named its failures to replay, and its replay folder \`${HARNESS_REVIEW_DIR}/<date>/\`.`,
+	"- If there is no such review, skip this part.",
+	"- If the folder holds no `result.json`, say in one line that last week's replay was never run, and repeat the command that review ended with.",
+	`- Otherwise run \`${replay} summary --by-task --out ${HARNESS_REVIEW_DIR}/<date>\` and, for each replayed failure, say whether the change fixed it: whether the replay kept the checks that passed at its base, whether the checks that failed there now pass, and, from its \`change.diff\`, whether it did what the review said should happen instead.`,
+	"",
+	"Then read this past week:",
+	`- The last 7 days of \`${join(configDir, "ship-trace.jsonl")}\`, one JSON line per ship stage of every repository, yampa-ai/yampa included: its refusals (\`refusal\`), fix rounds (\`round\`), checks, and cost.`,
+	"  Count as escalated a pull request whose fix hit its round budget (a refusal saying the fix has run its rounds) or stalled (a refusal saying the count did not shrink), since both need me to approve more rounds with `moreRounds`, and say when a fix round was recorded after one, which means I did.",
+	"- `LEARNINGS.md` in this workspace, the omp-agents checkout: the lessons already written down.",
+	`- The failed lands: the merges whose \`state.kind\` is \`failed\` in \`${mergesFile}\`.`,
+	`- The failed sessions: the routine runs with \`errors\` or a \`failed\` outcome in \`${routinesFile}\`, and the dashboard's "exited early" and "stopped mid-turn" notifications.`,
+	"",
+	"Then reply with:",
+	"1. Last week's verdict, as above.",
+	"2. The failures and escalations, grouped by cause, each group with its count, its repositories and pull requests, and one example.",
+	"3. Exactly one harness change, as a decision for me: the problem it fixes, the change (a skill, an extension, a check, or a rule), and what it costs. Do not make it.",
+	"   A replay loads no extension but `cache-tail.ts`, so it tests a skill, a rule, or a repository check, not an extension; say so when the change is one.",
+	"4. Five past failures to replay to test that change: for each, its session id, repository, and pull request, what failed, and what the change should make happen instead.",
+	"   Pick sessions whose first request states the work, without pointing at `local://` or `agent://` files.",
+	"",
+	"Then save the replay:",
+	`- Run \`mkdir -p ${HARNESS_REVIEW_DIR}\` and \`${replay} candidates --sessions <the five session ids, comma-separated> > ${HARNESS_REVIEW_DIR}/<today>-tasks.json\`, which turns each session into a replay task from the commit it started at, and say which sessions it left out and why.`,
+	`- Write your whole reply to \`${HARNESS_REVIEW_DIR}/<today>-review.md\`, so next week's review can judge it.`,
+	`- End your reply with the command to run once the change lands: \`${replay} run --tasks ${HARNESS_REVIEW_DIR}/<today>-tasks.json --models <worker model> --out ${HARNESS_REVIEW_DIR}/<today>\`, where the worker model is the \`task\` role in \`modelRoles\` of \`~/.omp/agent/config.yml\`.`,
+	"",
+	"If the week holds no failures, say so in one line, after last week's verdict.",
+].join("\n");
+
 /** The built-in routines, in the order they are added. */
 export const BUILT_IN_ROUTINES: readonly BuiltInRoutine[] = [
 	{
@@ -43,7 +88,7 @@ export const BUILT_IN_ROUTINES: readonly BuiltInRoutine[] = [
 			id: HARNESS_BOT_ID,
 			kind: "routines",
 			name: "Harness review",
-			job: "Once a week, read how the agent harness failed and propose one change to it as a decision for me.\nNever edit, commit, or push: only read and report.",
+			job: `Once a week, read how the agent harness failed, judge last week's proposed change, and propose one change to it as a decision for me.\nNever edit, commit, or push in a repository: write only under ${HARNESS_REVIEW_DIR}/.`,
 			cwd: sourceDir,
 			model: null,
 			skill: null,
@@ -58,23 +103,33 @@ export const BUILT_IN_ROUTINES: readonly BuiltInRoutine[] = [
 			task: { kind: "prompt", prompt: HARNESS_REVIEW_PROMPT },
 			enabled: false,
 		},
+		pastPrompts: [HARNESS_REVIEW_PROMPT_V1],
 	},
 ];
 
-/** What adding the built-in routines needs: whether a Bot exists, and how to save a Bot and a routine. */
+/** What adding the built-in routines needs: whether a Bot exists, a stored routine, and how to save a Bot and a routine. */
 export interface BuiltInSaves {
 	hasBot(id: BotId): boolean;
+	routine(id: string): RoutineSpec | undefined;
 	saveBot(bot: BotSpec): void;
 	saveRoutine(routine: RoutineSpec): void;
 }
 
 /**
  * Adds each of `builtIns` that the file at `addedPath` does not list yet, with its Bot unless that Bot exists, and lists
- * it there. A second call adds nothing, and a routine you delete is not added again.
+ * it there. A second call adds nothing, and a routine you delete is not added again. A listed routine whose prompt is
+ * one of its `pastPrompts` gets the current prompt; one you edited keeps yours.
  */
 export function addBuiltInRoutines(addedPath: string, saves: BuiltInSaves, builtIns: readonly BuiltInRoutine[] = BUILT_IN_ROUTINES): void {
 	const added = new JsonFile<string[]>(addedPath, { parse: value => (isTexts(value) ? value : null), holds: "a list of routine ids", onInvalid: "ignore" });
 	const before = added.load() ?? [];
+	for (const { routine, pastPrompts } of builtIns) {
+		if (!before.includes(routine.id)) continue;
+		const stored = saves.routine(routine.id);
+		if (stored?.task.kind !== "prompt" || !pastPrompts.includes(stored.task.prompt)) continue;
+		const { id, botId, name, schedules, triggers, enabled } = stored;
+		saves.saveRoutine({ id, botId, name, schedules, triggers, enabled, task: routine.task });
+	}
 	const fresh = builtIns.filter(({ routine }) => !before.includes(routine.id));
 	if (fresh.length === 0) return;
 	for (const { bot, routine } of fresh) {

@@ -71,8 +71,12 @@
   A routine whose next run is an hour or more overdue counts as missing its schedule too.
 - The dashboard adds one routine of its own, **Weekly harness review**, once, with a Bot named **Harness review** that works in the omp-agents checkout.
   It is paused; turn it on to run it on Mondays at 9:00.
-  Each run reads the last week of `ship-trace.jsonl` beside the access token, `LEARNINGS.md`, the failed merges, and the failed routine runs, groups the failures by cause, proposes exactly one harness change as a decision for you, and lists five past failures to replay to test that change.
-  It edits nothing.
+  Each run first says whether last week's proposed change fixed the failures it named, from the replay of them you ran once that change landed, or says in one line that the replay was never run.
+  It then reads the last week of `ship-trace.jsonl` beside the access token, for every repository, `LEARNINGS.md`, the failed merges, and the failed routine runs.
+  It groups by cause the failures and the pull requests whose fixes hit the round limit or stalled, proposes exactly one harness change as a decision for you, and lists five past failures to replay to test that change.
+  It saves those five as replay tasks, and its reply, in `~/.cache/omp-harness-review/`, and ends with the command that replays them on the worker model once the change lands.
+  It edits no repository and writes nothing outside that folder.
+  A copy whose prompt you never edited gets the newest prompt as the dashboard starts; one you edited keeps yours.
   If you delete it, it does not come back.
 - Routines made before every routine had a Bot move to Bots as the dashboard that runs the routines starts or takes over.
   Each one goes to one Bot named **Routines**, made once, which works in the first routine's workspace, else your home directory.

@@ -984,6 +984,7 @@ export class Dashboard {
 	#addBuiltInRoutines(): void {
 		addBuiltInRoutines(builtInRoutinesFile, {
 			hasBot: id => this.#botsFile.value.some(bot => bot.id === id),
+			routine: id => this.#routines.value.find(routine => routine.id === id),
 			saveBot: bot => this.#lists.apply("bots", { op: "save", bot }),
 			saveRoutine: routine => this.#lists.apply("routines", { op: "save", routine }),
 		});
