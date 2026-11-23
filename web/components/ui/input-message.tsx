@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { FilePreviewTile } from "@/components/ui/file-preview-tile";
 import { PromptEditor, type PromptEditorHandle } from "@/components/prompt-editor";
+import type { Tokenize } from "@/prompt-tokens";
 
 const DEFAULT_ACCEPT = "image/png,image/jpeg,application/pdf";
 
@@ -94,6 +95,8 @@ interface InputMessageProps
   >;
   /** The text field's caret and focus, for a consumer that moves either. */
   editorRef?: Ref<PromptEditorHandle>;
+  /** The references the text field shows as chips; omp's prompt grammar by default. */
+  tokenize?: Tokenize;
   /** What opens the file picker, for a consumer whose shortcut opens it. */
   filePickerRef?: Ref<(acceptOverride?: string) => void>;
   /** Assistant response state. When `"streaming"`, the send button becomes a
@@ -134,6 +137,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
       accept = DEFAULT_ACCEPT,
       editorProps,
       editorRef,
+      tokenize,
       filePickerRef,
       status,
       onStop,
@@ -457,6 +461,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
           <div className="relative">
             <PromptEditor
               handle={setEditorHandle}
+              tokenize={tokenize}
               value={value}
               onValueChange={onValueChange}
               disabled={disabled || locked}

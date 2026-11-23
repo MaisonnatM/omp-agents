@@ -187,7 +187,56 @@ export function inBotsName(change: BoardChange, bots: readonly Bot[]): BoardChan
 	return change;
 }
 
-export const isMention = (text: string, member: Member): boolean => text.toLowerCase().includes(`@${member.name.toLowerCase()}`);
+/** A command typed after `/` at the start of a message. */
+export interface BoardCommand {
+	name: string;
+	about: string;
+	/** A workflow's steps, which its card lists; a task command has none. */
+	steps?: readonly string[];
+	/** Offered as a button under the composer. */
+	quick?: true;
+}
+
+export const BOARD_COMMANDS: readonly BoardCommand[] = [
+	{ name: "review", about: "Run the review panel on this thread and post the verdict here", steps: ["Interface review", "Thermonuclear review", "Cross-judge (Codex)"], quick: true },
+	{ name: "implement", about: "Have an agent claim this task, build it, and report back", steps: ["Claim task", "Implement", "Open PR", "Report back"], quick: true },
+	{ name: "grill", about: "Stress-test the plan in this thread with two models", steps: ["Claude grills", "Codex grills", "Merge findings"] },
+	{ name: "schedule", about: "Post to an agent later: /schedule @name text in 10m, or every 2h", quick: true },
+	{ name: "claim", about: "Take this task with a one-hour lease" },
+	{ name: "done", about: "Settle this task, which opens the tasks waiting on it" },
+];
+
+/** `text` as a command, its name and what follows it, or `null` for a plain post. */
+export function parseCommand(text: string): { command: BoardCommand; arg: string } | null {
+	const match = text.trim().match(/^\/([a-z]+)(?:\s+([\s\S]*))?$/);
+	const command = match && BOARD_COMMANDS.find(item => item.name === match[1]);
+	return command ? { command, arg: match[2] ?? "" } : null;
+}
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * `@` and one of `members`' names, in any case, after the start or a space and before a space, punctuation, or the end.
+ * Longer names come first, so `@Max Power` is not `@Max`. Group 1 is the name as written; the expression is global.
+ */
+export function mentionPattern(members: readonly Pick<Member, "name">[]): RegExp | null {
+	if (members.length === 0) return null;
+	const names = members.map(member => member.name).toSorted((a, b) => b.length - a.length);
+	return new RegExp(`(?<=^|\\s)@(${names.map(escapeRegExp).join("|")})(?=[\\s,.;:!?)\\]]|$)`, "giu");
+}
+
+/** Each member `text` mentions, where it does, left to right. */
+export function mentions(text: string, members: readonly Member[]): { member: Member; start: number; end: number }[] {
+	const pattern = mentionPattern(members);
+	if (!pattern) return [];
+	const byName = new Map(members.map(member => [member.name.toLowerCase(), member]));
+	return [...text.matchAll(pattern)].flatMap(match => {
+		const member = byName.get(match[1]!.toLowerCase());
+		return member ? [{ member, start: match.index, end: match.index + match[0].length }] : [];
+	});
+}
+
+export const isMention = (text: string, member: Member): boolean => mentions(text, [member]).length > 0;
 
 /** What waits for `member`: messages in threads they posted in or that mention them, newer than their read mark, not their own. */
 export function queueOf(state: BoardState, member: Member): Message[] {

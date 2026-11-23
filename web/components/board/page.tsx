@@ -1,29 +1,17 @@
 /** The Board: channels and threads where people, omp sessions, and remote agents post, with an inbox per member; a message for a session wakes it. */
-import { IconArrowUp, IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconPlusSmall, IconShieldCheck, IconSidebarSimpleRightWide } from "central-icons";
+import { IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconPlusSmall, IconShieldCheck, IconSidebarSimpleRightWide } from "central-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { boardTokens } from "../../board-composer";
+import { boardMessagePreset, type MarkdownPreset, MessageMarkdown } from "../message-markdown";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 import { hashForPage } from "../../routing";
-import { type Attachment, type BoardChange, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
+import { type Attachment, type BoardChange, type BoardCommand, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, mentions, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
 import type { CoreData } from "../module-views";
 import { type BoardRoute, type BoardView, resolveBoardView } from "./module";
 import { Avatar, MIN, NameDialog, relTime, UNITS, useNow } from "./parts";
-
-const COMMANDS = [
-	{ name: "review", about: "Run the review panel on this thread and post the verdict here" },
-	{ name: "implement", about: "Have an agent claim this task, build it, and report back" },
-	{ name: "grill", about: "Stress-test the plan in this thread with two models" },
-	{ name: "schedule", about: "Post to an agent later: /schedule @name text in 10m, or every 2h" },
-	{ name: "claim", about: "Take this task with a one-hour lease" },
-	{ name: "done", about: "Settle this task, which opens the tasks waiting on it" },
-] as const;
-
-const WORKFLOW_STEPS: Record<string, string[]> = {
-	review: ["Interface review", "Thermonuclear review", "Cross-judge (Codex)"],
-	grill: ["Claude grills", "Codex grills", "Merge findings"],
-	implement: ["Claim task", "Implement", "Open PR", "Report back"],
-};
+import { Composer } from "./composer";
 
 const lastIn = (state: BoardState, threadId: string): Message | undefined => state.messages.findLast(msg => msg.thread === threadId);
 
@@ -62,31 +50,31 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 		setOpen(id);
 	}
 
-	function runCommand(threadId: string, command: string, arg: string) {
+	function runCommand(threadId: string, command: BoardCommand, arg: string) {
 		const thread = state.threads.find(item => item.id === threadId)!;
-		if (command === "claim") {
+		if (command.name === "claim") {
 			onChange({ op: "task", thread: threadId, task: "claimed", lease: { by: state.me, until: Date.now() + LEASE_MS } });
 			post(threadId, "Claimed. Lease 1h.");
-		} else if (command === "done") {
+		} else if (command.name === "done") {
 			onChange({ op: "task", thread: threadId, task: "done", lease: null });
 			post(threadId, arg || "Done.");
-		} else if (command === "schedule") {
-			const to = members.find(member => isMention(arg, member));
+		} else if (command.name === "schedule") {
+			const [to] = mentions(arg, members);
 			if (!to) return post(threadId, "/schedule needs an @member to post to.", { internal: true });
 			const every = arg.match(/\bevery (\d+)\s*([mhd])\b/);
 			const after = arg.match(/\bin (\d+)\s*([mhd])\b/);
 			const step = (match: RegExpMatchArray) => Number(match[1]) * UNITS[match[2]!]!;
 			const repeat = every ? step(every) : null;
 			const at = Date.now() + (after ? step(after) : (repeat ?? 5 * MIN));
-			const text = arg.replace(`@${to.name}`, "").replace(/\b(every|in) \d+\s*[mhd]\b/g, "").trim() || "Check back on this thread.";
-			onChange({ op: "schedule", schedule: { id: crypto.randomUUID(), thread: threadId, by: state.me, to: to.id, text, at, every: repeat } });
-			post(threadId, `Scheduled for ${to.name}`, { internal: true, attachment: { kind: "schedule", text, at, every: repeat } });
+			const text = (arg.slice(0, to.start) + arg.slice(to.end)).replace(/\b(every|in) \d+\s*[mhd]\b/g, "").trim() || "Check back on this thread.";
+			onChange({ op: "schedule", schedule: { id: crypto.randomUUID(), thread: threadId, by: state.me, to: to.member.id, text, at, every: repeat } });
+			post(threadId, `Scheduled for ${to.member.name}`, { internal: true, attachment: { kind: "schedule", text, at, every: repeat } });
 		} else {
 			// The workflow goes to the agent it mentions, else to the agent holding the task.
 			const holder = thread.lease ? byId.get(thread.lease.by) : undefined;
-			const target = members.find(member => member.kind !== "human" && isMention(arg, member)) ?? (holder?.kind === "human" ? undefined : holder);
-			const text = `/${command}${target && !isMention(arg, target) ? ` @${target.name}` : ""}${arg ? ` ${arg}` : ""}`;
-			post(threadId, text, { attachment: { kind: "workflow", command: `/${command}`, steps: WORKFLOW_STEPS[command]!.map(label => ({ label, state: "queued" })) } });
+			const target = mentions(arg, members).find(({ member }) => member.kind !== "human")?.member ?? (holder?.kind === "human" ? undefined : holder);
+			const text = `/${command.name}${target && !isMention(arg, target) ? ` @${target.name}` : ""}${arg ? ` ${arg}` : ""}`;
+			post(threadId, text, { attachment: { kind: "workflow", command: `/${command.name}`, steps: (command.steps ?? []).map(label => ({ label, state: "queued" })) } });
 		}
 	}
 
@@ -341,7 +329,7 @@ interface ThreadViewProps {
 	now: number;
 	typing?: Member;
 	onPost: (text: string) => void;
-	onCommand: (command: string, arg: string) => void;
+	onCommand: (command: BoardCommand, arg: string) => void;
 	onAnswer: (msgId: string, option: string) => void;
 	onOpenThread: (id: string) => void;
 	/** Back to the list, which the narrow page hides while a thread is open. */
@@ -350,6 +338,10 @@ interface ThreadViewProps {
 
 function ThreadView({ state, thread, byId, members, now, typing, onPost, onCommand, onAnswer, onOpenThread, onBack }: ThreadViewProps) {
 	const messages = state.messages.filter(msg => msg.thread === thread.id);
+	// Keyed on the names, not the roster's identity, which every presence change renews: a new tokenizer renders every message again.
+	const names = members.map(member => `${member.id}\0${member.name}`).join("\n");
+	const tokenize = useMemo(() => boardTokens(members), [names]);
+	const preset = useMemo(() => boardMessagePreset(tokenize), [tokenize]);
 	const channel = state.channels.find(item => item.id === thread.channel)!;
 	const scroller = useRef<HTMLDivElement>(null);
 	const [showInternal, setShowInternal] = useState(true);
@@ -409,7 +401,7 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 						{shown.map((msg, i) => {
 							const prev = shown[i - 1];
 							const grouped = prev && prev.author === msg.author && msg.at - prev.at < 10 * 60_000;
-							return <MessageRow key={msg.id} msg={msg} author={byId.get(msg.author)} grouped={!!grouped} now={now} onAnswer={onAnswer} me={state.me} />;
+							return <MessageRow key={msg.id} msg={msg} author={byId.get(msg.author)} grouped={!!grouped} now={now} onAnswer={onAnswer} preset={preset} />;
 						})}
 						{typing && (
 							<li className="flex items-center gap-3 pt-4 text-xs text-muted-foreground">
@@ -426,7 +418,7 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 						)}
 					</ol>
 				</div>
-				<Composer members={members} onPost={onPost} onCommand={onCommand} channel={channel.name} />
+				<Composer members={members} tokenize={tokenize} onPost={onPost} onCommand={onCommand} channel={channel.name} />
 				</div>
 				<aside
 					aria-label="Details"
@@ -511,7 +503,7 @@ function DepRow({ label, thread, onOpen }: { label: string; thread: Thread; onOp
 	);
 }
 
-function MessageRow({ msg, author, grouped, now, onAnswer, me }: { msg: Message; author?: Member; grouped: boolean; now: number; onAnswer: (id: string, option: string) => void; me: string }) {
+function MessageRow({ msg, author, grouped, now, onAnswer, preset }: { msg: Message; author?: Member; grouped: boolean; now: number; onAnswer: (id: string, option: string) => void; preset: MarkdownPreset }) {
 	return (
 		<li className={cn("group flex gap-3 rounded-lg px-2 -mx-2", grouped ? "pt-1" : "pt-4", msg.internal && "bg-[repeating-linear-gradient(135deg,transparent,transparent_6px,color-mix(in_oklab,var(--muted)_60%,transparent)_6px,color-mix(in_oklab,var(--muted)_60%,transparent)_7px)]")}>
 			<span className="w-8 shrink-0">{!grouped && author && <Avatar member={author} size="md" />}</span>
@@ -525,20 +517,15 @@ function MessageRow({ msg, author, grouped, now, onAnswer, me }: { msg: Message;
 						{msg.synced && <span className="text-3xs text-muted-foreground">via {msg.synced}</span>}
 					</p>
 				)}
-				{msg.text && <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderText(msg.text, msg.author === me)}</p>}
+				{msg.text && (
+					<div className="text-sm leading-relaxed">
+						<MessageMarkdown text={msg.text} preset={preset} />
+					</div>
+				)}
 				{msg.attachment && <AttachmentCard attachment={msg.attachment} now={now} onAnswer={option => onAnswer(msg.id, option)} />}
 			</div>
 		</li>
 	);
-}
-
-function renderText(text: string, mine: boolean): ReactNode {
-	return text.split(/(@[\p{L}'][\p{L}'\- ]*?(?=[\s,.?!:]|$)|`[^`]+`|\/[a-z]+\b)/u).map((part, i) => {
-		if (part.startsWith("@")) return <span key={i} className={cn("rounded px-0.5 font-medium", mine ? "bg-primary/10 text-primary" : "bg-amber-500/15 text-amber-800 dark:text-amber-300")}>{part}</span>;
-		if (part.startsWith("`")) return <code key={i} className="rounded bg-muted px-1 font-mono text-[0.8em]">{part.slice(1, -1)}</code>;
-		if (/^\/[a-z]+$/.test(part) && COMMANDS.some(command => `/${command.name}` === part)) return <span key={i} className="font-mono text-[0.85em] font-medium text-violet-700 dark:text-violet-300">{part}</span>;
-		return part;
-	});
 }
 
 function AttachmentCard({ attachment, now, onAnswer }: { attachment: Attachment; now: number; onAnswer: (option: string) => void }) {
@@ -646,107 +633,3 @@ function StepDot({ state }: { state: "done" | "running" | "queued" | "failed" })
 	return <span className="size-4 rounded-full border border-dashed border-muted-foreground/50" />;
 }
 
-/* ─────────────────────────── Composer ─────────────────────────── */
-
-type Suggestion = { kind: "member"; member: Member } | { kind: "command"; name: string; about: string };
-
-function Composer({ members, onPost, onCommand, channel }: { members: Member[]; onPost: (text: string) => void; onCommand: (command: string, arg: string) => void; channel: string }) {
-	const [text, setText] = useState("");
-	const [active, setActive] = useState(0);
-	const field = useRef<HTMLTextAreaElement>(null);
-	const token = text.match(/(?:^|\s)([@/])([\p{L}'\- ]{0,20})$/u);
-	const suggestions: Suggestion[] = !token
-		? []
-		: token[1] === "@"
-			? members.filter(member => member.name.toLowerCase().startsWith(token[2]!.toLowerCase())).slice(0, 6).map(member => ({ kind: "member", member }))
-			: text.trimStart().startsWith("/") && !text.includes(" ")
-				? COMMANDS.filter(command => command.name.startsWith(token[2]!)).map(command => ({ kind: "command", ...command }))
-				: [];
-
-	function pick(suggestion: Suggestion) {
-		const head = text.slice(0, text.length - token![2]!.length - 1);
-		setText(`${head}${suggestion.kind === "member" ? `@${suggestion.member.name}` : `/${suggestion.name}`} `);
-		setActive(0);
-		field.current?.focus();
-	}
-
-	function send() {
-		const trimmed = text.trim();
-		if (!trimmed) return;
-		const command = trimmed.match(/^\/([a-z]+)\s*(.*)$/s);
-		if (command && COMMANDS.some(item => item.name === command[1])) onCommand(command[1]!, command[2]!);
-		else onPost(trimmed);
-		setText("");
-	}
-
-	return (
-		<div className="shrink-0 pt-2 pb-[max(1.25rem,var(--toasts-clearance,0px))] transition-[padding] duration-200 max-phone:pb-5">
-			<div className="relative mx-auto max-w-3xl px-6">
-				{suggestions.length > 0 && (
-					<ul role="listbox" className="absolute right-6 bottom-full left-6 mb-2 overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-lg">
-						{suggestions.map((suggestion, i) => (
-							<li key={suggestion.kind === "member" ? suggestion.member.id : suggestion.name} role="option" aria-selected={i === active}>
-								<button type="button" onMouseDown={event => event.preventDefault()} onClick={() => pick(suggestion)} className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm", i === active && "bg-accent")}>
-									{suggestion.kind === "member" ? (
-										<>
-											<Avatar member={suggestion.member} size="sm" />
-											<span className="font-medium">{suggestion.member.name}</span>
-											<span className="truncate text-xs text-muted-foreground">{suggestion.member.kind === "human" ? "person" : suggestion.member.harness}</span>
-											{suggestion.member.presence === "asleep" && <span className="ml-auto text-2xs text-amber-700 dark:text-amber-300">queues until it wakes</span>}
-										</>
-									) : (
-										<>
-											<span className="w-20 font-mono text-[0.85em] font-medium text-violet-700 dark:text-violet-300">/{suggestion.name}</span>
-											<span className="truncate text-xs text-muted-foreground">{suggestion.about}</span>
-										</>
-									)}
-								</button>
-							</li>
-						))}
-					</ul>
-				)}
-				<div className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-shadow focus-within:shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_25%,transparent)]">
-					<textarea
-						ref={field}
-						value={text}
-						rows={2}
-						onChange={event => {
-							setText(event.target.value);
-							setActive(0);
-						}}
-						onKeyDown={event => {
-							if (suggestions.length > 0 && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
-								event.preventDefault();
-								setActive(i => (i + (event.key === "ArrowDown" ? 1 : suggestions.length - 1)) % suggestions.length);
-							} else if (suggestions.length > 0 && (event.key === "Tab" || event.key === "Enter")) {
-								event.preventDefault();
-								pick(suggestions[active]!);
-							} else if (event.key === "Enter" && !event.shiftKey) {
-								event.preventDefault();
-								send();
-							}
-						}}
-						placeholder={`Reply in #${channel}. @ to ping a person or agent, / for a workflow`}
-						className="block w-full resize-none bg-transparent px-4 pt-3 text-sm outline-none placeholder:text-muted-foreground"
-					/>
-					<div className="flex items-center gap-1 px-2 pb-2">
-						{(["review", "implement", "schedule"] as const).map(name => (
-							<button key={name} type="button" onClick={() => setText(`/${name} `)} className="h-7 rounded-md px-2 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
-								/{name}
-							</button>
-						))}
-						<button
-							type="button"
-							onClick={send}
-							disabled={!text.trim()}
-							aria-label="Send"
-							className="ml-auto grid size-8 place-items-center rounded-full bg-foreground text-background transition-opacity disabled:opacity-30"
-						>
-							<IconArrowUp className="size-4" />
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>
-	);
-}
