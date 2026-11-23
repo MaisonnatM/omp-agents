@@ -21,18 +21,41 @@ interface ListProps {
 
 const INBOX_META = "Mentions and replies waiting for you";
 
-/** The list `view` asks for; `queue` is the inbox's items, `onCreateThread` makes a thread in a channel. */
-export function BoardList({ view, queue, onCreateThread, ...props }: ListProps & { view: BoardView; queue: Message[]; onCreateThread: (channel: string, title: string) => void }) {
+/** The list `view` asks for; `queue` is the inbox's items, `query` the channel filter, `onCreateThread` makes a thread in a channel. */
+export function BoardList({ view, queue, query, onQuery, onCreateThread, ...props }: ListProps & { view: BoardView; queue: Message[]; query: string; onQuery: (query: string) => void; onCreateThread: (channel: string, title: string) => void }) {
 	switch (view.kind) {
 		case "inbox":
 			return <InboxList {...props} queue={queue} />;
 		case "scheduled":
 			return <ScheduledList {...props} />;
 		case "channel":
-			return <ChannelList key={view.id} {...props} channel={view.id} onCreateThread={onCreateThread} />;
+			return <ChannelList key={view.id} {...props} channel={view.id} query={query} onQuery={onQuery} onCreateThread={onCreateThread} />;
 		case "member":
 			return <MemberList {...props} member={view.id} />;
 	}
+}
+
+/** The ids of the threads `view` lists, top to bottom, which the next and previous thread shortcuts step through. */
+export function listedThreads({ view, state, index, queue, query }: { view: BoardView; state: BoardState; index: BoardIndex; queue: Message[]; query: string }): string[] {
+	switch (view.kind) {
+		case "inbox":
+			return queueThreads(index, queue).map(thread => thread.id);
+		case "scheduled":
+			return [...new Set(state.schedules.toSorted((a, b) => a.at - b.at).map(item => item.thread))];
+		case "channel":
+			return channelThreads(state, index, view.id, query).map(thread => thread.id);
+		case "member":
+			return queueThreads(index, index.queueByMember.get(view.id) ?? []).map(thread => thread.id);
+	}
+}
+
+function channelThreads(state: BoardState, index: BoardIndex, channel: string, query: string): Thread[] {
+	const at = (thread: Thread) => index.lastByThread.get(thread.id)?.at ?? 0;
+	return state.threads.filter(thread => thread.channel === channel && thread.title.toLowerCase().includes(query.toLowerCase())).toSorted((a, b) => at(b) - at(a));
+}
+
+function queueThreads(index: BoardIndex, messages: Message[]): Thread[] {
+	return [...new Set(messages.map(msg => msg.thread))].flatMap(id => index.threadById.get(id) ?? []);
 }
 
 /** The whole page when the inbox is empty and no thread is open. */
@@ -93,14 +116,12 @@ function ScheduledList({ state, index, onOpen, now }: ListProps) {
 	);
 }
 
-function ChannelList({ channel: id, onCreateThread, ...props }: ListProps & { channel: string; onCreateThread: (channel: string, title: string) => void }) {
+function ChannelList({ channel: id, query: q, onQuery, onCreateThread, ...props }: ListProps & { channel: string; query: string; onQuery: (query: string) => void; onCreateThread: (channel: string, title: string) => void }) {
 	const { state, index, open, onOpen, now } = props;
-	const [q, setQ] = useState("");
 	const [naming, setNaming] = useState(false);
 	const channel = index.channelById.get(id);
 	if (!channel) return null;
-	const at = (thread: Thread) => index.lastByThread.get(thread.id)?.at ?? 0;
-	const threads = state.threads.filter(thread => thread.channel === id && thread.title.toLowerCase().includes(q.toLowerCase())).toSorted((a, b) => at(b) - at(a));
+	const threads = channelThreads(state, index, id, q);
 	const title = `#${channel.name}`;
 	return (
 		<ListFrame
@@ -115,7 +136,7 @@ function ChannelList({ channel: id, onCreateThread, ...props }: ListProps & { ch
 			filter={
 				<label className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-4 text-sm text-muted-foreground">
 					<IconMagnifyingGlass className="size-3.5" />
-					<input value={q} onChange={event => setQ(event.target.value)} placeholder="Filter threads" className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground" />
+					<input value={q} onChange={event => onQuery(event.target.value)} placeholder="Filter threads" className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground" />
 				</label>
 			}
 		>

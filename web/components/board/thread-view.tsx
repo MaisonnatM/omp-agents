@@ -1,5 +1,5 @@
 /** An open Board thread: its messages, the composer, and a details column with its task, people, and schedules. */
-import { IconChevronLeft, IconClock, IconHashtag, IconSidebarSimpleRightWide } from "central-icons";
+import { IconChevronDownSmall, IconChevronLeft, IconChevronTopSmall, IconClock, IconCrossMedium, IconHashtag, IconSidebarSimpleRightWide } from "central-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -19,11 +19,14 @@ interface ThreadViewProps {
 	typing?: Member;
 	onPost: (text: string) => void;
 	onCommand: (command: BoardCommand, arg: string) => void;
-	/** Back to the list, which the narrow page hides while a thread is open. */
-	onBack: () => void;
+	/** Closes the thread; the narrow page, which hides the list while a thread is open, shows this as Back to list. */
+	onClose: () => void;
+	/** Opens the thread above or below this one in the list, absent at either end. */
+	onPrevious?: () => void;
+	onNext?: () => void;
 }
 
-export function ThreadView({ state, index, thread, members, now, typing, onPost, onCommand, onBack }: ThreadViewProps) {
+export function ThreadView({ state, index, thread, members, now, typing, onPost, onCommand, onClose, onPrevious, onNext }: ThreadViewProps) {
 	const byId = index.memberById;
 	const messages = index.messagesByThread.get(thread.id) ?? [];
 	// Keyed on the names, not the roster's identity, which every presence change renews: a new tokenizer renders every message again.
@@ -60,7 +63,7 @@ export function ThreadView({ state, index, thread, members, now, typing, onPost,
 	return (
 		<section aria-label={thread.title} className="flex min-h-0 min-w-0 flex-col">
 			<header className="flex h-(--page-header-height) shrink-0 items-center gap-3 border-b border-border px-6">
-				<Button variant="ghost" size="icon-compact" aria-label="Back to list" className="-ml-2 shrink-0 @min-[46rem]:hidden max-phone:inline-flex" onClick={onBack}>
+				<Button variant="ghost" size="icon-compact" aria-label="Back to list" className="-ml-2 shrink-0 @min-[46rem]:hidden max-phone:inline-flex" onClick={onClose}>
 					<IconChevronLeft />
 				</Button>
 				<div className="min-w-0 flex-1">
@@ -75,9 +78,20 @@ export function ThreadView({ state, index, thread, members, now, typing, onPost,
 					<input type="checkbox" checked={showInternal} onChange={event => setShowInternal(event.target.checked)} className="accent-current" />
 					Internal notes
 				</label>
-				<Button variant="ghost" size="icon-compact" aria-label="Details" aria-expanded={details} className="-mr-2 shrink-0 min-[1400px]:hidden" onClick={() => setDetails(open => !open)}>
-					<IconSidebarSimpleRightWide />
-				</Button>
+				<div className="flex shrink-0 items-center">
+					<Button variant="ghost" size="icon-compact" aria-label="Previous thread" title="Previous thread (K)" disabled={!onPrevious} onClick={onPrevious}>
+						<IconChevronTopSmall />
+					</Button>
+					<Button variant="ghost" size="icon-compact" aria-label="Next thread" title="Next thread (J)" disabled={!onNext} onClick={onNext}>
+						<IconChevronDownSmall />
+					</Button>
+					<Button variant="ghost" size="icon-compact" aria-label="Details" aria-expanded={details} className="min-[1400px]:hidden" onClick={() => setDetails(open => !open)}>
+						<IconSidebarSimpleRightWide />
+					</Button>
+					<Button variant="ghost" size="icon-compact" aria-label="Close thread" title="Close thread (Esc)" className="-mr-2 max-phone:hidden @max-[46rem]:hidden" onClick={onClose}>
+						<IconCrossMedium />
+					</Button>
+				</div>
 			</header>
 			<div className="relative flex min-h-0 flex-1">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col">

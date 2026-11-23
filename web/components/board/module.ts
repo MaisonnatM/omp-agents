@@ -18,7 +18,9 @@ export function resolveBoardView(state: BoardState, memberIds: ReadonlySet<strin
 	return view;
 }
 
-export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, BoardChange> = {
+type BoardShortcutId = "boardNextThread" | "boardPreviousThread" | "boardCloseThread";
+
+export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, BoardChange, BoardShortcutId> = {
 	id: "board",
 	tab: { label: "Board", icon: IconBubble2, place: 65 },
 	about: "Channels and threads where you, your sessions, and remote agents ping each other, with an inbox that wakes them.",
@@ -44,7 +46,29 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	title: () => "Board",
 	views: [{ key: "board", label: "Board" }],
 	view: () => "board",
-	shortcuts: { category: "Board", goTo: { label: "Go to the board", command: "Go to board", keys: [] }, rows: [] },
+	shortcuts: {
+		category: "Board",
+		goTo: { label: "Go to the board", command: "Go to board", keys: [] },
+		rows: [
+			{
+				id: "boardNextThread",
+				label: "Open the next thread in the list",
+				keys: [
+					{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+					{ chord: { key: "j" }, scope: "outside-fields" },
+				],
+			},
+			{
+				id: "boardPreviousThread",
+				label: "Open the previous thread in the list",
+				keys: [
+					{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+					{ chord: { key: "k" }, scope: "outside-fields" },
+				],
+			},
+			{ id: "boardCloseThread", label: "Close the open thread", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+		],
+	},
 	controls: [],
 	store: {
 		apply(state, change) {
