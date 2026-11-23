@@ -190,11 +190,12 @@ function withRawBilling(report: Record<string, unknown>, reports: readonly Usage
 /**
  * Plans with at least one quota window or extra usage, in omp's order. A window is named by its id (`5h`, `7d`),
  * plus its model tier when it meters one model. Limits that would share a name keep omp's label.
+ * Accounts of one provider that share an email, such as a team and a personal organization, add the organization's name.
  */
 export function parsePlanUsage(stdout: string, rawReports: readonly UsageReport[] = []): PlanUsage[] {
 	const data: unknown = JSON.parse(stdout);
 	if (!isObject(data) || !Array.isArray(data.reports)) throw new Error("omp usage --json printed no reports");
-	const plans: PlanUsage[] = [];
+	const plans: (PlanUsage & { orgName: string | undefined })[] = [];
 	for (const rawReport of data.reports as unknown[]) {
 		if (!isObject(rawReport) || !Array.isArray(rawReport.limits)) continue;
 		const report = withRawBilling(rawReport, rawReports, data.reports);
@@ -209,6 +210,7 @@ export function parsePlanUsage(stdout: string, rawReports: readonly UsageReport[
 			provider,
 			name: providerName(provider),
 			account: str(metadata.email) || str(metadata.accountId) || null,
+			orgName: str(metadata.orgName) || undefined,
 			windows: windows.map(window =>
 				windows.some(other => other !== window && other.label === window.label) ? { ...window, label: window.title } : window,
 			),
@@ -216,7 +218,10 @@ export function parsePlanUsage(stdout: string, rawReports: readonly UsageReport[
 			resetCredits: parseResetCredits(report.resetCredits),
 		});
 	}
-	return plans;
+	return plans.map(({ orgName, ...plan }) => {
+		const shared = plan.account !== null && plans.some(other => other.provider === plan.provider && other.account === plan.account && other.orgName !== orgName);
+		return shared && orgName ? { ...plan, account: `${plan.account} · ${orgName}` } : plan;
+	});
 }
 
 /**
