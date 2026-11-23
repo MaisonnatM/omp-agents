@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildPrompt, type EvalTask, exportsName, namedImports, testTerms } from "./candidates";
-import { arms, type EvalRow, summarize } from "./run";
+import { arms, DECAY_COMPONENTS, decayPlan, decayRows, deltaBand, type EvalRow, pastCost, summarize, verdict } from "./run";
 
 describe("hidden test imports", () => {
 	test("reads named imports from relative modules, resolved against the test's folder", () => {
@@ -93,6 +93,52 @@ describe("decay summary", () => {
 		expect(summarize(rows)).toEqual([
 			{ arm: "full", runs: 2, passRate: 1, costPerRun: 3, minutesPerRun: 1, passRateDelta: null, costDelta: null },
 			{ arm: "-extension:ship", runs: 2, passRate: 0.5, costPerRun: 1.5, minutesPerRun: 1, passRateDelta: -0.5, costDelta: -1.5 },
+		]);
+	});
+
+	test("the noise band widens with few runs and its verdict keeps a component only when dropping it hurts beyond the band", () => {
+		const hurts = deltaBand({ passes: 50, runs: 60 }, { passes: 20, runs: 60 });
+		expect(hurts.high).toBeLessThan(0);
+		expect(verdict(hurts)).toBe("keep");
+		expect(verdict(deltaBand({ passes: 20, runs: 60 }, { passes: 50, runs: 60 }))).toBe("harmful");
+		// One task's flip among 60 runs, or a full pass against a full failure on 1 run each, is noise.
+		expect(verdict(deltaBand({ passes: 40, runs: 60 }, { passes: 39, runs: 60 }))).toBe("drop candidate");
+		expect(verdict(deltaBand({ passes: 1, runs: 1 }, { passes: 0, runs: 1 }))).toBe("drop candidate");
+	});
+
+	test("the decay table gives each dropped component its pass@k, band, and verdict, and the full harness none", () => {
+		const runs = (arm: string, task: string, passes: boolean[]) => passes.map((passed, i) => row(arm, passed, 1, { task, run: i + 1 }));
+		const rows = [...Array.from({ length: 10 }, (_, t) => runs("full", `t${t}`, [true, true, true])), ...Array.from({ length: 10 }, (_, t) => runs("-skill:ship", `t${t}`, [t < 2, false, false]))].flat();
+		const [full, ship] = decayRows(rows, 3);
+		expect(full).toMatchObject({ arm: "full", passRate: 1, passAtK: 1, band: null, verdict: null });
+		expect(ship).toMatchObject({ arm: "-skill:ship", runs: 30, passAtK: 0.2, verdict: "keep" });
+		expect(ship?.passRateDelta).toBeCloseTo(-28 / 30);
+	});
+
+	test("the default decay arms drop the ship extension and each listed skill", () => {
+		expect(arms(DECAY_COMPONENTS.extensions, DECAY_COMPONENTS.skills).map(arm => arm.disabled)).toEqual([[], ["extension-module:ship"], ...DECAY_COMPONENTS.skills.map(skill => [`skill:${skill}`])]);
+	});
+
+	test("the plan prices the runs still to record from the model's past runs, on the set's own tasks first", () => {
+		const past = [row("full", true, 1, { task: "other" }), row("full", true, 3, { task: "t" }), row("full", true, 9, { task: "t", model: "anthropic/claude-sonnet-5-5" })];
+		expect(pastCost(past, "anthropic/claude-opus-5-5:auto", new Set(["t"]))).toEqual({ perRun: 3, runs: 1, sameSet: true });
+		expect(pastCost(past, "anthropic/claude-opus-5-5:auto", new Set(["new"]))).toEqual({ perRun: 2, runs: 2, sameSet: false });
+		expect(pastCost(past, "openai/gpt-6", new Set(["t"]))).toBeNull();
+		const plan = decayPlan({
+			model: "anthropic/claude-opus-5-5:auto",
+			arms: arms([], ["ship"]),
+			tasks: 2,
+			runs: 3,
+			toRun: new Map([["full", 4], ["-skill:ship", 6]]),
+			cost: { perRun: 2, runs: 2, sameSet: false },
+			maxCost: 5,
+		});
+		expect(plan).toEqual([
+			"Decay check of anthropic/claude-opus-5-5:auto: 2 arms × 2 tasks × 3 runs = 12 runs, 10 not recorded yet.",
+			"  full         4 to run",
+			"  -skill:ship  6 to run, disables skill:ship",
+			"Estimate: 10 runs × $2.00 per run = $20.00, from 2 past scored runs of this model on other tasks.",
+			"Ceiling: 10 runs × $5.00 --max-cost = $50.00.",
 		]);
 	});
 });

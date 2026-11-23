@@ -77,11 +77,36 @@ A run whose model could not answer, such as on a usage limit, is recorded with i
 
 ## The decay check
 
+Run it on every model upgrade: a skill or review a weaker model needed can stop earning its tokens on a stronger one, or start getting in its way.
+It drops one component at a time and keeps only what moves the pass rate.
+
+```sh
+bun scripts/evals/run.ts --tasks ~/.cache/omp-evalset/yampa-20.json --out ~/.cache/omp-evals/yampa --model <new model> --decay --plan   # arms, runs, and cost; spends nothing
+bun scripts/evals/run.ts --tasks ~/.cache/omp-evalset/yampa-20.json --out ~/.cache/omp-evals/yampa --model <new model> --decay          # the runs, then the table
+```
+
 `--disable-extensions ship,bash-guard` and `--disable-skills ship,code-review` add one arm per listed component besides the full harness.
 An arm turns that one component off through omp's `disabledExtensions` setting, `extension-module:<name>` for an extension and `skill:<name>` for a skill, added to the user's own list.
-The summary prints, per arm, the pass rate as pass@1, its change in points against the full harness, pass@3, the cost per run and its change, and minutes per run.
-pass@k is the unbiased estimate 1 - C(n-c, k) / C(n, k) for a task with n scored runs of which c passed, averaged over the tasks with at least k runs; with 3 runs, pass@3 is the share of tasks that passed at least once.
-A component whose arm passes as often for less money is not earning its tokens; one whose arm passes less often is.
-`bun scripts/evals/run.ts summary` prints the table again from the results file.
+`--decay` fills either list you leave out with `DECAY_COMPONENTS` in `run.ts`: the `ship` extension and the skills `backend-development`, `writing-tests`, `implementation-guidelines`, `diagnosing-bugs`, `code-review`, and `ship`.
 
-With 20 tasks and 3 runs, one task's flip moves an arm's pass rate by 1.7 points, so read a difference under about 10 points as noise.
+The thermonuclear and interface reviews have no arm of their own.
+Only `/ship` spawns `thermonuclear-reviewer` and `interface-reviewer`, after it opens a pull request, and a run has no remote to open one on; none of the 29 eval runs recorded by 2026-11-23 spawned a subagent or called `ship_stage`.
+omp's `disabledExtensions` has no id for an agent either, so the `-extension:ship` arm, which drops the whole ship flow that asks for the reviews, is as close as a run gets.
+
+The summary prints, per arm, pass@1, pass@k for k = `--runs`, the change in pass@1 points against the full harness with its 95% band, the cost per task run and its change, minutes per task run, and a verdict.
+pass@k is the unbiased estimate 1 - C(n-c, k) / C(n, k) for a task with n scored runs of which c passed, averaged over the tasks with at least k runs; with 3 runs, pass@3 is the share of tasks that passed at least once.
+The band is the Agresti-Caffo interval on the difference of two pass rates: add one pass and one failure to each arm, then take the smoothed difference ± 1.96 standard errors, so an arm at 0% or 100% still gets a band.
+The verdict reads the band:
+
+- keep: the whole band is below zero, so dropping the component lowers the pass rate beyond noise.
+- drop candidate: the band holds zero, so dropping it has no measurable effect; drop it when its arm also costs less.
+- harmful: the whole band is above zero, so the harness passes more often without it.
+
+With 18 tasks and 3 runs, 54 runs per arm, the band is about ±18 points at a 50% pass rate, so only a large effect earns keep or harmful; raise `--runs` to narrow it.
+The band treats runs as independent and ignores that both arms ran the same tasks, which makes it wider than a paired test, never narrower.
+`bun scripts/evals/run.ts summary --out <out>` prints the table again from the results file.
+
+`--plan` prints the arms, how many runs each still has to record, and the cost, and runs nothing.
+The estimate is (1 + extensions + skills) × tasks × `--runs` runs, less those already recorded, times the mean cost of a scored run of `--model`.
+That mean comes from the set's own past runs when it has any, else from every past run of the model in `~/.cache/omp-evals*/results.jsonl` and one folder below, and the plan says which.
+The ceiling is the same run count times `--max-cost`, each run's cost cap.

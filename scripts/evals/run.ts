@@ -5,7 +5,9 @@
  *
  * - `--disable-extensions a,b` and `--disable-skills c,d` add a decay check: besides the full harness, the set runs once
  *   per listed component with only that component turned off, through omp's `disabledExtensions`, and the summary prints
- *   each component's pass-rate and cost delta against the full harness.
+ *   each component's pass-rate and cost delta against the full harness, a 95% band on the pass-rate delta, and a verdict.
+ *   `--decay` fills a list left out with `DECAY_COMPONENTS`, the components to recheck on a model upgrade.
+ * - `--plan` prints the arms, the runs still to record, and their cost from past runs of the model, and runs nothing.
  * - A run already in the results file is skipped, so a stopped run resumes; a run whose model could not answer is
  *   recorded with its error, left out of the summary, and retried next time.
  * - `--dry-run` does everything but call the model: it prints the omp command, applies the landed change in place of
@@ -13,8 +15,9 @@
  *
  * Usage:
  *   bun scripts/evals/run.ts [--tasks scripts/evals/tasks.json] [--only id,id] [--runs 3] [--model anthropic/claude-opus-5-5:auto]
- *     [--disable-extensions ship,bash-guard] [--disable-skills ship] [--out ~/.cache/omp-evals] [--max-cost 5] [--max-time 30m] [--dry-run]
- *   bun scripts/evals/run.ts summary [--out ~/.cache/omp-evals]
+ *     [--decay] [--disable-extensions ship,bash-guard] [--disable-skills ship] [--out ~/.cache/omp-evals] [--max-cost 5] [--max-time 30m]
+ *     [--plan | --dry-run]
+ *   bun scripts/evals/run.ts summary [--out ~/.cache/omp-evals] [--runs 3]
  * `--out` must sit outside every checkout: a run nested in one reads it.
  */
 import { spawnSync } from "node:child_process";
@@ -64,6 +67,17 @@ const FULL = "full";
 /** A Python check builds its virtual environment in the fresh clone first, which takes minutes on a cold cache. */
 const CHECK_TIMEOUT_MS = 900_000;
 const DEFAULT_OUT = join(homedir(), ".cache", "omp-evals");
+
+/**
+ * The components a decay check drops one at a time by default, on a model upgrade: the ones a coding task's run loads
+ * and may lean on. The thermonuclear and interface reviews are not here: only `/ship` spawns them, after it opens a pull
+ * request, which a run with no remote never reaches, and omp's `disabledExtensions` has no id for an agent; dropping
+ * `extension-module:ship` drops the flow that asks for them.
+ */
+export const DECAY_COMPONENTS = {
+	extensions: ["ship"],
+	skills: ["backend-development", "writing-tests", "implementation-guidelines", "diagnosing-bugs", "code-review", "ship"],
+};
 
 export function arms(extensions: string[], skills: string[]): Arm[] {
 	return [
@@ -116,18 +130,91 @@ export function passAtKRate(rows: EvalRow[], k: number): number | null {
 	return scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null;
 }
 
-function printSummary(rows: EvalRow[]): void {
+interface Tally {
+	passes: number;
+	runs: number;
+}
+
+/**
+ * The 95% band on an arm's pass-rate change against the full harness, by the Agresti-Caffo interval: it adds one pass
+ * and one failure to each side, so it stays honest at a 0% or 100% pass rate, where the plain binomial band collapses.
+ */
+export function deltaBand(full: Tally, arm: Tally): { low: number; high: number } {
+	const smooth = ({ passes, runs }: Tally) => ({ rate: (passes + 1) / (runs + 2), runs: runs + 2 });
+	const [a, b] = [smooth(full), smooth(arm)];
+	const half = 1.96 * Math.sqrt((a.rate * (1 - a.rate)) / a.runs + (b.rate * (1 - b.rate)) / b.runs);
+	return { low: b.rate - a.rate - half, high: b.rate - a.rate + half };
+}
+
+export type Verdict = "keep" | "drop candidate" | "harmful";
+
+/** Removing the component lowers the pass rate beyond the band: keep it; raises it beyond the band: harmful; otherwise its effect is noise. */
+export const verdict = (band: { low: number; high: number }): Verdict => (band.high < 0 ? "keep" : band.low > 0 ? "harmful" : "drop candidate");
+
+export interface DecayRow extends ArmSummary {
+	passAtK: number | null;
+	/** The 95% band on `passRateDelta`; null for the full harness or when it has no scored runs. */
+	band: { low: number; high: number } | null;
+	verdict: Verdict | null;
+}
+
+/** Each arm's summary with its pass@k, and for each dropped component the band on its pass-rate delta and a verdict. */
+export function decayRows(rows: EvalRow[], k: number): DecayRow[] {
+	const summaries = summarize(rows);
+	const tally = (summary: ArmSummary): Tally => ({ passes: Math.round(summary.passRate * summary.runs), runs: summary.runs });
+	const full = summaries.find(summary => summary.arm === FULL);
+	return summaries.map(summary => {
+		const band = full && summary.arm !== FULL ? deltaBand(tally(full), tally(summary)) : null;
+		return { ...summary, passAtK: passAtKRate(rows.filter(row => row.arm === summary.arm), k), band, verdict: band && verdict(band) };
+	});
+}
+
+export interface PastCost {
+	perRun: number;
+	runs: number;
+	/** Whether the runs are of the set's own tasks; otherwise they are every past scored run of the model. */
+	sameSet: boolean;
+}
+
+/** The mean cost of one scored run of `model`, over the set's own tasks when it has past runs, else over every past run of the model. */
+export function pastCost(rows: EvalRow[], model: string, taskIds: Set<string>): PastCost | null {
+	const ofModel = rows.filter(row => row.model === model && scored(row));
+	const ofSet = ofModel.filter(row => taskIds.has(row.task));
+	const basis = ofSet.length > 0 ? ofSet : ofModel;
+	if (basis.length === 0) return null;
+	return { perRun: basis.reduce((sum, row) => sum + row.cost, 0) / basis.length, runs: basis.length, sameSet: ofSet.length > 0 };
+}
+
+/** What a run of the set would do and cost, for `--plan`: one line per arm, then the total, the estimate, and the `--max-cost` ceiling. */
+export function decayPlan(plan: { model: string; arms: Arm[]; tasks: number; runs: number; toRun: Map<string, number>; cost: PastCost | null; maxCost: number }): string[] {
+	const total = plan.arms.length * plan.tasks * plan.runs;
+	const pending = plan.arms.reduce((sum, arm) => sum + (plan.toRun.get(arm.name) ?? 0), 0);
+	const width = Math.max(...plan.arms.map(arm => arm.name.length));
+	const dollars = (value: number) => `$${value.toFixed(2)}`;
+	return [
+		`Decay check of ${plan.model}: ${plan.arms.length} arms × ${plan.tasks} tasks × ${plan.runs} runs = ${total} runs, ${pending} not recorded yet.`,
+		...plan.arms.map(arm => `  ${arm.name.padEnd(width)}  ${plan.toRun.get(arm.name) ?? 0} to run${arm.disabled.length > 0 ? `, disables ${arm.disabled.join(", ")}` : ""}`),
+		plan.cost
+			? `Estimate: ${pending} runs × ${dollars(plan.cost.perRun)} per run = ${dollars(pending * plan.cost.perRun)}, from ${plan.cost.runs} past scored runs of this model ${plan.cost.sameSet ? "on this set" : "on other tasks"}.`
+			: `Estimate: none, no past scored run of ${plan.model}.`,
+		`Ceiling: ${pending} runs × ${dollars(plan.maxCost)} --max-cost = ${dollars(pending * plan.maxCost)}.`,
+	];
+}
+
+function printSummary(rows: EvalRow[], k: number): void {
 	const signed = (value: number | null, digits: number, scale = 1) => (value === null ? "" : `${value >= 0 ? "+" : ""}${(value * scale).toFixed(digits)}`);
 	console.table(
-		summarize(rows).map(s => ({
+		decayRows(rows, k).map(s => ({
 			arm: s.arm,
 			runs: s.runs,
 			"pass@1 %": (s.passRate * 100).toFixed(0),
-			"pass@3 %": ((rate: number | null) => (rate === null ? "" : (rate * 100).toFixed(0)))(passAtKRate(rows.filter(row => row.arm === s.arm), 3)),
+			[`pass@${k} %`]: s.passAtK === null ? "" : (s.passAtK * 100).toFixed(0),
 			"Δ pass pts": signed(s.passRateDelta, 0, 100),
-			"$ per run": s.costPerRun.toFixed(2),
-			"Δ $ per run": signed(s.costDelta, 2),
-			"minutes per run": s.minutesPerRun.toFixed(1),
+			"95% band pts": s.band ? `${signed(s.band.low, 0, 100)} to ${signed(s.band.high, 0, 100)}` : "",
+			"$ per task": s.costPerRun.toFixed(2),
+			"Δ $ per task": signed(s.costDelta, 2),
+			"minutes per task": s.minutesPerRun.toFixed(1),
+			verdict: s.verdict ?? "",
 		})),
 	);
 }
@@ -219,27 +306,42 @@ if (import.meta.main) {
 			only: { type: "string" },
 			runs: { type: "string", default: "3" },
 			model: { type: "string", default: "anthropic/claude-opus-5-5:auto" },
-			"disable-extensions": { type: "string", default: "" },
-			"disable-skills": { type: "string", default: "" },
+			decay: { type: "boolean", default: false },
+			"disable-extensions": { type: "string" },
+			"disable-skills": { type: "string" },
 			out: { type: "string", default: DEFAULT_OUT },
 			"max-cost": { type: "string", default: "5" },
 			"max-time": { type: "string", default: "30m" },
 			"dry-run": { type: "boolean", default: false },
+			plan: { type: "boolean", default: false },
 		},
 	});
 	const out = resolve(values.out);
 	const resultsFile = join(out, "results.jsonl");
+	const runs = Number(values.runs);
 	if (positionals[0] === "summary") {
-		printSummary(readRows(resultsFile));
+		printSummary(readRows(resultsFile), runs);
+		process.exit(0);
+	}
+	const list = (text: string | undefined, fallback: string[]) => (text !== undefined ? text.split(",").filter(Boolean) : values.decay ? fallback : []);
+	const armList = arms(list(values["disable-extensions"], DECAY_COMPONENTS.extensions), list(values["disable-skills"], DECAY_COMPONENTS.skills));
+	const only = values.only ? new Set(values.only.split(",")) : null;
+	const tasks = (JSON.parse(readFileSync(values.tasks, "utf8")) as EvalTask[]).filter(task => !only || only.has(task.id));
+	const done = new Set(readRows(resultsFile).filter(row => !row.error).map(row => `${row.arm}\t${row.task}\t${row.run}\t${row.model}`));
+	if (values.plan) {
+		const cache = dirname(DEFAULT_OUT);
+		// The results files of every past set sit one or two folders down; a deeper walk would read every run's session files.
+		const files = ["omp-evals*/results.jsonl", "omp-evals*/*/results.jsonl"].flatMap(pattern => [...new Bun.Glob(pattern).scanSync(cache)].map(file => join(cache, file)));
+		const past = [...new Set([resultsFile, ...files])].flatMap(readRows);
+		const toRun = new Map(armList.map(arm => [arm.name, tasks.flatMap(task => Array.from({ length: runs }, (_, i) => `${arm.name}\t${task.id}\t${i + 1}\t${values.model}`)).filter(key => !done.has(key)).length]));
+		const cost = pastCost(past, values.model, new Set(tasks.map(task => task.id)));
+		console.log(decayPlan({ model: values.model, arms: armList, tasks: tasks.length, runs, toRun, cost, maxCost: Number(values["max-cost"]) }).join("\n"));
 		process.exit(0);
 	}
 	mkdirSync(out, { recursive: true });
 	const enclosing = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: out, encoding: "utf8" });
 	if (enclosing.status === 0) throw new Error(`--out ${out} is inside the checkout ${enclosing.stdout.trim()}; a run there reads it, so pick a folder outside every checkout`);
 	const repo = dirname(git(import.meta.dir, "rev-parse", "--path-format=absolute", "--git-common-dir"));
-	const only = values.only ? new Set(values.only.split(",")) : null;
-	const tasks = (JSON.parse(readFileSync(values.tasks, "utf8")) as EvalTask[]).filter(task => !only || only.has(task.id));
-	const list = (text: string) => text.split(",").filter(Boolean);
 	const mcpFile = join(homedir(), ".omp", "agent", "mcp.json");
 	const mcpServers = existsSync(mcpFile) ? Object.keys((JSON.parse(readFileSync(mcpFile, "utf8")) as { mcpServers?: object }).mcpServers ?? {}) : [];
 	const options: Options = {
@@ -250,11 +352,10 @@ if (import.meta.main) {
 		maxTime: values["max-time"],
 		noMcp: mcpServers.map(name => `mcp:${name}`),
 	};
-	const done = new Set(readRows(resultsFile).filter(row => !row.error).map(row => `${row.arm}\t${row.task}\t${row.run}\t${row.model}`));
 	const dryRows: EvalRow[] = [];
-	for (const arm of arms(list(values["disable-extensions"]), list(values["disable-skills"]))) {
+	for (const arm of armList) {
 		for (const task of tasks) {
-			for (let run = 1; run <= Number(values.runs); run++) {
+			for (let run = 1; run <= runs; run++) {
 				if (!values["dry-run"] && done.has(`${arm.name}\t${task.id}\t${run}\t${values.model}`)) continue;
 				console.error(`${arm.name} ${task.id} run ${run}`);
 				const row = runOnce(task, arm, run, options, values["dry-run"]);
@@ -264,6 +365,6 @@ if (import.meta.main) {
 			}
 		}
 	}
-	printSummary(values["dry-run"] ? dryRows : readRows(resultsFile).filter(row => row.model === values.model));
+	printSummary(values["dry-run"] ? dryRows : readRows(resultsFile).filter(row => row.model === values.model), runs);
 	if (values["dry-run"] && dryRows.some(row => !row.passed)) process.exit(1);
 }
