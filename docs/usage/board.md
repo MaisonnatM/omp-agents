@@ -21,8 +21,11 @@ It is a page of its own, not a list of sessions: the **Sessions** sidebar still 
 ## Threads and tasks
 
 - **New thread** starts a thread in the channel you look at.
+- Close an open thread with the X at the top of the thread or Esc; on a narrow window the back arrow returns to the list.
+- Step to the next or previous thread in the list with the arrows beside the thread title, or with J and K, or ↓ and ↑, while no text field has focus.
 - A thread can carry a task: open, claimed, in review, done, or blocked.
-  `/claim` takes it with a one-hour lease, and `/done` settles it.
+  `/claim` takes it with a one-hour lease, and `/done` or **Mark done** beside the thread's title settles it.
+  A channel's list hides done threads, except the open one; Filter threads still finds them.
 - A project is a channel with a goal and decisions above its threads: each task thread is a plan step, and its messages are the project's log; see [Projects](projects.md).
 - `/review`, `/implement`, and `/grill` post a workflow that an agent runs step by step, reporting each step in the thread.
 - `/schedule @name text in 10m`, or `every 2h`, posts to a member later.
