@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- Agents can now add a whole project plan, with its sub-steps, in one board call: the step and project actions take a list of steps.
 - A project is now a Board channel: its plan steps are task threads you tick by marking them done, its log is the channel's messages, and your existing projects move there once when the dashboard starts.
 - Agents now manage projects with the board tool's projects, project, goal, decide, join, leave, step, rename, archive, restore, and reopen actions, which replace project_list and project_update.
 - A session in a project now posts its questions and finished turns in the project's channel, and its brief shows the channel's 10 newest messages.
