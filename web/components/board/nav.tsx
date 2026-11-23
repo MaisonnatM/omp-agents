@@ -4,6 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import type { IconComponent } from "@/lib/icon-context";
 import type { RosterHost } from "../../../src/shared/sessions";
+import type { Bot } from "../../../src/shared/bots";
 import { type BoardState, boardMembers, type Member, queueOf, unreadIn } from "../../../src/shared/board";
 import { CountPill } from "../count-pill";
 import { hashForPage } from "../../routing";
@@ -11,9 +12,9 @@ import { type BoardRoute, type BoardView, resolveBoardView } from "./module";
 import { Avatar, relTime, useNow } from "./parts";
 
 /** The Board's own list, which the left sidebar shows in its Board mode; `route` is the route the Board shows, and nothing renders until its state loads. */
-export function BoardNav({ state, hosts, route }: { state: BoardState | null; hosts: RosterHost[]; route: BoardRoute }) {
+export function BoardNav({ state, hosts, bots, route }: { state: BoardState | null; hosts: RosterHost[]; bots: Bot[] | null; route: BoardRoute }) {
 	const now = useNow();
-	const members = useMemo(() => (state ? boardMembers(state, hosts) : []), [state, hosts]);
+	const members = useMemo(() => (state ? boardMembers(state, hosts, bots ?? []) : []), [state, hosts, bots]);
 	if (!state) return null;
 	const me = members.find(member => member.id === state.me)!;
 	const view = resolveBoardView(state, new Map(members.map(member => [member.id, member])), route.view);
@@ -23,9 +24,9 @@ export function BoardNav({ state, hosts, route }: { state: BoardState | null; ho
 function Rail({ state, members, view, onView, me, now, inboxCount }: { state: BoardState; members: Member[]; view: BoardView; onView: (view: BoardView) => void; me: Member; now: number; inboxCount: number }) {
 	const sel = (other: BoardView) => view.kind === other.kind && ("id" in view ? "id" in other && view.id === other.id : true);
 	const humans = members.filter(member => member.kind === "human");
-	// Named agents and bots, then the omp sessions on the board, which carry a session id.
-	const agents = members.filter(member => member.kind !== "human" && !member.sessionId);
-	const sessions = members.filter(member => member.kind !== "human" && member.sessionId);
+	// Named agents, Bots, and bots, then the omp sessions on the board, which carry a session id.
+	const agents = members.filter(member => member.kind !== "human" && (!member.sessionId || member.botId));
+	const sessions = members.filter(member => member.kind !== "human" && member.sessionId && !member.botId);
 	const memberRow = (member: Member) => (
 		<RailRow
 			key={member.id}

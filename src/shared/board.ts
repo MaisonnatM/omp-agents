@@ -4,7 +4,7 @@
  * tool's inbox. Both go through {@link applyBoardChange}. See `src/board-module.ts`.
  */
 import { arrayOf, decoder, fields, type Guard, isBoolean, isNonEmpty, isNumber, isString, nullable, oneOf, optional, type Parsed, recordOf, type Shape, tagged } from "../json";
-import { BOT_HUES, BOT_SHAPES, type BotLook, defaultLook } from "./bots";
+import { BOT_HUES, BOT_SHAPES, type Bot, type BotId, type BotLook, defaultLook, parseBotId } from "./bots";
 import type { RosterHost } from "./sessions";
 
 export type MemberKind = "human" | "agent" | "bot";
@@ -20,8 +20,10 @@ export interface Member {
 	look: BotLook;
 	/** A human's initials. */
 	initials?: string;
-	/** The omp session this member is, which a message for it wakes. */
+	/** The omp session this member is, which a message for it wakes; a Bot's is its conversation, while it has one. */
 	sessionId?: string;
+	/** The Bot this member is, which a message for it wakes through its conversation. */
+	botId?: BotId;
 }
 
 export type TaskState = "open" | "claimed" | "review" | "done" | "blocked";
@@ -203,11 +205,46 @@ export function sessionMember(host: RosterHost): Member {
 	};
 }
 
-/** Every member: the board's own, with the live sessions over the ones it kept, which are asleep until their session runs again. */
-export function boardMembers(state: BoardState, hosts: readonly RosterHost[]): Member[] {
-	const live = hosts.map(sessionMember);
+/** Bot `bot`'s board member id. */
+export const botMemberId = (id: BotId): string => `bot:${id}`;
+
+/** Bot `bot` as a board member: as busy as `host`, its conversation's live session, or asleep without one. */
+export function botMember(bot: Bot, host: RosterHost | undefined): Member {
+	return {
+		id: botMemberId(bot.id),
+		name: bot.name,
+		kind: "agent",
+		harness: "Bot",
+		presence: host ? sessionMember(host).presence : "asleep",
+		look: { shape: bot.shape, hue: bot.hue },
+		botId: bot.id,
+		...(bot.sessionId === null ? {} : { sessionId: bot.sessionId }),
+	};
+}
+
+/**
+ * Every member: the board's own, with the Bots and the live sessions over the ones it kept, which are asleep until their
+ * session runs again. A Bot's conversation is listed once, as the Bot.
+ */
+export function boardMembers(state: BoardState, hosts: readonly RosterHost[], bots: readonly Bot[]): Member[] {
+	const botSessions = new Set(bots.flatMap(bot => bot.sessionId ?? []));
+	const live = [...bots.map(bot => botMember(bot, hosts.find(host => host.sessionId === bot.sessionId))), ...hosts.filter(host => !botSessions.has(host.sessionId)).map(sessionMember)];
 	const liveIds = new Set(live.map(member => member.id));
-	return [...state.extraMembers.filter(member => !liveIds.has(member.id)), ...live];
+	return [...state.extraMembers.filter(member => !liveIds.has(member.id) && !(!member.botId && member.sessionId !== undefined && botSessions.has(member.sessionId))), ...live];
+}
+
+/** `change` as a session's `board` tool left it, in its Bot's name when the session is a Bot's conversation. */
+export function inBotsName(change: BoardChange, bots: readonly Bot[]): BoardChange {
+	const botOf = (author: string) => bots.find(bot => bot.sessionId !== null && author === `s-${bot.sessionId}`);
+	if (change.op === "post") {
+		const bot = botOf(change.message.author);
+		return bot ? { ...change, message: { ...change.message, author: botMemberId(bot.id) } } : change;
+	}
+	if (change.op === "task" && change.lease) {
+		const bot = botOf(change.lease.by);
+		return bot ? { ...change, lease: { ...change.lease, by: botMemberId(bot.id) } } : change;
+	}
+	return change;
 }
 
 export const isMention = (text: string, member: Member): boolean => text.toLowerCase().includes(`@${member.name.toLowerCase()}`);
@@ -300,6 +337,7 @@ const isMember: Guard<Member> = fields<Member>({
 	look: isLook,
 	initials: optional(isString),
 	sessionId: optional(isNonEmpty),
+	botId: optional((value: unknown): value is BotId => parseBotId(value) !== null),
 });
 const isAttachment = tagged<Attachment, "kind">("kind", {
 	pr: { repo: isString, number: isNumber, title: isString, state: oneOf(["open", "merged", "draft"] as const), checks: oneOf(["passing", "failing", "running"] as const) },

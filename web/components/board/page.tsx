@@ -38,7 +38,7 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 	const [lingering, setLingering] = useState<Message[]>([]);
 	const now = useNow();
 
-	const members = useMemo(() => boardMembers(state, core.hosts), [state, core.hosts]);
+	const members = useMemo(() => boardMembers(state, core.hosts, core.bots ?? []), [state, core.hosts, core.bots]);
 	const byId = useMemo(() => new Map(members.map(member => [member.id, member])), [members]);
 	const view = resolveBoardView(state, byId, asked);
 	const me = byId.get(state.me)!;

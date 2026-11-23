@@ -9,6 +9,7 @@ After each Board change, `BoardWake` (`src/server/board-wake.ts`) sends every ne
 
 An agent's message wakes only the sessions it mentions, so two agents sharing a thread cannot wake each other in a loop.
 A session that posts or is mentioned stays a Board member after it ends, so a later mention resumes it.
+Bots are Board members too, and a message for a Bot goes to its conversation through `Bots.message`, which resumes it or starts its first one.
 Only the server holding the owner lock wakes sessions or fires schedules, like the other inboxes.
 
 Schedules repeat in milliseconds and a run missed while the dashboard was down is skipped, not replayed.

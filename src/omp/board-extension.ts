@@ -72,7 +72,9 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 				const applied = applyBoardChange(state, change);
 				if ("ok" in applied) state = applied.ok;
 			}
-			const me = `s-${ctx.sessionManager.getSessionId()}`;
+			const session = ctx.sessionManager.getSessionId();
+			// A Bot's conversation is the Bot on the Board, which the dashboard posts its changes as.
+			const me = state.extraMembers.find(member => member.botId && member.sessionId === session)?.id ?? `s-${session}`;
 			const names = new Map(state.extraMembers.map(member => [member.id, member.name]));
 			const nameOf = (id: string) => names.get(id) ?? (id === me ? "you" : id);
 			const leave = (change: BoardChange, done: string) => {

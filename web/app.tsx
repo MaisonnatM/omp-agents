@@ -227,7 +227,7 @@ export function App() {
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 	const boardRoute = page?.kind === "board" ? page : BOARD_PAGE.home;
-	const boardList = useMemo(() => <BoardNav state={state.modules.board} hosts={visible.hosts} route={boardRoute} />, [state.modules.board, visible.hosts, boardRoute]);
+	const boardList = useMemo(() => <BoardNav state={state.modules.board} hosts={visible.hosts} bots={state.bots} route={boardRoute} />, [state.modules.board, visible.hosts, state.bots, boardRoute]);
 
 	const listPage = listPageOf(page, row);
 	const pageArea = useRef<HTMLDivElement>(null);

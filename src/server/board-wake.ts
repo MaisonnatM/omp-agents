@@ -1,30 +1,35 @@
 /**
- * Turns the Board's unread messages into turns: each new message is sent, as a follow-up, to every omp session it is
- * for, which resumes a session that ended; and a schedule that comes due is posted. A message is for a session when it
- * mentions it, or when a person writes in a thread the session posted in; an agent's message wakes only the sessions
- * it mentions, so two agents in one thread do not wake each other forever.
+ * Turns the Board's unread messages into turns: each new message is sent, as a follow-up, to every omp session and Bot
+ * it is for, which resumes a session that ended and starts a Bot's conversation it has not had yet; and a schedule that
+ * comes due is posted. A message is for a member when it mentions it, or when a person writes in a thread the member
+ * posted in; an agent's message wakes only the members it mentions, so two agents in one thread do not wake each other
+ * forever.
  */
 import { randomUUID } from "node:crypto";
 import { type BoardChange, type BoardState, boardMembers, isMention, type Member, type Message } from "../shared/board";
+import type { Bot, BotId } from "../shared/bots";
 import type { RosterHost } from "../shared/sessions";
 
 export interface BoardWakeDeps {
 	state(): BoardState;
 	hosts(): readonly RosterHost[];
+	bots(): readonly Bot[];
 	apply(change: BoardChange): void;
 	/** Sends `text` to session `sessionId` as a follow-up, resuming it when it ended. */
 	wake(sessionId: string, text: string): Promise<void>;
+	/** Sends `text` into Bot `botId`'s conversation, resuming or starting it. */
+	wakeBot(botId: BotId, text: string): Promise<void>;
 	/** Whether this server wakes at all: only the one that owns the files does. */
 	active(): boolean;
 	now(): number;
 }
 
-/** The sessions `msg` wakes, among `members`. */
+/** The sessions and Bots `msg` wakes, among `members`. */
 export function wakeTargets(state: BoardState, members: readonly Member[], msg: Message): Member[] {
 	const author = members.find(member => member.id === msg.author);
 	const byPerson = author?.kind === "human";
 	return members.filter(member => {
-		if (!member.sessionId || member.id === msg.author || msg.internal) return false;
+		if ((!member.sessionId && !member.botId) || member.id === msg.author || msg.internal) return false;
 		if (isMention(msg.text, member)) return true;
 		return byPerson && state.messages.some(other => other.thread === msg.thread && other.author === member.id);
 	});
@@ -54,25 +59,27 @@ export class BoardWake {
 		this.#seen = new Set(deps.state().messages.map(msg => msg.id));
 	}
 
-	/** Wakes the sessions each new message is for; the server calls it after every Board change. */
+	/** Wakes the sessions and Bots each new message is for; the server calls it after every Board change. */
 	check(): void {
 		const state = this.#deps.state();
 		const fresh = state.messages.filter(msg => !this.#seen.has(msg.id));
 		for (const msg of fresh) this.#seen.add(msg.id);
 		if (fresh.length === 0 || !this.#deps.active()) return;
-		const members = boardMembers(state, this.#deps.hosts());
+		const members = boardMembers(state, this.#deps.hosts(), this.#deps.bots());
 		const kept = new Set(state.extraMembers.map(member => member.id));
 		for (const msg of fresh) {
 			const targets = wakeTargets(state, members, msg);
 			const author = members.find(member => member.id === msg.author);
-			// A session that posts or is mentioned stays a member once it ends, so a later mention resumes it.
-			for (const member of [...targets, ...(author?.sessionId ? [author] : [])]) {
+			// A session or Bot that posts or is mentioned stays a member once it ends, so a later mention resumes it.
+			for (const member of [...targets, ...(author?.sessionId || author?.botId ? [author] : [])]) {
 				if (kept.has(member.id)) continue;
 				kept.add(member.id);
 				this.#deps.apply({ op: "member", member: { ...member, presence: "asleep" } });
 			}
 			for (const target of targets) {
-				this.#deps.wake(target.sessionId!, wakePrompt(state, members, msg)).catch(err => console.error(`The Board could not wake ${target.name}:`, err));
+				const prompt = wakePrompt(state, members, msg);
+				const woken = target.botId ? this.#deps.wakeBot(target.botId, prompt) : this.#deps.wake(target.sessionId!, prompt);
+				woken.catch(err => console.error(`The Board could not wake ${target.name}:`, err));
 			}
 		}
 	}
