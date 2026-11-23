@@ -8,6 +8,7 @@ type Reviews = Record<string, { needed: boolean; done: boolean }>;
 // Imported by path, not statically: a static import pulls the extension into `tsc`, where its `@oh-my-pi/pi-coding-agent` import does not resolve.
 type FixWork = "fix_ci" | "fix_comments";
 type Fixes = Partial<Record<FixWork, { rounds: number; counts: number[] }>>;
+type Contract = { goal: string; constraints: string[]; files_to_change: string[]; test_first: string | null; done_when: string[] };
 const extension: {
 	ghPr(words: string[], sub: "create" | "ready"): string[] | undefined;
 	prSelector(args: string[]): string[];
@@ -25,6 +26,10 @@ const extension: {
 	FIX_BUDGET: number;
 	startFix(fixes: Fixes | undefined, work: FixWork, count: number | undefined): { fixes: Fixes; round: number } | { round: number; refusal: string };
 	settleFixes(fixes: Fixes | undefined, status: object | undefined): Fixes | undefined;
+	repoRelative(path: string): boolean;
+	plannedTestEdits(contract: Contract): string[];
+	withRejected(rejected: string[] | undefined, approach: string): string[];
+	planBrief(state: { contract?: Contract; rejected?: string[] }): string | undefined;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
 const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, reviewsOf, reviewNeeded, authDiagnosis, REVIEWS, PROOF_BOX, renderLines } = extension;
 const THERMONUCLEAR = REVIEWS.thermonuclear.box;
@@ -263,5 +268,36 @@ describe("fix rounds", () => {
 		expect(settleFixes(spent, status("pending", 1))).toEqual(spent);
 		expect(settleFixes(spent, status("pass"))).toBeUndefined();
 		expect(rounds([2], "fix_ci", settleFixes(spent, status("pass", 1)))).toEqual([{ round: 1, fixes: { ...settleFixes(spent, status("pass", 1)), fix_ci: { rounds: 1, counts: [2] } } }]);
+	});
+});
+
+describe("plan contract", () => {
+	const contract: Contract = { goal: "Ship it", constraints: [], files_to_change: ["src/a.ts", "src/a.test.ts", "web/b.test.tsx"], test_first: null, done_when: ["tests pass"] };
+
+	test.each([
+		["src/a.ts", true], ["./src/a.ts", true], ["a..b.ts", true],
+		["/src/a.ts", false], ["~/a.ts", false], ["C:\\a.ts", false], ["src/../../a.ts", false], ["..\\a.ts", false], [" ", false],
+	])("%s is repository-relative: %p", (path, expected) => {
+		expect(extension.repoRelative(path)).toBe(expected);
+	});
+
+	test("the test files a contract changes are checked unless a constraint names test-change", () => {
+		expect(extension.plannedTestEdits(contract)).toEqual(["src/a.test.ts", "web/b.test.tsx"]);
+		expect(extension.plannedTestEdits({ ...contract, constraints: ["test-change: the refusal changes on purpose"] })).toEqual([]);
+	});
+
+	test("a rejected approach is added once, ignoring case and spacing", () => {
+		const list = extension.withRejected(undefined, " Poll GitHub ");
+		expect(list).toEqual(["Poll GitHub"]);
+		expect(extension.withRejected(list, "poll   github")).toBe(list);
+		expect(extension.withRejected(list, "A queue")).toEqual(["Poll GitHub", "A queue"]);
+	});
+
+	test("the brief lists the contract and the rejected approaches, and is absent without either", () => {
+		expect(extension.planBrief({})).toBeUndefined();
+		expect(extension.planBrief({ contract, rejected: ["Poll GitHub"] })).toBe([
+			"Contract goal: Ship it", "Files to change:", "- src/a.ts", "- src/a.test.ts", "- web/b.test.tsx", "Test first: none",
+			"Done when:", "- tests pass", "Rejected approaches, never to propose again:", "- Poll GitHub",
+		].join("\n"));
 	});
 });

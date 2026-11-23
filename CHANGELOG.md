@@ -5,6 +5,11 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- /ship now asks the agent to write down, before coding, the goal, the files it will change, and how it will know it is done, and it refuses to start coding without that.
+- /ship now remembers approaches you or a reviewer turned down, and reminds the agent of them and of the plan after its memory is compacted or the session resumes.
+- Agents are now stopped before risky shell commands, such as pushing straight to main, skipping git hooks, stopping the dashboard, using a default server port, or reading secret files.
+- Behind the scenes: the always-loaded agent instructions are about half as long; rare rules moved into skills that load only when needed.
+- Behind the scenes: `bun run test:agent` prints a one-line test summary and one line per failure, so agents read results faster.
 - /ship now stops a session after five rounds of fixing failed checks or review comments, or sooner when the count stops going down, and asks you before trying again.
 - /ship now writes one line per step with the model, tokens, and cost to a log in your omp-agents settings folder, so you can see what each pull request cost.
 - Behind the scenes: landing now refuses a change that edits an existing test unless a commit explains why, so an agent cannot make tests pass by rewriting them.

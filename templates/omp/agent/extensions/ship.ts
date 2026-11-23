@@ -12,6 +12,8 @@ import { type GhCredential, GhRunner, rejectedCredential, TOKEN_VARIABLE } from 
 import { descriptionSnapshot, editDescription } from "./github/description";
 
 const ENTRY = "omp-ship.state";
+/** The message that puts the contract and rejected approaches back in the agent's context after a compaction or a resume. */
+const BRIEF = "omp-ship.brief";
 const WIDGET = "omp-ship";
 /** A proof box a repository's PR template declares; the PR goes live only once the author checks it. The gate reads the box, not the proof behind it. */
 export const PROOF_BOX = "- [ ] Browser proof";
@@ -103,9 +105,59 @@ export interface ShipState {
 	prStatus?: PrStatus;
 	/** This PR's fix rounds since GitHub last showed each fix done. */
 	fixes?: Fixes;
+	/** The plan's contract, recorded at the plan stage; implement starts only once it holds one. */
+	contract?: Contract;
+	/** Approaches a reviewer or the user rejected, so the agent never proposes them again. */
+	rejected?: string[];
 	/** The session's cumulative usage at the last traced stage, so the next trace line reports what was spent since. */
 	spent?: Spent;
 	updatedAt: string;
+}
+
+/** What the implementation builds toward, written at the plan stage and judged against before the PR. */
+export interface Contract {
+	goal: string;
+	constraints: string[];
+	/** Repository-relative paths. */
+	files_to_change: string[];
+	/** The test written before the code, or `null` when the change starts without one. */
+	test_first: string | null;
+	done_when: string[];
+}
+
+/** Whether `path` names a file inside the repository: relative, and never climbing out through `..`. */
+export function repoRelative(path: string): boolean {
+	return /\S/.test(path) && !/^(?:[\\/~]|[A-Za-z]:)/.test(path) && !path.split(/[\\/]/).includes("..");
+}
+
+/** The test files `contract` plans to change, unless a constraint names `test-change`, the reason an existing test may change on purpose. */
+export function plannedTestEdits(contract: Contract): string[] {
+	if (contract.constraints.some(constraint => /test-change/i.test(constraint))) return [];
+	return contract.files_to_change.filter(path => /\.test\.tsx?$/.test(path));
+}
+
+/** `rejected` with `approach` appended, unless it already holds it, ignoring case and spacing. */
+export function withRejected(rejected: string[] | undefined, approach: string): string[] {
+	const key = (text: string) => text.trim().replace(/\s+/g, " ").toLowerCase();
+	const list = rejected ?? [];
+	return list.some(entry => key(entry) === key(approach)) ? list : [...list, approach.trim()];
+}
+
+/** The contract and the rejected approaches as the agent reads them, or `undefined` when the run recorded neither. */
+export function planBrief(s: Pick<ShipState, "contract" | "rejected">): string | undefined {
+	const lines: string[] = [];
+	const list = (label: string, items: string[]) => {
+		if (items.length > 0) lines.push(`${label}:`, ...items.map(item => `- ${item}`));
+	};
+	if (s.contract) {
+		lines.push(`Contract goal: ${s.contract.goal}`);
+		list("Constraints", s.contract.constraints);
+		list("Files to change", s.contract.files_to_change);
+		lines.push(`Test first: ${s.contract.test_first ?? "none"}`);
+		list("Done when", s.contract.done_when);
+	}
+	list("Rejected approaches, never to propose again", s.rejected ?? []);
+	return lines.length > 0 ? lines.join("\n") : undefined;
 }
 
 /** Live work that repeats until GitHub shows it done, so it runs in counted rounds. */
@@ -323,6 +375,8 @@ function report(s: ShipState | undefined): string {
 	const lines = renderLines(s);
 	lines.push(`Repo: ${s.repo ?? "unknown"}`);
 	lines.push(`Next: ${NEXT[s.stage]}`);
+	const brief = planBrief(s);
+	if (brief) lines.push(brief);
 	if (s.stage === "live" && s.prStatus) {
 		const needs = liveNeeds(s.prStatus);
 		if (needs.length > 0) lines.push(`First need: ${LABEL[needs[0].kind]}. Record it with ship_stage({stage: '${needs[0].kind}'}).`);
@@ -511,12 +565,23 @@ export default function ship(pi: ExtensionAPI) {
 		reviews: z.object(byReview(() => z.object({ needed: z.boolean(), done: z.boolean() }))),
 	});
 	const fixRoundsSchema = z.object({ rounds: z.number().int(), counts: z.array(z.number()) });
+	// omp's zod reports a failed check as "must be <message>" and uses a field's description as that message, so the checked fields carry no description of their own.
+	const filled = z.string().regex(/\S/, "non-empty");
+	const contractSchema = z.object({
+		goal: filled,
+		constraints: z.array(z.string()).default(() => []),
+		files_to_change: z.array(z.string().refine(repoRelative, "repository-relative, with no `..`")).default(() => []),
+		test_first: z.string().nullable().default(() => null),
+		done_when: z.array(filled).min(1),
+	});
 	const stateSchema = z.object({
 		stage: z.enum(STAGES), work: z.enum(LIVE_WORK).optional(), issue: z.string().optional(),
 		repo: z.string().optional(), pr: z.number().int().optional(), note: z.string().optional(),
 		// A status recorded before the reviews were per stage is dropped; the next poll refetches it.
 		prStatus: prStatusSchema.optional().catch(undefined),
 		fixes: z.object({ fix_ci: fixRoundsSchema.optional(), fix_comments: fixRoundsSchema.optional() }).optional().catch(undefined),
+		contract: contractSchema.optional().catch(undefined),
+		rejected: z.array(z.string()).optional().catch(undefined),
 		spent: z.object({ tokens: z.number(), cost: z.number() }).optional().catch(undefined),
 		updatedAt: z.string(),
 	});
@@ -561,6 +626,26 @@ export default function ship(pi: ExtensionAPI) {
 		lastSummary = state?.prStatus ? liveSummary(state.prStatus) : "";
 		refreshFailure = state?.prStatus && state.prStatus.state !== "MERGED" ? "Status restored from the session; awaiting a fresh GitHub read." : undefined;
 		render(ctx);
+	}
+
+	/**
+	 * Puts the contract and rejected approaches back in the agent's context after a compaction or a resume, unless the context since the last compaction already holds the same brief.
+	 * Idle, the message joins the context without starting a turn; during a run, it joins at the next step.
+	 */
+	function remind(ctx: ExtensionContext) {
+		const brief = state && planBrief(state);
+		if (!brief) return;
+		const content = `The /ship run's plan, as ship_stage recorded it:\n${brief}`;
+		const branch = ctx.sessionManager.getBranch();
+		for (let i = branch.length - 1; i >= 0; i--) {
+			const entry = branch[i];
+			if (entry.type === "compaction") break;
+			if (entry.type === "custom_message" && entry.customType === BRIEF) {
+				if (entry.content === content) return;
+				break;
+			}
+		}
+		pi.sendMessage({ customType: BRIEF, content, display: false, attribution: "agent" }, { deliverAs: ctx.isIdle() ? "nextTurn" : "aside" });
 	}
 
 	async function resolveRepo(cwd: string): Promise<string | undefined> {
@@ -667,9 +752,15 @@ export default function ship(pi: ExtensionAPI) {
 		// The session that runs /ship records its stages, so a subagent's requests leave out this tool's schema.
 		if (ctx.agent.kind === "sub") await pi.setActiveTools(pi.getActiveTools().filter(name => name !== "ship_stage"));
 		restore(ctx);
+		remind(ctx);
 		ctx.setInterval(() => refresh(ctx), POLL_MS);
 		await refresh(ctx);
 	});
+	pi.on("session_switch", async (_event, ctx) => {
+		restore(ctx);
+		remind(ctx);
+	});
+	pi.on("session_compact", async (_event, ctx) => remind(ctx));
 	pi.on("session_branch", async (_event, ctx) => restore(ctx));
 	pi.on("session_tree", async (_event, ctx) => restore(ctx));
 	pi.on("turn_end", async (_event, ctx) => {
@@ -729,9 +820,11 @@ export default function ship(pi: ExtensionAPI) {
 		note: z.string().optional().describe("One-line status note; empty string clears it"),
 		count: z.number().int().min(0).optional().describe("With fix_ci or fix_comments: how many checks fail, or review comments are open, as this round starts"),
 		moreRounds: z.boolean().optional().describe("With fix_ci or fix_comments: the user approved more rounds after ship_stage stopped the fix; starts its rounds over"),
+		contract: contractSchema.optional().describe("At the plan stage, required before implement, replacing any earlier one: goal, one sentence; constraints, rules the change keeps, naming `test-change: <reason>` to change an existing test; files_to_change, repository-relative paths; test_first, the test written before the code or null; done_when, at least one check that shows the change done"),
+		rejected: filled.optional().describe("One approach a reviewer or the user rejected, with why; added to the run's rejected list"),
 		stop: z.boolean().optional().describe("End the workflow in this session, as when the user says 'no ship'"),
 	});
-	type ToolParams = { stage?: Stage | LiveWork; issue?: string; pr?: number; repo?: string; note?: string; count?: number; moreRounds?: boolean; stop?: boolean };
+	type ToolParams = { stage?: Stage | LiveWork; issue?: string; pr?: number; repo?: string; note?: string; count?: number; moreRounds?: boolean; contract?: Contract; rejected?: string; stop?: boolean };
 	type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean; details?: unknown };
 	/** What a call did with the stage it named, for its trace line. */
 	type Outcome = { recorded: boolean; round?: number };
@@ -748,6 +841,7 @@ export default function ship(pi: ExtensionAPI) {
 			"Call with no stage to read the current stage, the PR's live needs from GitHub, and the next action.",
 			"Call with stop: true when the user says 'no ship'; the widget, the gates, and the dashboard's Ship card then drop the run.",
 			`fix_ci and fix_comments run in rounds per PR: pass count each round; after ${FIX_BUDGET} rounds, or when count did not shrink for ${STALL_ROUNDS} rounds in a row, the round is refused until the user approves moreRounds.`,
+			"Pass contract at the plan stage: implement is refused without one. Pass rejected for each approach a reviewer or the user rejects. Both show on every read and come back after a compaction or a resume.",
 			"Every call naming a stage appends a line to the ship trace.",
 		].join(" "),
 		parameters: toolParamsSchema,
@@ -755,7 +849,7 @@ export default function ship(pi: ExtensionAPI) {
 			// One call at a time: the session follows one PR, so parallel calls naming different PRs would each check whichever PR the last one named.
 			const call = calls.then(async () => {
 				const parsed = toolParamsSchema.safeParse(params);
-				if (!parsed.success) return { content: [{ type: "text" as const, text: "Invalid ship stage input." }], isError: true };
+				if (!parsed.success) return { content: [{ type: "text" as const, text: `Invalid ship stage input: ${parsed.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("; ")}` }], isError: true };
 				const { stage } = parsed.data;
 				if (!stage) return stageCall(parsed.data, ctx, { recorded: false });
 				const usage = ctx.sessionManager.getUsageStatistics();
@@ -786,12 +880,19 @@ export default function ship(pi: ExtensionAPI) {
 
 	/** One `ship_stage` call, recording into `outcome` whether it recorded the stage it named and which fix round it started. */
 	async function stageCall(params: ToolParams, ctx: ExtensionContext, outcome: Outcome): Promise<ToolResult> {
-		const { stage, issue, pr, repo, note, count, moreRounds, stop } = params;
+		const { stage, issue, pr, repo, note, count, moreRounds, contract, rejected, stop } = params;
 		if (stop) {
 			state = undefined;
 			pi.appendEntry(ENTRY, { stopped: true });
 			render(ctx);
 			return { content: [{ type: "text" as const, text: "Stopped the /ship workflow in this session." }] };
+		}
+		if (contract) {
+			const refusal = await testEditRefusal(contract, ctx.cwd);
+			if (refusal) return { content: [{ type: "text" as const, text: refusal }], isError: true };
+		}
+		if (stage === "implement" && !(contract ?? state?.contract)) {
+			return { content: [{ type: "text" as const, text: "Record the plan's contract before implementing: call ship_stage({stage: 'implement', contract: {goal, constraints, files_to_change, test_first, done_when}}), with done_when listing at least one check." }], isError: true };
 		}
 		const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
 		const newPr = (pr !== undefined && pr !== base.pr) || (repo !== undefined && repo !== base.repo);
@@ -805,7 +906,7 @@ export default function ship(pi: ExtensionAPI) {
 			return { content: [{ type: "text" as const, text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
 		}
 		let checked = "";
-		if (stage || issue || pr || repo || note !== undefined) {
+		if (stage || issue || pr || repo || note !== undefined || contract || rejected) {
 			if (stage === "ready_gate" || (stage !== undefined && isReviewStage(stage))) {
 				const status = state?.prStatus;
 				if (!status && reviewsBefore(stage).length > 0) {
@@ -864,9 +965,22 @@ export default function ship(pi: ExtensionAPI) {
 				issue: issue ?? current.issue,
 				note: note === undefined ? current.note : note || undefined,
 				fixes,
+				contract: contract ?? current.contract,
+				rejected: rejected ? withRejected(current.rejected, rejected) : current.rejected,
 			});
 			outcome.recorded = stage !== undefined;
 		}
 		return { content: [{ type: "text" as const, text: `${checked}${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
+	}
+
+	/** Why `contract` may not stand: it plans to change a test file HEAD already has, without a `test-change` constraint. */
+	async function testEditRefusal(contract: Contract, cwd: string): Promise<string | undefined> {
+		const tests = plannedTestEdits(contract);
+		if (tests.length === 0) return undefined;
+		// --full-tree reads the paths from the top of the checkout, as the contract writes them; a checkout without HEAD has no test yet.
+		const r = await pi.exec("git", ["ls-tree", "--full-tree", "-r", "--name-only", "HEAD", "--", ...tests], { cwd });
+		const existing = r.code === 0 ? r.stdout.split("\n").filter(Boolean) : [];
+		if (existing.length === 0) return undefined;
+		return `The contract is not recorded: files_to_change holds ${existing.join(", ")}, which HEAD already has, and a test that exists guards behavior. Leave it out, or add a constraint \`test-change: <why the behavior changes on purpose>\`.`;
 	}
 }

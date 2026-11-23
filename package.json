@@ -11,6 +11,7 @@
     "omp-template": "bun templates/omp/install.ts",
     "prepare": "git config core.hooksPath .githooks",
     "test": "bun test",
+    "test:agent": "bun scripts/agent-test.ts",
     "typecheck": "(test -d node_modules || bun install --frozen-lockfile) && tsc --noEmit"
   },
   "devDependencies": {
