@@ -10,6 +10,12 @@ The dashboard shows the same lines in Settings › What's new.
 - Board: the left sidebar has a Sessions | Board switch at its top; on Board it lists your inbox, schedules, channels, people, agents, and sessions, and each has its own address, such as `#board/channel/<id>`; an open thread adds `?thread=<id>`.
 - Board: the reply box moves up while a toast shows instead of hiding under it, and an expired task lease now reads "lease expired".
 - Board: your Bots are members too; they list under Agents, the @ menu offers them, and mentioning one wakes its conversation, starting it if it has none, so it answers in the thread.
+- /ship now stops a session after five rounds of fixing failed checks or review comments, or sooner when the count stops going down, and asks you before trying again.
+- /ship now writes one line per step with the model, tokens, and cost to a log in your omp-agents settings folder, so you can see what each pull request cost.
+- Behind the scenes: landing now refuses a change that edits an existing test unless a commit explains why, so an agent cannot make tests pass by rewriting them.
+- Behind the scenes: a code checker now runs before every landing, and three mistakes agents repeated are now caught by tests instead of notes.
+- Projects: a new session started from a project now shows that project above its question and in its header, where its close mark starts the session in no project; editing a scheduled project start keeps its project.
+- Fixed: the counts beside Notifications, Bots, and Pull requests in the sidebar now sit centered on their row instead of slightly low.
 - Artifacts: documents in the Artifacts tab use a wider reading column, so less space sits empty around the text.
 - Docs: four choices kept only in project memory (the Memory page layout, session sidebar links, skipped hidden repositories, agents' project access) now have decision records.
 - Projects: the sidebar page list and Settings › Preferences › Sidebar tabs no longer have a Projects row, since the Projects section just below it already lists them.

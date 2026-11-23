@@ -3,6 +3,7 @@
 ## Pitfalls
 
 Read [LEARNINGS.md](LEARNINGS.md) before you retry a failed check; it lists the mistakes agents already made here.
+When a lesson there recurs a second time, turn it into a check (a test, a lint rule as [Tests and lint](CODING_STANDARDS.md#tests-and-lint) says, a hook, or a `land` check) and replace its line with a pointer to the check.
 Every land on `main` needs new lines in `CHANGELOG.md`, as [Changelog](CODING_STANDARDS.md#changelog) says: write them before you call `land`, whatever the global "none by default" rule says.
 
 ## Read before you act

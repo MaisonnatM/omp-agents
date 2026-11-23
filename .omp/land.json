@@ -4,6 +4,7 @@
 	"setup": ["bun install --frozen-lockfile", "bun install --cwd desktop --frozen-lockfile"],
 	"checks": [
 		"git diff --quiet \"$LAND_BASE\" HEAD -- CHANGELOG.md && { echo 'Landing on main needs new lines in CHANGELOG.md that say, in everyday words, what changed. See CODING_STANDARDS.md#changelog.'; exit 1; } || true",
-		["bun test", "bun run typecheck", "bun run --cwd desktop typecheck"]
+		"bun scripts/check-test-edits.ts",
+		["bun test", "bun run typecheck", "bun run lint", "bun run --cwd desktop typecheck"]
 	]
 }

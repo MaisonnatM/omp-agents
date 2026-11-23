@@ -1,7 +1,8 @@
 // Tracks the /ship workflow (optional Linear ticket -> plan -> draft PR -> reviews -> live for review) per session.
 // The agent declares the stage it works on through the `ship_stage` tool. GitHub decides what a live PR
 // needs next (rebase, review comments, CI), so that part is polled, never declared.
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
@@ -100,7 +101,31 @@ export interface ShipState {
 	pr?: number;
 	note?: string;
 	prStatus?: PrStatus;
+	/** This PR's fix rounds since GitHub last showed each fix done. */
+	fixes?: Fixes;
+	/** The session's cumulative usage at the last traced stage, so the next trace line reports what was spent since. */
+	spent?: Spent;
 	updatedAt: string;
+}
+
+/** Live work that repeats until GitHub shows it done, so it runs in counted rounds. */
+export type FixWork = Extract<LiveWork, "fix_ci" | "fix_comments">;
+const isFixWork = (work: string | undefined): work is FixWork => work === "fix_ci" || work === "fix_comments";
+/** The rounds of one fix: how many started, and the failing-check or open-comment count each round that reported one started with. */
+export interface FixRounds {
+	rounds: number;
+	counts: number[];
+}
+export type Fixes = Partial<Record<FixWork, FixRounds>>;
+/** Rounds a PR gets for one fix before ship_stage refuses another and the agent asks the user. */
+export const FIX_BUDGET = 5;
+/** Reported counts in a row that did not shrink before ship_stage calls the fix stalled. */
+const STALL_ROUNDS = 2;
+
+/** Cumulative session usage, as omp's session usage statistics report it. */
+export interface Spent {
+	tokens: number;
+	cost: number;
 }
 
 export interface Need {
@@ -204,6 +229,65 @@ export function liveSummary(s: PrStatus): string {
 	if (needs.length > 0) return needs.map(n => `${LABEL[n.kind]} (${n.detail})`).join(" · ");
 	if (s.approved && s.checks !== "pending") return "approved, check forge mergeability";
 	return s.checks === "pending" ? "waiting for review · checks running" : "waiting for review";
+}
+
+/** Whether GitHub's status shows `work` done: checks pass for fix_ci, no unresolved review thread for fix_comments. */
+export function fixDone(work: FixWork, s: PrStatus): boolean {
+	return work === "fix_ci" ? s.checks === "pass" || s.checks === "none" : s.unresolvedThreads === 0 && !s.moreThreads;
+}
+
+/** The fix rounds once `s` is GitHub's status: a fix it shows done starts over at its next round. */
+export function settleFixes(fixes: Fixes | undefined, s: PrStatus | undefined): Fixes | undefined {
+	if (!fixes || !s) return fixes;
+	const open = Object.entries(fixes).filter(([work]) => isFixWork(work) && !fixDone(work, s));
+	return open.length ? Object.fromEntries(open) : undefined;
+}
+
+/**
+ * Starts the next round of `work`, which began with `count` failing checks or open comments when the agent reported one,
+ * or says why it may not: the fix used its whole budget, or its count did not shrink for two rounds in a row.
+ */
+export function startFix(fixes: Fixes | undefined, work: FixWork, count: number | undefined): { fixes: Fixes; round: number } | { round: number; refusal: string } {
+	const done = fixes?.[work] ?? { rounds: 0, counts: [] };
+	const round = done.rounds + 1;
+	const ask = `Stop, tell the user what you tried, and ask them with \`ask\` how to proceed; if they approve more rounds, call ship_stage({stage: '${work}', moreRounds: true}).`;
+	if (done.rounds >= FIX_BUDGET) {
+		return { round, refusal: `${LABEL[work]} has run ${FIX_BUDGET} rounds on this PR without GitHub showing it fixed, so round ${round} is not recorded. ${ask}` };
+	}
+	const counts = count === undefined ? done.counts : [...done.counts, count];
+	const recent = counts.slice(-(STALL_ROUNDS + 1));
+	if (count !== undefined && recent.length > STALL_ROUNDS && recent.every((n, i) => i === 0 || n >= recent[i - 1]!)) {
+		const noun = work === "fix_ci" ? "failing-check" : "open-comment";
+		return { round, refusal: `${LABEL[work]} stalled: the ${noun} count did not shrink for ${STALL_ROUNDS} rounds in a row (${recent.join(" → ")}), so round ${round} is not recorded. ${ask}` };
+	}
+	return { fixes: { ...fixes, [work]: { rounds: round, counts } }, round };
+}
+
+/** One `ship_stage` call as the trace records it. */
+export interface TraceLine {
+	ts: string;
+	session: string;
+	repo?: string;
+	pr?: number;
+	stage: Stage | LiveWork;
+	model?: string;
+	/** Tokens and cost the session spent since the previous traced stage, or since it started. */
+	tokens: number;
+	cost: number;
+	/** The round of a fix stage, recorded or refused. */
+	round?: number;
+	/** GitHub's checks on the PR when the call read them: pass, fail, pending, or none. */
+	checks?: PrStatus["checks"];
+	recorded: boolean;
+	/** Why the stage was not recorded, when the call said so. */
+	refusal?: string;
+}
+
+/** Appends `line` to the JSONL trace every `ship_stage` call naming a stage writes to, across this user's sessions and repositories, beside the kit's other GitHub state. */
+function appendTrace(line: TraceLine) {
+	const file = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents", "ship-trace.jsonl");
+	mkdirSync(dirname(file), { recursive: true });
+	appendFileSync(file, `${JSON.stringify(line)}\n`);
 }
 
 export function renderLines(s: ShipState): string[] {
@@ -426,17 +510,23 @@ export default function ship(pi: ExtensionAPI) {
 		checks: z.enum(["pass", "fail", "pending", "none"]),
 		reviews: z.object(byReview(() => z.object({ needed: z.boolean(), done: z.boolean() }))),
 	});
+	const fixRoundsSchema = z.object({ rounds: z.number().int(), counts: z.array(z.number()) });
 	const stateSchema = z.object({
 		stage: z.enum(STAGES), work: z.enum(LIVE_WORK).optional(), issue: z.string().optional(),
 		repo: z.string().optional(), pr: z.number().int().optional(), note: z.string().optional(),
 		// A status recorded before the reviews were per stage is dropped; the next poll refetches it.
-		prStatus: prStatusSchema.optional().catch(undefined), updatedAt: z.string(),
+		prStatus: prStatusSchema.optional().catch(undefined),
+		fixes: z.object({ fix_ci: fixRoundsSchema.optional(), fix_comments: fixRoundsSchema.optional() }).optional().catch(undefined),
+		spent: z.object({ tokens: z.number(), cost: z.number() }).optional().catch(undefined),
+		updatedAt: z.string(),
 	});
 	const viewSchema = z.object({ body: z.string(), changedFiles: z.number().int(), files: z.array(z.object({ path: z.string() })), url: z.string() });
 	let state: ShipState | undefined;
 	let lastRefresh = 0;
 	let lastSummary = "";
 	let refreshFailure: string | undefined;
+	/** The session's usage at the last traced stage; `save` persists it so a resumed session's next trace line starts from it. */
+	let usageMark: Spent | undefined;
 	const runner = new GhRunner((command, args, options) => pi.exec(command, args, options));
 	const gh = async (args: string[], cwd: string) => {
 		try {
@@ -453,7 +543,7 @@ export default function ship(pi: ExtensionAPI) {
 	}
 
 	function save(ctx: ExtensionContext, next: ShipState) {
-		state = { ...next, updatedAt: new Date().toISOString() };
+		state = { ...next, spent: usageMark, updatedAt: new Date().toISOString() };
 		pi.appendEntry(ENTRY, state);
 		render(ctx);
 	}
@@ -467,6 +557,7 @@ export default function ship(pi: ExtensionAPI) {
 				else if ((entry.data as { stopped?: unknown } | undefined)?.stopped === true) state = undefined;
 			}
 		}
+		usageMark = state?.spent;
 		lastSummary = state?.prStatus ? liveSummary(state.prStatus) : "";
 		refreshFailure = state?.prStatus && state.prStatus.state !== "MERGED" ? "Status restored from the session; awaiting a fresh GitHub read." : undefined;
 		render(ctx);
@@ -636,8 +727,14 @@ export default function ship(pi: ExtensionAPI) {
 		pr: z.number().int().optional().describe("Pull request number"),
 		repo: z.string().optional().describe("owner/name; resolved from the cwd when omitted"),
 		note: z.string().optional().describe("One-line status note; empty string clears it"),
+		count: z.number().int().min(0).optional().describe("With fix_ci or fix_comments: how many checks fail, or review comments are open, as this round starts"),
+		moreRounds: z.boolean().optional().describe("With fix_ci or fix_comments: the user approved more rounds after ship_stage stopped the fix; starts its rounds over"),
 		stop: z.boolean().optional().describe("End the workflow in this session, as when the user says 'no ship'"),
 	});
+	type ToolParams = { stage?: Stage | LiveWork; issue?: string; pr?: number; repo?: string; note?: string; count?: number; moreRounds?: boolean; stop?: boolean };
+	type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean; details?: unknown };
+	/** What a call did with the stage it named, for its trace line. */
+	type Outcome = { recorded: boolean; round?: number };
 	/** The `ship_stage` call under way, which the next one waits for. */
 	let calls: Promise<unknown> = Promise.resolve();
 	pi.registerTool({
@@ -650,6 +747,8 @@ export default function ship(pi: ExtensionAPI) {
 			"`gh pr ready` records live; while live, record the work you start: rebase, fix_comments, or fix_ci; record `live` again after you push.",
 			"Call with no stage to read the current stage, the PR's live needs from GitHub, and the next action.",
 			"Call with stop: true when the user says 'no ship'; the widget, the gates, and the dashboard's Ship card then drop the run.",
+			`fix_ci and fix_comments run in rounds per PR: pass count each round; after ${FIX_BUDGET} rounds, or when count did not shrink for ${STALL_ROUNDS} rounds in a row, the round is refused until the user approves moreRounds.`,
+			"Every call naming a stage appends a line to the ship trace.",
 		].join(" "),
 		parameters: toolParamsSchema,
 		execute(_id, params, _signal, _onUpdate, ctx) {
@@ -657,78 +756,117 @@ export default function ship(pi: ExtensionAPI) {
 			const call = calls.then(async () => {
 				const parsed = toolParamsSchema.safeParse(params);
 				if (!parsed.success) return { content: [{ type: "text" as const, text: "Invalid ship stage input." }], isError: true };
-				const { stage, issue, pr, repo, note, stop } = parsed.data;
-				if (stop) {
-					state = undefined;
-					pi.appendEntry(ENTRY, { stopped: true });
-					render(ctx);
-					return { content: [{ type: "text" as const, text: "Stopped the /ship workflow in this session." }] };
-				}
-				const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
-				const newPr = (pr !== undefined && pr !== base.pr) || (repo !== undefined && repo !== base.repo);
-				if (newPr) {
-					// Record the PR before polling, so the gates below read this PR's body rather than none or another PR's.
-					const prRepo = repo ?? base.repo ?? (pr ? await resolveRepo(ctx.cwd) : undefined);
-					save(ctx, { ...base, pr: pr ?? base.pr, repo: prRepo, prStatus: undefined });
-				}
-				await refreshNow(ctx);
-				if (refreshFailure && stage && NEEDS_CURRENT_STATUS.includes(stage)) {
-					return { content: [{ type: "text" as const, text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
-				}
-				let checked = "";
-				if (stage || issue || pr || repo || note !== undefined) {
-					if (stage === "ready_gate" || (stage !== undefined && isReviewStage(stage))) {
-						const status = state?.prStatus;
-						if (!status && reviewsBefore(stage).length > 0) {
-							return { content: [{ type: "text" as const, text: `GitHub has reported no status for this PR, so ${stage} cannot check its review boxes. Name the PR with ship_stage({pr}).` }], isError: true };
-						}
-						const unchecked = status ? reviewsBefore(stage).filter(review => status.reviews[review].needed && !status.reviews[review].done) : [];
-						if (state && status && unchecked.length > 0) {
-							// Recording a stage declares the reviews before it done, so their boxes go in the PR body; a box the body already holds, such as one GitHub's status read missed just after an edit, stays as it is.
-							const path = `repos/${state.repo}/pulls/${state.pr}`;
-							const boxes = unchecked.map(review => `\`${REVIEWS[review].box}\``).join(" and ");
-							try {
-								const { changed } = await editDescription(`${state.repo}-${state.pr}`, { kind: "check", boxes: unchecked.map(review => REVIEWS[review].box) }, {
-									read: async () => descriptionSnapshot(await runner.json(["api", path], ctx.cwd)),
-									write: async body => {
-										await runner.json(["api", "-X", "PATCH", path, "-f", `body=${body}`], ctx.cwd);
-									},
-								});
-								if (changed) checked = `Checked ${boxes} in the PR body.\n`;
-							} catch (error) {
-								return { content: [{ type: "text" as const, text: `Could not check ${boxes} in the PR body, so ${stage} is not recorded: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
-							}
-							save(ctx, { ...state, prStatus: { ...status, reviews: byReview(review => (unchecked.includes(review) ? { ...status.reviews[review], done: true } : status.reviews[review])) } });
-						}
-					}
-					const isWork = stage === "rebase" || stage === "fix_comments" || stage === "fix_ci";
-					if (stage === "live" || isWork) {
-						if (state?.prStatus?.state === "OPEN" && state.prStatus.draft) {
-							const next = stage === "live"
-								? `Run \`gh pr ready ${state.pr}\` once the ready gate passes; it asks the user to approve, and a successful run records live.`
-								: "Do the work without recording it; live work is for a PR under review.";
-							return { content: [{ type: "text" as const, text: `PR #${state.pr} is still a draft, so ${stage} is not recorded and the stage stays ${LABEL[state.stage]}. ${next}` }] };
-						}
-						if (!state?.prStatus || state.prStatus.state !== "OPEN") {
-							return { content: [{ type: "text" as const, text: "The PR must be open before recording live work." }], isError: true };
-						}
-					}
-					if (stage === "merged" && state?.prStatus?.state !== "MERGED") {
-						return { content: [{ type: "text" as const, text: "GitHub has not reported this PR merged." }], isError: true };
-					}
-					const current = state ?? base;
-					save(ctx, {
-						...current,
-						stage: stage ? (isWork ? "live" : stage) : current.stage,
-						work: stage ? (isWork ? stage : undefined) : current.work,
-						issue: issue ?? current.issue,
-						note: note === undefined ? current.note : note || undefined,
-					});
-				}
-				return { content: [{ type: "text" as const, text: `${checked}${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
+				const { stage } = parsed.data;
+				if (!stage) return stageCall(parsed.data, ctx, { recorded: false });
+				const usage = ctx.sessionManager.getUsageStatistics();
+				const since = usageMark ?? { tokens: 0, cost: 0 };
+				usageMark = { tokens: usage.totalTokens, cost: usage.cost };
+				const outcome: Outcome = { recorded: false };
+				const result = await stageCall(parsed.data, ctx, outcome);
+				appendTrace({
+					ts: new Date().toISOString(),
+					session: ctx.sessionManager.getSessionId(),
+					repo: state?.repo ?? parsed.data.repo,
+					pr: state?.pr ?? parsed.data.pr,
+					stage,
+					model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+					tokens: usageMark.tokens - since.tokens,
+					cost: usageMark.cost - since.cost,
+					round: outcome.round,
+					checks: state?.prStatus?.checks,
+					recorded: outcome.recorded,
+					refusal: outcome.recorded ? undefined : result.content[0]?.text,
+				});
+				return result;
 			});
 			calls = call.catch(() => undefined);
 			return call;
 		},
 	});
+
+	/** One `ship_stage` call, recording into `outcome` whether it recorded the stage it named and which fix round it started. */
+	async function stageCall(params: ToolParams, ctx: ExtensionContext, outcome: Outcome): Promise<ToolResult> {
+		const { stage, issue, pr, repo, note, count, moreRounds, stop } = params;
+		if (stop) {
+			state = undefined;
+			pi.appendEntry(ENTRY, { stopped: true });
+			render(ctx);
+			return { content: [{ type: "text" as const, text: "Stopped the /ship workflow in this session." }] };
+		}
+		const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
+		const newPr = (pr !== undefined && pr !== base.pr) || (repo !== undefined && repo !== base.repo);
+		if (newPr) {
+			// Record the PR before polling, so the gates below read this PR's body rather than none or another PR's.
+			const prRepo = repo ?? base.repo ?? (pr ? await resolveRepo(ctx.cwd) : undefined);
+			save(ctx, { ...base, pr: pr ?? base.pr, repo: prRepo, prStatus: undefined, fixes: undefined });
+		}
+		await refreshNow(ctx);
+		if (refreshFailure && stage && NEEDS_CURRENT_STATUS.includes(stage)) {
+			return { content: [{ type: "text" as const, text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
+		}
+		let checked = "";
+		if (stage || issue || pr || repo || note !== undefined) {
+			if (stage === "ready_gate" || (stage !== undefined && isReviewStage(stage))) {
+				const status = state?.prStatus;
+				if (!status && reviewsBefore(stage).length > 0) {
+					return { content: [{ type: "text" as const, text: `GitHub has reported no status for this PR, so ${stage} cannot check its review boxes. Name the PR with ship_stage({pr}).` }], isError: true };
+				}
+				const unchecked = status ? reviewsBefore(stage).filter(review => status.reviews[review].needed && !status.reviews[review].done) : [];
+				if (state && status && unchecked.length > 0) {
+					// Recording a stage declares the reviews before it done, so their boxes go in the PR body; a box the body already holds, such as one GitHub's status read missed just after an edit, stays as it is.
+					const path = `repos/${state.repo}/pulls/${state.pr}`;
+					const boxes = unchecked.map(review => `\`${REVIEWS[review].box}\``).join(" and ");
+					try {
+						const { changed } = await editDescription(`${state.repo}-${state.pr}`, { kind: "check", boxes: unchecked.map(review => REVIEWS[review].box) }, {
+							read: async () => descriptionSnapshot(await runner.json(["api", path], ctx.cwd)),
+							write: async body => {
+								await runner.json(["api", "-X", "PATCH", path, "-f", `body=${body}`], ctx.cwd);
+							},
+						});
+						if (changed) checked = `Checked ${boxes} in the PR body.\n`;
+					} catch (error) {
+						return { content: [{ type: "text" as const, text: `Could not check ${boxes} in the PR body, so ${stage} is not recorded: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+					}
+					save(ctx, { ...state, prStatus: { ...status, reviews: byReview(review => (unchecked.includes(review) ? { ...status.reviews[review], done: true } : status.reviews[review])) } });
+				}
+			}
+			const isWork = stage === "rebase" || stage === "fix_comments" || stage === "fix_ci";
+			if (stage === "live" || isWork) {
+				if (state?.prStatus?.state === "OPEN" && state.prStatus.draft) {
+					const next = stage === "live"
+						? `Run \`gh pr ready ${state.pr}\` once the ready gate passes; it asks the user to approve, and a successful run records live.`
+						: "Do the work without recording it; live work is for a PR under review.";
+					return { content: [{ type: "text" as const, text: `PR #${state.pr} is still a draft, so ${stage} is not recorded and the stage stays ${LABEL[state.stage]}. ${next}` }] };
+				}
+				if (!state?.prStatus || state.prStatus.state !== "OPEN") {
+					return { content: [{ type: "text" as const, text: "The PR must be open before recording live work." }], isError: true };
+				}
+			}
+			if (stage === "merged" && state?.prStatus?.state !== "MERGED") {
+				return { content: [{ type: "text" as const, text: "GitHub has not reported this PR merged." }], isError: true };
+			}
+			let fixes = settleFixes(state?.fixes, state?.prStatus);
+			if (isFixWork(stage)) {
+				if (moreRounds && fixes) {
+					const { [stage]: _restarted, ...others } = fixes;
+					fixes = others;
+				}
+				const next = startFix(fixes, stage, count);
+				outcome.round = next.round;
+				if ("refusal" in next) return { content: [{ type: "text" as const, text: next.refusal }], isError: true };
+				fixes = next.fixes;
+			}
+			const current = state ?? base;
+			save(ctx, {
+				...current,
+				stage: stage ? (isWork ? "live" : stage) : current.stage,
+				work: stage ? (isWork ? stage : undefined) : current.work,
+				issue: issue ?? current.issue,
+				note: note === undefined ? current.note : note || undefined,
+				fixes,
+			});
+			outcome.recorded = stage !== undefined;
+		}
+		return { content: [{ type: "text" as const, text: `${checked}${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
+	}
 }

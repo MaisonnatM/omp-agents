@@ -474,8 +474,8 @@ const SidebarMenuBadge = forwardRef<HTMLDivElement, SidebarMenuBadgeProps>(
         ref={ref}
         data-sidebar="menu-badge"
         className={cn(
-          "pointer-events-none absolute right-2 z-10 flex h-5 min-w-5 items-center justify-center px-1 tabular-nums",
-          sizeClasses.variant === "compact" ? "top-1 text-[10px]" : "top-1.5 text-[11px]",
+          "pointer-events-none absolute top-1/2 right-2 z-10 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center px-1 tabular-nums",
+          sizeClasses.variant === "compact" ? "text-[10px]" : "text-[11px]",
           "transition-[color,font-variation-settings] duration-80",
           active ? "text-foreground" : "text-muted-foreground",
           className

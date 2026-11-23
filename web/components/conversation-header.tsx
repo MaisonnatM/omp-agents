@@ -7,7 +7,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { PrivateChip } from "./private-chip";
 import { CONFIRM_PRIVATE_END, hostLabel, PRIVATE_NOTE } from "../labels";
 import { isPrivateHost } from "../sessions";
-import { shortcutLabels } from "../shortcuts";
 import { useInlineConfirm } from "../use-inline-confirm";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";

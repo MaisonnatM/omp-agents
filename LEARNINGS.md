@@ -2,6 +2,7 @@
 
 Pitfalls agents have hit in this repository, with the fix.
 Add one when a mistake cost a retry and the docs did not prevent it.
+The second time a lesson recurs, it becomes a check: a test, a lint rule as [Tests and lint](CODING_STANDARDS.md#tests-and-lint) says, a hook, or a `land` check; its line here then goes or points at the check.
 
 ## GitHub rate limit
 
@@ -12,8 +13,8 @@ Add one when a mistake cost a retry and the docs did not prevent it.
 
 ## Kit extensions
 
-- omp hands an extension its own zod-compatible `pi.zod`, which refuses an object or array passed to `.default()` and then fails to load the whole extension; `templates/omp/extensions.test.ts` builds schemas with that same zod, so such a schema fails there.
-- Pass a factory, `.default(() => ({ ... }))`, and after changing an extension's schemas load it for real with `omp -p --no-extensions -e <path to the extension> "<prompt that calls its tool>"`; a load failure prints `Failed to load extension`.
+- `src/extension-zod-defaults.test.ts` checks that a kit extension passes `.default()` a factory, never a literal, which omp's `pi.zod` refuses at load.
+- After changing an extension's schemas, load it for real with `omp -p --no-extensions -e <path to the extension> "<prompt that calls its tool>"`; a load failure prints `Failed to load extension`.
 
 ## Landing
 
@@ -30,4 +31,4 @@ Add one when a mistake cost a retry and the docs did not prevent it.
 
 ## Shortcuts in dialogs
 
-- A Base UI dialog's popup stops the arrows, Home, and End from bubbling, so a `useShortcuts` binding on one of them never fires while the dialog has focus, and no test catches it; bind it with `usePopupShortcuts` on the popup and press the key in a browser smoke.
+- `web/popup-shortcuts.test.ts` checks that a Base UI dialog binds arrows, Home, and End with `usePopupShortcuts`, since its popup stops them before `useShortcuts`.

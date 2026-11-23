@@ -140,6 +140,10 @@ export const PageSwitch = memo(function PageSwitch({
 					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId, projectId: page.projectId })}
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId, projectId: page.projectId }) }, when)}
 					todo={seed}
+					projectId={page.projectId}
+					onDropProject={() => {
+						location.hash = hashForNewSession({ cwd: page.cwd, todoId: page.todoId });
+					}}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
 				/>
 			);
