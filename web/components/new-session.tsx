@@ -1,4 +1,4 @@
-import { IconCrossMedium, IconLock, IconSparklesTwo, IconUnlocked } from "central-icons";
+import { IconCrossMedium, IconFlag1, IconLock, IconSparklesTwo, IconUnlocked } from "central-icons";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { RetroGrid } from "@/components/dithercn/retro-grid";
 import type { BranchChoice } from "../../src/shared/git";
@@ -55,6 +55,10 @@ interface NewSessionProps {
 	onSchedule: (op: ScheduledOp, when: ScheduleWhen) => Promise<void>;
 	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
 	todo: { text: string; prompt: string } | null;
+	/** The name of the project the session joins once it starts; `null` for none. */
+	project: string | null;
+	/** Start the session in no project instead. */
+	onDropProject: () => void;
 	/** A scheduled start opened to edit: the draft starts as it, sending saves it, **Start now** calls `onStart`, and `onSchedule` moves its time. */
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
@@ -84,7 +88,7 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, scheduled, draftKey }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, project, onDropProject, scheduled, draftKey }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const pickFiles = useRef<(accept?: string) => void>(null);
@@ -97,8 +101,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const draftSkill = initial?.skill ?? pinnedSkill;
 	const [skipSkill, setSkipSkill] = useState(initial !== null && initial.skill === null);
 	const [privateOn, setPrivate] = useState(initial?.private ?? false);
-	// A draft that starts from a todo is never private, since nothing may link to a private session.
-	const isPrivate = todo === null && privateOn;
+	// A draft that starts from a todo or for a project is never private, since nothing may link to a private session.
+	const isPrivate = todo === null && project === null && privateOn;
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
 	const listedSkills = skills.error === null ? skills.data?.skills : [];
@@ -124,7 +128,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	useEffect(() => {
 		if (typeable && document.activeElement === document.body) editorRef.current?.focus();
 	}, [typeable]);
-	const privacy = todo ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
+	const privacy = todo || project !== null ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
+	const projectPill = project === null ? null : <ProjectPill name={project} onDrop={onDropProject} disabled={starting} />;
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();
 	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
@@ -196,6 +201,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		<div className="relative isolate flex h-full min-h-0 flex-1 flex-col">
 			{scheduled ? (
 				<Header title="Scheduled session" meta={scheduled.when}>
+					{projectPill}
 					{privacy}
 					<Button variant="ghost" size="compact" disabled={starting || !connected || !draft.trim() || directCommand !== null} onClick={() => onStart({ ...opOf(draft.trim()), images: [] })}>
 						{scheduled.error ? "Try again now" : "Start now"}
@@ -206,6 +212,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				</Header>
 			) : (
 				<Header title="New session" status={starting ? "Starting omp…" : undefined}>
+					{projectPill}
 					{privacy}
 				</Header>
 			)}
@@ -222,7 +229,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			) : (
 				<>
 					{backdrop}
-					<NewSessionWelcome folder={name} isPrivate={isPrivate} />
+					<NewSessionWelcome folder={name} isPrivate={isPrivate} project={project} />
 				</>
 			)}
 			{/* The composer docks at the page's bottom, with the project picker left of the model; only a scheduled start shows the branch. */}
@@ -344,12 +351,37 @@ function PrivatePill({ on, onToggle, disabled }: { on: boolean; onToggle: () => 
 	);
 }
 
-/** What a new session's empty page says above the docked composer: the omp mark over a serif question naming where the work happens. */
-function NewSessionWelcome({ folder, isPrivate }: { folder: string; isPrivate: boolean }) {
+/** The header's project the draft starts in, with a close mark that starts it in none. */
+function ProjectPill({ name, onDrop, disabled }: { name: string; onDrop: () => void; disabled: boolean }) {
+	return (
+		<Tooltip content="Start the session in no project" disabled={disabled}>
+			<button
+				type="button"
+				aria-label={`Project ${name}, remove`}
+				onClick={onDrop}
+				disabled={disabled}
+				className="inline-flex h-7 max-w-64 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-foreground ring-1 ring-border ring-inset transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:outline-none disabled:opacity-50"
+			>
+				<IconFlag1 className="size-3.5 shrink-0" />
+				<span className="truncate">{name}</span>
+				<IconCrossMedium className="size-3 shrink-0 text-muted-foreground" />
+			</button>
+		</Tooltip>
+	);
+}
+
+/** What a new session's empty page says above the docked composer: the omp mark, the project it joins, then a serif question naming where the work happens. */
+function NewSessionWelcome({ folder, isPrivate, project }: { folder: string; isPrivate: boolean; project: string | null }) {
 	return (
 		<div className="m-auto flex w-full max-w-conversation flex-col items-center px-6 py-10 text-center" data-empty-conversation>
 			{isPrivate ? <IconLock aria-hidden="true" className="size-7" /> : <AppMark className="size-8" />}
-			<h2 className="mt-5 max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance">
+			{project !== null && (
+				<p className="mt-5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm font-medium">
+					<IconFlag1 aria-hidden="true" className="size-4 shrink-0" />
+					<span className="truncate">{project}</span>
+				</p>
+			)}
+			<h2 className={cn("max-w-lg font-serif text-[2rem] leading-tight font-normal tracking-tight text-balance", project === null ? "mt-5" : "mt-3")}>
 				What should we work on in <span className="underline decoration-[oklch(0.62_0.21_295)]/40 decoration-2 underline-offset-[6px]">{folder}</span>?
 			</h2>
 			{isPrivate && <p className="mt-3 max-w-sm text-sm text-pretty text-muted-foreground">{PRIVATE_NOTE}</p>}

@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useContext } from "react";
 import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { botRows, type OpenBot } from "../bots-model";
@@ -13,7 +13,7 @@ import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
 import { todoCwd } from "../todo-views";
 import type { WorkspaceScope } from "../use-workspace-scope";
-import { useDashboardActions } from "./dashboard-context";
+import { OpenProjectsContext, useDashboardActions } from "./dashboard-context";
 import { EmptyHome } from "./empty-home";
 import { ModuleOffPage } from "./module-off-page";
 import { ModulePageView } from "./module-views";
@@ -110,6 +110,7 @@ export const PageSwitch = memo(function PageSwitch({
 	const { send, start, dismissStart, changeTodo } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const [modulesOff] = useModulesOff();
+	const openProjects = useContext(OpenProjectsContext);
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	if (page && isModulePage(page)) {
 		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
@@ -140,6 +141,10 @@ export const PageSwitch = memo(function PageSwitch({
 					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId, projectId: page.projectId })}
 					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId, projectId: page.projectId }) }, when)}
 					todo={seed}
+					project={openProjects.find(each => each.id === page.projectId)?.name ?? null}
+					onDropProject={() => {
+						location.hash = hashForNewSession({ cwd: page.cwd, todoId: page.todoId });
+					}}
 					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
 				/>
 			);

@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- Projects: a new session started from a project now shows that project above its question and in its header, where its close mark starts the session in no project; editing a scheduled project start keeps its project.
 - Fixed: the counts beside Notifications, Bots, and Pull requests in the sidebar now sit centered on their row instead of slightly low.
 - Artifacts: documents in the Artifacts tab use a wider reading column, so less space sits empty around the text.
 - Docs: four choices kept only in project memory (the Memory page layout, session sidebar links, skipped hidden repositories, agents' project access) now have decision records.

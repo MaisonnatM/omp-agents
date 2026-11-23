@@ -7,7 +7,7 @@ import type { Completions } from "../pane-store";
 import type { ScheduleWhen } from "../scheduled-model";
 import { useAction } from "../use-action";
 import { useMinute } from "../use-minute";
-import { useDashboardActions } from "./dashboard-context";
+import { OpenProjectsContext, useDashboardActions } from "./dashboard-context";
 import { NewSession, type ScheduledOp } from "./new-session";
 import { ScheduledSends, whenLabel } from "./scheduled";
 
@@ -43,12 +43,14 @@ interface DraftPageProps extends Omit<ScheduledSessionProps, "id"> {
 function ScheduledDraftPage({ send, request, workspaces, connected, completions, todoOf }: DraftPageProps) {
 	const { request: ask, send: post } = useDashboardActions();
 	const [cwd, setCwd] = useState(request.cwd);
+	const [projectId, setProjectId] = useState(request.projectId);
+	const project = useContext(OpenProjectsContext).find(each => each.id === projectId) ?? null;
 	const now = useMinute();
 	const change = useAction((...changes: ScheduledChange[]) => changes.reduce((done, next) => done.then(() => ask({ t: "schedule", change: next })), Promise.resolve()), "Could not change the scheduled session");
 	/** The send with the draft's start, at `when`, else at its own time. */
 	const updated = (op: ScheduledOp, when: ScheduleWhen | null): ScheduledChange => ({
 		op: "update",
-		send: { id: send.id, at: when?.at ?? send.at, reset: when ? when.reset : send.reset, target: { kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: request.todoId, subject: request.subject }) } },
+		send: { id: send.id, at: when?.at ?? send.at, reset: when ? when.reset : send.reset, target: { kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: request.todoId, projectId, subject: request.subject }) } },
 	});
 	return (
 		<NewSession
@@ -62,6 +64,8 @@ function ScheduledDraftPage({ send, request, workspaces, connected, completions,
 			onStart={op => change.run(updated(op, null), { op: "send-now", id: send.id })}
 			onSchedule={(op, when) => ask({ t: "schedule", change: updated(op, when) })}
 			todo={todoOf(request.todoId)}
+			project={project?.name ?? null}
+			onDropProject={() => setProjectId(null)}
 			draftKey={null}
 			scheduled={{
 				request,
