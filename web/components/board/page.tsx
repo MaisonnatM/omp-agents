@@ -8,7 +8,7 @@ import { hashForPage } from "../../routing";
 import { type Attachment, type BoardChange, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
 import type { CoreData } from "../module-views";
 import { type BoardRoute, type BoardView, resolveBoardView } from "./module";
-import { Avatar, MIN, PRESENCE_COLOR, relTime, UNITS, useNow } from "./parts";
+import { Avatar, MIN, relTime, UNITS, useNow } from "./parts";
 
 const COMMANDS = [
 	{ name: "review", about: "Run the review panel on this thread and post the verdict here" },
