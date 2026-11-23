@@ -4,7 +4,7 @@ import { type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type Rea
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { completionTrigger, type Trigger } from "../completion-trigger";
-import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
+import { type Composer, completionOption, fileSearch, mentionMenu, type MenuOption, type MenuSection, } from "../mentions";
 import type { Completions } from "../pane-store";
 import { useSearchedPullRequests } from "../reads";
 import { useDashboardStatus, useMentionLists } from "./dashboard-context";

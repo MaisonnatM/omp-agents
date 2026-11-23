@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type LinkedPullRequest, type PullRequestSummary, type PullRequestComment, type PullRequestDetail, type PullRequestThread, type RepoPullRequests, type Reviewer, type StackedPullRequest, repoKey } from "../src/shared/github";
+import { type PullRequestSummary, type PullRequestComment, type PullRequestDetail, type PullRequestThread, type RepoPullRequests, type Reviewer, repoKey } from "../src/shared/github";
 import { type AgentOn, actionFacts, agentOn, type MoveId, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
@@ -27,7 +27,6 @@ import {
 	withPullRequestState,
 	withThreadResolved,
 	withoutHidden,
-	withRepoMoved,
 	withRepoStepped,
 	yourMoveCount,
 } from "./pull-requests-model";

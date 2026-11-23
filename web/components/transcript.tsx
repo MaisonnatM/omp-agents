@@ -2,7 +2,6 @@
 import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise, IconArrowsRepeat, IconBrain, IconBubbleAlert, IconBubbleQuestion, IconBug, IconChainLink1, IconChip, IconCircleCheck, IconCircleX, IconCode, IconCodeBrackets, IconConsole, IconEyeOpen, IconFileEdit, IconFileText, IconFlag1, IconFolderOpen, IconGlobe, IconGraduateCap, IconHistory, IconHourglass, IconImac, IconImages1, IconLightBulb, IconNote1, IconPageAdd, IconPageTextSearch, IconPlugin1, IconPullRequest, IconPageSearch, IconShieldCheck, IconShip, IconSparklesTwo, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { ArtifactSave } from "../../src/shared/artifacts";
 import type { View } from "../../src/shared/sessions";
 import { taskText } from "../../src/shared/routine-message";
 import type { PromptFile } from "../../src/shared/prompt-files";
