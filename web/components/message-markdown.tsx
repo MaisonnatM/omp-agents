@@ -359,7 +359,7 @@ const remarkLineBreaks = () => (root: BreakNode) => {
 export const BOT_MESSAGE_PRESET: MarkdownPreset = { ...SESSION_AGENT_PRESET, remark: [...AGENT_PRESET.remark, remarkLineBreaks] };
 
 /** A Board message: agent text whose line breaks stay, with the references `tokenize` finds, its members and workflows, as chips. */
-export const boardMessagePreset = (tokenize: Tokenize): MarkdownPreset => ({ ...PROMPT_PRESET, remark: [remarkGfm, remarkChips(tokenize), remarkFilePaths, remarkLineBreaks] });
+export const boardMessagePreset = (tokenize: Tokenize): MarkdownPreset => ({ ...PROMPT_PRESET, remark: [...PROMPT_PRESET.remark.map(plugin => (plugin === remarkPromptChips ? remarkChips(tokenize) : plugin)), remarkLineBreaks] });
 
 /**
  * Text written on GitHub, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which follows

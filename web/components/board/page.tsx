@@ -1,35 +1,17 @@
 /** The Board: channels and threads where people, omp sessions, and remote agents post, with an inbox per member; a message for a session wakes it. */
-import { IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconPlusSmall, IconRunShortcut, IconShieldCheck, IconSidebarSimpleRightWide, IconUser } from "central-icons";
-import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { InputMessage } from "@/components/ui/input-message";
-import type { MenuOption } from "../../mentions";
-import { CompletionPopup } from "../completion-popup";
+import { IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconPlusSmall, IconShieldCheck, IconSidebarSimpleRightWide } from "central-icons";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { boardTokens } from "../../board-composer";
 import { boardMessagePreset, type MarkdownPreset, MessageMarkdown } from "../message-markdown";
-import type { PromptEditorHandle } from "../prompt-editor";
-import type { PromptToken, Tokenize } from "../../prompt-tokens";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 import { hashForPage } from "../../routing";
-import { type Attachment, type BoardChange, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
+import { type Attachment, type BoardChange, type BoardCommand, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, mentions, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
 import type { CoreData } from "../module-views";
 import { type BoardRoute, type BoardView, resolveBoardView } from "./module";
 import { Avatar, MIN, NameDialog, relTime, UNITS, useNow } from "./parts";
-
-const COMMANDS = [
-	{ name: "review", about: "Run the review panel on this thread and post the verdict here" },
-	{ name: "implement", about: "Have an agent claim this task, build it, and report back" },
-	{ name: "grill", about: "Stress-test the plan in this thread with two models" },
-	{ name: "schedule", about: "Post to an agent later: /schedule @name text in 10m, or every 2h" },
-	{ name: "claim", about: "Take this task with a one-hour lease" },
-	{ name: "done", about: "Settle this task, which opens the tasks waiting on it" },
-] as const;
-
-const WORKFLOW_STEPS: Record<string, string[]> = {
-	review: ["Interface review", "Thermonuclear review", "Cross-judge (Codex)"],
-	grill: ["Claude grills", "Codex grills", "Merge findings"],
-	implement: ["Claim task", "Implement", "Open PR", "Report back"],
-};
+import { Composer } from "./composer";
 
 const lastIn = (state: BoardState, threadId: string): Message | undefined => state.messages.findLast(msg => msg.thread === threadId);
 
@@ -68,31 +50,31 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 		setOpen(id);
 	}
 
-	function runCommand(threadId: string, command: string, arg: string) {
+	function runCommand(threadId: string, command: BoardCommand, arg: string) {
 		const thread = state.threads.find(item => item.id === threadId)!;
-		if (command === "claim") {
+		if (command.name === "claim") {
 			onChange({ op: "task", thread: threadId, task: "claimed", lease: { by: state.me, until: Date.now() + LEASE_MS } });
 			post(threadId, "Claimed. Lease 1h.");
-		} else if (command === "done") {
+		} else if (command.name === "done") {
 			onChange({ op: "task", thread: threadId, task: "done", lease: null });
 			post(threadId, arg || "Done.");
-		} else if (command === "schedule") {
-			const to = members.find(member => isMention(arg, member));
+		} else if (command.name === "schedule") {
+			const [to] = mentions(arg, members);
 			if (!to) return post(threadId, "/schedule needs an @member to post to.", { internal: true });
 			const every = arg.match(/\bevery (\d+)\s*([mhd])\b/);
 			const after = arg.match(/\bin (\d+)\s*([mhd])\b/);
 			const step = (match: RegExpMatchArray) => Number(match[1]) * UNITS[match[2]!]!;
 			const repeat = every ? step(every) : null;
 			const at = Date.now() + (after ? step(after) : (repeat ?? 5 * MIN));
-			const text = arg.replace(`@${to.name}`, "").replace(/\b(every|in) \d+\s*[mhd]\b/g, "").trim() || "Check back on this thread.";
-			onChange({ op: "schedule", schedule: { id: crypto.randomUUID(), thread: threadId, by: state.me, to: to.id, text, at, every: repeat } });
-			post(threadId, `Scheduled for ${to.name}`, { internal: true, attachment: { kind: "schedule", text, at, every: repeat } });
+			const text = (arg.slice(0, to.start) + arg.slice(to.end)).replace(/\b(every|in) \d+\s*[mhd]\b/g, "").trim() || "Check back on this thread.";
+			onChange({ op: "schedule", schedule: { id: crypto.randomUUID(), thread: threadId, by: state.me, to: to.member.id, text, at, every: repeat } });
+			post(threadId, `Scheduled for ${to.member.name}`, { internal: true, attachment: { kind: "schedule", text, at, every: repeat } });
 		} else {
 			// The workflow goes to the agent it mentions, else to the agent holding the task.
 			const holder = thread.lease ? byId.get(thread.lease.by) : undefined;
-			const target = members.find(member => member.kind !== "human" && isMention(arg, member)) ?? (holder?.kind === "human" ? undefined : holder);
-			const text = `/${command}${target && !isMention(arg, target) ? ` @${target.name}` : ""}${arg ? ` ${arg}` : ""}`;
-			post(threadId, text, { attachment: { kind: "workflow", command: `/${command}`, steps: WORKFLOW_STEPS[command]!.map(label => ({ label, state: "queued" })) } });
+			const target = mentions(arg, members).find(({ member }) => member.kind !== "human")?.member ?? (holder?.kind === "human" ? undefined : holder);
+			const text = `/${command.name}${target && !isMention(arg, target) ? ` @${target.name}` : ""}${arg ? ` ${arg}` : ""}`;
+			post(threadId, text, { attachment: { kind: "workflow", command: `/${command.name}`, steps: (command.steps ?? []).map(label => ({ label, state: "queued" })) } });
 		}
 	}
 
@@ -347,7 +329,7 @@ interface ThreadViewProps {
 	now: number;
 	typing?: Member;
 	onPost: (text: string) => void;
-	onCommand: (command: string, arg: string) => void;
+	onCommand: (command: BoardCommand, arg: string) => void;
 	onAnswer: (msgId: string, option: string) => void;
 	onOpenThread: (id: string) => void;
 	/** Back to the list, which the narrow page hides while a thread is open. */
@@ -356,7 +338,9 @@ interface ThreadViewProps {
 
 function ThreadView({ state, thread, byId, members, now, typing, onPost, onCommand, onAnswer, onOpenThread, onBack }: ThreadViewProps) {
 	const messages = state.messages.filter(msg => msg.thread === thread.id);
-	const tokenize = useMemo(() => boardTokens(members), [members]);
+	// Keyed on the names, not the roster's identity, which every presence change renews: a new tokenizer renders every message again.
+	const names = members.map(member => `${member.id}\0${member.name}`).join("\n");
+	const tokenize = useMemo(() => boardTokens(members), [names]);
 	const preset = useMemo(() => boardMessagePreset(tokenize), [tokenize]);
 	const channel = state.channels.find(item => item.id === thread.channel)!;
 	const scroller = useRef<HTMLDivElement>(null);
@@ -434,7 +418,7 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 						)}
 					</ol>
 				</div>
-				<Composer members={members} onPost={onPost} onCommand={onCommand} channel={channel.name} />
+				<Composer members={members} tokenize={tokenize} onPost={onPost} onCommand={onCommand} channel={channel.name} />
 				</div>
 				<aside
 					aria-label="Details"
@@ -649,109 +633,3 @@ function StepDot({ state }: { state: "done" | "running" | "queued" | "failed" })
 	return <span className="size-4 rounded-full border border-dashed border-muted-foreground/50" />;
 }
 
-/* ─────────────────────────── Composer ─────────────────────────── */
-
-const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** A Board message's chips: `@` and a member's name, and a workflow command at the start. */
-function boardTokens(members: Member[]): Tokenize {
-	const names = members.map(member => member.name).sort((a, b) => b.length - a.length);
-	const mention = names.length ? new RegExp(`(?<=^|\\s)@(${names.map(escape).join("|")})(?=\\s|$)`, "gu") : null;
-	const command = new RegExp(`^/(${COMMANDS.map(item => item.name).join("|")})(?=\\s|$)`, "g");
-	return (text, { open = null, leading = true } = {}) => {
-		const found: PromptToken[] = [];
-		const scan = (re: RegExp, token: (match: RegExpExecArray) => Pick<PromptToken, "kind" | "label" | "target">) => {
-			for (const match of text.matchAll(re)) {
-				const end = match.index + match[0].length;
-				if (end !== open) found.push({ ...token(match), start: match.index, end });
-			}
-		};
-		if (leading) scan(command, match => ({ kind: "command", label: match[1]!, target: match[1]! }));
-		if (mention) scan(mention, match => ({ kind: "person", label: `@${match[1]}`, target: members.find(member => member.name === match[1])!.id }));
-		return found.sort((a, b) => a.start - b.start);
-	};
-}
-
-function Composer({ members, onPost, onCommand, channel }: { members: Member[]; onPost: (text: string) => void; onCommand: (command: string, arg: string) => void; channel: string }) {
-	const [text, setText] = useState("");
-	const [active, setActive] = useState(0);
-	const [closed, setClosed] = useState(false);
-	const editorRef = useRef<PromptEditorHandle>(null);
-	const listId = useId();
-	const token = text.match(/(?:^|\s)([@/])([\p{L}'\- ]{0,20})$/u);
-	const head = token ? text.slice(0, text.length - token[2]!.length - 1) : text;
-	const option = (icon: MenuOption["icon"], label: string, detail: string | null, inserted: string): MenuOption => ({ icon, label, detail, edit: { text: `${head}${inserted} `, cursor: head.length + inserted.length + 1 }, opens: false });
-	const tokenize = useMemo(() => boardTokens(members), [members]);
-	const options: MenuOption[] =
-		!token || closed
-			? []
-			: token[1] === "@"
-				? members
-						.filter(member => member.name.toLowerCase().startsWith(token[2]!.toLowerCase()))
-						.slice(0, 6)
-						.map(member => option(IconUser, member.name, member.presence === "asleep" ? "queues until it wakes" : member.kind === "human" ? "person" : (member.harness ?? null), `@${member.name}`))
-				: text.trimStart().startsWith("/") && !text.includes(" ")
-					? COMMANDS.filter(command => command.name.startsWith(token[2]!)).map(command => option(IconRunShortcut, `/${command.name}`, command.about, `/${command.name}`))
-					: [];
-
-	function change(value: string) {
-		setText(value);
-		setActive(0);
-		setClosed(false);
-	}
-
-	function insert(edit: MenuOption["edit"]) {
-		change(edit.text);
-		requestAnimationFrame(() => editorRef.current?.select(edit.cursor));
-	}
-
-	function send(value: string) {
-		const trimmed = value.trim();
-		if (!trimmed) return;
-		const command = trimmed.match(/^\/([a-z]+)\s*(.*)$/s);
-		if (command && COMMANDS.some(item => item.name === command[1])) onCommand(command[1]!, command[2]!);
-		else onPost(trimmed);
-		change("");
-	}
-
-	function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-		if (options.length === 0 || event.nativeEvent.isComposing) return;
-		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-			event.preventDefault();
-			setActive(i => (i + (event.key === "ArrowDown" ? 1 : options.length - 1)) % options.length);
-		} else if ((event.key === "Tab" && !event.shiftKey) || event.key === "Enter") {
-			event.preventDefault();
-			insert(options[active]!.edit);
-		} else if (event.key === "Escape") {
-			event.preventDefault();
-			setClosed(true);
-		}
-	}
-
-	return (
-		<div className="shrink-0 pt-2 pb-[max(1.25rem,var(--toasts-clearance,0px))] transition-[padding] duration-200 max-phone:pb-5">
-			<div className="relative mx-auto max-w-3xl px-6">
-				{options.length > 0 && <CompletionPopup id={listId} sections={[{ title: null, options }]} active={active} onPick={picked => insert(picked.edit)} error={null} />}
-				<InputMessage
-					editorRef={editorRef}
-					value={text}
-					onValueChange={change}
-					onSend={send}
-					tokenize={tokenize}
-					minRows={2}
-					placeholder={`Reply in #${channel}. @ to ping a person or agent, / for a workflow`}
-					editorProps={{
-						onKeyDown,
-						"aria-controls": options.length > 0 ? listId : undefined,
-						"aria-activedescendant": options.length > 0 ? `${listId}-${active}` : undefined,
-					}}
-					leftSlot={(["review", "implement", "schedule"] as const).map(name => (
-						<button key={name} type="button" onClick={() => insert({ text: `/${name} `, cursor: name.length + 2 })} className="h-7 rounded-md px-2 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
-							/{name}
-						</button>
-					))}
-				/>
-			</div>
-		</div>
-	);
-}

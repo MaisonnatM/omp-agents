@@ -40,7 +40,8 @@ export function annotationReference(label: string, content: string): string {
 	return `${fence}${inner}${fence}`;
 }
 
-interface Pattern {
+/** One kind of reference: where it reads, and the chip it reads as. The regular expression is global. */
+export interface Pattern {
 	re: RegExp;
 	/** Only at the very start of the prompt, as omp reads a command. */
 	leading?: true;
@@ -76,29 +77,34 @@ const PATTERNS: readonly Pattern[] = [
 	},
 ];
 
-/** Finds the references a composer shows as chips, with `promptTokens`' `open` and `leading`. */
+/**
+ * Finds the references in `text`, left to right and never overlapping. `open` is the caret while the user types: a
+ * reference ending there may still be written, as `/mo` on the way to `/move`, so it stays text. `leading` says `text`
+ * starts the prompt, where a command or skill may sit.
+ */
 export type Tokenize = (text: string, options?: { open?: number | null; leading?: boolean }) => PromptToken[];
 
-/**
- * The references in `text`, left to right and never overlapping. `open` is the caret while the user types: a reference
- * ending there may still be written, as `/mo` on the way to `/move`, so it stays text. `leading` says `text` starts the
- * prompt, where a command or skill may sit.
- */
-export function promptTokens(text: string, { open = null, leading = true }: { open?: number | null; leading?: boolean } = {}): PromptToken[] {
-	const found: PromptToken[] = [];
-	for (const pattern of PATTERNS) {
-		if (pattern.leading && !leading) continue;
-		pattern.re.lastIndex = 0;
-		for (let match = pattern.re.exec(text); match; match = pattern.re.exec(text)) {
-			const end = match.index + match[0].length;
-			if (end !== open) found.push({ ...pattern.token(match), start: match.index, end });
+/** The `Tokenize` that reads `patterns`; where two overlap, the earlier and then the longer wins. */
+export function tokenizer(patterns: readonly Pattern[]): Tokenize {
+	return (text, { open = null, leading = true } = {}) => {
+		const found: PromptToken[] = [];
+		for (const pattern of patterns) {
+			if (pattern.leading && !leading) continue;
+			pattern.re.lastIndex = 0;
+			for (let match = pattern.re.exec(text); match; match = pattern.re.exec(text)) {
+				const end = match.index + match[0].length;
+				if (end !== open) found.push({ ...pattern.token(match), start: match.index, end });
+			}
 		}
-	}
-	found.sort((a, b) => a.start - b.start || b.end - a.end);
-	const tokens: PromptToken[] = [];
-	for (const token of found) if (tokens.length === 0 || token.start >= tokens[tokens.length - 1].end) tokens.push(token);
-	return tokens;
+		found.sort((a, b) => a.start - b.start || b.end - a.end);
+		const tokens: PromptToken[] = [];
+		for (const token of found) if (tokens.length === 0 || token.start >= tokens[tokens.length - 1].end) tokens.push(token);
+		return tokens;
+	};
 }
+
+/** The references omp reads in a prompt. */
+export const promptTokens: Tokenize = tokenizer(PATTERNS);
 
 interface MdNode {
 	type: string;
