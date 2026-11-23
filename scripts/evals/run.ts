@@ -62,6 +62,7 @@ export interface ArmSummary {
 
 const FULL = "full";
 const CHECK_TIMEOUT_MS = 300_000;
+const DEFAULT_OUT = join(homedir(), ".cache", "omp-evals");
 
 export function arms(extensions: string[], skills: string[]): Arm[] {
 	return [
@@ -131,6 +132,8 @@ interface Options {
 	model: string;
 	maxCost: string;
 	maxTime: string;
+	/** `mcp:<server>` ids for every MCP server the user's omp configures: a run must not post to Slack or Linear, nor wait on their startup. */
+	noMcp: string[];
 }
 
 function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun: boolean): EvalRow {
@@ -139,9 +142,11 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 	const clone = prepare(options.repo, task.base, dir);
 	writeFileSync(join(dir, "prompt.md"), task.prompt);
 	const sessions = join(dir, "sessions");
-	const args = ["-p", "--model", options.model, "--config", pinnedConfig(options.model, dir, arm.disabled), "--session-dir", sessions, "--no-title"];
+	const config = pinnedConfig(options.model, dir, [...arm.disabled, ...options.noMcp]);
+	const args = ["-p", "--model", options.model, "--config", config, "--session-dir", sessions, "--no-title"];
 	args.push("--max-cost", options.maxCost, "--max-time", options.maxTime, task.prompt);
-	const { sandboxArgs, env } = confined(options.repo, dir, args);
+	// Hiding every eval folder keeps a run from copying another run's change, or a dry run's landed one, from its clone.
+	const { sandboxArgs, env } = confined(options.repo, dir, args, [options.out, DEFAULT_OUT]);
 	// The kit's extensions keep their state, such as the ship trace, under XDG_CONFIG_HOME; a run writes its own.
 	env.XDG_CONFIG_HOME = join(dir, "config");
 	const started = Date.now();
@@ -191,7 +196,7 @@ if (import.meta.main) {
 			model: { type: "string", default: "anthropic/claude-opus-5-5:auto" },
 			"disable-extensions": { type: "string", default: "" },
 			"disable-skills": { type: "string", default: "" },
-			out: { type: "string", default: join(homedir(), ".cache", "omp-evals") },
+			out: { type: "string", default: DEFAULT_OUT },
 			"max-cost": { type: "string", default: "5" },
 			"max-time": { type: "string", default: "30m" },
 			"dry-run": { type: "boolean", default: false },
@@ -210,7 +215,16 @@ if (import.meta.main) {
 	const only = values.only ? new Set(values.only.split(",")) : null;
 	const tasks = (JSON.parse(readFileSync(values.tasks, "utf8")) as EvalTask[]).filter(task => !only || only.has(task.id));
 	const list = (text: string) => text.split(",").filter(Boolean);
-	const options: Options = { repo, out, model: values.model, maxCost: values["max-cost"], maxTime: values["max-time"] };
+	const mcpFile = join(homedir(), ".omp", "agent", "mcp.json");
+	const mcpServers = existsSync(mcpFile) ? Object.keys((JSON.parse(readFileSync(mcpFile, "utf8")) as { mcpServers?: object }).mcpServers ?? {}) : [];
+	const options: Options = {
+		repo,
+		out,
+		model: values.model,
+		maxCost: values["max-cost"],
+		maxTime: values["max-time"],
+		noMcp: mcpServers.map(name => `mcp:${name}`),
+	};
 	const done = new Set(readRows(resultsFile).filter(row => !row.error).map(row => `${row.arm}\t${row.task}\t${row.run}\t${row.model}`));
 	const dryRows: EvalRow[] = [];
 	for (const arm of arms(list(values["disable-extensions"]), list(values["disable-skills"]))) {

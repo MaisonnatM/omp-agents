@@ -206,7 +206,7 @@ function replay(task: Task, model: string): Result | null {
 	args.push("--max-cost", values["max-cost"], "--max-time", values["max-time"], prompt);
 	const log = openSync(join(dir, "output.txt"), "w");
 	const started = Date.now();
-	const { sandboxArgs, env } = confined(task.repo, dir, args);
+	const { sandboxArgs, env } = confined(task.repo, dir, args, [out]);
 	const run = spawnSync("sandbox-exec", sandboxArgs, { cwd: clone, env, stdio: ["ignore", log, log] });
 	closeSync(log);
 	const minutes = (Date.now() - started) / 60_000;

@@ -15,7 +15,7 @@
 		"base": "5df3b138a14e946673d71896668c263ae2905a02",
 		"landed": "f8a071f13eb251633291510ae0d4a1a2a813847a",
 		"landedAt": "2026-11-23",
-		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nStart the Board empty instead of with demo data\n\n- `seed` becomes `emptyBoard`: one `general` channel and the user, no threads, messages, schedules, or demo members.\n\nUse emptyBoard in the Bot roster test\n\nMark Board test fixture changes\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { emptyBoard } from \"src/shared/board.ts\"\n",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nStart the Board empty instead of with demo data\n\n- `seed` becomes `emptyBoard`: one `general` channel and the user, no threads, messages, schedules, or demo members.\n\nUse emptyBoard in the Bot roster test\n\nMark Board test fixture changes\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { emptyBoard } from \"src/shared/board.ts\"\n\nThe tests also expect these names and texts, word for word:\n- \"c-general\"\n",
 		"hiddenTests": [
 			"src/server/board-wake.test.ts",
 			"web/components/board/module.test.ts"
@@ -27,7 +27,7 @@
 		"base": "50683c495383b4bc25f68dc741207e2892226a6b",
 		"landed": "d590abc67274c20011ba947db4ee82e5bf1d4b61",
 		"landedAt": "2026-11-23",
-		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nOpen the PRs and Linear tabs when a session with them opens\n\n- newIdsOnOpen remembers only the last session shown, so each open adds the tabs again\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { newIdsOnOpen } from \"web/details-tabs.ts\"\n",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nOpen the PRs and Linear tabs when a session with them opens\n\n- newIdsOnOpen remembers only the last session shown, so each open adds the tabs again\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { newIdsOnOpen } from \"web/details-tabs.ts\"\n\nThe tests also expect these names and texts, word for word:\n- \"newIdsOnOpen\"\n",
 		"hiddenTests": [
 			"web/details-tabs.test.ts"
 		],
@@ -60,7 +60,7 @@
 		"base": "f2694917688fdd88ec30a5cceeff0c30abb5a44c",
 		"landed": "33bab2482510432b635820377137453e658a9377",
 		"landedAt": "2026-11-20",
-		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nLet agents add a Todo section through user_todo\n\nApply thermonuclear review: findSection, pure sectionsOf, one-line section names, sections tests\n",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nLet agents add a Todo section through user_todo\n\nApply thermonuclear review: findSection, pure sectionsOf, one-line section names, sections tests\n\nThe tests also expect these names and texts, word for word:\n- \"add-section\"\n",
 		"hiddenTests": [
 			"src/server/todo-inbox.test.ts",
 			"templates/omp/extensions.test.ts"
@@ -83,7 +83,7 @@
 		"base": "8025343ff7dfc7eb5dd3e5fecab9539b1baae4d4",
 		"landed": "340af6e127e19f44705a4fac6a850bab41c3b3f9",
 		"landedAt": "2026-11-20",
-		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nPull requests: keep ask-human pull requests out of Approved\n",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nPull requests: keep ask-human pull requests out of Approved\n\nThe tests also expect these names and texts, word for word:\n- \"ask-human\"\n",
 		"hiddenTests": [
 			"src/pull-requests.test.ts",
 			"web/pull-requests-model.test.ts"
@@ -95,7 +95,7 @@
 		"base": "196b3357af58ea9790e49729af506d7f9642121b",
 		"landed": "8025343ff7dfc7eb5dd3e5fecab9539b1baae4d4",
 		"landedAt": "2026-11-19",
-		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nLet agents schedule follow-up sends to their own session\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { SessionFollowUps } from \"src/server/session-follow-ups.ts\"\n",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nLet agents schedule follow-up sends to their own session\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { SessionFollowUps } from \"src/server/session-follow-ups.ts\"\n\nThe tests also expect these names and texts, word for word:\n- \"schedule_follow_up\"\n- \"in_minutes\"\n",
 		"hiddenTests": [
 			"src/server/session-follow-ups.test.ts"
 		],
@@ -117,7 +117,7 @@
 		"base": "ccaa43b714ee49159a3ea7cbe8eb18244134b17f",
 		"landed": "b9b2ca3923bba3124d8e1fb0beb6daf61604eebb",
 		"landedAt": "2026-11-19",
-		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nOpen project memory in a side panel like Bookmarks\n\n- Project memory uses ListSplit instead of the Drawer sheet; Escape closes via memoryProjectClose.\n- Delete the now-unused Drawer component.\n\nNudge agents to record a project memory before ending a session\n\n- The project-memory extension blocks a session's first end_session once when it wrote no memory.\n",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nOpen project memory in a side panel like Bookmarks\n\n- Project memory uses ListSplit instead of the Drawer sheet; Escape closes via memoryProjectClose.\n- Delete the now-unused Drawer component.\n\nNudge agents to record a project memory before ending a session\n\n- The project-memory extension blocks a session's first end_session once when it wrote no memory.\n\nThe tests also expect these names and texts, word for word:\n- \"memoryProjectClose\"\n",
 		"hiddenTests": [
 			"templates/omp/project-memory.test.ts",
 			"web/shortcuts.test.ts"
@@ -140,7 +140,7 @@
 		"base": "ac60371efc4933c5b67ff05686e275ff51b0c8b8",
 		"landed": "ad2c11024bd2dba94d543fc8a9e196a11fce5b9e",
 		"landedAt": "2026-11-19",
-		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nNudge Claude to batch tool calls and widen heavy slots\n\n- agent-pace extension appends elapsed time and Anthropic's batching nudge to tool-results messages\n- heavy.py defaults to a third of CPU cores\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { NUDGE, PaceNotes } from \"templates/omp/agent/extensions/agent-pace/notes.ts\"\n",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nNudge Claude to batch tool calls and widen heavy slots\n\n- agent-pace extension appends elapsed time and Anthropic's batching nudge to tool-results messages\n- heavy.py defaults to a third of CPU cores\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { NUDGE, PaceNotes } from \"templates/omp/agent/extensions/agent-pace/notes.ts\"\n\nThe tests also expect these names and texts, word for word:\n- \"pace\"\n",
 		"hiddenTests": [
 			"templates/omp/agent-pace.test.ts"
 		],
@@ -200,7 +200,7 @@
 		"base": "0714c91d14b897f5d01ca7e5e2ba85656827fe9d",
 		"landed": "2f0d0029d276ae0525305347954f619cad857c5e",
 		"landedAt": "2026-11-16",
-		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nStop an idle session's omp after a setting's hours, keeping its worktree\n\nDefault the idle session stop to 12 hours\n",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nStop an idle session's omp after a setting's hours, keeping its worktree\n\nDefault the idle session stop to 12 hours\n\nThe tests also expect these names and texts, word for word:\n- \"stopIdleSessionsAfterHours\"\n- \"stopsWhenIdle\"\n- \"lastWrittenAt\"\n",
 		"hiddenTests": [
 			"src/server/process-settings-file.test.ts",
 			"src/server/session-processes.test.ts"
@@ -212,7 +212,7 @@
 		"base": "c60da41e948aa4dfdb58cb5df89ac3a81c221d2d",
 		"landed": "00e1d91994ce39f26e94bd4e774e4b5768996225",
 		"landedAt": "2026-11-16",
-		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nHeader tabs: Duplicate tab, Copy URL, Close tabs to the right\n\nThe tab menu now lists Capy's items in its order. Duplicate tab copies a\ntab right after it, a pinned one's copy first of the unpinned; a session\nmay then show in two tabs, and going to it from the copy stays there.\nCopy URL, and Cmd+L for the tab on screen, copy its dashboard address.\nClose tabs to the right keeps pinned tabs.\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { closeRightHeaderTabs, duplicateHeaderTab } from \"web/header-tabs.ts\"\n",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nHeader tabs: Duplicate tab, Copy URL, Close tabs to the right\n\nThe tab menu now lists Capy's items in its order. Duplicate tab copies a\ntab right after it, a pinned one's copy first of the unpinned; a session\nmay then show in two tabs, and going to it from the copy stays there.\nCopy URL, and Cmd+L for the tab on screen, copy its dashboard address.\nClose tabs to the right keeps pinned tabs.\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { closeRightHeaderTabs, duplicateHeaderTab } from \"web/header-tabs.ts\"\n\nThe tests also expect these names and texts, word for word:\n- \"copyTabUrl\"\n- \"closeRightHeaderTabs\"\n- \"duplicateHeaderTab\"\n",
 		"hiddenTests": [
 			"web/header-tabs.test.ts",
 			"web/shortcuts.test.ts"

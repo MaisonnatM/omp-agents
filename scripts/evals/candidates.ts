@@ -3,7 +3,8 @@
  * added or changed root `bun test` files becomes a prompt, its base, and a hidden check, the tests the landing brought.
  *
  * - The prompt is the branch's commit messages, plus the imports the hidden tests make of names the base lacks,
- *   so a run is not failed for naming a new function differently.
+ *   so a run is not failed for naming a new function differently, and the other names and texts the tests share with
+ *   the change and the base lacks, such as a setting's key, a tool parameter, or an error message.
  * - A landing is left out when it touches `desktop/` or dependencies, changes more than 300 non-test, non-doc lines,
  *   brings more than 3 test files, or its messages run past 4000 characters.
  * - `--verify` keeps a task only when its hidden check fails at the base and passes at the landed commit, run in one
@@ -62,12 +63,26 @@ export function exportsName(source: string, name: string): boolean {
 	);
 }
 
-/** The prompt for a landing: its commit messages, then the imports of names the base does not export yet. */
-export function buildPrompt(messages: string, missing: { module: string; names: string[] }[]): string {
+/**
+ * Names and quoted texts in `tests`: words of 4 or more characters, and string literals without interpolation that
+ * start with a word character and end with one or with sentence punctuation, which leaves out a template's fragments.
+ */
+export function testTerms(tests: string): { names: Set<string>; texts: Set<string> } {
+	const names = new Set([...tests.matchAll(/(?<![\w$])[A-Za-z_$][\w$]{3,}/g)].map(([name]) => name));
+	const literals = [...tests.matchAll(/(["'`])((?:(?!\1|\$\{)[^\\\n]|\\.){8,}?)\1/g)].map(match => match[2]!);
+	return { names, texts: new Set(literals.filter(text => /^\w(.*[\w.!?)])?$/.test(text))) };
+}
+
+/** The prompt for a landing: its commit messages, then the imports of names the base does not export yet, then other new names and texts. */
+export function buildPrompt(messages: string, missing: { module: string; names: string[] }[], terms: string[] = []): string {
 	const lines = ["Make this change in the repository in the current directory. Its author described it in these commit messages:", "", messages.trim()];
 	if (missing.length > 0) {
 		lines.push("", "Tests will check it through these imports, so give the new code these names and paths:");
 		for (const { module, names } of missing) lines.push(`- import { ${names.join(", ")} } from "${module}"`);
+	}
+	if (terms.length > 0) {
+		lines.push("", "The tests also expect these names and texts, word for word:");
+		for (const term of terms) lines.push(`- ${JSON.stringify(term)}`);
 	}
 	return `${lines.join("\n")}\n`;
 }
@@ -100,6 +115,21 @@ function missingImports(repo: string, base: string, landed: string, hidden: stri
 	return missing;
 }
 
+/**
+ * Names and texts the hidden tests use that the landed change adds outside tests and docs and the base never has,
+ * such as a setting's key, a tool parameter, or an error message; imported names are left to `missingImports`.
+ */
+function newTerms(repo: string, base: string, landed: string, hidden: string[], imported: Set<string>): string[] {
+	const { names, texts } = testTerms(hidden.map(test => show(repo, landed, test) ?? "").join("\n"));
+	const added = git(repo, "diff", "--no-renames", "-U0", base, landed, "--", ".", ...hidden.map(path => `:!${path}`), ":!docs", ":!*.md")
+		.split("\n")
+		.filter(line => line.startsWith("+") && !line.startsWith("+++"))
+		.join("\n");
+	const addedWords = new Set(added.match(/[A-Za-z_$][\w$]*/g));
+	const fresh = new Set([...[...names].filter(name => !imported.has(name) && addedWords.has(name)), ...[...texts].filter(text => added.includes(text))]);
+	return [...fresh].filter(term => !sh(`git grep -q -F ${/^[\w$]+$/.test(term) ? "-w " : ""}-e "$TERM" ${base}`, repo, { TERM: term }).ok);
+}
+
 export function candidates(repo: string, scan: number): EvalTask[] {
 	const tasks: EvalTask[] = [];
 	const rows = git(repo, "log", "--first-parent", "main", "--merges", `-n${scan}`, "--format=%H%x09%P%x09%cs%x09%s").split("\n").filter(Boolean);
@@ -126,12 +156,14 @@ export function candidates(repo: string, scan: number): EvalTask[] {
 			.join("\n")
 			.replace(/\n{3,}/g, "\n\n");
 		if (!messages.trim() || messages.length > MAX_MESSAGE_CHARS) continue;
+		const imports = missingImports(repo, base, landed, hidden);
+		const terms = newTerms(repo, base, landed, hidden, new Set(imports.flatMap(({ names }) => names)));
 		tasks.push({
 			id: branch,
 			base,
 			landed,
 			landedAt,
-			prompt: buildPrompt(messages, missingImports(repo, base, landed, hidden)),
+			prompt: buildPrompt(messages, imports, terms),
 			hiddenTests: hidden,
 			check: `bun test ${hidden.map(path => `./${path}`).join(" ")}`,
 		});
