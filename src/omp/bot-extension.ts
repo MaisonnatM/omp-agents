@@ -1,7 +1,8 @@
-// omp-agents Bots: gives a Bot's session its name, job, memory, routines, and the other Bots on every turn, the
-// `remember` tool, the one writer of that memory, the `set_job` tool, which asks the dashboard to change the Bot's job,
-// the `save_routine` and `delete_routine` tools, which ask it to change the Bot's own routines, the `message_bot`
-// tool, which asks it to message another Bot, and the `stay_quiet` tool, which ends a turn without marking it unread.
+// omp-agents Bots: tells a Bot's session how a Bot works in its system prompt, and its name, job, memory, routines, and
+// the other Bots in a hidden message whenever they changed, the `remember` tool, the one writer of that memory, the
+// `set_job` tool, which asks the dashboard to change the Bot's job, the `save_routine` and `delete_routine` tools, which
+// ask it to change the Bot's own routines, the `message_bot` tool, which asks it to message another Bot, and the
+// `stay_quiet` tool, which ends a turn without marking it unread.
 // The dashboard loads it with `omp -e` and the flags in `BOT_FLAGS` for a Bot's session only (`Bots.join` in
 // src/server/bots.ts), so no other session reads it.
 import { randomUUID } from "node:crypto";
@@ -43,7 +44,7 @@ export const BOT_FLAGS = {
 /** What `save_routine` takes: `id` names one of the Bot's routines to change, and every field left out keeps its value; without `id` it creates one. */
 export type SaveRoutineParams = Partial<Omit<RoutineSpec, "botId">>;
 
-/** How much of a routine's prompt or command its line in the system prompt shows. */
+/** How much of a routine's prompt or command its line in the Bot's state shows. */
 const TASK_PREVIEW_LENGTH = 80;
 
 /** `routine` as one short line: its fields as `save_routine` takes them, then its task's kind and the start of its prompt or command. */
@@ -55,6 +56,19 @@ function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSp
 
 const APPLIES = "The dashboard applies it, and while the dashboard is stopped the change waits for it.";
 const NO_ROUTINES = "This session is not an omp-agents Bot, so it has no routines.";
+
+/** The first line of the hidden message that carries the Bot's state, which the system prompt names. */
+const STATE_HEADING = "# omp-agents Bot state";
+const STATE_MESSAGE_TYPE = "omp-agents.bot-state";
+
+/** What a Bot's system prompt adds: the same bytes every turn of every Bot, so the prompt cache keeps hitting. */
+const BOT_RULES = [
+	"You are an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.",
+	`The newest message that starts with \`${STATE_HEADING}\` holds your name, your job, what you remember, your routines, and the other Bots as they are now; a new one comes whenever any of them changes.`,
+	"When the user tells you something worth keeping across turns, such as a preference, a decision, or a fact about the work, call `remember` with it as one short sentence.",
+	"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create one, or to change one with its `id` and only the fields that change, and `delete_routine` to delete one.",
+	`Call \`${MESSAGE_BOT_TOOL}\` to hand another Bot work that is its job. A message whose last line starts with \`${BOT_MESSAGE_STAMP.trimEnd()}\` comes from the Bot that line names, not the user, and your reply in this conversation does not reach it. Call \`${MESSAGE_BOT_TOOL}\` with its id only when you have a result or a question to send back, and never answer a message that needs no answer, such as thanks or an acknowledgment.`,
+].join("\n");
 
 /** A Bot's session as its flags name it: the Bot, its `bots.json` and `memory.md`, and its inboxes and `routines.json`, `null` when the dashboard passed none. */
 interface ThisBot {
@@ -94,33 +108,46 @@ export default function botExtension(pi: ExtensionApi): void {
 		return value.routines.flatMap(entry => parseRoutineSpec(entry)?.ok ?? []).filter(routine => routine.botId === botId);
 	};
 
-	pi.on("before_agent_start", (event, ctx) => {
-		const me = thisBot();
-		if (ctx.agent.kind === "sub" || !me) return undefined;
+	/** The Bot's state as its files hold it now, or `null` when `bots.json` no longer has the Bot. */
+	const botState = (me: ThisBot): string | null => {
 		const bots = readBots(me);
 		const bot = bots.find(bot => bot.id === me.botId);
-		if (!bot) return undefined;
+		if (!bot) return null;
 		const others = bots.filter(other => other.id !== me.botId);
 		const routines = ownRoutines(me);
-		const prompt = [
-			`You are ${bot.name}, an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.`,
+		return [
+			STATE_HEADING,
+			`You are ${bot.name}.`,
 			"Your job, and what you ask before doing:",
 			bot.job.trim() || "No job yet. Ask the user what it is, and what you should ask before doing, then call `set_job` with what they say.",
 			"What you remember from earlier turns:",
 			...memoryLines(me.memoryPath),
-			"When the user tells you something worth keeping across turns, such as a preference, a decision, or a fact about the work, call `remember` with it as one short sentence.",
 			`Your routines, one per line: its fields as \`save_routine\` takes them, then its task's kind and its prompt or command, cut at ${TASK_PREVIEW_LENGTH} characters:`,
 			...(routines.length > 0 ? routines.map(routineLine) : ["None yet."]),
-			"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create one, or to change one with its `id` and only the fields that change, and `delete_routine` to delete one.",
 			"The other Bots, one per line: its id, name, and kind, then its job's first sentence:",
 			...(others.length > 0 ? others.map(({ id, name, kind, job }) => `${JSON.stringify({ id, name, kind })} ${jobLine(job) || "No job yet."}`) : ["None yet."]),
-			`Call \`${MESSAGE_BOT_TOOL}\` to hand another Bot work that is its job. A message whose last line starts with \`${BOT_MESSAGE_STAMP.trimEnd()}\` comes from the Bot that line names, not the user, and your reply in this conversation does not reach it. Call \`${MESSAGE_BOT_TOOL}\` with its id only when you have a result or a question to send back, and never answer a message that needs no answer, such as thanks or an acknowledgment.`,
 		].join("\n");
-		return { systemPrompt: [...event.systemPrompt, prompt] };
+	};
+
+	// Read on every turn, so a saved job, fact, or routine reaches the next one, but sent only when it changed: the
+	// conversation already holds the last one, and the system prompt stays the same bytes.
+	let sent = "";
+	pi.on("before_agent_start", (event, ctx) => {
+		const me = thisBot();
+		if (ctx.agent.kind === "sub" || !me) return undefined;
+		const systemPrompt = [...event.systemPrompt, BOT_RULES];
+		const state = botState(me);
+		if (state === null || state === sent) return { systemPrompt };
+		sent = state;
+		return { systemPrompt, message: { customType: STATE_MESSAGE_TYPE, content: state, display: false } };
+	});
+	// Compaction drops the last state from the conversation, so the next turn sends it again.
+	pi.on("session_compact", () => {
+		sent = "";
 	});
 
 	pi.registerTool(
-		rememberTool(pi, `Adds one fact to this Bot's memory, which every later turn's system prompt carries. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`, async () => {
+		rememberTool(pi, `Adds one fact to this Bot's memory, which reaches every later turn. Use one short sentence that stays true, at most ${MAX_FACT_LENGTH} characters.`, async () => {
 			const memoryPath = thisBot()?.memoryPath;
 			if (!memoryPath) throw new Error("This session is not an omp-agents Bot, so it has no memory.");
 			return memoryPath;
@@ -130,7 +157,7 @@ export default function botExtension(pi: ExtensionApi): void {
 	pi.registerTool<{ job: string }>({
 		name: "set_job",
 		label: "Set job",
-		description: `Replaces this Bot's job, which every later turn's system prompt carries and the user sees in the Bot's Job field: Markdown on what the Bot does and what it asks before doing, at most ${MAX_JOB_LENGTH} characters. An empty job clears it.`,
+		description: `Replaces this Bot's job, which reaches every later turn and the user sees in the Bot's Job field: Markdown on what the Bot does and what it asks before doing, at most ${MAX_JOB_LENGTH} characters. An empty job clears it.`,
 		parameters: pi.typebox.Type.Object({ job: pi.typebox.Type.String({ description: "The whole job, as Markdown; empty to clear it.", maxLength: MAX_JOB_LENGTH }) }),
 		loadMode: "essential",
 		approval: "write",
@@ -172,7 +199,7 @@ export default function botExtension(pi: ExtensionApi): void {
 		name: "save_routine",
 		label: "Save routine",
 		description:
-			"Creates one of this Bot's routines, or changes one. To change a routine, pass its `id` from the system prompt and only the fields that change; the rest keep their values. To create one, leave out `id` and pass a `name`, a `task`, and at least one schedule or trigger. The user sees it under the Bot's Routines.",
+			"Creates one of this Bot's routines, or changes one. To change a routine, pass its `id` from your Bot state and only the fields that change; the rest keep their values. To create one, leave out `id` and pass a `name`, a `task`, and at least one schedule or trigger. The user sees it under the Bot's Routines.",
 		parameters: Type.Object({
 			id: Type.Optional(Type.String({ minLength: 1, description: "The id of one of your routines, to change it; omit it to create a routine." })),
 			name: Type.Optional(Type.String({ minLength: 1, description: "A short name the user knows the routine by; a new routine needs one." })),
@@ -208,7 +235,7 @@ export default function botExtension(pi: ExtensionApi): void {
 	pi.registerTool<{ id: string }>({
 		name: "delete_routine",
 		label: "Delete routine",
-		description: "Deletes one of this Bot's routines, by its id from the system prompt.",
+		description: "Deletes one of this Bot's routines, by its id from your Bot state.",
 		parameters: Type.Object({ id: Type.String({ minLength: 1, description: "The id of one of your routines." }) }),
 		loadMode: "essential",
 		approval: "write",
@@ -225,7 +252,7 @@ export default function botExtension(pi: ExtensionApi): void {
 	pi.registerTool<{ to: string; text: string }>({
 		name: MESSAGE_BOT_TOOL,
 		label: "Message Bot",
-		description: `Sends a message to another omp-agents Bot, by its id from the system prompt. It wakes that Bot, which reads it as from you, not the user, and can answer later with its own message. Write it whole, with what the other Bot needs to know, as Markdown of at most ${MAX_BOT_MESSAGE_LENGTH} characters.`,
+		description: `Sends a message to another omp-agents Bot, by its id from your Bot state. It wakes that Bot, which reads it as from you, not the user, and can answer later with its own message. Write it whole, with what the other Bot needs to know, as Markdown of at most ${MAX_BOT_MESSAGE_LENGTH} characters.`,
 		parameters: Type.Object({
 			to: Type.String({ minLength: 1, description: "The id of the Bot to message." }),
 			text: Type.String({ minLength: 1, maxLength: MAX_BOT_MESSAGE_LENGTH, description: "The message, as Markdown; it cannot start with ! or /." }),
@@ -237,7 +264,7 @@ export default function botExtension(pi: ExtensionApi): void {
 			if (!me?.botInbox) throw new Error("This session is not an omp-agents Bot, so it cannot message Bots.");
 			if (to === me.botId) throw new Error("You cannot message yourself.");
 			const recipient = readBots(me).find(bot => bot.id === to);
-			if (!recipient) throw new Error(`No Bot has id ${to}; the system prompt lists the other Bots.`);
+			if (!recipient) throw new Error(`No Bot has id ${to}; your Bot state lists the other Bots.`);
 			const message = parseBotMessageText(text);
 			if (!message) throw new Error(`text must not be empty, must be at most ${MAX_BOT_MESSAGE_LENGTH} characters, and cannot start with ! or /, which would run as a command in the other Bot's session.`);
 			inbox<BotMessageRequest>(me.botInbox).leave({ botId: me.botId, message: { to: recipient.id, text: message } });

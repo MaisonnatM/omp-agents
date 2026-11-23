@@ -1,7 +1,8 @@
 /** The left sidebar's Board mode: the inbox, schedules, channels, and members, in the Sessions list's rows. */
-import { IconBell, IconCalendar1, IconHashtag, IconLock } from "central-icons";
-import { useMemo, type ReactNode } from "react";
-import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { IconBell, IconCalendar1, IconHashtag, IconLock, IconPlusSmall } from "central-icons";
+import { useMemo, useState, type ReactNode } from "react";
+import { SidebarGroup, SidebarGroupAction, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { IconComponent } from "@/lib/icon-context";
 import type { RosterHost } from "../../../src/shared/sessions";
 import type { Bot } from "../../../src/shared/bots";
@@ -9,7 +10,8 @@ import { type BoardState, boardMembers, type Member, queueOf, unreadIn } from ".
 import { CountPill } from "../count-pill";
 import { hashForPage } from "../../routing";
 import { type BoardRoute, type BoardView, resolveBoardView } from "./module";
-import { Avatar, relTime, useNow } from "./parts";
+import { useDashboardActions } from "../dashboard-context";
+import { Avatar, NameDialog, relTime, useNow } from "./parts";
 
 /** The Board's own list, which the left sidebar shows in its Board mode; `route` is the route the Board shows, and nothing renders until its state loads. */
 export function BoardNav({ state, hosts, bots, route }: { state: BoardState | null; hosts: RosterHost[]; bots: Bot[] | null; route: BoardRoute }) {
@@ -21,7 +23,17 @@ export function BoardNav({ state, hosts, bots, route }: { state: BoardState | nu
 	return <Rail state={state} members={members} me={me} now={now} inboxCount={queueOf(state, me).length} view={view} onView={next => (location.hash = hashForPage({ kind: "board", view: next, thread: null }))} />;
 }
 
+/** A channel's name as the rail shows it after `#`: lower case, words joined by hyphens. */
+const channelName = (typed: string) => typed.toLowerCase().replace(/^#+/, "").replace(/\s+/g, "-");
+
 function Rail({ state, members, view, onView, me, now, inboxCount }: { state: BoardState; members: Member[]; view: BoardView; onView: (view: BoardView) => void; me: Member; now: number; inboxCount: number }) {
+	const { changeModule } = useDashboardActions();
+	const [naming, setNaming] = useState(false);
+	function createChannel(typed: string) {
+		const id = `c-${crypto.randomUUID()}`;
+		void changeModule("board", { op: "channel", channel: { id, name: channelName(typed), about: "", sync: null, restricted: false } });
+		onView({ kind: "channel", id });
+	}
 	const sel = (other: BoardView) => view.kind === other.kind && ("id" in view ? "id" in other && view.id === other.id : true);
 	const humans = members.filter(member => member.kind === "human");
 	// Named agents, Bots, and bots, then the omp sessions on the board, which carry a session id.
@@ -50,7 +62,16 @@ function Rail({ state, members, view, onView, me, now, inboxCount }: { state: Bo
 					onClick={() => onView({ kind: "scheduled" })}
 				/>
 			</RailGroup>
-			<RailGroup label="Channels">
+			<RailGroup
+				label="Channels"
+				action={
+					<Tooltip content="New channel" side="bottom">
+						<SidebarGroupAction aria-label="New channel" onClick={() => setNaming(true)}>
+							<IconPlusSmall />
+						</SidebarGroupAction>
+					</Tooltip>
+				}
+			>
 				{state.channels.map(channel => (
 					<RailRow
 						key={channel.id}
@@ -66,14 +87,24 @@ function Rail({ state, members, view, onView, me, now, inboxCount }: { state: Bo
 			<RailGroup label="People">{humans.map(memberRow)}</RailGroup>
 			<RailGroup label="Agents">{agents.map(memberRow)}</RailGroup>
 			{sessions.length > 0 && <RailGroup label="Sessions">{sessions.map(memberRow)}</RailGroup>}
+			{naming && (
+				<NameDialog
+					title="New channel"
+					label="Channel name"
+					refuse={typed => (state.channels.some(channel => channel.name === channelName(typed)) ? `#${channelName(typed)} already exists.` : null)}
+					onSave={createChannel}
+					onClose={() => setNaming(false)}
+				/>
+			)}
 		</nav>
 	);
 }
 
-function RailGroup({ label, children }: { label?: string; children: ReactNode }) {
+function RailGroup({ label, action, children }: { label?: string; action?: ReactNode; children: ReactNode }) {
 	return (
 		<SidebarGroup className={label ? "pt-4 pb-1" : "py-1"}>
 			{label && <SidebarGroupLabel>{label}</SidebarGroupLabel>}
+			{action}
 			<SidebarMenu className="gap-px">{children}</SidebarMenu>
 		</SidebarGroup>
 	);

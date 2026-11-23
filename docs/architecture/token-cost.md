@@ -62,20 +62,17 @@ Cache writes by cause, from consecutive requests of one session:
   `pr_description` and `project_memory` stay, since subagents call them.
 - **`skill://Poteto Mode` no longer fails 37 times per 14 days.** pstack renamed its skill `poteto-mode`, and the kit's alias still told agents the old name; it now says that `skill://poteto-mode` opens pstack's file.
 - **The baseline is one command.** `scripts/token-audit/report.ts` prints every table above, and `scripts/token-audit/dump-request.ts` writes each request omp sends so the report can size it.
-- **Editing workers run on the `task` role, Sonnet in the kit's config.** `poteto-agent` reads `@task`, like the bundled `task` agent, and the kit sets `task` to `anthropic/claude-sonnet-5-5:auto`, half Opus's price per token; the planning session stays on `default`.
-  It is not evaluated yet: replay worker prompts as [Worker model replay](#worker-model-replay) says, and set `task` back to Opus if Sonnet keeps the checks less often or loses more judge verdicts than it wins.
-  An existing config keeps its `task` role, since the installer leaves keys you set; `~/.omp/agent/docs/model-routing.md` says when a spawn passes Opus instead.
-- **The todos note left the system prompt.** `todos.ts` appended a session's open todos to the system prompt at every prompt, so a `user_todo` call changed the prompt's digest and the next request wrote the system head and the whole conversation again; it now sends the note as a conversation message only when it changed.
-  Over the 14 days to 2026-11-23, 168 main-session digest changes had a following request, 75 of them within the hour, while the old prefix was still cached; the 6 that followed a `user_todo` call wrote 0.59M tokens, about $3, and 5 after a Bot's `remember`, `save_routine`, or `set_job` call wrote 0.37M, about $2.
-  The rest follow causes the kit does not own: a restart (28, 2.9M tokens), `/move` (13, 1.1M), or none the session file records (20, 1.6M); main-session cache hit was 94.7% and subagent 95.5% over the same days.
+- **A Bot's system prompt no longer changes from turn to turn.** The Bot extension used to put the Bot's name, job, memory, routines, and the other Bots in the system prompt, read again each turn, so every `remember` or saved routine rewrote the cached head of the next request.
+  The system prompt now holds only rules that are the same for every Bot, and the changing part comes as a hidden message sent only when it changed and again after compaction, as `todos.ts` sends a session's todos; see [Bots](bots.md).
 
 ## Proposals
 
-Ranked by expected saving; none is applied, because each needs an evaluation of quality the repository does not have yet.
+Ranked by expected saving; each needs an evaluation of quality the repository does not have yet.
+The worker-model proposal is applied in part: the kit's `poteto-worker` agent runs fully specified edits on `anthropic/claude-sonnet-5-5:medium`, while `poteto-agent` and `task` stay on the session's model until the replay below backs a wider swap.
 
 | Proposal | Saving per 14 days | Risk | Owner |
 | --- | --- | --- | --- |
-| Run `poteto-agent` and `task` workers on a cheaper code model, keeping Opus for planning and review | about $400 if half of their $1005 moves to a model at a fifth of the price | worse code, more turns | applied in the kit's `config.yml`, unevaluated; see Changes made |
+| Run `poteto-agent` and `task` workers on a cheaper code model, keeping Opus for planning and review | about $400 if half of their $1005 moves to a model at a fifth of the price | worse code, more turns | the user's `task.agentModelOverrides` |
 | Fewer, smaller worker turns: workers average 120 requests at 108k tokens | unknown until measured | lost context | pstack prompts, `task.agentCompactionThresholdOverrides` |
 | Resolve an edit's relative path to the checkout its hash came from, and stop stale-anchor edits | about $35 from 885 failed edits at 12 to 16% | none for users | omp's edit tool |
 | Give an agent file a skill allow-list, so a scout skips the 9.5k-char skill list | about $19 | an agent misses a skill it needed | omp's task executor |

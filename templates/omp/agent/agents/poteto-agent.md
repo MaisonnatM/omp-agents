@@ -1,7 +1,6 @@
 ---
 name: poteto-agent
-description: Delegate for code-writing and helper tasks spawned during a `/poteto-mode` run, on the `task` role model, cheaper than the planner's. Spawn a fresh one for each new task. Before any work, reads `~/.omp/agent/skills/poteto-mode/SKILL.md` in full, including the pstack file it names. Substituting another agent skips that read and drifts.
-model: "@task"
+description: Delegate for code-writing and helper tasks spawned during a `/poteto-mode` run, on the parent's model. Spawn a fresh one for each new task. Before any work, reads `~/.omp/agent/skills/poteto-mode/SKILL.md` in full, including the pstack file it names. Substituting another agent skips that read and drifts.
 ---
 
 # Poteto subagent

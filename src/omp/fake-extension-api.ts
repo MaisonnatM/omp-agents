@@ -19,9 +19,14 @@ export function loadExtension(extension: (pi: ExtensionApi) => void, flags: Read
 	return {
 		/** Fires `session_start`, as omp does once the session is ready, from a session in `at`. */
 		start: async (at = cwd): Promise<void> => (handlers.get("session_start") as StartHandler | undefined)?.({}, { cwd: at }),
+		/** What a turn of a `kind` agent in `at` starts with: the system prompt after the base prompt, and the message it adds, if any. */
+		turn: async (kind: "main" | "sub" = "main", at = cwd): Promise<PromptChange | undefined> =>
+			(handlers.get("before_agent_start") as PromptHandler)({ systemPrompt: ["base"] }, { cwd: at, agent: { kind } }),
 		/** The system prompt a turn of a `kind` agent in `at` starts with, after the base prompt. */
 		prompt: async (kind: "main" | "sub" = "main", at = cwd): Promise<string[] | undefined> =>
 			(await (handlers.get("before_agent_start") as PromptHandler)({ systemPrompt: ["base"] }, { cwd: at, agent: { kind } }))?.systemPrompt,
+		/** Fires `session_compact`, as omp does once compaction replaced the conversation. */
+		compact: (): void => (handlers.get("session_compact") as (() => void) | undefined)?.(),
 		/** The tools the extension registered so far, by name. */
 		tools: () => [...tools.keys()],
 		call: <Params>(name: string, params: Params, at = cwd) => tools.get(name)!.execute("call-1", params, undefined, undefined, { cwd: at, sessionManager: { getSessionId: () => sessionId } }),

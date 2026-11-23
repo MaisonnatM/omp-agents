@@ -6,13 +6,17 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-23
 
 - A new eval set replays 20 real past tasks to check that harness changes help, and can switch off one part at a time to see which parts still matter.
-- `bun run metrics` shows the cost per landed change, how often a land passes on the first try, how often agents rightly asked for help, and how much you edited after them.
-- The safety checks are now tested against 50 real past commands, so a rule change that blocks the wrong thing shows up.
-- Small changes in /ship can skip the design and code-quality reviews, and editing helpers run on a cheaper model while the planner keeps the stronger one.
-- Agent instructions now keep the parts that change from turn to turn at the end, so more of each request is reused from cache.
+- The safety checks are now tested against 50 real past commands, so a rule change that blocks the wrong thing shows up; this caught a way around the git hooks check and a missed warning when reading pull request text in a loop, both now fixed.
+- /ship now skips the plan contest and both code reviews for a small change, up to 50 changed lines in 3 files that touch no shared or schema file, so quick fixes ship faster and cost less.
+- Edits the plan already spelled out now go to a cheaper worker agent, while planning, design calls, and reviews stay on the strongest model.
+- Behind the scenes: the note about a session's todos now comes as a message instead of changing the agent's standing instructions, so those instructions stay the same in every session and are read from the cache, which costs less.
+- Behind the scenes: a Bot's name, job, memory, and routines now come as a message whenever they change, instead of rewriting the Bot's standing instructions every turn, so those instructions are read from the cache, which costs less.
+- Behind the scenes: a new metrics report shows, week by week, what each landed change cost, how often /ship steps pass, how often asking for help was worth it, and how often a person had to fix agent work afterwards.
 - /ship now checks that each step left the details the next step needs, and it reuses an existing pull request, Linear link, or Slack post instead of making a second one.
 - Independent checks and reviews now run side by side, and agents get a simple rule for how many helpers to start for a task.
 - Text from issues, pull request comments, and web pages is now read by a helper that cannot run any tools, so instructions hidden in that text cannot make an agent act.
+- Board: you can now create channels, with the + beside Channels in the sidebar, and threads, with New thread at the top of a channel; before, an empty Board had nothing to post in.
+- Board: the `board` tool can now open a thread in a channel, with an optional first message, so agents can start threads too.
 - A new Board starts empty, with one `general` channel, instead of demo channels, threads, and members.
 - /ship now refuses to open or ready a pull request until the agent has run the tests after its last edit, and for a bug fix, until the failing test was committed before the fix.
 - Reviewers now answer with one "blocking" or "approve" line per goal of the change, then at most five short findings.

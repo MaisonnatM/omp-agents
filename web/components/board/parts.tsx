@@ -1,8 +1,43 @@
-/** The pieces the Board's page and its sidebar list share: times, a ticking clock, and member avatars. */
+/** The pieces the Board's page and its sidebar list share: times, a ticking clock, member avatars, and the dialog that names a new channel or thread. */
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Member } from "../../../src/shared/board";
 import { BotAvatar } from "../bots/bot-avatar";
+import { useDashboardStatus } from "../dashboard-context";
+import { FormDialog, FormDialogHeader } from "../form-dialog";
+import { FIELD } from "../form-field";
+
+/** Asks for one name, such as a new channel's or a new thread's title, and hands it trimmed to `onSave`; `refuse` says why a name cannot be used. */
+export function NameDialog({ title, label, refuse, onSave, onClose }: { title: string; label: string; refuse?: (name: string) => string | null; onSave: (name: string) => void; onClose: () => void }) {
+	const { connected } = useDashboardStatus();
+	const [name, setName] = useState("");
+	const trimmed = name.trim();
+	const refused = trimmed ? (refuse?.(trimmed) ?? null) : null;
+	const ready = trimmed !== "" && refused === null && connected;
+	return (
+		<FormDialog busy={false} onClose={onClose} className="top-[20%] w-[min(24rem,calc(100vw-2rem))]">
+			<FormDialogHeader title={title} busy={false} />
+			<form
+				className="flex flex-col gap-3 px-4 pt-3 pb-4"
+				onSubmit={event => {
+					event.preventDefault();
+					if (!ready) return;
+					onSave(trimmed);
+					onClose();
+				}}
+			>
+				<input aria-label={label} autoFocus placeholder={label} value={name} onChange={event => setName(event.target.value)} className={cn(FIELD, "h-8 w-full")} />
+				{refused && <p className="text-xs text-red-600 dark:text-red-400">{refused}</p>}
+				<div className="flex justify-end">
+					<Button type="submit" size="compact" disabled={!ready}>
+						Create
+					</Button>
+				</div>
+			</form>
+		</FormDialog>
+	);
+}
 
 export const MIN = 60_000;
 export const UNITS: Record<string, number> = { m: MIN, h: 60 * MIN, d: 24 * 60 * MIN };

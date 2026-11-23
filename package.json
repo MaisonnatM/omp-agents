@@ -7,7 +7,7 @@
     "start": "bun src/server.ts",
     "desktop": "bun install --cwd desktop --frozen-lockfile && bun run --cwd desktop start",
     "lint": "biome lint",
-    "metrics": "bun scripts/metrics.ts",
+    "metrics": "bun scripts/harness-metrics.ts",
     "omp-release": "bun scripts/omp-release.ts",
     "omp-template": "bun templates/omp/install.ts",
     "prepare": "git config core.hooksPath .githooks",
