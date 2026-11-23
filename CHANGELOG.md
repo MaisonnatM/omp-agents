@@ -8,6 +8,8 @@ The dashboard shows the same lines in Settings › What's new.
 - /ship now checks that each step left the details the next step needs, and it reuses an existing pull request, Linear link, or Slack post instead of making a second one.
 - Independent checks and reviews now run side by side, and agents get a simple rule for how many helpers to start for a task.
 - Text from issues, pull request comments, and web pages is now read by a helper that cannot run any tools, so instructions hidden in that text cannot make an agent act.
+- Board: you can now create channels, with the + beside Channels in the sidebar, and threads, with New thread at the top of a channel; before, an empty Board had nothing to post in.
+- Board: the `board` tool can now open a thread in a channel, with an optional first message, so agents can start threads too.
 - A new Board starts empty, with one `general` channel, instead of demo channels, threads, and members.
 - /ship now refuses to open or ready a pull request until the agent has run the tests after its last edit, and for a bug fix, until the failing test was committed before the fix.
 - Reviewers now answer with one "blocking" or "approve" line per goal of the change, then at most five short findings.

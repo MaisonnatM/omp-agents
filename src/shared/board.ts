@@ -99,6 +99,8 @@ export interface BoardState {
 }
 
 export type BoardChange =
+	| { op: "channel"; channel: Channel }
+	| { op: "thread"; thread: Thread }
 	| { op: "post"; message: Message }
 	| { op: "read"; member: string; thread: string; at: number }
 	| { op: "task"; thread: string; task: TaskState | null; lease: Lease | null }
@@ -215,6 +217,16 @@ function unblock(threads: Thread[]): Thread[] {
 export function applyBoardChange(state: BoardState, change: BoardChange): Parsed<BoardState, { error: string }> {
 	const hasThread = (id: string) => state.threads.some(thread => thread.id === id);
 	switch (change.op) {
+		case "channel": {
+			if (state.channels.some(channel => channel.id === change.channel.id)) return { ok: state };
+			if (state.channels.some(channel => channel.name === change.channel.name)) return { error: `#${change.channel.name} already exists.` };
+			return { ok: { ...state, channels: [...state.channels, change.channel] } };
+		}
+		case "thread": {
+			if (hasThread(change.thread.id)) return { ok: state };
+			if (!state.channels.some(channel => channel.id === change.thread.channel)) return { error: `No channel ${change.thread.channel}.` };
+			return { ok: { ...state, threads: [...state.threads, change.thread] } };
+		}
 		case "post": {
 			if (!hasThread(change.message.thread)) return { error: `No thread ${change.message.thread}.` };
 			if (state.messages.some(msg => msg.id === change.message.id)) return { ok: state };
@@ -295,8 +307,12 @@ const isMessage: Guard<Message> = fields<Message>({
 	synced: optional(isSync),
 });
 const isSchedule: Guard<Schedule> = fields<Schedule>({ id: isNonEmpty, thread: isNonEmpty, by: isNonEmpty, to: isNonEmpty, text: isString, at: isNumber, every: nullable(isNumber) });
+const isChannel: Guard<Channel> = fields<Channel>({ id: isNonEmpty, name: isNonEmpty, about: isString, sync: nullable(isSync), restricted: isBoolean });
+const isThread: Guard<Thread> = fields<Thread>({ id: isNonEmpty, channel: isNonEmpty, title: isString, task: nullable(isTask), lease: nullable(isLease), labels: arrayOf(isString), blockedBy: arrayOf(isNonEmpty), createdAt: isNumber });
 
 const CHANGE_SHAPES: { [Op in BoardChange["op"]]: Shape<Omit<Extract<BoardChange, { op: Op }>, "op">> } = {
+	channel: { channel: isChannel },
+	thread: { thread: isThread },
 	post: { message: isMessage },
 	read: { member: isNonEmpty, thread: isNonEmpty, at: isNumber },
 	task: { thread: isNonEmpty, task: nullable(isTask), lease: nullable(isLease) },
@@ -315,10 +331,8 @@ export const parseBoardState = decoder<BoardState>(
 	fields<BoardState>({
 		version: oneOf([1] as const),
 		me: isNonEmpty,
-		channels: arrayOf(fields<Channel>({ id: isNonEmpty, name: isNonEmpty, about: isString, sync: nullable(isSync), restricted: isBoolean })),
-		threads: arrayOf(
-			fields<Thread>({ id: isNonEmpty, channel: isNonEmpty, title: isString, task: nullable(isTask), lease: nullable(isLease), labels: arrayOf(isString), blockedBy: arrayOf(isNonEmpty), createdAt: isNumber }),
-		),
+		channels: arrayOf(isChannel),
+		threads: arrayOf(isThread),
 		messages: arrayOf(isMessage),
 		extraMembers: arrayOf(isMember),
 		schedules: arrayOf(isSchedule),

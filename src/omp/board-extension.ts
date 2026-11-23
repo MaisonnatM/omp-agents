@@ -17,11 +17,13 @@ export const BOARD_FLAGS = {
 	inbox: "omp-agents-board-inbox",
 } as const;
 
-const ACTIONS = ["read", "post", "claim", "review", "done", "progress"] as const;
+const ACTIONS = ["read", "create", "post", "claim", "review", "done", "progress"] as const;
 
 interface BoardParams {
 	action: (typeof ACTIONS)[number];
 	thread?: string;
+	channel?: string;
+	title?: string;
 	text?: string;
 	message?: string;
 	step?: number;
@@ -31,6 +33,7 @@ interface BoardParams {
 const DESCRIPTION = [
 	"The Board: channels and threads where the user, other people, remote agents, and omp sessions post. A Board message for you arrives as a follow-up naming its thread. Pick one action.",
 	"- read: with `thread`, the whole thread; without, every thread with its task state, and the messages waiting for you.",
+	"- create: opens a thread titled `title` in channel `channel` (its name, without #), posting `text` as its first message when given; answers the new thread's id.",
 	"- post: posts `text` in `thread`. Mention a member with @name to wake them.",
 	"- claim: takes `thread`'s task for an hour. review: marks it ready for review. done: settles it, which opens the threads waiting on it.",
 	"- progress: sets `step` (from 0) of the workflow that message `message` runs to `state`: running, done, or failed.",
@@ -56,7 +59,9 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 				{ description: "What to do." },
 			),
 			thread: Type.Optional(Type.String({ description: "The thread id, such as the one the follow-up names." })),
-			text: Type.Optional(Type.String({ description: "post: the message." })),
+			channel: Type.Optional(Type.String({ description: "create: the channel's name, without #." })),
+			title: Type.Optional(Type.String({ description: "create: the new thread's title." })),
+			text: Type.Optional(Type.String({ description: "post: the message. create: the thread's first message." })),
 			message: Type.Optional(Type.String({ description: "progress: the id of the message whose workflow you report on." })),
 			step: Type.Optional(Type.Integer({ description: "progress: the step, from 0.", minimum: 0 })),
 			state: Type.Optional(Type.Union([Type.Literal("running"), Type.Literal("done"), Type.Literal("failed")], { description: "progress: the step's state." })),
@@ -66,8 +71,9 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const paths = pathsOf(pi);
 			const changes = inbox<BoardChange>(paths.inbox);
-			let state: BoardState | null = parseBoardState(parseJson(readText(paths.file)));
-			if (!state) throw new Error("The dashboard has not written the Board yet.");
+			const written = parseBoardState(parseJson(readText(paths.file)));
+			if (!written) throw new Error("The dashboard has not written the Board yet.");
+			let state: BoardState = written;
 			for (const change of changes.waiting()) {
 				const applied = applyBoardChange(state, change);
 				if ("ok" in applied) state = applied.ok;
@@ -81,6 +87,7 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 				const applied = applyBoardChange(state, change);
 				if ("error" in applied) throw new Error(`The Board refused it, so nothing was left for the dashboard: ${applied.error}`);
 				changes.leave(change);
+				state = applied.ok;
 				return reply(done);
 			};
 			const thread = () => {
@@ -99,6 +106,17 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 					const waiting = self ? queueOf(state, self) : [];
 					const threads = state.threads.map(item => `${item.id} #${state.channels.find(channel => channel.id === item.channel)?.name}: ${item.title} — ${item.task ?? "discussion"}${item.lease ? `, held by ${nameOf(item.lease.by)}` : ""}`);
 					return reply([...threads, "", `Waiting for you: ${waiting.length === 0 ? "nothing" : waiting.map(msg => `[${msg.thread}] ${nameOf(msg.author)}: ${msg.text}`).join("\n")}`].join("\n"));
+				}
+				case "create": {
+					const title = params.title?.trim();
+					if (!title) throw new Error("create needs title.");
+					const name = params.channel?.replace(/^#/, "");
+					const channel = state.channels.find(item => item.name === name);
+					if (!channel) throw new Error(`channel must be one of ${state.channels.map(item => item.name).join(", ")}.`);
+					const id = `t-${randomUUID()}`;
+					const created = leave({ op: "thread", thread: { id, channel: channel.id, title, task: null, lease: null, labels: [], blockedBy: [], createdAt: Date.now() } }, `Opened ${id} in #${channel.name}.`);
+					const text = params.text?.trim();
+					return text ? leave({ op: "post", message: { id: randomUUID(), thread: id, author: me, at: Date.now(), text } }, `Opened ${id} in #${channel.name} and posted in it.`) : created;
 				}
 				case "post": {
 					if (!params.text?.trim()) throw new Error("post needs text.");
