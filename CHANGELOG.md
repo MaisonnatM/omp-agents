@@ -9,6 +9,8 @@ The dashboard shows the same lines in Settings › What's new.
 - Board messages now show Markdown, such as **bold**, *italic*, lists, and links.
 - A Board mention now counts when a comma or other punctuation follows it, such as `@Maxence,`, in any case, and `@Max` no longer wakes `@Maxence`; the composer's chips match exactly what wakes.
 - Behind the scenes: the Board composer and the session composers share one completion list core, `useCompletionMenu`, and the Board reads mentions and commands with one grammar in `src/shared/board.ts`.
+- A Board command such as `/schedule` or `/claim` now saves all its changes together or none of them, and a schedule keeps its member's name even after that member leaves.
+- Behind the scenes: the Board drops its unused pull request, finding, question, blocked, and label surfaces; its page is split into list, thread view, attachments, and composer files; and the dashboard server runs the Board through a module `run` hook instead of naming it.
 - The safety check now lets an agent keep the dashboard token in a shell variable when it only goes into a request header, and /ship now counts `astro check` and `playwright test` as test runs.
 - The Weekly harness review now saves the five failures it picks so you can replay them once its proposed change lands, and the next week it tells you whether that change fixed each one.
 - The Weekly harness review now also counts pull requests in every repository whose fixes ran out of rounds or stalled, grouped by cause.

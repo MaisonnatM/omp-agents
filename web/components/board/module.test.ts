@@ -26,7 +26,7 @@ describe("Board address", () => {
 });
 
 describe("resolveBoardView", () => {
-	const state = emptyBoard();
+	const state = emptyBoard("Maxence");
 	const members = new Set(["u-maxence"]);
 
 	test("a channel or member that no longer exists opens the inbox", () => {

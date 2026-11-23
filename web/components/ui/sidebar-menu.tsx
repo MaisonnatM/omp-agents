@@ -233,6 +233,8 @@ interface SidebarMenuButtonProps
   /** `short` is `sm`'s 28px row, keeping the surrounding text size, which `sm` drops to 12px. */
   size?: "default" | "sm" | "lg" | "short";
   icon?: IconComponent;
+  /** Any element in the icon column, such as an avatar, when the row's mark is no icon component. Ignored when `icon` is set. */
+  leading?: ReactNode;
   /** Semantic thread state for status-dot navigation. Drives the dot
    *  visuals (`active`/`unread` → filled, `idle` → ring), stamps
    *  `data-status` on the button, appends visually-hidden "unread" text for
@@ -253,6 +255,7 @@ const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
       size = "default",
       variant,
       icon: Icon,
+      leading,
       status,
       dot,
       render,
@@ -334,7 +337,12 @@ const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
             )}
           />
         )}
-        {!Icon && resolvedDot && (
+        {!Icon && leading && (
+          <span className="flex shrink-0 items-center justify-center" style={{ width: sizeClasses.icon, height: sizeClasses.icon }}>
+            {leading}
+          </span>
+        )}
+        {!Icon && !leading && resolvedDot && (
           <span
             className="flex shrink-0 items-center justify-center"
             style={{ width: sizeClasses.icon, height: sizeClasses.icon }}

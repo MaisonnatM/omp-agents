@@ -8,7 +8,7 @@
 import { randomUUID } from "node:crypto";
 import { inbox } from "../../templates/omp/agent/extensions/inbox/client";
 import { parseJson } from "../json";
-import { applyBoardChange, type BoardChange, type BoardState, LEASE_MS, parseBoardState, queueOf } from "../shared/board";
+import { applyBoardChange, type BoardChange, type BoardState, LEASE_MS, parseBoardState, queueOf, sessionMemberId } from "../shared/board";
 import { type ExtensionApi, type ExtensionTool, flagValue, readText, reply } from "./extension-kit";
 
 /** The flags that name the Board's file and the inbox a session leaves its changes in. */
@@ -80,7 +80,7 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 			}
 			const session = ctx.sessionManager.getSessionId();
 			// A Bot's conversation is the Bot on the Board, which the dashboard posts its changes as.
-			const me = state.extraMembers.find(member => member.botId && member.sessionId === session)?.id ?? `s-${session}`;
+			const me = state.extraMembers.find(member => member.botId && member.sessionId === session)?.id ?? sessionMemberId(session);
 			const names = new Map(state.extraMembers.map(member => [member.id, member.name]));
 			const nameOf = (id: string) => names.get(id) ?? (id === me ? "you" : id);
 			const leave = (change: BoardChange, done: string) => {
@@ -114,7 +114,7 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 					const channel = state.channels.find(item => item.name === name);
 					if (!channel) throw new Error(`channel must be one of ${state.channels.map(item => item.name).join(", ")}.`);
 					const id = `t-${randomUUID()}`;
-					const created = leave({ op: "thread", thread: { id, channel: channel.id, title, task: null, lease: null, labels: [], blockedBy: [], createdAt: Date.now() } }, `Opened ${id} in #${channel.name}.`);
+					const created = leave({ op: "thread", thread: { id, channel: channel.id, title, task: null, lease: null, createdAt: Date.now() } }, `Opened ${id} in #${channel.name}.`);
 					const text = params.text?.trim();
 					return text ? leave({ op: "post", message: { id: randomUUID(), thread: id, author: me, at: Date.now(), text } }, `Opened ${id} in #${channel.name} and posted in it.`) : created;
 				}

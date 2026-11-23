@@ -27,7 +27,7 @@ import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { activityDb, botInboxDir, botsDir, botsFile, builtInRoutinesFile, directoryOf, displayPath, endedWorktreesFile, HOME, interruptedFile, machineFile, mergesFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
-import { type ModuleChanges, moduleInboxes, moduleJoins, openModules, type StoredModuleId } from "../modules";
+import { isStoredModuleId, type ModuleChanges, type ModuleRuns, moduleInboxes, moduleJoins, openModules, runModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -108,9 +108,6 @@ import { UsagePoll } from "./usage-poll";
 import { type Socket, Views } from "./views";
 import { parseClientMsg } from "./wire";
 import { adoptOldWorkspaces, WorkspacesFile } from "./workspaces-file";
-import { BoardFeed } from "./board-feed";
-import { BoardWake } from "./board-wake";
-import { type BoardChange, inBotsName } from "../shared/board";
 
 /** What the dashboard publishes through once the server listens. */
 type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
@@ -191,10 +188,8 @@ export class Dashboard {
 	/** What the bell's checks saw last, which tells the routines' triggers what is new. */
 	readonly #triggerWatch = new TriggerWatch();
 	readonly #scheduledRunner: ScheduledRunner;
-	/** Wakes the sessions a Board message is for, and posts the Board's schedules as they come due. */
-	#boardWake: BoardWake | undefined;
-	/** Posts each session's questions and finished turns in its #sessions thread. */
-	#boardFeed: BoardFeed | undefined;
+	/** The stored modules' runs, started once the sessions are. */
+	#moduleRuns: ModuleRuns = {};
 	readonly #autoContinue: AutoContinue;
 	readonly #mergeQueue: MergeQueue;
 	readonly #mergeCleanup: MergeCleanup;
@@ -342,7 +337,7 @@ export class Dashboard {
 			},
 		}, modules, kind => {
 			this.#broadcasts.pushList(kind);
-			if (kind === "board") this.#boardWake?.check();
+			if (isStoredModuleId(kind)) this.#moduleRuns[kind]?.changed?.();
 		}));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(factsOf), error: this.#rosterError }),
@@ -358,7 +353,7 @@ export class Dashboard {
 			},
 			onRosterChange: () => {
 				this.#waits.check();
-				this.#boardFeed?.check();
+				for (const run of Object.values(this.#moduleRuns)) run?.rosterChanged?.();
 			},
 			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
 		}));
@@ -370,8 +365,7 @@ export class Dashboard {
 			lists.applyModule(id, change);
 			return modules[id].flush();
 		};
-		// The `board` tool posts as its session, so a Bot's conversation posts in the Bot's name.
-		const modulesInboxes = moduleInboxes(modules, (id, change) => applyModuleNow(id, id === "board" ? (inBotsName(change as BoardChange, this.#botsFile.value) as typeof change) : change), { active: () => ownerLock.held });
+		const modulesInboxes = moduleInboxes(modules, (id, change) => applyModuleNow(id, this.#moduleRuns[id]?.fromAgent?.(change) ?? change), { active: () => ownerLock.held });
 		const routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
 		const botInbox = new BotInbox(
 			botInboxDir,
@@ -488,26 +482,15 @@ export class Dashboard {
 			now: Date.now,
 			onChange: () => broadcasts.pushList("scheduled"),
 		}));
-		const boardWake = (this.#boardWake = new BoardWake({
-			state: () => modules.board.value,
+		this.#moduleRuns = runModules(modules, (id, change) => void lists.applyModule(id, change), {
 			hosts: () => sessions.rows(factsOf),
 			bots: () => this.#botsFile.value,
-			apply: change => void lists.applyModule("board", change),
 			wake: async (sessionId, text) => (await reach(sessionId)).prompt(null, text, [], "followUp"),
 			wakeBot: async (botId, text) => void (await this.#bots.message(botId, text)),
 			active: () => ownerLock.held,
 			now: Date.now,
-		}));
-		this.#boardFeed = new BoardFeed({
-			state: () => modules.board.value,
-			hosts: () => sessions.rows(factsOf),
-			bots: () => this.#botsFile.value,
-			apply: change => void lists.applyModule("board", change),
-			active: () => ownerLock.held,
-			now: Date.now,
+			stopping,
 		});
-		const boardTimer = setInterval(() => boardWake.fireDue(), 30_000);
-		stopping.addEventListener("abort", () => clearInterval(boardTimer));
 		this.#prWatches = new PullRequestWatches({
 			file: new PullRequestWatchesFile(pullRequestWatchesFile),
 			hosts: () => sessions.rows(factsOf),

@@ -7,7 +7,7 @@ import { arrayOf, decoder, fields, type Guard, isBoolean, isNonEmpty, isNumber, 
 import { BOT_HUES, BOT_SHAPES, type Bot, type BotId, type BotLook, defaultLook, parseBotId } from "./bots";
 import type { RosterHost } from "./sessions";
 
-export type MemberKind = "human" | "agent" | "bot";
+export type MemberKind = "human" | "agent";
 export type Presence = "working" | "idle" | "asking" | "asleep" | "online" | "away";
 
 export interface Member {
@@ -26,7 +26,7 @@ export interface Member {
 	botId?: BotId;
 }
 
-export type TaskState = "open" | "claimed" | "review" | "done" | "blocked";
+export type TaskState = "open" | "claimed" | "review" | "done";
 export type StepState = "done" | "running" | "queued" | "failed";
 
 export interface Lease {
@@ -34,12 +34,7 @@ export interface Lease {
 	until: number;
 }
 
-export type Attachment =
-	| { kind: "pr"; repo: string; number: number; title: string; state: "open" | "merged" | "draft"; checks: "passing" | "failing" | "running" }
-	| { kind: "finding"; severity: "low" | "medium" | "high" | "critical"; repo: string; file: string; summary: string }
-	| { kind: "workflow"; command: string; steps: { label: string; state: StepState }[] }
-	| { kind: "schedule"; text: string; at: number; every: number | null }
-	| { kind: "question"; options: string[]; picked: string | null };
+export type Attachment = { kind: "workflow"; command: string; steps: { label: string; state: StepState }[] } | { kind: "schedule"; text: string; at: number; every: number | null };
 
 export interface Message {
 	id: string;
@@ -50,8 +45,6 @@ export interface Message {
 	/** Internal notes stay on the board and never sync out. */
 	internal?: boolean;
 	attachment?: Attachment;
-	/** Where it came from or goes to besides the board. */
-	synced?: "slack" | "github" | "linear";
 }
 
 export interface Thread {
@@ -60,9 +53,6 @@ export interface Thread {
 	title: string;
 	task: TaskState | null;
 	lease: Lease | null;
-	labels: string[];
-	/** Thread ids that must be done before this one can start. */
-	blockedBy: string[];
 	createdAt: number;
 }
 
@@ -70,8 +60,6 @@ export interface Channel {
 	id: string;
 	name: string;
 	about: string;
-	sync: "slack" | "github" | "linear" | null;
-	restricted: boolean;
 }
 
 /** A message the board posts later, in `by`'s name, mentioning `to`; `every` milliseconds later again when it repeats. */
@@ -80,6 +68,8 @@ export interface Schedule {
 	thread: string;
 	by: string;
 	to: string;
+	/** `to`'s name when the schedule was made, which the post mentions; a schedule saved before it existed looks `to` up in the kept members. */
+	toName?: string;
 	text: string;
 	at: number;
 	every: number | null;
@@ -104,43 +94,47 @@ export type BoardChange =
 	| { op: "post"; message: Message }
 	| { op: "read"; member: string; thread: string; at: number }
 	| { op: "task"; thread: string; task: TaskState | null; lease: Lease | null }
-	| { op: "answer"; message: string; option: string }
 	| { op: "progress"; message: string; step: number; state: StepState }
 	| { op: "schedule"; schedule: Schedule }
 	/** Posts schedule `schedule`'s message as message `message`, then moves it `every` later or drops it. */
 	| { op: "fire"; schedule: string; message: string; at: number }
-	| { op: "member"; member: Member };
+	| { op: "member"; member: Member }
+	/** Every change in `changes`, in order, or none of them when one is refused. */
+	| { op: "all"; changes: BoardChange[] };
 
-const MIN = 60_000;
-const HOUR = 60 * MIN;
+export const MIN = 60_000;
+export const HOUR = 60 * MIN;
+export const DAY = 24 * HOUR;
 /** How long `/claim` and the `board` tool's claim hold a task. */
 export const LEASE_MS = HOUR;
 
-const look = (id: string): BotLook => defaultLook(id as never);
-
-/** The board a fresh `board.json` starts with: one empty channel and the user. */
-export function emptyBoard(): BoardState {
+/** The board a fresh `board.json` starts with: one empty channel and `owner`, the person who runs the dashboard. */
+export function emptyBoard(owner: string): BoardState {
+	const id = `u-${owner.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-")}`;
 	return {
 		version: 1,
-		me: "u-maxence",
-		channels: [{ id: "c-general", name: "general", about: "", sync: null, restricted: false }],
+		me: id,
+		channels: [{ id: "c-general", name: "general", about: "" }],
 		threads: [],
 		messages: [],
-		extraMembers: [{ id: "u-maxence", name: "Maxence", kind: "human", presence: "online", look: look("u-maxence"), initials: "M" }],
+		extraMembers: [{ id, name: owner, kind: "human", presence: "online", look: defaultLook(id), initials: owner.slice(0, 1).toUpperCase() }],
 		schedules: [],
 		readAt: {},
 	};
 }
 
+/** Session `sessionId`'s board member id. */
+export const sessionMemberId = (sessionId: string): string => `s-${sessionId}`;
+
 /** Live session `host` as a board member. */
 export function sessionMember(host: RosterHost): Member {
 	return {
-		id: `s-${host.sessionId}`,
+		id: sessionMemberId(host.sessionId),
 		name: host.sessionName?.trim() || host.cwdDisplay.split("/").at(-1) || "session",
 		kind: "agent",
 		harness: `omp · ${host.model?.split("/").at(-1) ?? "this Mac"}`,
 		presence: host.requests.length > 0 || host.status === "needs-input" ? "asking" : host.status === "working" ? "working" : "idle",
-		look: look(host.sessionId),
+		look: defaultLook(host.sessionId),
 		sessionId: host.sessionId,
 	};
 }
@@ -175,7 +169,8 @@ export function boardMembers(state: BoardState, hosts: readonly RosterHost[], bo
 
 /** `change` as a session's `board` tool left it, in its Bot's name when the session is a Bot's conversation. */
 export function inBotsName(change: BoardChange, bots: readonly Bot[]): BoardChange {
-	const botOf = (author: string) => bots.find(bot => bot.sessionId !== null && author === `s-${bot.sessionId}`);
+	const botOf = (author: string) => bots.find(bot => bot.sessionId !== null && author === sessionMemberId(bot.sessionId));
+	if (change.op === "all") return { ...change, changes: change.changes.map(item => inBotsName(item, bots)) };
 	if (change.op === "post") {
 		const bot = botOf(change.message.author);
 		return bot ? { ...change, message: { ...change.message, author: botMemberId(bot.id) } } : change;
@@ -203,7 +198,7 @@ export const BOARD_COMMANDS: readonly BoardCommand[] = [
 	{ name: "grill", about: "Stress-test the plan in this thread with two models", steps: ["Claude grills", "Codex grills", "Merge findings"] },
 	{ name: "schedule", about: "Post to an agent later: /schedule @name text in 10m, or every 2h", quick: true },
 	{ name: "claim", about: "Take this task with a one-hour lease" },
-	{ name: "done", about: "Settle this task, which opens the tasks waiting on it" },
+	{ name: "done", about: "Settle this task" },
 ];
 
 /** `text` as a command, its name and what follows it, or `null` for a plain post. */
@@ -245,27 +240,101 @@ export function queueOf(state: BoardState, member: Member): Message[] {
 	return state.messages.filter(msg => msg.author !== member.id && msg.at > (marks[msg.thread] ?? 0) && (joined.has(msg.thread) || isMention(msg.text, member)));
 }
 
-export function unreadIn(state: BoardState, threadId: string): number {
-	const mark = state.readAt[state.me]?.[threadId] ?? 0;
-	return state.messages.filter(msg => msg.thread === threadId && msg.at > mark && msg.author !== state.me).length;
+/** What the page looks up by id or per thread, built once per state rather than by scanning every message per row. */
+export interface BoardIndex {
+	threadById: Map<string, Thread>;
+	channelById: Map<string, Channel>;
+	memberById: Map<string, Member>;
+	messagesByThread: Map<string, Message[]>;
+	lastByThread: Map<string, Message>;
+	/** How many messages in each thread the board's owner has not read; a thread with none is absent. */
+	unreadByThread: Map<string, number>;
+	/** {@link queueOf} for each member. */
+	queueByMember: Map<string, Message[]>;
+}
+
+export function boardIndex(state: BoardState, members: readonly Member[]): BoardIndex {
+	const messagesByThread = Map.groupBy(state.messages, msg => msg.thread);
+	const lastByThread = new Map([...messagesByThread].map(([thread, msgs]) => [thread, msgs.at(-1)!]));
+	const myMarks = state.readAt[state.me] ?? {};
+	const unreadByThread = new Map<string, number>();
+	for (const msg of state.messages) if (msg.author !== state.me && msg.at > (myMarks[msg.thread] ?? 0)) unreadByThread.set(msg.thread, (unreadByThread.get(msg.thread) ?? 0) + 1);
+	const memberIds = new Set(members.map(member => member.id));
+	const joined = new Map<string, Set<string>>();
+	for (const msg of state.messages) if (memberIds.has(msg.author)) joined.set(msg.author, (joined.get(msg.author) ?? new Set()).add(msg.thread));
+	// Each message's text is matched against the roster once, not once per member.
+	const mentioned = new Map(state.messages.map(msg => [msg, new Set(mentions(msg.text, members).map(found => found.member.id))]));
+	const queueByMember = new Map(
+		members.map(member => {
+			const marks = state.readAt[member.id] ?? {};
+			const threads = joined.get(member.id);
+			return [member.id, state.messages.filter(msg => msg.author !== member.id && msg.at > (marks[msg.thread] ?? 0) && (threads?.has(msg.thread) || mentioned.get(msg)!.has(member.id)))];
+		}),
+	);
+	return {
+		threadById: new Map(state.threads.map(thread => [thread.id, thread])),
+		channelById: new Map(state.channels.map(channel => [channel.id, channel])),
+		memberById: new Map(members.map(member => [member.id, member])),
+		messagesByThread,
+		lastByThread,
+		unreadByThread,
+		queueByMember,
+	};
 }
 
 /** "every 2h" or "daily" for a repeat of `ms`. */
 export function repeatLabel(ms: number): string {
-	if (ms % (24 * HOUR) === 0) return ms === 24 * HOUR ? "daily" : `every ${ms / (24 * HOUR)}d`;
+	if (ms % DAY === 0) return ms === DAY ? "daily" : `every ${ms / DAY}d`;
 	return ms % HOUR === 0 ? `every ${ms / HOUR}h` : `every ${Math.round(ms / MIN)}m`;
 }
 
-/** Threads waiting on `threads`' done ones open. */
-function unblock(threads: Thread[]): Thread[] {
-	const done = new Set(threads.filter(thread => thread.task === "done").map(thread => thread.id));
-	return threads.map(thread => (thread.task === "blocked" && thread.blockedBy.every(dep => done.has(dep)) ? { ...thread, task: "open" } : thread));
+const UNITS: Record<string, number> = { m: MIN, h: HOUR, d: DAY };
+
+/** What running `command` with `arg` in thread `thread` changes, as `me` at `now`; `newId` names each message and schedule it makes. */
+export function commandChanges({ members, me, thread, command, arg, now, newId }: { members: readonly Member[]; me: string; thread: Thread; command: BoardCommand; arg: string; now: number; newId: () => string }): BoardChange[] {
+	const post = (text: string, extra: Partial<Message> = {}): BoardChange => ({ op: "post", message: { id: newId(), thread: thread.id, author: me, at: now, text, ...extra } });
+	switch (command.name) {
+		case "claim":
+			return [{ op: "task", thread: thread.id, task: "claimed", lease: { by: me, until: now + LEASE_MS } }, post("Claimed. Lease 1h.")];
+		case "done":
+			return [{ op: "task", thread: thread.id, task: "done", lease: null }, post(arg || "Done.")];
+		case "schedule": {
+			const [to] = mentions(arg, members);
+			if (!to) return [post("/schedule needs an @member to post to.", { internal: true })];
+			const every = arg.match(/\bevery (\d+)\s*([mhd])\b/);
+			const after = arg.match(/\bin (\d+)\s*([mhd])\b/);
+			const step = (match: RegExpMatchArray) => Number(match[1]) * UNITS[match[2]!]!;
+			const repeat = every ? step(every) : null;
+			const at = now + (after ? step(after) : (repeat ?? 5 * MIN));
+			const text = (arg.slice(0, to.start) + arg.slice(to.end)).replace(/\b(every|in) \d+\s*[mhd]\b/g, "").replace(/\s+/g, " ").trim() || "Check back on this thread.";
+			return [
+				{ op: "schedule", schedule: { id: newId(), thread: thread.id, by: me, to: to.member.id, toName: to.member.name, text, at, every: repeat } },
+				post(`Scheduled for ${to.member.name}`, { internal: true, attachment: { kind: "schedule", text, at, every: repeat } }),
+			];
+		}
+		default: {
+			// The workflow goes to the agent it mentions, else to the agent holding the task.
+			const holder = thread.lease ? members.find(member => member.id === thread.lease!.by) : undefined;
+			const target = mentions(arg, members).find(({ member }) => member.kind !== "human")?.member ?? (holder?.kind === "human" ? undefined : holder);
+			const text = `/${command.name}${target && !isMention(arg, target) ? ` @${target.name}` : ""}${arg ? ` ${arg}` : ""}`;
+			return [post(text, { attachment: { kind: "workflow", command: `/${command.name}`, steps: (command.steps ?? []).map(label => ({ label, state: "queued" })) } })];
+		}
+	}
 }
 
 /** `state` after `change`, or why the board refuses it. */
 export function applyBoardChange(state: BoardState, change: BoardChange): Parsed<BoardState, { error: string }> {
 	const hasThread = (id: string) => state.threads.some(thread => thread.id === id);
 	switch (change.op) {
+		case "all": {
+			let next = state;
+			for (const item of change.changes) {
+				const applied = applyBoardChange(next, item);
+				if ("error" in applied) return applied;
+				next = applied.ok;
+			}
+			return { ok: next };
+		}
 		case "channel": {
 			if (state.channels.some(channel => channel.id === change.channel.id)) return { ok: state };
 			if (state.channels.some(channel => channel.name === change.channel.name)) return { error: `#${change.channel.name} already exists.` };
@@ -286,14 +355,7 @@ export function applyBoardChange(state: BoardState, change: BoardChange): Parsed
 			return { ok: { ...state, readAt: { ...state.readAt, [change.member]: { ...state.readAt[change.member], [change.thread]: change.at } } } };
 		case "task":
 			if (!hasThread(change.thread)) return { error: `No thread ${change.thread}.` };
-			return { ok: { ...state, threads: unblock(state.threads.map(thread => (thread.id === change.thread ? { ...thread, task: change.task, lease: change.lease } : thread))) } };
-		case "answer": {
-			const asked = state.messages.find(msg => msg.id === change.message)?.attachment;
-			if (asked?.kind !== "question") return { error: `Message ${change.message} asks no question.` };
-			if (asked.picked !== null) return { error: "That question is already answered." };
-			if (!asked.options.includes(change.option)) return { error: `Answer with one of: ${asked.options.join(", ")}.` };
-			return { ok: { ...state, messages: state.messages.map(msg => (msg.id === change.message ? { ...msg, attachment: { ...asked, picked: change.option } } : msg)) } };
-		}
+			return { ok: { ...state, threads: state.threads.map(thread => (thread.id === change.thread ? { ...thread, task: change.task, lease: change.lease } : thread)) } };
 		case "progress": {
 			const workflow = state.messages.find(msg => msg.id === change.message)?.attachment;
 			if (workflow?.kind !== "workflow") return { error: `Message ${change.message} runs no workflow.` };
@@ -308,8 +370,8 @@ export function applyBoardChange(state: BoardState, change: BoardChange): Parsed
 		case "fire": {
 			const schedule = state.schedules.find(item => item.id === change.schedule);
 			if (!schedule || schedule.at > change.at) return { ok: state };
-			const to = state.extraMembers.find(member => member.id === schedule.to);
-			const posted: Message = { id: change.message, thread: schedule.thread, author: schedule.by, at: change.at, text: `${to ? `@${to.name} ` : ""}${schedule.text}` };
+			const toName = schedule.toName ?? state.extraMembers.find(member => member.id === schedule.to)?.name;
+			const posted: Message = { id: change.message, thread: schedule.thread, author: schedule.by, at: change.at, text: `${toName ? `@${toName} ` : ""}${schedule.text}` };
 			// A repeat skips the runs it missed while the dashboard was down, rather than posting each.
 			const next = schedule.every === null ? null : schedule.at + Math.ceil((change.at - schedule.at + 1) / schedule.every) * schedule.every;
 			const schedules = next === null ? state.schedules.filter(item => item.id !== schedule.id) : state.schedules.map(item => (item.id === schedule.id ? { ...item, at: next } : item));
@@ -323,14 +385,13 @@ export function applyBoardChange(state: BoardState, change: BoardChange): Parsed
 }
 
 const isLook: Guard<BotLook> = fields<BotLook>({ shape: oneOf(BOT_SHAPES), hue: oneOf(BOT_HUES) });
-const isSync = oneOf(["slack", "github", "linear"] as const);
-const isTask = oneOf(["open", "claimed", "review", "done", "blocked"] as const);
+const isTask = oneOf(["open", "claimed", "review", "done"] as const);
 const isStepState = oneOf(["done", "running", "queued", "failed"] as const);
 const isLease: Guard<Lease> = fields<Lease>({ by: isNonEmpty, until: isNumber });
 const isMember: Guard<Member> = fields<Member>({
 	id: isNonEmpty,
 	name: isNonEmpty,
-	kind: oneOf(["human", "agent", "bot"] as const),
+	kind: oneOf(["human", "agent"] as const),
 	harness: optional(isString),
 	presence: oneOf(["working", "idle", "asking", "asleep", "online", "away"] as const),
 	look: isLook,
@@ -339,25 +400,15 @@ const isMember: Guard<Member> = fields<Member>({
 	botId: optional((value: unknown): value is BotId => parseBotId(value) !== null),
 });
 const isAttachment = tagged<Attachment, "kind">("kind", {
-	pr: { repo: isString, number: isNumber, title: isString, state: oneOf(["open", "merged", "draft"] as const), checks: oneOf(["passing", "failing", "running"] as const) },
-	finding: { severity: oneOf(["low", "medium", "high", "critical"] as const), repo: isString, file: isString, summary: isString },
 	workflow: { command: isString, steps: arrayOf(fields<{ label: string; state: StepState }>({ label: isString, state: isStepState })) },
 	schedule: { text: isString, at: isNumber, every: nullable(isNumber) },
-	question: { options: arrayOf(isNonEmpty), picked: nullable(isString) },
 });
-const isMessage: Guard<Message> = fields<Message>({
-	id: isNonEmpty,
-	thread: isNonEmpty,
-	author: isNonEmpty,
-	at: isNumber,
-	text: isString,
-	internal: optional(isBoolean),
-	attachment: optional(isAttachment),
-	synced: optional(isSync),
-});
-const isSchedule: Guard<Schedule> = fields<Schedule>({ id: isNonEmpty, thread: isNonEmpty, by: isNonEmpty, to: isNonEmpty, text: isString, at: isNumber, every: nullable(isNumber) });
-const isChannel: Guard<Channel> = fields<Channel>({ id: isNonEmpty, name: isNonEmpty, about: isString, sync: nullable(isSync), restricted: isBoolean });
-const isThread: Guard<Thread> = fields<Thread>({ id: isNonEmpty, channel: isNonEmpty, title: isString, task: nullable(isTask), lease: nullable(isLease), labels: arrayOf(isString), blockedBy: arrayOf(isNonEmpty), createdAt: isNumber });
+const isMessage: Guard<Message> = fields<Message>({ id: isNonEmpty, thread: isNonEmpty, author: isNonEmpty, at: isNumber, text: isString, internal: optional(isBoolean), attachment: optional(isAttachment) });
+const isSchedule: Guard<Schedule> = fields<Schedule>({ id: isNonEmpty, thread: isNonEmpty, by: isNonEmpty, to: isNonEmpty, toName: optional(isNonEmpty), text: isString, at: isNumber, every: nullable(isNumber) });
+const isChannel: Guard<Channel> = fields<Channel>({ id: isNonEmpty, name: isNonEmpty, about: isString });
+const isThread: Guard<Thread> = fields<Thread>({ id: isNonEmpty, channel: isNonEmpty, title: isString, task: nullable(isTask), lease: nullable(isLease), createdAt: isNumber });
+
+const isChanges = (value: unknown): value is BoardChange[] => arrayOf(isChange)(value);
 
 const CHANGE_SHAPES: { [Op in BoardChange["op"]]: Shape<Omit<Extract<BoardChange, { op: Op }>, "op">> } = {
 	channel: { channel: isChannel },
@@ -365,17 +416,19 @@ const CHANGE_SHAPES: { [Op in BoardChange["op"]]: Shape<Omit<Extract<BoardChange
 	post: { message: isMessage },
 	read: { member: isNonEmpty, thread: isNonEmpty, at: isNumber },
 	task: { thread: isNonEmpty, task: nullable(isTask), lease: nullable(isLease) },
-	answer: { message: isNonEmpty, option: isNonEmpty },
 	progress: { message: isNonEmpty, step: isNumber, state: isStepState },
 	schedule: { schedule: isSchedule },
 	fire: { schedule: isNonEmpty, message: isNonEmpty, at: isNumber },
 	member: { member: isMember },
+	all: { changes: isChanges },
 };
 
-/** A change as a page or a session sent it, or `null` when it is none. */
-export const parseBoardChange = decoder<BoardChange>(tagged<BoardChange, "op">("op", CHANGE_SHAPES));
+const isChange = tagged<BoardChange, "op">("op", CHANGE_SHAPES);
 
-/** What `board.json` holds, or `null` for anything else. */
+/** A change as a page or a session sent it, or `null` when it is none. */
+export const parseBoardChange = decoder<BoardChange>(isChange);
+
+/** What `board.json` holds, or `null` for anything else. Fields older boards kept, such as a channel's `sync`, are ignored. */
 export const parseBoardState = decoder<BoardState>(
 	fields<BoardState>({
 		version: oneOf([1] as const),
