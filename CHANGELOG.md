@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- Fixed: the counts beside Notifications, Bots, and Pull requests in the sidebar now sit centered on their row instead of slightly low.
 - Artifacts: documents in the Artifacts tab use a wider reading column, so less space sits empty around the text.
 - Docs: four choices kept only in project memory (the Memory page layout, session sidebar links, skipped hidden repositories, agents' project access) now have decision records.
 - Projects: the sidebar page list and Settings › Preferences › Sidebar tabs no longer have a Projects row, since the Projects section just below it already lists them.
