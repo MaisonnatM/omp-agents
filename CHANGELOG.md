@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-23
 
 - Board: you can now create channels, with the + beside Channels in the sidebar, and threads, with New thread at the top of a channel; before, an empty Board had nothing to post in.
+- Board: the `board` tool can now open a thread in a channel, with an optional first message, so agents can start threads too.
 - A new Board starts empty, with one `general` channel, instead of demo channels, threads, and members.
 - /ship now refuses to open or ready a pull request until the agent has run the tests after its last edit, and for a bug fix, until the failing test was committed before the fix.
 - Reviewers now answer with one "blocking" or "approve" line per goal of the change, then at most five short findings.
