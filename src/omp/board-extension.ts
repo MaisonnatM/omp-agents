@@ -37,6 +37,12 @@ const ACTIONS = ["read", "create", "post", "claim", "review", "done", "reopen", 
 /** The actions that change nothing. */
 const READS: readonly string[] = ["read", "projects"];
 
+/** A plan step a call adds, with its sub-steps; a plan nests two levels at most. */
+interface PlanStep {
+	text: string;
+	steps?: PlanStep[];
+}
+
 interface BoardParams {
 	action: (typeof ACTIONS)[number];
 	thread?: string;
@@ -47,6 +53,7 @@ interface BoardParams {
 	remove?: boolean;
 	message?: string;
 	step?: number;
+	steps?: PlanStep[];
 	state?: "running" | "done" | "failed";
 }
 
@@ -59,8 +66,8 @@ const DESCRIPTION = [
 	"- progress: sets `step` (from 0) of the workflow that message `message` runs to `state`: running, done, or failed.",
 	"Projects are channels with a goal, decisions, and a plan whose steps are task threads. The project actions below act on `channel` or, without it, on the project you are in.",
 	"- projects: every open project with its goal, numbered plan, and decisions.",
-	"- project: makes project `title` with goal `text` and puts you in it. join: puts you in `channel` (out of any other). leave: takes you out.",
-	"- step: adds plan step `title`, under step thread `parent` when given. goal: sets the goal to `text`. decide: records decision `text`, or removes it with `remove`.",
+	"- project: makes project `title` with goal `text`, adds the plan `steps` when given, and puts you in it. join: puts you in `channel` (out of any other). leave: takes you out.",
+	"- step: adds plan step `title`, or the whole plan `steps` ([{text, steps?: [{text}]}], in order) in one call, under step thread `parent` when given. goal: sets the goal to `text`. decide: records decision `text`, or removes it with `remove`.",
 	"- rename: renames the project `title`. archive / restore: archives or reopens the project.",
 	"The dashboard applies each change, and while it is stopped the change waits for it.",
 ].join("\n");
@@ -91,6 +98,12 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 			remove: Type.Optional(Type.Boolean({ description: "decide: removes the decision instead." })),
 			message: Type.Optional(Type.String({ description: "progress: the id of the message whose workflow you report on." })),
 			step: Type.Optional(Type.Integer({ description: "progress: the step, from 0.", minimum: 0 })),
+			steps: Type.Optional(
+				Type.Array(
+					Type.Object({ text: Type.String({ description: "The step's text." }), steps: Type.Optional(Type.Array(Type.Object({ text: Type.String({ description: "The sub-step's text." }) }), { description: "Its sub-steps, which hold none of their own." })) }),
+					{ description: "step, project: plan steps to add in order, each with optional sub-steps; a plan nests two levels at most." },
+				),
+			),
 			state: Type.Optional(Type.Union([Type.Literal("running"), Type.Literal("done"), Type.Literal("failed")], { description: "progress: the step's state." })),
 		}),
 		loadMode: "essential",
@@ -140,6 +153,14 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 				if (!trimmed) throw new Error(`${params.action} needs ${what}.`);
 				return trimmed;
 			};
+			/** The changes that add `steps` to `channel`'s plan in order, under step `parent` when given. */
+			const planChanges = (steps: PlanStep[], channel: string, parent?: string, depth = parent ? 2 : 1): BoardChange[] =>
+				steps.flatMap(step => {
+					if (depth > 2) throw new Error("A sub-step holds no steps of its own: a plan nests two levels at most.");
+					const id = `t-${randomUUID()}`;
+					const thread: BoardChange = { op: "thread", thread: { id, channel, title: required(step.text, "text on every step"), task: "open", lease: null, createdAt: Date.now(), ...(parent ? { parent } : {}) } };
+					return [thread, ...planChanges(step.steps ?? [], channel, id, depth + 1)];
+				});
 			switch (params.action) {
 				case "read": {
 					if (params.thread !== undefined) {
@@ -197,15 +218,17 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 					const id = `c-project-${randomUUID()}`;
 					const name = channelName(state, title);
 					const goal = params.text?.trim() ?? "";
+					const plan = planChanges(params.steps ?? [], id);
 					return leave(
 						{
 							op: "all",
 							changes: [
 								{ op: "channel", channel: { id, name, about: "", project: { goal, decisions: [], sessionIds: [], createdAt: Date.now() } } },
+								...plan,
 								{ op: "join", channel: id, sessionId: session },
 							],
 						},
-						`Made project #${name} and put you in it.`,
+						`Made project #${name}${plan.length ? ` with ${plan.length} plan steps` : ""} and put you in it.`,
 					);
 				}
 				case "goal": {
@@ -225,10 +248,15 @@ function boardTool(pi: ExtensionApi): ExtensionTool<BoardParams> {
 				case "leave":
 					return leave({ op: "leave", sessionId: session }, "You are in no project.");
 				case "step": {
-					const title = required(params.title, "title, the step's text");
 					const parent = params.parent === undefined ? undefined : state.threads.find(item => item.id === params.parent);
 					if (params.parent !== undefined && !parent) throw new Error(`No step thread ${params.parent}.`);
 					const channel = parent ? parent.channel : project().id;
+					if (params.steps !== undefined) {
+						const plan = planChanges(params.steps, channel, parent?.id);
+						if (plan.length === 0) throw new Error("step needs title or a non-empty steps.");
+						return leave({ op: "all", changes: plan }, `Added ${plan.length} steps.`);
+					}
+					const title = required(params.title, "title, the step's text");
 					const id = `t-${randomUUID()}`;
 					return leave(
 						{ op: "thread", thread: { id, channel, title, task: "open", lease: null, createdAt: Date.now(), ...(parent ? { parent: parent.id } : {}) } },
