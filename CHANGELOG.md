@@ -5,6 +5,10 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- /ship now skips the plan contest and both code reviews for a small change, up to 50 changed lines in 3 files that touch no shared or schema file, so quick fixes ship faster and cost less.
+- Edits the plan already spelled out now go to a cheaper worker agent, while planning, design calls, and reviews stay on the strongest model.
+- Behind the scenes: the note about a session's todos now comes as a message instead of changing the agent's standing instructions, so those instructions stay the same in every session and are read from the cache, which costs less.
+- Behind the scenes: a new metrics report shows, week by week, what each landed change cost, how often /ship steps pass, how often asking for help was worth it, and how often a person had to fix agent work afterwards.
 - /ship now checks that each step left the details the next step needs, and it reuses an existing pull request, Linear link, or Slack post instead of making a second one.
 - Independent checks and reviews now run side by side, and agents get a simple rule for how many helpers to start for a task.
 - Text from issues, pull request comments, and web pages is now read by a helper that cannot run any tools, so instructions hidden in that text cannot make an agent act.

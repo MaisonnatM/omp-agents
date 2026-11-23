@@ -4,7 +4,7 @@ import { SHIP_STAGES, SHIP_WORK } from "../../src/shared/sessions";
 import { commands } from "./agent/extensions/shell/commands";
 
 type Review = { label: string; box: string; pathsFile: string; withoutPaths: boolean };
-type Reviews = Record<string, { needed: boolean; done: boolean }>;
+type Reviews = Record<string, { needed: boolean; done: boolean; fastPath?: true }>;
 // Imported by path, not statically: a static import pulls the extension into `tsc`, where its `@oh-my-pi/pi-coding-agent` import does not resolve.
 type FixWork = "fix_ci" | "fix_comments";
 type Fixes = Partial<Record<FixWork, { rounds: number; counts: number[] }>>;
@@ -15,7 +15,7 @@ const extension: {
 	selectorOwner(selector: string[]): string | undefined;
 	otherOwner(owner: string | undefined, repo: string | undefined): boolean;
 	publishBlocker(body: string, reviews: Reviews): string | undefined;
-	reviewsOf(body: string, files: string[], changedFiles: number, read: (pathsFile: string) => string | undefined): Reviews;
+	reviewsOf(body: string, files: string[], changedFiles: number, read: (pathsFile: string) => string | undefined, changedLines?: number): Reviews;
 	reviewNeeded(review: Review, paths: string | undefined, files: string[], changedFiles: number): boolean;
 	authDiagnosis(credentials: { host: string; state: string; active: boolean; login: string; tokenSource: string }[], dotenvFiles: Record<string, string>): string | undefined;
 	REVIEWS: Record<string, Review>;
@@ -30,6 +30,9 @@ const extension: {
 	plannedTestEdits(contract: Contract): string[];
 	withRejected(rejected: string[] | undefined, approach: string): string[];
 	planBrief(state: { contract?: Contract; rejected?: string[] }): string | undefined;
+	FAST_PATH: { lines: number; files: number };
+	withFastPath(stage: string, outputs: object, reviews: Reviews | undefined): object;
+	missingOutput(stage: string, from: string, outputs: object | undefined): { stage: string; argument: string } | undefined;
 } = await import(join(import.meta.dir, "agent/extensions/ship.ts"));
 const { ghPr, prSelector, selectorOwner, otherOwner, publishBlocker, reviewsOf, reviewNeeded, authDiagnosis, REVIEWS, PROOF_BOX, renderLines } = extension;
 const THERMONUCLEAR = REVIEWS.thermonuclear.box;
@@ -299,5 +302,43 @@ describe("plan contract", () => {
 			"Contract goal: Ship it", "Files to change:", "- src/a.ts", "- src/a.test.ts", "- web/b.test.tsx", "Test first: none",
 			"Done when:", "- tests pass", "Rejected approaches, never to propose again:", "- Poll GitHub",
 		].join("\n"));
+	});
+});
+
+describe("fast path", () => {
+	const checkout: Record<string, string> = { ".omp/ui-paths": "web/**\n", ".omp/review-paths": "src/shared/**\n" };
+	/** The reviews of an unreviewed PR changing `files` by `lines` lines. */
+	const reviewsFor = (files: string[], lines: number) => reviewsOf("## Summary", files, files.length, path => checkout[path], lines);
+	/** The output advancing from the draft PR to the ready gate still lacks, once the fast path filled in what it skips. */
+	const missingPastReviews = (reviews: Reviews) => extension.missingOutput("ready_gate", "draft_pr", extension.withFastPath("ready_gate", {}, reviews));
+
+	test("a small diff passes both review gates with no verdicts, recorded as skipped", () => {
+		const reviews = reviewsFor(["web/app.tsx", "README.md"], extension.FAST_PATH.lines);
+		expect(Object.values(reviews).every(review => !review.needed && review.fastPath)).toBe(true);
+		expect(publishBlocker("## Summary", reviews)).toBeUndefined();
+		expect(missingPastReviews(reviews)).toBeUndefined();
+		expect(extension.withFastPath("ready_gate", {}, reviews)).toEqual({ interface_review: { verdicts: [], skipped: "fast-path" }, thermonuclear: { verdicts: [], skipped: "fast-path" } });
+	});
+
+	test("verdicts the agent passed are kept", () => {
+		const verdicts = { verdicts: [{ finding: "typo", verdict: "fixed" }] };
+		expect(extension.withFastPath("ready_gate", { thermonuclear: verdicts }, reviewsFor(["README.md"], 3))).toMatchObject({ thermonuclear: verdicts });
+	});
+
+	test.each([
+		["too many lines", ["web/app.tsx"], extension.FAST_PATH.lines + 1],
+		["too many files", ["web/a.tsx", "web/b.tsx", "web/c.tsx", "web/d.tsx"], 4],
+		["a schema file", ["web/app.tsx", "db/schema.prisma"], 4],
+		["a migration", ["web/app.tsx", "db/migrations/0001_init.sql"], 4],
+		["a shared contract", ["web/app.tsx", "src/shared/protocol.ts"], 4],
+	])("a diff with %s still needs its reviews and their verdicts", (_, files, lines) => {
+		const reviews = reviewsFor(files, lines);
+		expect(Object.values(reviews).some(review => review.fastPath)).toBe(false);
+		expect(publishBlocker("## Summary", reviews)).toContain(INTERFACE);
+		expect(missingPastReviews(reviews)?.stage).toBe("thermonuclear");
+	});
+
+	test("a PR whose size is unknown never takes the fast path", () => {
+		expect(reviewsOf("## Summary", ["README.md"], 1, () => undefined).thermonuclear).toEqual({ needed: true, done: false });
 	});
 });

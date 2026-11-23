@@ -207,9 +207,9 @@ function checkout(reviewPaths?: string, uiPaths?: string, mainCheckout?: string)
 	return dir;
 }
 
-/** `gh pr view --json body,changedFiles,files,url` answering with this body and changed files, for PR 7 of `repository`, as `host/owner/name`. */
+/** `gh pr view --json body,changedFiles,additions,deletions,files,url` answering with this body and changed files, too many changed lines for the fast path, for PR 7 of `repository`, as `host/owner/name`. */
 function prView(body: string, files: string[] = [], repository = "github.com/me/app") {
-	return { code: 0, stdout: JSON.stringify({ body, changedFiles: files.length, files: files.map(path => ({ path })), url: `https://${repository}/pull/7` }), stderr: "" };
+	return { code: 0, stdout: JSON.stringify({ body, changedFiles: files.length, additions: 200, deletions: 0, files: files.map(path => ({ path })), url: `https://${repository}/pull/7` }), stderr: "" };
 }
 
 /** gh's answers in a checkout of `checkoutOf`: `view` for the PR, and whether the user may push to the PR's repository `pr`, where `push: "error"` fails that read; both as `host/owner/name`. */
@@ -391,9 +391,9 @@ describe("ship publication gate", () => {
 		expect(result).toBeNull();
 		expect(confirmations).toBe(1);
 		expect(executed).toEqual([
-			["pr", "view", "--json", "body,changedFiles,files,url"],
+			["pr", "view", "--json", "body,changedFiles,additions,deletions,files,url"],
 			["auth", "status", "--json", "hosts"],
-			["env", "-u", "GITHUB_TOKEN", "pr", "view", "--json", "body,changedFiles,files,url"],
+			["env", "-u", "GITHUB_TOKEN", "pr", "view", "--json", "body,changedFiles,additions,deletions,files,url"],
 			["env", "-u", "GITHUB_TOKEN", "api", "repos/me/app", "--hostname", "github.com", "--jq", ".permissions.push"],
 			["env", "-u", "GITHUB_TOKEN", "repo", "view", "--json", "url", "-q", ".url"],
 		]);
@@ -482,11 +482,11 @@ describe("checked PR description CLI", () => {
 describe("ship_stage review gates", () => {
 	const INTERFACE_BOX = "- [x] Interface review";
 	const THERMONUCLEAR_BOX = "- [x] Thermo-nuclear code quality review";
-	// GitHub's answer to the gate's read of a PR with this body changing `file`.
-	const prRead = (body: string, file: string, isDraft = true, statusCheckRollup: object = { state: "SUCCESS" }) => {
+	// GitHub's answer to the gate's read of a PR with this body changing `file` by `additions` lines, by default too many for the fast path.
+	const prRead = (body: string, file: string, isDraft = true, statusCheckRollup: object = { state: "SUCCESS" }, additions = 200) => {
 		const pullRequest = {
 			state: "OPEN", isDraft, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: null, body,
-			changedFiles: 1, files: { nodes: [{ path: file }] },
+			changedFiles: 1, additions, deletions: 0, files: { nodes: [{ path: file }] },
 			reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } },
 			commits: { nodes: [{ commit: { statusCheckRollup } }] },
 		};
@@ -528,6 +528,22 @@ describe("ship_stage review gates", () => {
 		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
 		expect(written(result.executed)).toBe(`Unreviewed PR\n${THERMONUCLEAR_BOX}`);
 		expect(result.text).toStartWith(`Checked \`${THERMONUCLEAR_BOX}\` in the PR body.`);
+	});
+
+	test.each([
+		["a small PR skips both reviews on the fast path, with no verdicts", 10, true],
+		["a large PR still needs the thermonuclear verdicts", 200, false],
+	])("%s", (_, additions, fast) => {
+		const env = quotaConfig();
+		const result = exercise("ship", {
+			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name", output: before.live }, entries,
+			responses: { "api graphql": prRead("Small PR", "README.md", true, { state: "SUCCESS" }, additions), "api repos/owner/name/pulls/7": restRead("Small PR"), "api -X": patched },
+		}, env);
+		expect(result.run.isError).toBe(!fast);
+		if (!fast) expect(result.text).toContain("Thermonuclear stage's output");
+		expect(written(result.executed)).toBeNull();
+		const line = JSON.parse(readFileSync(join(env.XDG_CONFIG_HOME!, "omp-agents/ship-trace.jsonl"), "utf8").trim());
+		expect(line).toMatchObject({ stage: "ready_gate", recorded: fast, fastPath: fast });
 	});
 
 	test("recording ready_gate ticks the template's unchecked boxes in place", () => {
@@ -627,8 +643,8 @@ describe("ship_stage review gates", () => {
 		}, env);
 		const lines = readFileSync(join(env.XDG_CONFIG_HOME!, "omp-agents/ship-trace.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line));
 		expect(lines.map(({ ts, ...line }) => (expect(Date.parse(ts)).not.toBeNaN(), line))).toEqual([
-			{ session: "session", repo: "owner/name", pr: 7, stage: "live", tokens: 100, cost: 0.5, checks: "fail", recorded: true, output: before.live },
-			{ session: "session", repo: "owner/name", pr: 7, stage: "fix_ci", tokens: 150, cost: 0.75, round: 1, checks: "fail", recorded: true },
+			{ session: "session", repo: "owner/name", pr: 7, stage: "live", tokens: 100, cost: 0.5, checks: "fail", recorded: true, output: before.live, fastPath: false },
+			{ session: "session", repo: "owner/name", pr: 7, stage: "fix_ci", tokens: 150, cost: 0.75, round: 1, checks: "fail", recorded: true, fastPath: false },
 		]);
 	});
 
@@ -713,7 +729,7 @@ describe("ship_stage merged", () => {
 	const prIn = (state: "OPEN" | "MERGED") => {
 		const pullRequest = {
 			state, isDraft: false, mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN", reviewDecision: null, body: "",
-			changedFiles: 1, files: { nodes: [{ path: "README.md" }] },
+			changedFiles: 1, additions: 200, deletions: 0, files: { nodes: [{ path: "README.md" }] },
 			reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } },
 			commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
 		};

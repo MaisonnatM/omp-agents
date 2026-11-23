@@ -72,3 +72,11 @@ omp config get retry.paidFallback
 - `judge`: the `:auto` effort classifier, unexpected-stop detection, and eval `judge()`.
 
 The `council` agent reads no role: the council skill passes one model per provider on each spawn, which `task.perCallModelAllow` limits to its three, and its Gemini Pro member spends Cursor quota with no fallback.
+
+## Planner and worker agents
+
+The session and `poteto-agent` plan, make design calls, debug, and review on the session's model; that stays the strongest model.
+`poteto-worker` sets `model: anthropic/claude-sonnet-5-5:medium` in its frontmatter and reads no role: use it for editing tasks the planner fully specified, naming every file, the change in each, and the check that proves it done.
+Keep work with an open design choice, an unknown bug cause, or a judgment call on `poteto-agent`; a worker that hits one stops and reports the question to the planner.
+Its model has no fallback chain, so when Anthropic reports no quota left, run that task on `poteto-agent`.
+Change its model with `task.agentModelOverrides` for `poteto-worker`, using a selector that `omp models --json` lists, and read the setting back; `docs/architecture/token-cost.md` in the omp-agents repository describes the replay that compares worker models.
