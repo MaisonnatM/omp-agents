@@ -9,6 +9,11 @@ import { BOARD_COMMANDS, type BoardCommand, type BoardIndex, type BoardState, ty
 import { AttachmentCard } from "./attachments";
 import { Composer } from "./composer";
 import { Avatar, Chip, feedLead, leaseLabel, relTime, TaskChip } from "./parts";
+import type { Workspace } from "../../../src/shared/workspaces";
+import { DirectoryPicker } from "../workspace-picker";
+
+/** Where the workspace a Board thread last started a session in is kept, so the next thread offers it first. */
+const LAST_WORKSPACE_KEY = "board.lastWorkspace";
 
 const DONE = BOARD_COMMANDS.find(command => command.name === "done")!;
 
@@ -19,7 +24,10 @@ interface ThreadViewProps {
 	members: Member[];
 	now: number;
 	typing?: Member;
-	onPost: (text: string) => void;
+	/** The workspaces the composer's picker offers while the thread's next message starts a session. */
+	workspaces: Workspace[];
+	/** Posts `text`; `cwd` is where the session it starts runs, when it starts one. */
+	onPost: (text: string, cwd?: string) => void;
 	onCommand: (command: BoardCommand, arg: string) => void;
 	/** Closes the thread; the narrow page, which hides the list while a thread is open, shows this as Back to list. */
 	onClose: () => void;
@@ -28,7 +36,7 @@ interface ThreadViewProps {
 	onNext?: () => void;
 }
 
-export function ThreadView({ state, index, thread, members, now, typing, onPost, onCommand, onClose, onPrevious, onNext }: ThreadViewProps) {
+export function ThreadView({ state, index, thread, members, now, typing, workspaces, onPost, onCommand, onClose, onPrevious, onNext }: ThreadViewProps) {
 	const byId = index.memberById;
 	const messages = index.messagesByThread.get(thread.id) ?? [];
 	// Keyed on the names, not the roster's identity, which every presence change renews: a new tokenizer renders every message again.
@@ -36,6 +44,15 @@ export function ThreadView({ state, index, thread, members, now, typing, onPost,
 	const tokenize = useMemo(() => boardTokens(members), [names]);
 	const preset = useMemo(() => boardMessagePreset(tokenize), [tokenize]);
 	const channel = index.channelById.get(thread.channel)?.name ?? thread.channel;
+	// A message here starts a session while no agent posted yet; inside a project, the project picks the workspace.
+	const startsSession = !index.channelById.get(thread.channel)?.project && messages.every(msg => byId.get(msg.author)?.kind === "human");
+	const [cwd, setCwd] = useState(() => localStorage.getItem(LAST_WORKSPACE_KEY) ?? workspaces[0]?.cwd ?? "~");
+	const post = (text: string) => {
+		if (!startsSession) return onPost(text);
+		localStorage.setItem(LAST_WORKSPACE_KEY, cwd);
+		onPost(text, cwd);
+	};
+	const picker = startsSession ? <DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={false} tooltip={`Starts a session in ${cwd}`} onPick={setCwd} /> : undefined;
 	const scroller = useRef<HTMLDivElement>(null);
 	const [showInternal, setShowInternal] = useState(true);
 	const [details, setDetails] = useState(false);
@@ -125,7 +142,7 @@ export function ThreadView({ state, index, thread, members, now, typing, onPost,
 						)}
 					</ol>
 				</div>
-				<Composer members={members} tokenize={tokenize} onPost={onPost} onCommand={onCommand} channel={channel} />
+				<Composer members={members} tokenize={tokenize} picker={picker} onPost={post} onCommand={onCommand} channel={channel} />
 				</div>
 				<aside
 					aria-label="Details"

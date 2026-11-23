@@ -15,7 +15,7 @@ export const SESSIONS_CHANNEL = { id: "c-sessions", name: "sessions", about: "Ea
 export const sessionThreadId = (sessionId: string): string => `t-session-${sessionId}`;
 
 /** What the feed reads and does. */
-export type BoardFeedDeps = Omit<BoardEnv, "stopping" | "wake" | "wakeBot">;
+export type BoardFeedDeps = Omit<BoardEnv, "stopping" | "wake" | "wakeBot" | "startSession" | "workspaces">;
 
 type Phase = "asking" | "working" | "idle";
 

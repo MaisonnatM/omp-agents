@@ -44,6 +44,8 @@ export interface Message {
 	text: string;
 	/** Internal notes stay on the board and never sync out. */
 	internal?: boolean;
+	/** The directory a session this message starts runs in, which the composer's workspace picker sets outside a project. */
+	cwd?: string;
 	attachment?: Attachment;
 }
 
@@ -551,7 +553,7 @@ const isAttachment = tagged<Attachment, "kind">("kind", {
 	workflow: { command: isString, steps: arrayOf(fields<{ label: string; state: StepState }>({ label: isString, state: isStepState })) },
 	schedule: { text: isString, at: isNumber, every: nullable(isNumber) },
 });
-const isMessage: Guard<Message> = fields<Message>({ id: isNonEmpty, thread: isNonEmpty, author: isNonEmpty, at: isNumber, text: isString, internal: optional(isBoolean), attachment: optional(isAttachment) });
+const isMessage: Guard<Message> = fields<Message>({ id: isNonEmpty, thread: isNonEmpty, author: isNonEmpty, at: isNumber, text: isString, internal: optional(isBoolean), attachment: optional(isAttachment), cwd: optional(isNonEmpty) });
 const isSchedule: Guard<Schedule> = fields<Schedule>({ id: isNonEmpty, thread: isNonEmpty, by: isNonEmpty, to: isNonEmpty, toName: optional(isNonEmpty), text: isString, at: isNumber, every: nullable(isNumber) });
 const isChannelProject: Guard<ChannelProject> = fields<ChannelProject>({ goal: isString, decisions: arrayOf(isString), sessionIds: arrayOf(isNonEmpty), createdAt: isNumber, archivedAt: optional(isNumber) });
 const isChannel: Guard<Channel> = fields<Channel>({ id: isNonEmpty, name: isNonEmpty, about: isString, project: optional(isChannelProject) });

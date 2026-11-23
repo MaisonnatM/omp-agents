@@ -3,10 +3,11 @@
  * it is for, which resumes a session that ended and starts a Bot's conversation it has not had yet; and a schedule that
  * comes due is posted. A message is for a member when it mentions it, or when a person writes in a thread the member
  * posted in; an agent's message wakes only the members it mentions, so two agents in one thread do not wake each other
- * forever.
+ * forever. A person's message that is for no one, in a thread no agent posted in, starts a new session on it.
  */
 import { randomUUID } from "node:crypto";
-import { type BoardState, boardMembers, isMention, type Member, type Message } from "../shared/board";
+import { type BoardState, boardMembers, isMention, type Member, type Message, sessionMemberId } from "../shared/board";
+import { defaultLook } from "../shared/bots";
 import type { BoardEnv } from "../board-module";
 
 /** What waking reads and does. */
@@ -21,6 +22,21 @@ export function wakeTargets(state: BoardState, members: readonly Member[], msg: 
 		if (isMention(msg.text, member)) return true;
 		return byPerson && state.messages.some(other => other.thread === msg.thread && other.author === member.id);
 	});
+}
+
+/** Whether a person's `msg` should start a session: it is for no one, and no agent posted in its thread yet. */
+export function startsSession(state: BoardState, members: readonly Member[], msg: Message): boolean {
+	if (msg.internal || msg.attachment || members.find(member => member.id === msg.author)?.kind !== "human") return false;
+	return !state.messages.some(other => other.thread === msg.thread && members.find(member => member.id === other.author)?.kind !== "human");
+}
+
+/** Where a session started from `msg` runs: its project's newest live session's directory, else the directory `msg` picked, else the first workspace, else home. */
+function startPlace(state: BoardState, deps: BoardWakeDeps, msg: Message): { cwd: string; projectId: string | null } {
+	const channelId = state.threads.find(item => item.id === msg.thread)?.channel;
+	const project = state.channels.find(item => item.id === channelId && item.project && !item.project.archivedAt);
+	const hosts = deps.hosts();
+	const projectHost = project?.project?.sessionIds.toReversed().flatMap(id => hosts.find(host => host.sessionId === id) ?? [])[0];
+	return { cwd: projectHost?.cwd ?? msg.cwd ?? deps.workspaces()[0] ?? "~", projectId: project?.id ?? null };
 }
 
 /** What a woken session reads: where the message is, who wrote it, and how to answer. */
@@ -41,6 +57,8 @@ export class BoardWake {
 	readonly #deps: BoardWakeDeps;
 	/** The messages already handled, so each wakes its sessions once. */
 	readonly #seen: Set<string>;
+	/** The threads a session is starting for, so a second message before it posts does not start another. */
+	readonly #starting = new Set<string>();
 
 	constructor(deps: BoardWakeDeps) {
 		this.#deps = deps;
@@ -69,7 +87,24 @@ export class BoardWake {
 				const woken = target.botId ? this.#deps.wakeBot(target.botId, prompt) : this.#deps.wake(target.sessionId!, prompt);
 				woken.catch(err => console.error(`The Board could not wake ${target.name}:`, err));
 			}
+			if (targets.length === 0 && !this.#starting.has(msg.thread) && startsSession(state, members, msg)) this.#start(state, members, msg);
 		}
+	}
+
+	/** Starts a session on `msg` and posts its first line in the thread, which makes it the thread's member. */
+	#start(state: BoardState, members: readonly Member[], msg: Message): void {
+		const { cwd, projectId } = startPlace(state, this.#deps, msg);
+		const title = state.threads.find(item => item.id === msg.thread)?.title ?? "Board thread";
+		this.#starting.add(msg.thread);
+		this.#deps
+			.startSession(cwd, wakePrompt(state, members, msg), projectId)
+			.then(sessionId => {
+				const id = sessionMemberId(sessionId);
+				this.#deps.apply({ op: "member", member: { id, name: title, kind: "agent", presence: "asleep", look: defaultLook(sessionId), sessionId } });
+				this.#deps.apply({ op: "post", message: { id: randomUUID(), thread: msg.thread, author: id, at: this.#deps.now(), text: `Started a session in ${cwd} on this thread.`, internal: true } });
+			})
+			.catch(err => console.error(`The Board could not start a session for thread ${msg.thread}:`, err))
+			.finally(() => this.#starting.delete(msg.thread));
 	}
 
 	/** Posts every schedule that came due. */

@@ -15,6 +15,8 @@ After each Board change, `BoardWake` (`src/server/board-wake.ts`) sends every ne
 
 An agent's message wakes only the sessions it mentions, so two agents sharing a thread cannot wake each other in a loop.
 A session that posts or is mentioned stays a Board member after it ends, so a later mention resumes it.
+A person's message that wakes no one, in a thread no session or Bot posted in, starts a new session on it instead of going nowhere; the session posts a first line in the thread, which makes the thread's later messages reach it.
+Outside a project it starts in the directory the composer's picker set on the message, which defaults to the last one picked, else the first workspace; in a project channel in the directory of the project's newest live session, joined to the project.
 Bots are Board members too, and a message for a Bot goes to its conversation through `Bots.message`, which resumes it or starts its first one.
 Only the server holding the owner lock wakes sessions or fires schedules, like the other inboxes.
 

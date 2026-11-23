@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- A message you write in a new Board thread now starts a session on it, and your replies in that thread reach the session; before, a message that mentioned no one went nowhere.
+- While a Board thread's next message starts a session, its reply box shows a directory picker for where that session runs, set to the folder you picked last.
 - Agents can now add a whole project plan, with its sub-steps, in one board call: the step and project actions take a list of steps.
 - A session watching a pull request is now woken only when it has something to do: checks failing, new unresolved review threads, changes requested, or a merge or close. Checks passing and approvals no longer wake it, unless it asked to merge once the pull request is ready.
 - A pull request change now wakes a session only once it has lasted a minute, so a check that fails and passes again wakes nothing, and the message names only the net change.

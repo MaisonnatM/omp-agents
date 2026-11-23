@@ -41,7 +41,7 @@ import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchedKinds } from "../routine
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { agentOn } from "../shared/moves";
-import { awaitsSubagents, type StartRequest, type StartResult, type View } from "../shared/sessions";
+import { awaitsSubagents, newSessionRequest, type StartRequest, type StartResult, type View } from "../shared/sessions";
 import { inAppData } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
@@ -487,6 +487,14 @@ export class Dashboard {
 			bots: () => this.#botsFile.value,
 			wake: async (sessionId, text) => (await reach(sessionId)).prompt(null, text, [], "followUp"),
 			wakeBot: async (botId, text) => void (await this.#bots.message(botId, text)),
+			async startSession(cwd, prompt, projectId) {
+				const result = await startSession(newSessionRequest(cwd, prompt, { projectId }));
+				if (!result.ok) throw new Error(result.error);
+				const started = sessions.get(result.instanceId);
+				if (!started) throw new Error("The session exited as it started.");
+				return started.sessionId;
+			},
+			workspaces: () => this.#workspaceCwds(),
 			active: () => ownerLock.held,
 			now: Date.now,
 			stopping,

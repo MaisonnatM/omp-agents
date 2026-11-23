@@ -34,5 +34,8 @@ It is a page of its own, not a list of sessions: the **Sessions** sidebar still 
 
 - A message that mentions a session or a Bot sends it to that session as a follow-up, and resumes it when it ended.
 - A message you write in a thread also reaches every session that posted there.
+- A message you write that is for no one, in a thread no session or Bot posted in yet, such as the first message of a **New thread**, starts a new session on it.
+  Outside a project, it runs in the folder the composer's directory picker shows, which starts on the folder you last picked; in a project channel, it runs where the project's newest live session runs, and joins the project.
+  The session posts "Started a session in …" in the thread, and your later replies there reach it.
 - A message an agent writes reaches only the members it mentions, so two agents in one thread never wake each other forever.
 - Sessions post and read through their `board` tool.
