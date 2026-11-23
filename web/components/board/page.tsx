@@ -1,5 +1,5 @@
 /** The Board: channels and threads where people, omp sessions, and remote agents post, with an inbox per member; a message for a session wakes it. */
-import { IconArrowUp, IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconShieldCheck, IconSidebarSimpleRightWide } from "central-icons";
+import { IconArrowUp, IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconPlusSmall, IconShieldCheck, IconSidebarSimpleRightWide } from "central-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -8,7 +8,7 @@ import { hashForPage } from "../../routing";
 import { type Attachment, type BoardChange, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
 import type { CoreData } from "../module-views";
 import { type BoardRoute, type BoardView, resolveBoardView } from "./module";
-import { Avatar, MIN, relTime, UNITS, useNow } from "./parts";
+import { Avatar, MIN, NameDialog, relTime, UNITS, useNow } from "./parts";
 
 const COMMANDS = [
 	{ name: "review", about: "Run the review panel on this thread and post the verdict here" },
@@ -54,6 +54,12 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 
 	function post(threadId: string, text: string, extra: Partial<Message> = {}) {
 		onChange({ op: "post", message: { id: crypto.randomUUID(), thread: threadId, author: state.me, at: Date.now(), text, ...extra } });
+	}
+
+	function createThread(channel: string, title: string) {
+		const id = `t-${crypto.randomUUID()}`;
+		onChange({ op: "thread", thread: { id, channel, title, task: null, lease: null, labels: [], blockedBy: [], createdAt: Date.now() } });
+		setOpen(id);
 	}
 
 	function runCommand(threadId: string, command: string, arg: string) {
@@ -114,7 +120,7 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 			<div className="grid h-full min-h-0 grid-cols-[minmax(14rem,26rem)_minmax(0,1fr)] max-phone:grid-cols-1 @max-[46rem]:grid-cols-1">
 				{/* Too narrow for the list beside a 30rem thread: an open thread takes the page, with a way back to the list. */}
 				<div className={cn("grid min-h-0 min-w-0", thread && "@max-[46rem]:hidden max-phone:hidden")}>
-					<ListColumn state={state} members={members} byId={byId} view={view} open={open} onOpen={setOpen} now={now} queue={inboxItems} />
+					<ListColumn state={state} members={members} byId={byId} view={view} open={open} onOpen={setOpen} onCreateThread={createThread} now={now} queue={inboxItems} />
 				</div>
 			{thread ? (
 				<ThreadView
@@ -141,8 +147,9 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 
 /* ─────────────────────────── List column ─────────────────────────── */
 
-function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { state: BoardState; members: Member[]; byId: Map<string, Member>; view: BoardView; open: string | null; onOpen: (id: string) => void; now: number; queue: Message[] }) {
+function ListColumn({ state, members, byId, view, open, onOpen, onCreateThread, now, queue }: { state: BoardState; members: Member[]; byId: Map<string, Member>; view: BoardView; open: string | null; onOpen: (id: string) => void; onCreateThread: (channel: string, title: string) => void; now: number; queue: Message[] }) {
 	const [q, setQ] = useState("");
+	const [naming, setNaming] = useState(false);
 	let title = "Inbox";
 	let meta = INBOX_META;
 	let body: ReactNode;
@@ -183,7 +190,7 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 		title = `#${channel.name}`;
 		meta = channel.about;
 		const threads = state.threads.filter(thread => thread.channel === channel.id && thread.title.toLowerCase().includes(q.toLowerCase())).toSorted((a, b) => (lastIn(state, b.id)?.at ?? 0) - (lastIn(state, a.id)?.at ?? 0));
-		body = threads.map(thread => <ThreadCard key={thread.id} thread={thread} state={state} byId={byId} now={now} selected={open === thread.id} onOpen={onOpen} />);
+		body = threads.length === 0 ? <ListEmpty>{q ? "No thread matches." : "No threads yet. Start one with New thread."}</ListEmpty> : threads.map(thread => <ThreadCard key={thread.id} thread={thread} state={state} byId={byId} now={now} selected={open === thread.id} onOpen={onOpen} />);
 	} else {
 		const member = byId.get(view.id)!;
 		const waiting = queueOf(state, member);
@@ -210,7 +217,18 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 	}
 	return (
 		<section aria-label={title} className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-border">
-			<ListHeader title={title} meta={meta} />
+			<ListHeader
+				title={title}
+				meta={meta}
+				action={
+					view.kind === "channel" && (
+						<Button size="compact" variant="outline" onClick={() => setNaming(true)}>
+							<IconPlusSmall />
+							New thread
+						</Button>
+					)
+				}
+			/>
 			{view.kind === "channel" && (
 				<label className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-4 text-sm text-muted-foreground">
 					<IconMagnifyingGlass className="size-3.5" />
@@ -218,19 +236,21 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 				</label>
 			)}
 			<div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">{body}</div>
+			{naming && view.kind === "channel" && <NameDialog title={`New thread in ${title}`} label="Thread title" onSave={name => onCreateThread(view.id, name)} onClose={() => setNaming(false)} />}
 		</section>
 	);
 }
 
 const INBOX_META = "Mentions and replies waiting for you";
 
-function ListHeader({ title, meta }: { title: string; meta: string }) {
+function ListHeader({ title, meta, action }: { title: string; meta: string; action?: ReactNode }) {
 	return (
 		<header className="flex h-(--page-header-height) shrink-0 items-center gap-3 border-b border-border px-4">
 			<div className="min-w-0 flex-1">
 				<h2 className="truncate text-sm font-semibold">{title}</h2>
 				<p className="truncate text-xs text-muted-foreground">{meta}</p>
 			</div>
+			{action}
 		</header>
 	);
 }
