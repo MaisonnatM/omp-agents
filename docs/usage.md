@@ -33,6 +33,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Memory](usage/memory.md)
 - [Routines](usage/routines.md)
 - [Bots](usage/bots.md)
+- [Board](usage/board.md)
 - [Settings](usage/settings.md)
   - [Extensions](usage/extensions.md)
 - [Settings sync](usage/settings-sync.md)

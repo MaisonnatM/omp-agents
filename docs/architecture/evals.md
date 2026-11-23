@@ -12,6 +12,8 @@ Each task is a prompt, the base commit it started from, and a hidden check: the 
 3. A landing is left out when it touches `desktop/`, `package.json`, or `bun.lock`, changes more than 300 lines outside tests and docs, or its commit messages run past 4000 characters.
 4. The prompt is the branch's commit messages, without their `Omp-Session`, `test-change`, and other trailers.
    When a hidden test imports a name the base does not export, the prompt lists that import, so a run is not failed for naming a new function differently.
+   It also lists, word for word, every other name and quoted text a hidden test uses that the landing adds outside tests and docs and the base never has, such as a setting's key, a tool parameter, or an error message.
+   Without that list, 2 of the pilot's first 5 runs failed on a setting key or a tool parameter the commit messages never named, as [the pilot](evals-pilot-2026-11-23.md) records.
 5. `--verify` keeps a candidate only when its check fails at the base with the hidden tests in place and passes at the landed commit, in one temporary worktree, newest first, until 20 are kept.
 
 Rebuild the set with `bun scripts/evals/candidates.ts --verify > scripts/evals/tasks.json`; a new set changes every number, so compare runs only on the same set.
@@ -57,7 +59,10 @@ Each run replays the task the way [Worker model replay](token-cost.md#worker-mod
 
 - A new repository holds the base's history and nothing after it, after the repository's `.omp/land.json` setup.
 - `omp -p` runs the prompt in it under macOS's `sandbox-exec`, which hides the real repository, its worktrees, and their session folders, with no way to a remote, so a run cannot copy the landed change.
+- The sandbox also hides `--out` and every `~/.cache/omp-evals*` folder except the run's own, so a run cannot copy another run's change or a dry run's landed one; the pilot's first try did exactly that.
+- The run's environment drops the `PI_*` and `OMPCODE` variables an omp session sets, so a set started from inside a session starts clean.
 - Unlike a model replay, a run keeps the full harness: every extension and skill the user's omp loads.
+- It turns off every MCP server in `~/.omp/agent/mcp.json` through `disabledExtensions`, so a run cannot post to Slack or Linear and does not wait 30 seconds each on their startup.
 - A config overlay pins every model role to `--model`, Opus by default, with no fallback.
 - `XDG_CONFIG_HOME` points at the run's folder, so the kit's extensions, such as `/ship`'s trace, write there and not to the user's own files.
 - After the run, the hidden tests are written from the landed commit over whatever the agent wrote, and the check runs outside the sandbox.

@@ -40,7 +40,8 @@ export function annotationReference(label: string, content: string): string {
 	return `${fence}${inner}${fence}`;
 }
 
-interface Pattern {
+/** One kind of reference: where it reads, and the chip it reads as. The regular expression is global. */
+export interface Pattern {
 	re: RegExp;
 	/** Only at the very start of the prompt, as omp reads a command. */
 	leading?: true;
@@ -77,25 +78,33 @@ const PATTERNS: readonly Pattern[] = [
 ];
 
 /**
- * The references in `text`, left to right and never overlapping. `open` is the caret while the user types: a reference
- * ending there may still be written, as `/mo` on the way to `/move`, so it stays text. `leading` says `text` starts the
- * prompt, where a command or skill may sit.
+ * Finds the references in `text`, left to right and never overlapping. `open` is the caret while the user types: a
+ * reference ending there may still be written, as `/mo` on the way to `/move`, so it stays text. `leading` says `text`
+ * starts the prompt, where a command or skill may sit.
  */
-export function promptTokens(text: string, { open = null, leading = true }: { open?: number | null; leading?: boolean } = {}): PromptToken[] {
-	const found: PromptToken[] = [];
-	for (const pattern of PATTERNS) {
-		if (pattern.leading && !leading) continue;
-		pattern.re.lastIndex = 0;
-		for (let match = pattern.re.exec(text); match; match = pattern.re.exec(text)) {
-			const end = match.index + match[0].length;
-			if (end !== open) found.push({ ...pattern.token(match), start: match.index, end });
+export type Tokenize = (text: string, options?: { open?: number | null; leading?: boolean }) => PromptToken[];
+
+/** The `Tokenize` that reads `patterns`; where two overlap, the earlier and then the longer wins. */
+export function tokenizer(patterns: readonly Pattern[]): Tokenize {
+	return (text, { open = null, leading = true } = {}) => {
+		const found: PromptToken[] = [];
+		for (const pattern of patterns) {
+			if (pattern.leading && !leading) continue;
+			pattern.re.lastIndex = 0;
+			for (let match = pattern.re.exec(text); match; match = pattern.re.exec(text)) {
+				const end = match.index + match[0].length;
+				if (end !== open) found.push({ ...pattern.token(match), start: match.index, end });
+			}
 		}
-	}
-	found.sort((a, b) => a.start - b.start || b.end - a.end);
-	const tokens: PromptToken[] = [];
-	for (const token of found) if (tokens.length === 0 || token.start >= tokens[tokens.length - 1].end) tokens.push(token);
-	return tokens;
+		found.sort((a, b) => a.start - b.start || b.end - a.end);
+		const tokens: PromptToken[] = [];
+		for (const token of found) if (tokens.length === 0 || token.start >= tokens[tokens.length - 1].end) tokens.push(token);
+		return tokens;
+	};
 }
+
+/** The references omp reads in a prompt. */
+export const promptTokens: Tokenize = tokenizer(PATTERNS);
 
 interface MdNode {
 	type: string;
@@ -111,11 +120,11 @@ const chipNode = ({ kind, label, target }: PromptToken): MdNode => ({
 	data: { hName: "span", hProperties: { dataChip: kind, dataLabel: label, dataTarget: target } },
 });
 
-function chipText(node: MdNode): MdNode[] {
+function chipText(node: MdNode, tokenize: Tokenize): MdNode[] {
 	const text = node.value ?? "";
 	const nodes: MdNode[] = [];
 	let at = 0;
-	for (const token of promptTokens(text, { leading: node.position?.start.offset === 0 })) {
+	for (const token of tokenize(text, { leading: node.position?.start.offset === 0 })) {
 		if (token.start > at) nodes.push({ type: "text", value: text.slice(at, token.start) });
 		nodes.push(chipNode(token));
 		at = token.end;
@@ -124,20 +133,23 @@ function chipText(node: MdNode): MdNode[] {
 	return nodes;
 }
 
-function chipTree(parent: MdNode, source: string): void {
+function chipTree(parent: MdNode, source: string, tokenize: Tokenize): void {
 	if (!parent.children) return;
 	parent.children = parent.children.flatMap(node => {
-		if (node.type === "text") return chipText(node);
+		if (node.type === "text") return chipText(node, tokenize);
 		if (node.type === "link" || node.type === "inlineCode") {
 			// A pull request or person is a markdown link, and a Browser annotation a code span, which the parser has already taken apart: match its source.
 			const written = source.slice(node.position?.start.offset, node.position?.end.offset);
-			const [token] = promptTokens(written, { leading: false });
+			const [token] = tokenize(written, { leading: false });
 			return token && token.start === 0 && token.end === written.length ? [chipNode(token)] : [node];
 		}
-		chipTree(node, source);
+		chipTree(node, source, tokenize);
 		return [node];
 	});
 }
 
-/** A remark plugin that makes each reference in a sent prompt a chip, as the composer showed it. */
-export const remarkPromptChips = () => (tree: MdNode, file: { value: unknown }) => chipTree(tree, String(file.value));
+/** A remark plugin that makes each reference `tokenize` finds in sent text a chip, as the composer showed it. */
+export const remarkChips = (tokenize: Tokenize) => () => (tree: MdNode, file: { value: unknown }) => chipTree(tree, String(file.value), tokenize);
+
+/** `remarkChips` for omp's prompt grammar. */
+export const remarkPromptChips = remarkChips(promptTokens);

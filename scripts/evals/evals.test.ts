@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildPrompt, type EvalTask, exportsName, namedImports } from "./candidates";
+import { buildPrompt, type EvalTask, exportsName, namedImports, testTerms } from "./candidates";
 import { arms, type EvalRow, summarize } from "./run";
 
 describe("hidden test imports", () => {
@@ -33,6 +33,20 @@ describe("hidden test imports", () => {
 		expect(buildPrompt("Start empty\n", [])).not.toContain("import");
 		expect(buildPrompt("Start empty\n", [{ module: "src/shared/board.ts", names: ["emptyBoard"] }])).toContain(
 			'- import { emptyBoard } from "src/shared/board.ts"',
+		);
+	});
+
+	test("reads a test's names and its quoted texts, leaving out short and interpolated ones", () => {
+		const { names, texts } = testTerms('expect(call({ in_minutes: 0 })).rejects.toThrow("in_minutes must be from 1 to 10080.");\nconst id = `p${n}`; it("ok");');
+		expect(names.has("in_minutes")).toBe(true);
+		expect(names.has("id")).toBe(false);
+		expect([...texts]).toEqual(["in_minutes must be from 1 to 10080."]);
+	});
+
+	test("the prompt lists the new names and texts word for word", () => {
+		expect(buildPrompt("Stop idle sessions\n", [])).not.toContain("word for word");
+		expect(buildPrompt("Stop idle sessions\n", [], ["stopIdleSessionsAfterHours", 'say "no"'])).toContain(
+			'word for word:\n- "stopIdleSessionsAfterHours"\n- "say \\"no\\""',
 		);
 	});
 });

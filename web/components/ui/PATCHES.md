@@ -32,6 +32,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `afterActions`: a slot under the action bar, inside the composer's frame, where the dashboard renders its suggested prompts.
 - `useRegionHeight` and `useIsTouch` move to `hooks/use-region-height.ts` and `hooks/use-is-touch.ts`, and `FilePreviewTile` to `ui/file-preview-tile.tsx`, so the dashboard's rows in the slots animate and reveal their × as the attachments do.
 - `InputMessage` is wrapped in `memo` around its `forwardRef`, so a parent's render that leaves its props unchanged skips the composer.
+- `tokenize`: which references the text field shows as chips, omp's prompt grammar by default; the Board's composer chips its members and workflows instead.
 - The default export and the `InputMessageProps`, `InputMessageSlotContext`, and `QueuedMessage` type exports are removed, since nothing imports them.
 
 ## `ui/chat-message.tsx`

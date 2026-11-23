@@ -6,8 +6,20 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-23
 
 - Behind the scenes: the eval set can now also replay merged yampa pull requests, each started from its Linear ticket and passed only when that pull request's own tests pass, run 3 times to show how often a task passes at least once; the first yampa set has 18 of its planned 20 tasks.
+- Behind the scenes: eval runs can no longer copy each other's work, post to Slack or Linear, or pick up the session they were started from, and their task prompts now spell out the exact names the tests expect; a first 5-task trial passed 1 to 2 of 5 for about $4 a round.
+- The Board's reply box is now the same composer as a session's, so its `@` and `/` lists look and work the same way, and a member you mention or a workflow you start shows as a chip.
+- Board messages now show Markdown, such as **bold**, *italic*, lists, and links.
+- A Board mention now counts when a comma or other punctuation follows it, such as `@Maxence,`, in any case, and `@Max` no longer wakes `@Maxence`; the composer's chips match exactly what wakes.
+- Behind the scenes: the Board composer and the session composers share one completion list core, `useCompletionMenu`, and the Board reads mentions and commands with one grammar in `src/shared/board.ts`.
+- The safety check now lets an agent keep the dashboard token in a shell variable when it only goes into a request header, and /ship now counts `astro check` and `playwright test` as test runs.
+- The Weekly harness review now saves the five failures it picks so you can replay them once its proposed change lands, and the next week it tells you whether that change fixed each one.
+- The Weekly harness review now also counts pull requests in every repository whose fixes ran out of rounds or stalled, grouped by cause.
+- If you never edited the Weekly harness review's instructions, it now gets the newest ones by itself; ones you edited stay yours.
 - A new eval set replays 20 real past tasks to check that harness changes help, and can switch off one part at a time to see which parts still matter.
 - The safety checks are now tested against 50 real past commands, so a rule change that blocks the wrong thing shows up; this caught a way around the git hooks check and a missed warning when reading pull request text in a loop, both now fixed.
+- The dashboard now opens on the Board's Inbox.
+- Each session now posts on the Board, in its own thread in #sessions, when it asks you something or finishes a turn you did not see, so your Inbox lists what waits for you.
+- A new Board page in the docs explains channels, threads, tasks, and how messages reach sessions.
 - /ship now skips the plan contest and both code reviews for a small change, up to 50 changed lines in 3 files that touch no shared or schema file, so quick fixes ship faster and cost less.
 - Edits the plan already spelled out now go to a cheaper worker agent, while planning, design calls, and reviews stay on the strongest model.
 - Behind the scenes: the note about a session's todos now comes as a message instead of changing the agent's standing instructions, so those instructions stay the same in every session and are read from the cache, which costs less.

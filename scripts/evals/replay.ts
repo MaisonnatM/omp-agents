@@ -3,7 +3,7 @@
  * `scripts/token-audit/model-replay.ts` and `scripts/evals/run.ts` share it, so both replay a task the same way.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { sessionPaths } from "../../src/omp/modules";
@@ -126,17 +126,29 @@ export function prepare(repo: string, base: string, dir: string): string {
  * hides `repo`, its worktrees, and their omp session folders, where the original change and
  * transcript sit; git rewrites every remote address to a missing folder, and gh has no sign-in.
  * Without them, replays copied the original change from a worktree and force-pushed a branch of the real repository.
+ * It also hides each folder in `hidden` except the run's own `dir`, such as the folder holding every replay: without
+ * that, a pilot run copied a sibling run's change from its clone.
+ * The environment drops the `PI_*` and `OMPCODE` variables an omp session sets for its own tools, so a replay started
+ * from inside a session does not inherit that session's file, id, and tool call.
  */
-export function confined(repo: string, dir: string, args: string[]): { sandboxArgs: string[]; env: Record<string, string | undefined> } {
+export function confined(
+	repo: string,
+	dir: string,
+	args: string[],
+	hidden: string[] = [],
+): { sandboxArgs: string[]; env: Record<string, string | undefined> } {
 	if (process.platform !== "darwin") throw new Error("a replay needs macOS's sandbox-exec to hide the task's checkouts from it");
-	const startingWith = (path: string) => `(regex #"^${path.replace(/[.*+?^$()|[\]{}\\"]/g, "\\$&")}($|[-/])")`;
+	// The sandbox matches resolved paths, such as /private/tmp for /tmp.
+	const startingWith = (path: string) =>
+		`(regex #"^${(existsSync(path) ? realpathSync(path) : path).replace(/[.*+?^$()|[\]{}\\"]/g, "\\$&")}($|[-/])")`;
 	const sessions = sessionPaths.sessionDirForCwd(repo, join(homedir(), ".omp", "agent", "sessions"));
-	const profile = `(version 1)(allow default)(deny file-read* file-write* ${startingWith(repo)} ${startingWith(sessions)})`;
+	const denied = [repo, sessions, ...hidden].map(startingWith).join(" ");
+	const profile = `(version 1)(allow default)(deny file-read* file-write* ${denied})(allow file-read* file-write* ${startingWith(dir)})`;
 	const remotes = ["https://", "http://", "ssh://", "git://", "git@"];
 	const gh = join(dir, "gh");
 	mkdirSync(gh, { recursive: true });
 	const env: Record<string, string | undefined> = {
-		...process.env,
+		...Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("PI_") && name !== "OMPCODE")),
 		GH_CONFIG_DIR: gh,
 		GH_TOKEN: undefined,
 		GITHUB_TOKEN: undefined,
