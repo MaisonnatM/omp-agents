@@ -6,7 +6,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import { useContext, useState } from "react";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
-import { hideTab, moveTab, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
+import { hideTab, moveTab, ROWLESS_TAB, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
 import { type Theme, THEMES, useTheme } from "../../theme";
 import { playSound, useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
@@ -49,9 +49,10 @@ function SidebarTabs() {
 			meta="The pages the sidebar lists, in order. A hidden tab's page, command, and links still work. Saved in this app."
 		>
 			<ShownOrderList
-				rows={layout.map(({ tab, hidden }) => {
+				rows={layout.flatMap(({ tab, hidden }) => {
+					if (tab === ROWLESS_TAB) return [];
 					const row = TAB_ROWS[tab];
-					return {
+					return [{
 						key: tab,
 						label: row.label,
 						shown: !hidden,
@@ -66,7 +67,7 @@ function SidebarTabs() {
 									.
 								</>
 							) : undefined,
-					};
+					}];
 				})}
 				onShow={(tab, shown) => setLayout(prev => hideTab(prev, tab, !shown))}
 				onMove={(tab, by) => setLayout(prev => moveTab(prev, tab, by))}
