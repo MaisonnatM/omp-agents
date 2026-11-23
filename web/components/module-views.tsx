@@ -12,6 +12,7 @@ import type { UserTodoList } from "../../src/user-todos-shared";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { SectionTarget } from "../section";
 import { useDashboardActions } from "./dashboard-context";
+import { BoardPage } from "./board/page";
 import { MemoryPage } from "./memory/page";
 import { ProjectsPage } from "./projects/page";
 import { SportNav } from "./sport/nav";
@@ -66,6 +67,7 @@ interface ModuleViews<I extends WebModuleId> {
 
 const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
 	memory: { Page: MemoryPage },
+	board: { Page: BoardPage },
 	sport: { Page: SportPage, Nav: SportNav },
 	projects: { Page: ProjectsPage },
 };
