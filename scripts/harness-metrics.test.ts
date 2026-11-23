@@ -154,9 +154,15 @@ describe("readSpend", () => {
 });
 
 describe("GitHub metrics", () => {
-	const run = (name: string, suite: number, minute: number, conclusion: string | null): CheckRun => ({ name, suite, startedAt: `2026-11-10T10:${String(minute).padStart(2, "0")}:00Z`, conclusion });
+	const run = (name: string, suite: number, minute: number, conclusion: string | null, required = true): CheckRun => ({ name, suite, startedAt: `2026-11-10T10:${String(minute).padStart(2, "0")}:00Z`, conclusion, required });
 	const prs: MergedPr[] = [
-		{ number: 1, mergedAt: Date.parse("2026-11-14T12:00:00Z"), changesRequested: 1, commits: [{ sha: "a", sessions: [D] }], firstCi: [run("lint", 1, 1, "success"), run("test", 1, 0, "cancelled"), run("test", 1, 2, "skipped")] },
+		{
+			number: 1,
+			mergedAt: Date.parse("2026-11-14T12:00:00Z"),
+			changesRequested: 1,
+			commits: [{ sha: "a", sessions: [D] }],
+			firstCi: [run("lint", 1, 1, "success"), run("test", 1, 0, "cancelled"), run("test", 1, 2, "skipped"), run("human-review", 2, 0, "failure", false)],
+		},
 		{
 			number: 2,
 			mergedAt: Date.parse("2026-11-19T12:00:00Z"),
@@ -167,7 +173,7 @@ describe("GitHub metrics", () => {
 			],
 			firstCi: [run("test", 1, 3, "success"), run("test", 1, 1, "failure")],
 		},
-		{ number: 3, mergedAt: Date.parse("2026-11-20T12:00:00Z"), changesRequested: 0, commits: [{ sha: "d", sessions: [E] }] },
+		{ number: 3, mergedAt: Date.parse("2026-11-20T12:00:00Z"), changesRequested: 0, commits: [{ sha: "d", sessions: [E] }], firstCi: [run("human-review", 2, 0, "success", false)] },
 		{ number: 4, mergedAt: Date.parse("2026-11-08T12:00:00Z"), changesRequested: 5, commits: [{ sha: "e", sessions: [] }] },
 	];
 	const githubTrace = [line("13T10:00:00", D, 1, "fix_comments", true, 1), line("14T10:00:00", D, 1, "merged", true), line("18T10:00:00", E, 2, "fix_comments", false, 1)];
@@ -184,13 +190,13 @@ describe("GitHub metrics", () => {
 		]).toEqual([undefined, true, false, false, false, true]);
 	});
 
-	test("prices, CI-rates, counts review rounds of, and checks for a person's commit in the PRs merged in each period", () => {
+	test("prices, CI-rates on required checks only, counts review rounds of, and checks for a person's commit in the PRs merged in each period", () => {
 		expect(periods.map(p => p.github)).toEqual([
 			{
 				repo: "o/r",
 				merged: 1,
 				cost: { priced: 1, usd: 2, perPr: 2 },
-				ciFirstPass: { judged: 1, passed: 1, rate: 1 },
+				ciFirstPass: { judged: 1, passed: 1, rate: 1, noRequired: 0 },
 				reviewRounds: { changesRequested: 1, fixRounds: 1, perPr: 2 },
 				humanEdits: { edited: 0, rate: 0 },
 			},
@@ -198,7 +204,7 @@ describe("GitHub metrics", () => {
 				repo: "o/r",
 				merged: 2,
 				cost: { priced: 1, usd: 3, perPr: 3 },
-				ciFirstPass: { judged: 1, passed: 0, rate: 0 },
+				ciFirstPass: { judged: 1, passed: 0, rate: 0, noRequired: 1 },
 				reviewRounds: { changesRequested: 2, fixRounds: 0, perPr: 1 },
 				humanEdits: { edited: 1, rate: 0.5 },
 			},
@@ -207,11 +213,11 @@ describe("GitHub metrics", () => {
 
 	test("adds the GitHub rows to the table", () => {
 		expect(formatTable(periods).split("\n").slice(7)).toEqual([
-			"Merged PRs in o/r                   1                                         2",
-			"Cost per merged PR                  $2.00 (1 priced)                          $3.00 (1 priced)",
-			"CI first-pass rate                  100% (1/1)                                0% (0/1)",
-			"Review rounds per merged PR         2.00 (1 changes requested, 1 fix rounds)  1.00 (2 changes requested, 0 fix rounds)",
-			"Merged PRs with a person's commit   0% (0/1)                                  50% (1/2)",
+			"Merged PRs in o/r                     1                                         2",
+			"Cost per merged PR                    $2.00 (1 priced)                          $3.00 (1 priced)",
+			"CI first-pass rate (required checks)  100% (1/1)                                0% (0/1, 1 with no required checks)",
+			"Review rounds per merged PR           2.00 (1 changes requested, 1 fix rounds)  1.00 (2 changes requested, 0 fix rounds)",
+			"Merged PRs with a person's commit     0% (0/1)                                  50% (1/2)",
 		]);
 	});
 
