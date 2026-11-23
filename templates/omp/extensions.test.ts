@@ -1148,7 +1148,7 @@ describe("project_list, project_update, and the brief", () => {
 		]);
 		expect(exercise("project", { runs: [update({ action: "log", text: "Done" })], sessionId: "stranger" }, env).runs[0]).toMatchObject({
 			isError: true,
-			text: "This session is in no open project; name one with projectId, from project_list.",
+			text: "This session is in no open project; name one with projectId: Migration (id p1), Launch (id p2).",
 		});
 		expect(changes()).toEqual([]);
 	});

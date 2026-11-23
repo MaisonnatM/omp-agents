@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { CONFIG_DIR, inbox, readJson, reply } from "./inbox/client";
-import { briefText, findDecision, findProject, findStep, listText, MAX_NAME, MAX_TEXT, type Project, type ProjectChange, projectOfSession, projectsIn, withWaiting } from "./project/brief";
+import { briefText, findDecision, findProject, findStep, listText, MAX_NAME, MAX_TEXT, noProjectError, type Project, type ProjectChange, projectOfSession, projectsIn, withWaiting } from "./project/brief";
 
 const LIST_FILE = join(CONFIG_DIR, "project-list.json");
 const INBOX = inbox<ProjectChange>(join(CONFIG_DIR, "project-inbox"));
@@ -83,7 +83,7 @@ export default function project(pi: ExtensionAPI) {
 			}
 			const projects = allProjects();
 			const current = input.projectId ? null : projectOfSession(projects, sessionId);
-			const found = input.projectId ? findProject(projects, input.projectId) : current ? { project: current } : { error: "This session is in no open project; name one with projectId, from project_list." };
+			const found = input.projectId ? findProject(projects, input.projectId) : current ? { project: current } : { error: noProjectError(projects) };
 			if ("error" in found) return reply(found.error, true);
 			const { project: target } = found;
 			const projectId = target.id;
