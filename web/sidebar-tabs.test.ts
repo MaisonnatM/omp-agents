@@ -88,9 +88,9 @@ test("hideTab hides and shows any tab", () => {
 	expect(hideTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "todo", false)).toEqual(DEFAULT);
 });
 
-test("shownTabs drops hidden and absent tabs and keeps the order", () => {
+test("shownTabs drops hidden and absent tabs and Projects, and keeps the order", () => {
 	const layout = moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "sport", -1);
-	expect(shownTabs(layout, new Set(["bots"]))).toEqual(["pull-requests", "sport", "memory", "projects"]);
+	expect(shownTabs(layout, new Set(["bots"]))).toEqual(["pull-requests", "sport", "memory"]);
 });
 
 test("a saved order that still has Todo immediately before Notes puts it just before Sport", () => {
