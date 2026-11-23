@@ -8,6 +8,9 @@ The dashboard shows the same lines in Settings › What's new.
 - The safety check now lets an agent keep the dashboard token in a shell variable when it only goes into a request header, and /ship now counts `astro check` and `playwright test` as test runs.
 - A new eval set replays 20 real past tasks to check that harness changes help, and can switch off one part at a time to see which parts still matter.
 - The safety checks are now tested against 50 real past commands, so a rule change that blocks the wrong thing shows up; this caught a way around the git hooks check and a missed warning when reading pull request text in a loop, both now fixed.
+- The dashboard now opens on the Board's Inbox.
+- Each session now posts on the Board, in its own thread in #sessions, when it asks you something or finishes a turn you did not see, so your Inbox lists what waits for you.
+- A new Board page in the docs explains channels, threads, tasks, and how messages reach sessions.
 - /ship now skips the plan contest and both code reviews for a small change, up to 50 changed lines in 3 files that touch no shared or schema file, so quick fixes ship faster and cost less.
 - Edits the plan already spelled out now go to a cheaper worker agent, while planning, design calls, and reviews stay on the strongest model.
 - Behind the scenes: the note about a session's todos now comes as a message instead of changing the agent's standing instructions, so those instructions stay the same in every session and are read from the cache, which costs less.
