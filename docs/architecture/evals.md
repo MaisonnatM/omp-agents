@@ -18,6 +18,40 @@ Each task is a prompt, the base commit it started from, and a hidden check: the 
 
 Rebuild the set with `bun scripts/evals/candidates.ts --verify > scripts/evals/tasks.json`; a new set changes every number, so compare runs only on the same set.
 
+## A set from merged pull requests
+
+A repository with no `Land` merges, such as yampa, gets its set from its merged pull requests through `scripts/evals/pull-candidates.ts`.
+Each task carries its `repo`, the checkout it comes from, so `run.ts` replays it there instead of in omp-agents.
+
+1. It lists the last `--pages` hundred closed pull requests on `main` through `gh api` and keeps the merged ones that name a Linear ticket, such as `ENG-2903`, in the title, branch, or body.
+2. A pull request is kept when it changes Python under `--package` (`yampa`) and a Python test under `tests/`, changes fewer than 400 lines outside `tests/`, and adds no migration.
+   A ticket that more than one merged pull request names is left out, since its text asks for more than any one of them did.
+3. The base is the merge commit's first parent, which is `main` before the change for a squash merge and for a merge commit; a rebase merge, whose subject lacks `(#<number>)`, has no single base and is left out.
+4. The hidden tests are every file the pull request added or changed under `tests/`, `conftest.py` and factories included; `testIds` lists the pytest node ids its test modules hold, and the check runs those modules.
+5. The prompt is the Linear ticket's title and description, with Linear's mention tags cut to their labels, never the pull request's body, which describes the change and often holds its diff.
+   A script cannot reach Linear, so the calling session saves the tickets to a JSON file keyed by ticket id and passes it as `--tickets`; `--tickets-needed` prints the ids in pick order.
+   A ticket missing from the file falls back to the pull request's title and its body's first section without code, and the script says so.
+   A prompt that names a hidden test, a hidden file, the pull request's number, or holds a code block is dropped.
+6. Picks go newest first, at most 2 per folder under `yampa/` until that runs short, and `--verify` keeps a task only when its check fails at the base with the hidden tests in place and passes at the merge commit, in one temporary clone, until 20 are kept.
+
+yampa's tests need Postgres with pgvector.
+The default check starts the main checkout's `db` service with `docker compose -f ~/code/yampa/compose.yml up -d db`, which leaves a running container alone; a clone's own `compose.yml` at an old base could differ and recreate it.
+It then creates the empty `envs/local.env` and `envs/shared-secrets.env` that yampa's CI creates, and runs `uv run --group dev pytest` on the hidden test modules with `DB_HOST=localhost` and `TEST_GROUP=evals`, so the tests' `postgres_test_db` fixture creates and drops its own `test_db_evals` database beside a developer's.
+`--check` replaces that command for another repository; `{files}` becomes the hidden test modules.
+The first check in a clone builds its virtual environment from uv's cache, about two minutes, so a check may run 15 minutes before it times out.
+The sandbox does not block docker, but the check runs after omp exits and outside the sandbox anyway, and needs no model.
+
+The set holds yampa's ticket text, security findings included, so it stays out of this repository, in `~/.cache/omp-evalset/yampa-20.json`:
+
+```sh
+bun scripts/evals/pull-candidates.ts --tickets-needed > ids.txt   # fill tickets.json from Linear for these ids
+bun scripts/evals/pull-candidates.ts --tickets ~/.cache/omp-evalset/yampa-tickets.json --verify > ~/.cache/omp-evalset/yampa-20.json
+bun scripts/evals/run.ts --tasks ~/.cache/omp-evalset/yampa-20.json --runs 3 --out ~/.cache/omp-evals/yampa
+```
+
+The set built on 2026-11-23 holds 18 of its 20 tasks: the disk filled up during `--verify` after the 18th was kept.
+The next candidates, `pr-7317` (ENG-2811) and `pr-7271` (ENG-2838), are not verified yet; rerun the `--verify` command above to fill the set to 20.
+
 ## A run
 
 `bun scripts/evals/run.ts` runs each task 3 times by default.
@@ -45,7 +79,8 @@ A run whose model could not answer, such as on a usage limit, is recorded with i
 
 `--disable-extensions ship,bash-guard` and `--disable-skills ship,code-review` add one arm per listed component besides the full harness.
 An arm turns that one component off through omp's `disabledExtensions` setting, `extension-module:<name>` for an extension and `skill:<name>` for a skill, added to the user's own list.
-The summary prints, per arm, the pass rate, its change in points against the full harness, the cost per run and its change, and minutes per run.
+The summary prints, per arm, the pass rate as pass@1, its change in points against the full harness, pass@3, the cost per run and its change, and minutes per run.
+pass@k is the unbiased estimate 1 - C(n-c, k) / C(n, k) for a task with n scored runs of which c passed, averaged over the tasks with at least k runs; with 3 runs, pass@3 is the share of tasks that passed at least once.
 A component whose arm passes as often for less money is not earning its tokens; one whose arm passes less often is.
 `bun scripts/evals/run.ts summary` prints the table again from the results file.
 

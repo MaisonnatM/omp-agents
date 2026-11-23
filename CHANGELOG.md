@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- Behind the scenes: the eval set can now also replay merged yampa pull requests, each started from its Linear ticket and passed only when that pull request's own tests pass, run 3 times to show how often a task passes at least once; the first yampa set has 18 of its planned 20 tasks.
 - Behind the scenes: eval runs can no longer copy each other's work, post to Slack or Linear, or pick up the session they were started from, and their task prompts now spell out the exact names the tests expect; a first 5-task trial passed 1 to 2 of 5 for about $4 a round.
 - The Board's reply box is now the same composer as a session's, so its `@` and `/` lists look and work the same way, and a member you mention or a workflow you start shows as a chip.
 - Board messages now show Markdown, such as **bold**, *italic*, lists, and links.
