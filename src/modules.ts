@@ -62,6 +62,10 @@ export interface CoreEnv {
 	wake(sessionId: string, text: string): Promise<void>;
 	/** Sends `text` into Bot `botId`'s conversation, resuming or starting it. */
 	wakeBot(botId: BotId, text: string): Promise<void>;
+	/** Starts a new session in `cwd` on `prompt`, in project `projectId` when it names one, and answers its session id. */
+	startSession(cwd: string, prompt: string, projectId: string | null): Promise<string>;
+	/** The workspaces the page shows, the first being where a session starts when nothing names another. */
+	workspaces(): string[];
 	/** Whether this server acts at all: only the one that owns the files does. */
 	active(): boolean;
 	now(): number;

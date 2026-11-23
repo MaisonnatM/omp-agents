@@ -24,6 +24,8 @@ function wakeWith(bots: Bot[], hosts: RosterHost[] = []) {
 		apply,
 		wake: async (session, text) => void woken.push({ bot: null, session, text }),
 		wakeBot: async (id, text) => void woken.push({ bot: id, session: null, text }),
+		startSession: async () => "started",
+		workspaces: () => [],
 		active: () => true,
 		now: () => 1,
 	});
