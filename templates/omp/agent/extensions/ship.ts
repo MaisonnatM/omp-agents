@@ -74,9 +74,9 @@ const NEXT: Record<Stage, string> = {
 	ticket: "Link the Linear issue the user named, or an open one that clearly matches the work, then record ship_stage({stage: 'plan', issue}); with no issue, record ship_stage({stage: 'plan'}).",
 	plan: "Choose how to build the change as the ship skill's Plan step says, then record ship_stage({stage: 'implement'}).",
 	implement: "Implement the plan and commit on the work's branch. Do not open a PR in this stage.",
-	draft_pr: "Push the branch and run `gh pr create --draft`. Reference the issue, or put the plan in the body without one, as the ship skill's Draft PR step says.",
-	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`task\` with \`agent: "interface-reviewer"\` on the PR, apply the findings in a fresh agent, push, then record ship_stage({stage: 'thermonuclear'}), which checks \`${REVIEWS.interface_review.box}\` in the PR body.`,
-	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff, apply the findings, push, then record ship_stage({stage: 'ready_gate'}), which checks \`${REVIEWS.thermonuclear.box}\` in the PR body. If the ${REVIEWS.interface_review.label} was needed and the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	draft_pr: "If ship_stage named an open PR for the branch, reuse it: push the branch and record ship_stage({stage: 'interface_review'}). Otherwise push the branch and run `gh pr create --draft`. Reference the issue, or put the plan in the body without one, as the ship skill's Draft PR step says.",
+	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`interface-reviewer\` on the PR and, unless the ${REVIEWS.thermonuclear.label} is not needed, \`thermonuclear-reviewer\` on the PR diff, in one \`task\` call, apply both reviews' findings in one fresh agent, push, then record ship_stage({stage: 'thermonuclear'}), which checks \`${REVIEWS.interface_review.box}\` in the PR body.`,
+	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise, if thermonuclear-reviewer already ran alongside the ${REVIEWS.interface_review.label}, run it again on the interface fix commits alone unless they changed only copy, tokens, or styles; if not, wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff; apply the findings, push, then record ship_stage({stage: 'ready_gate'}), which checks \`${REVIEWS.thermonuclear.box}\` in the PR body. If the ${REVIEWS.interface_review.label} was needed and the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
 	ready_gate: `When the ${REVIEWS.interface_review.label} was needed, make sure the PR body has no unchecked \`${PROOF_BOX}\` box. Then run \`gh pr ready <N>\` without asking first: the command itself asks the user to approve.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
@@ -109,6 +109,10 @@ export interface ShipState {
 	contract?: Contract;
 	/** Approaches a reviewer or the user rejected, so the agent never proposes them again. */
 	rejected?: string[];
+	/** What each finished stage produced; advancing to a stage needs the output of the stage before it. */
+	outputs?: StageOutputs;
+	/** Slack posts and Linear links made for the run's PRs, so a resumed run never makes one twice. */
+	posts?: Post[];
 	/** The session's cumulative usage at the last traced stage, so the next trace line reports what was spent since. */
 	spent?: Spent;
 	updatedAt: string;
@@ -123,6 +127,69 @@ export interface Contract {
 	/** The test written before the code, or `null` when the change starts without one. */
 	test_first: string | null;
 	done_when: string[];
+}
+
+/** One check a stage ran, with the result line it printed. */
+export interface CheckRun {
+	command: string;
+	result: string;
+}
+
+/** What became of one review finding. */
+export interface ReviewVerdict {
+	finding: string;
+	verdict: "fixed" | "dismissed" | "deferred";
+}
+
+/** What each finished stage produced, recorded by the call that leaves it; the plan's output is the contract. */
+export interface StageOutputs {
+	implement?: { files_changed: string[]; checks_run: CheckRun[] };
+	draft_pr?: { pr: number; url: string };
+	interface_review?: { verdicts: ReviewVerdict[] };
+	thermonuclear?: { verdicts: ReviewVerdict[] };
+	ready_gate?: { checks: CheckRun[] };
+}
+export type OutputStage = keyof StageOutputs;
+
+/** The fields of each stage's output, as a refusal names them. */
+const OUTPUT_FIELDS: Record<OutputStage, string> = {
+	implement: "files_changed: [repository-relative paths], checks_run: [{command, result}]",
+	draft_pr: "pr: <number>, url: <the PR's URL>",
+	interface_review: "verdicts: [{finding, verdict: fixed | dismissed | deferred}], empty when the review was skipped or found nothing",
+	thermonuclear: "verdicts: [{finding, verdict: fixed | dismissed | deferred}], empty when the review was skipped or found nothing",
+	ready_gate: "checks: [{command, result}]",
+};
+
+/** The stage whose output each stage starts from. */
+const STARTS_FROM: Partial<Record<Stage | LiveWork, OutputStage>> = { draft_pr: "implement", interface_review: "draft_pr", thermonuclear: "interface_review", ready_gate: "thermonuclear", live: "ready_gate" };
+
+/**
+ * The output that advancing from `from` to `stage` needs and `outputs` lacks, with the `output` argument that records it, or `undefined` when nothing is missing.
+ * Only advancing needs it: recording the current stage again, or an earlier one, does not.
+ */
+export function missingOutput(stage: Stage | LiveWork, from: Stage, outputs: StageOutputs | undefined): { stage: OutputStage; argument: string } | undefined {
+	const needed = STARTS_FROM[stage];
+	if (!needed || (STAGES as readonly string[]).indexOf(stage) <= STAGES.indexOf(from) || outputs?.[needed]) return undefined;
+	return { stage: needed, argument: `{${needed}: {${OUTPUT_FIELDS[needed]}}}` };
+}
+
+/** The repository (`owner/name`) and number of a pull request URL, else `undefined`. */
+export function prOfUrl(url: string): { repo: string; pr: number } | undefined {
+	const match = url.match(/^https?:\/\/[^/\s]+\/([^/\s]+\/[^/\s]+)\/pull\/(\d+)\/?$/);
+	return match ? { repo: match[1], pr: Number(match[2]) } : undefined;
+}
+
+/** A Slack post or Linear link made for a PR, with its permalink or URL. */
+export interface Post {
+	kind: "slack" | "linear";
+	pr: number;
+	ref: string;
+}
+
+/** `posts` with `post` added, or the post already recorded for the same kind and PR, which makes recording it again a no-op. */
+export function withPost(posts: Post[] | undefined, post: Post): { posts: Post[] } | { existing: Post } {
+	const existing = posts?.find(p => p.kind === post.kind && p.pr === post.pr);
+	return existing ? { existing } : { posts: [...(posts ?? []), post] };
 }
 
 /** Whether `path` names a file inside the repository: relative, and never climbing out through `..`. */
@@ -480,6 +547,8 @@ export interface TraceLine {
 	recorded: boolean;
 	/** Why the stage was not recorded, when the call said so. */
 	refusal?: string;
+	/** The stage outputs the call carried. */
+	output?: StageOutputs;
 }
 
 /** Appends `line` to the JSONL trace every `ship_stage` call naming a stage writes to, across this user's sessions and repositories, beside the kit's other GitHub state. */
@@ -524,6 +593,7 @@ function report(s: ShipState | undefined): string {
 	lines.push(`Next: ${NEXT[s.stage]}`);
 	const brief = planBrief(s);
 	if (brief) lines.push(brief);
+	for (const post of s.posts ?? []) lines.push(`Posted: ${post.kind} for PR #${post.pr}, ${post.ref}; do not post it again.`);
 	if (s.stage === "live" && s.prStatus) {
 		const needs = liveNeeds(s.prStatus);
 		if (needs.length > 0) lines.push(`First need: ${LABEL[needs[0].kind]}. Record it with ship_stage({stage: '${needs[0].kind}'}).`);
@@ -721,6 +791,17 @@ export default function ship(pi: ExtensionAPI) {
 		test_first: z.string().nullable().default(() => null),
 		done_when: z.array(filled).min(1),
 	});
+	const checkRunSchema = z.object({ command: filled, result: filled });
+	const verdictsSchema = z.object({ verdicts: z.array(z.object({ finding: filled, verdict: z.enum(["fixed", "dismissed", "deferred"]) })) });
+	const outputSchema = z.object({
+		implement: z.object({ files_changed: z.array(z.string().refine(repoRelative, "repository-relative, with no `..`")).min(1), checks_run: z.array(checkRunSchema).min(1) }).optional(),
+		draft_pr: z.object({ pr: z.number().int(), url: z.string() }).refine(({ pr, url }) => prOfUrl(url)?.pr === pr, { message: "the URL of PR `pr`, as https://github.com/owner/name/pull/<pr>", path: ["url"] }).optional(),
+		interface_review: verdictsSchema.optional(),
+		thermonuclear: verdictsSchema.optional(),
+		ready_gate: z.object({ checks: z.array(checkRunSchema).min(1) }).optional(),
+	}).strict();
+	const postKind = z.enum(["slack", "linear"]);
+	const postSchema = z.object({ kind: postKind, pr: z.number().int(), ref: filled });
 	const stateSchema = z.object({
 		stage: z.enum(STAGES), work: z.enum(LIVE_WORK).optional(), issue: z.string().optional(),
 		repo: z.string().optional(), pr: z.number().int().optional(), note: z.string().optional(),
@@ -729,6 +810,8 @@ export default function ship(pi: ExtensionAPI) {
 		fixes: z.object({ fix_ci: fixRoundsSchema.optional(), fix_comments: fixRoundsSchema.optional() }).optional().catch(undefined),
 		contract: contractSchema.optional().catch(undefined),
 		rejected: z.array(z.string()).optional().catch(undefined),
+		outputs: outputSchema.optional().catch(undefined),
+		posts: z.array(postSchema).optional().catch(undefined),
 		spent: z.object({ tokens: z.number(), cost: z.number() }).optional().catch(undefined),
 		updatedAt: z.string(),
 	});
@@ -925,6 +1008,10 @@ export default function ship(pi: ExtensionAPI) {
 			}
 			const ready = ghPr(words, "ready");
 			if (!ready || ready.includes("--undo")) continue;
+			const missing = state && !otherOwner(selectorOwner(prSelector(ready)), state.repo) ? missingOutput("live", state.stage, state.outputs) : undefined;
+			if (missing) {
+				return { block: true, reason: `Blocked: \`gh pr ready\` puts the PR live, which starts from the ${LABEL[missing.stage]} stage's output, and ship has not recorded it. Record it first with ship_stage({output: ${missing.argument}}), then retry.` };
+			}
 			const command = `\`${words.join(" ")}\``;
 			if (/\bGH_(?:REPO|HOST)=/.test(input.command)) {
 				return { block: true, reason: `Blocked: this command sets GH_REPO or GH_HOST, which this gate cannot apply to its own read of the PR ${command} puts live. Name the repository with \`-R owner/name\` or a PR URL instead, then retry.` };
@@ -948,7 +1035,7 @@ export default function ship(pi: ExtensionAPI) {
 		const url = output.match(/https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/);
 		const ran = commands(command);
 		if (ran.some(words => ghPr(words, "create")) && url && !state.pr) {
-			save(ctx, { ...state, repo: url[1], pr: Number(url[2]), stage: REVIEW_STAGES[0] });
+			save(ctx, { ...state, repo: url[1], pr: Number(url[2]), stage: REVIEW_STAGES[0], outputs: { ...state.outputs, draft_pr: { pr: Number(url[2]), url: url[0] } } });
 			await refresh(ctx);
 		} else if (state.pr && state.stage !== "live" && ran.some(words => {
 			const ready = ghPr(words, "ready");
@@ -969,9 +1056,11 @@ export default function ship(pi: ExtensionAPI) {
 		moreRounds: z.boolean().optional().describe("With fix_ci or fix_comments: the user approved more rounds after ship_stage stopped the fix; starts its rounds over"),
 		contract: contractSchema.optional().describe("At the plan stage, required before implement, replacing any earlier one: goal, one sentence; constraints, rules the change keeps, naming `test-change: <reason>` to change an existing test; files_to_change, repository-relative paths; test_first, the test path written and committed before the code, which a bug fix needs, or null; done_when, at least one check that shows the change done"),
 		rejected: filled.optional().describe("One approach a reviewer or the user rejected, with why; added to the run's rejected list"),
+		output: outputSchema.optional().describe("The output of each stage this call finishes, keyed by stage; advancing to a stage needs the output of the stage before it. implement: {files_changed, checks_run: [{command, result}]}; draft_pr: {pr, url}; interface_review and thermonuclear: {verdicts: [{finding, verdict: fixed, dismissed, or deferred}]}, empty when skipped; ready_gate: {checks: [{command, result}]}"),
+		posted: z.object({ kind: postKind, pr: z.number().int().optional(), ref: filled }).optional().describe("A Slack post or Linear link you just made for a PR: kind, ref (its permalink or URL), and pr, which defaults to the run's PR. Recording a kind already recorded for that PR is a no-op that says not to post again"),
 		stop: z.boolean().optional().describe("End the workflow in this session, as when the user says 'no ship'"),
 	});
-	type ToolParams = { stage?: Stage | LiveWork; issue?: string; pr?: number; repo?: string; note?: string; count?: number; moreRounds?: boolean; contract?: Contract; rejected?: string; stop?: boolean };
+	type ToolParams = { stage?: Stage | LiveWork; issue?: string; pr?: number; repo?: string; note?: string; count?: number; moreRounds?: boolean; contract?: Contract; rejected?: string; output?: StageOutputs; posted?: { kind: Post["kind"]; pr?: number; ref: string }; stop?: boolean };
 	type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean; details?: unknown };
 	/** What a call did with the stage it named, for its trace line. */
 	type Outcome = { recorded: boolean; round?: number };
@@ -990,7 +1079,9 @@ export default function ship(pi: ExtensionAPI) {
 			`fix_ci and fix_comments run in rounds per PR: pass count each round; after ${FIX_BUDGET} rounds, or when count did not shrink for ${STALL_ROUNDS} rounds in a row, the round is refused until the user approves moreRounds.`,
 			"Pass contract at the plan stage: implement is refused without one. Pass rejected for each approach a reviewer or the user rejects. Both show on every read and come back after a compaction or a resume.",
 			"draft_pr and ready_gate are refused until a test, typecheck, or lint bash command exits 0 in this session after the last edit, write, or task call; with a contract's test_first, draft_pr is also refused until a branch commit changing only that test comes before the first commit changing code.",
-			"Every call naming a stage appends a line to the ship trace.",
+			"Advancing to draft_pr, interface_review, thermonuclear, ready_gate, or live is refused until the stage before it has its output, passed as output keyed by that stage; `gh pr ready` is blocked until the ready gate's output is recorded. draft_pr reuses the branch's open PR when one exists.",
+			"Pass posted after each Slack post or Linear link you make for a PR; every read lists them, and recording one again is a no-op.",
+			"Every call naming a stage appends a line to the ship trace, with the outputs it carried.",
 		].join(" "),
 		parameters: toolParamsSchema,
 		execute(_id, params, _signal, _onUpdate, ctx) {
@@ -1018,6 +1109,7 @@ export default function ship(pi: ExtensionAPI) {
 					checks: state?.prStatus?.checks,
 					recorded: outcome.recorded,
 					refusal: outcome.recorded ? undefined : result.content[0]?.text,
+					output: parsed.data.output,
 				});
 				return result;
 			});
@@ -1028,7 +1120,11 @@ export default function ship(pi: ExtensionAPI) {
 
 	/** One `ship_stage` call, recording into `outcome` whether it recorded the stage it named and which fix round it started. */
 	async function stageCall(params: ToolParams, ctx: ExtensionContext, outcome: Outcome): Promise<ToolResult> {
-		const { stage, issue, pr, repo, note, count, moreRounds, contract, rejected, stop } = params;
+		const { stage, issue, note, count, moreRounds, contract, rejected, output, posted, stop } = params;
+		const opened = output?.draft_pr && prOfUrl(output.draft_pr.url);
+		// A draft PR's output names the PR, so the call need not name it again.
+		const pr = params.pr ?? opened?.pr;
+		const repo = params.repo ?? opened?.repo;
 		if (stop) {
 			state = undefined;
 			pi.appendEntry(ENTRY, { stopped: true });
@@ -1041,6 +1137,18 @@ export default function ship(pi: ExtensionAPI) {
 		}
 		if (stage === "implement" && !(contract ?? state?.contract)) {
 			return { content: [{ type: "text" as const, text: "Record the plan's contract before implementing: call ship_stage({stage: 'implement', contract: {goal, constraints, files_to_change, test_first, done_when}}), with done_when listing at least one check." }], isError: true };
+		}
+		const missing = stage && missingOutput(stage, state?.stage ?? "ticket", { ...state?.outputs, ...output });
+		if (missing) {
+			return { content: [{ type: "text" as const, text: `${stage} is not recorded: it starts from the ${LABEL[missing.stage]} stage's output, and ship has not recorded it. Pass it with this call: output: ${missing.argument}.` }], isError: true };
+		}
+		let posts = state?.posts;
+		if (posted) {
+			const postPr = posted.pr ?? pr ?? state?.pr;
+			if (postPr === undefined) return { content: [{ type: "text" as const, text: "posted needs the PR it is for: pass posted.pr, or name the PR first." }], isError: true };
+			const added = withPost(posts, { kind: posted.kind, pr: postPr, ref: posted.ref });
+			if ("existing" in added) return { content: [{ type: "text" as const, text: `A ${posted.kind} post for PR #${postPr} is already recorded, ${added.existing.ref}, so nothing changed. Do not post it again.` }] };
+			posts = added.posts;
 		}
 		const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
 		const newPr = (pr !== undefined && pr !== base.pr) || (repo !== undefined && repo !== base.repo);
@@ -1060,7 +1168,8 @@ export default function ship(pi: ExtensionAPI) {
 			if (refusal) return { content: [{ type: "text" as const, text: refusal }], isError: true };
 		}
 		let checked = "";
-		if (stage || issue || pr || repo || note !== undefined || contract || rejected) {
+		let reused = "";
+		if (stage || issue || pr || repo || note !== undefined || contract || rejected || output || posted) {
 			if (stage === "ready_gate" || (stage !== undefined && isReviewStage(stage))) {
 				const status = state?.prStatus;
 				if (!status && reviewsBefore(stage).length > 0) {
@@ -1121,10 +1230,39 @@ export default function ship(pi: ExtensionAPI) {
 				fixes,
 				contract: contract ?? current.contract,
 				rejected: rejected ? withRejected(current.rejected, rejected) : current.rejected,
+				outputs: output ? { ...current.outputs, ...output } : current.outputs,
+				posts,
 			});
 			outcome.recorded = stage !== undefined;
+			if (stage === "draft_pr" && state && !state.pr) {
+				const found = await branchPr(ctx.cwd);
+				const at = found && prOfUrl(found.url);
+				if (found && at) {
+					save(ctx, { ...state, pr: at.pr, repo: at.repo, prStatus: undefined, fixes: undefined, outputs: { ...state.outputs, draft_pr: { pr: at.pr, url: found.url } } });
+					reused = `PR #${at.pr} (${found.url}) is already open for branch \`${found.branch}\`, so ship reuses it: do not run \`gh pr create\`. Push the branch${found.draft ? "" : `, run \`gh pr ready ${at.pr} --undo\` to make it a draft again`}, then record ship_stage({stage: 'interface_review'}).\n`;
+					await refreshNow(ctx);
+				}
+			}
 		}
-		return { content: [{ type: "text" as const, text: `${checked}${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
+		return { content: [{ type: "text" as const, text: `${checked}${reused}${report(state)}${refreshFailure ? `\nGitHub status unavailable; previous status is stale: ${refreshFailure}` : ""}` }], details: { state, ...(refreshFailure ? { stale: true, error: refreshFailure } : {}) } };
+	}
+
+	/** The open PR whose head is the checkout's current branch, so draft_pr reuses it rather than sending the agent to open a second one. */
+	async function branchPr(cwd: string): Promise<{ url: string; draft: boolean; branch: string } | undefined> {
+		const current = await pi.exec("git", ["branch", "--show-current"], { cwd });
+		const branch = current.code === 0 ? current.stdout.trim() : "";
+		if (!branch) return undefined;
+		const r = await gh(["pr", "list", "--head", branch, "--state", "open", "--json", "url,isDraft", "--limit", "1"], cwd);
+		if (r.code !== 0) return undefined;
+		let list: unknown;
+		try {
+			list = JSON.parse(r.stdout);
+		} catch {
+			return undefined;
+		}
+		const parsed = z.array(z.object({ url: z.string(), isDraft: z.boolean() })).safeParse(list);
+		const first = parsed.success ? parsed.data[0] : undefined;
+		return first && { url: first.url, draft: first.isDraft, branch };
 	}
 
 	/** Why `contract` may not stand: it plans to change a test file HEAD already has, without a `test-change` constraint. */
