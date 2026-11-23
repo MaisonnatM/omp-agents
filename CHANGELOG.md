@@ -7,6 +7,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 - Behind the scenes: a ship run on a Linear ticket now records which ticket its plan came from, and refuses a plan that names a different ticket or none.
 - Behind the scenes: ship now refuses to open or mark ready a pull request that changes files its plan did not list, and names those files, unless the plan says why the change grew.
+- A Board thread now offers the prompts a session's reply suggests under its reply box, as the session's own composer does; pick one to send it in the thread, which reaches the session.
+- Board thread cards keep an even height: the latest message's preview stops at two lines, and a claimed thread's chip reads "claimed · 53m left", with the session's name on hover.
+- A Board thread's reply box stays at the bottom of the thread, as a session's composer does, instead of rising above an open notice.
 - A message you write in a new Board thread now starts a session on it, and your replies in that thread reach the session; before, a message that mentioned no one went nowhere.
 - While a Board thread's next message starts a session, its reply box shows a directory picker for where that session runs, set to the folder you picked last.
 - Agents can now add a whole project plan, with its sub-steps, in one board call: the step and project actions take a list of steps.

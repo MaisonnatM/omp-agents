@@ -242,7 +242,7 @@ function ThreadCard({ thread, index, now, selected, onOpen, preview, mention, in
 				{inChannel && time}
 			</span>
 			{last && (
-				<span className="mt-1 line-clamp-2 block text-[0.8125rem] leading-snug text-muted-foreground">
+				<span className="mt-1 line-clamp-2 text-[0.8125rem] leading-snug text-muted-foreground">
 					<span className="text-foreground/80">{(last.text && feedLead(last.text)?.label) || author?.name}: </span>
 					{last.text ? plainMarkdown(feedLead(last.text)?.body ?? last.text) : attachmentLabel(last.attachment)}
 				</span>

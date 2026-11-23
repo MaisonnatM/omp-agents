@@ -59,23 +59,29 @@ export function feedLead(text: string): { label: string; tone: "green" | "amber"
 	return lead[1] === "finished" ? { label: "Finished", tone: "green", body } : { label: "Waits on you", tone: "amber", body };
 }
 
-export function Chip({ children, tone }: { children: ReactNode; tone?: "blue" | "green" | "amber" | "violet" }) {
+export function Chip({ children, tone, title }: { children: ReactNode; tone?: "blue" | "green" | "amber" | "violet"; title?: string }) {
 	const tones = { blue: "bg-sky-500/12 text-sky-700 dark:text-sky-300", green: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300", amber: "bg-amber-500/15 text-amber-800 dark:text-amber-300", violet: "bg-violet-500/12 text-violet-700 dark:text-violet-300" };
-	return <span className={cn("inline-block h-5 min-w-0 truncate rounded px-1.5 text-2xs leading-5 font-medium", tone ? tones[tone] : "bg-foreground/[0.06] text-muted-foreground")}>{children}</span>;
+	return <span title={title} className={cn("inline-block h-5 min-w-0 truncate rounded px-1.5 text-2xs leading-5 font-medium", tone ? tones[tone] : "bg-foreground/[0.06] text-muted-foreground")}>{children}</span>;
 }
 
 /** Who holds a lease and for how long, or that it ran out. */
 export function leaseLabel(lease: NonNullable<Thread["lease"]>, byId: ReadonlyMap<string, Member>, now: number, sep: string) {
-	const name = byId.get(lease.by)?.name ?? lease.by;
-	return lease.until <= now ? `${name}${sep}lease expired` : `${name}${sep}${relTime(lease.until, now).replace("in ", "")} left`;
+	return `${byId.get(lease.by)?.name ?? lease.by}${sep}${leaseLeft(lease, now)}`;
 }
+
+const leaseLeft = (lease: NonNullable<Thread["lease"]>, now: number): string => (lease.until <= now ? "lease expired" : `${relTime(lease.until, now).replace("in ", "")} left`);
 
 const TASK_TONE = { open: "blue", claimed: "violet", review: "amber", done: "green" } as const;
 
+/** The task's state, and for a claim how long it has left; the holder's name, often a long session title, shows on hover and in the thread's details. */
 export function TaskChip({ thread, byId, now }: { thread: Thread; byId: ReadonlyMap<string, Member>; now: number }) {
 	if (!thread.task) return null;
-	const label = thread.task === "claimed" && thread.lease && byId.has(thread.lease.by) ? leaseLabel(thread.lease, byId, now, " · ") : thread.task;
-	return <Chip tone={TASK_TONE[thread.task]}>{label}</Chip>;
+	const lease = thread.task === "claimed" ? thread.lease : null;
+	return (
+		<Chip tone={TASK_TONE[thread.task]} title={lease ? leaseLabel(lease, byId, now, " · ") : undefined}>
+			{lease ? `claimed · ${leaseLeft(lease, now)}` : thread.task}
+		</Chip>
+	);
 }
 
 export function useNow(ms = 15_000) {

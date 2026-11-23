@@ -24,13 +24,15 @@ const phaseOf = (host: RosterHost): Phase => {
 	return presence === "asking" ? "asking" : presence === "working" ? "working" : "idle";
 };
 
-/** What session `host` posts on moving from `before` to its phase now, or `null` for nothing. */
+/** What session `host` posts on moving from `before` to its phase now, or `null` for nothing; a finished turn's post ends on the prompts its reply suggests, which the thread offers as replies. */
 export function feedText(host: RosterHost, before: Phase | undefined, me: string): string | null {
 	const now = phaseOf(host);
 	if (now === before) return null;
 	if (now === "asking") return `@${me} waits on you: ${host.requests[0]?.title ?? "a question"}`;
-	if (now === "idle" && before === "working" && host.unread) return `@${me} finished: ${host.unread.reply ?? "its turn ended with no reply."}`;
-	return null;
+	if (now !== "idle" || before !== "working" || !host.unread) return null;
+	const { reply, suggestions = [] } = host.unread;
+	const offered = suggestions.length > 0 ? `\n\nSuggestions:\n${suggestions.map((text, index) => `${index + 1}. ${text}`).join("\n")}` : "";
+	return `@${me} finished: ${reply ?? "its turn ended with no reply."}${offered}`;
 }
 
 export class BoardFeed {

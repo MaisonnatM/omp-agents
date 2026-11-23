@@ -14,7 +14,7 @@ import { type BotId, MESSAGE_BOT_TOOL, parseBotId } from "./shared/bots";
 import { type PromptFile, splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
 import type { RoutineMessage } from "./shared/routine-message";
-import { isPrompt, type Item, type PromptItem, promptAuthor, skillInvocation } from "./shared/transcript";
+import { isPrompt, type Item, type PromptItem, promptAuthor, skillInvocation, splitSuggestions } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -143,26 +143,6 @@ function sameItem(a: Item, b: Item): boolean {
 	const y: Json = b;
 	const keys = Object.keys(x);
 	return keys.length === Object.keys(y).length && keys.every(key => sameValue(x[key], y[key]));
-}
-
-/** The numbered list the reply ends on after a `Suggestions:` heading, or none. */
-const SUGGESTIONS_HEADING = /^\s*Suggestions:\s*$/;
-const SUGGESTION_LINE = /^\s*\d+\.\s+(.+?)\s*$/;
-
-/** Whether a reply ends on a numbered `Suggestions:` block and, if so, the lines the body keeps and the prompts it offers. */
-export function splitSuggestions(text: string): { body: string; suggestions: string[] } {
-	const suggestions: string[] = [];
-	for (let end = text.length; end > 0; ) {
-		const start = text.lastIndexOf("\n", end - 1) + 1;
-		const line = text.slice(start, end);
-		end = start - 1;
-		if (line.trim() === "") continue;
-		const match = SUGGESTION_LINE.exec(line);
-		if (match) suggestions.unshift(match[1]);
-		else if (suggestions.length > 0 && SUGGESTIONS_HEADING.test(line)) return { body: text.slice(0, start).trimEnd(), suggestions };
-		else break;
-	}
-	return { body: text, suggestions: [] };
 }
 
 /** A prompt, a routine's or another Bot's message, or a reply as the transcript shows it. */
