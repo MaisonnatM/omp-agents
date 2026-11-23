@@ -1,3 +1,9 @@
+---
+status: accepted
+date: 2026-11-23
+decision-makers: user, agent
+---
+
 # Board messages wake the sessions they are for
 
 The Board is a stored module: the dashboard is the one writer of `board.json`, the page sends changes over the socket, and sessions leave changes through the `board` tool's inbox directory, as Projects and Sport do.

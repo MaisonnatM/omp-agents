@@ -11,10 +11,11 @@ test("the modules-off preference keeps the known ids once, and reads anything un
 
 const sport = SERVER_MODULES.sport.join!;
 const memory = SERVER_MODULES.memory.join!;
+const board = SERVER_MODULES.board.join!;
 
 test("a new session joins with every module's join, less those the preferences turn off", () => {
-	expect(moduleJoins(null)).toEqual([sport, memory]);
-	expect(moduleJoins({ [MODULES_OFF_KEY]: JSON.stringify(["weather", "bogus"]) })).toEqual([sport, memory]);
-	expect(moduleJoins({ [MODULES_OFF_KEY]: JSON.stringify(["sport"]) })).toEqual([memory]);
-	expect(moduleJoins({ [MODULES_OFF_KEY]: JSON.stringify(["sport", "memory"]) })).toEqual([]);
+	expect(moduleJoins(null)).toEqual([sport, memory, board]);
+	expect(moduleJoins({ [MODULES_OFF_KEY]: JSON.stringify(["weather", "bogus"]) })).toEqual([sport, memory, board]);
+	expect(moduleJoins({ [MODULES_OFF_KEY]: JSON.stringify(["sport"]) })).toEqual([memory, board]);
+	expect(moduleJoins({ [MODULES_OFF_KEY]: JSON.stringify(["sport", "memory", "board"]) })).toEqual([]);
 });
