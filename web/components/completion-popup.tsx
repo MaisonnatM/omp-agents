@@ -4,7 +4,7 @@ import { type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type Rea
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { completionTrigger, type Trigger } from "../completion-trigger";
-import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
+import { type Composer, completionOption, fileSearch, mentionMenu, type MenuOption, type MenuSection, } from "../mentions";
 import type { Completions } from "../pane-store";
 import { useSearchedPullRequests } from "../reads";
 import { useDashboardStatus, useMentionLists } from "./dashboard-context";
@@ -102,7 +102,6 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 	const lists = useMentionLists();
 
 	const token = menu?.trigger.kind === "mention" ? menu.trigger.token : null;
-	const query = token && mentionQuery(token);
 	const { pullRequestsScope } = useDashboardStatus();
 	const pullRequestRepos = useSearchedPullRequests(pullRequestsScope);
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;

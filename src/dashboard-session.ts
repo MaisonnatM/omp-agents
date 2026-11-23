@@ -12,7 +12,7 @@ import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
 import { type AdmittedLaunch, attachRpc, parseRpcGoal, type RpcChild, type RpcClient, type RpcGoal, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
-import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
+import { type AgentRow, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
 import { advisorCommand, contextCommand, goalCommand, type AdvisorState, type CompactionState, type ContextAction, type GoalChange, type GoalSlot, type SessionGoal } from "./shared/session-controls";
 import { promptAuthor } from "./shared/transcript";
 import { PromptTurn } from "./prompt-turn";

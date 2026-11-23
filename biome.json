@@ -1,0 +1,44 @@
+{
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+	"files": { "includes": ["**/*.ts", "**/*.tsx"] },
+	"formatter": { "enabled": false },
+	"assist": { "enabled": false },
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "none",
+			"correctness": {
+				"noConstAssign": "error",
+				"noInvalidUseBeforeDeclaration": "error",
+				"noSelfAssign": "error",
+				"noSwitchDeclarations": "error",
+				"noUnreachable": "error",
+				"noUnsafeFinally": "error",
+				"noUnsafeOptionalChaining": "error",
+				"noUnusedImports": "error",
+				"noUnusedLabels": "error",
+				"noUnusedVariables": "error"
+			},
+			"suspicious": {
+				"noAsyncPromiseExecutor": "error",
+				"noCompareNegZero": "error",
+				"noDebugger": "error",
+				"noDoubleEquals": "error",
+				"noDuplicateCase": "error",
+				"noDuplicateClassMembers": "error",
+				"noDuplicateObjectKeys": "error",
+				"noDuplicateParameters": "error",
+				"noExportsInTest": "error",
+				"noFallthroughSwitchClause": "error",
+				"noFocusedTests": "error",
+				"noGlobalIsNan": "error",
+				"noImportAssign": "error",
+				"noRedeclare": "error",
+				"noSelfCompare": "error",
+				"noSkippedTests": "error",
+				"noSparseArray": "error"
+			}
+		}
+	}
+}

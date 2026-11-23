@@ -5,6 +5,10 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- /ship now stops a session after five rounds of fixing failed checks or review comments, or sooner when the count stops going down, and asks you before trying again.
+- /ship now writes one line per step with the model, tokens, and cost to a log in your omp-agents settings folder, so you can see what each pull request cost.
+- Behind the scenes: landing now refuses a change that edits an existing test unless a commit explains why, so an agent cannot make tests pass by rewriting them.
+- Behind the scenes: a code checker now runs before every landing, and three mistakes agents repeated are now caught by tests instead of notes.
 - Fixed: the counts beside Notifications, Bots, and Pull requests in the sidebar now sit centered on their row instead of slightly low.
 - Artifacts: documents in the Artifacts tab use a wider reading column, so less space sits empty around the text.
 - Docs: four choices kept only in project memory (the Memory page layout, session sidebar links, skipped hidden repositories, agents' project access) now have decision records.

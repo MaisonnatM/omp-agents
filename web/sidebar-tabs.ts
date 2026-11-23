@@ -1,7 +1,6 @@
 /** The sidebar's page list as the user arranged it in Settings › Preferences: the tabs' order, and which ones it leaves out. */
 import { useEffect, useMemo } from "react";
 import { isObject } from "../src/json";
-import type { View } from "../src/shared/sessions";
 import { useModulesOff } from "./modules-off";
 import { type Page, SIDEBAR_TABS, type SidebarTab } from "./routing";
 import type { ShortcutId } from "./shortcuts";

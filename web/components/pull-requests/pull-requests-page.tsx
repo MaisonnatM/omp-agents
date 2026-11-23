@@ -228,7 +228,7 @@ function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route:
 		const stored = Number(raw);
 		return stored >= MIN_DETAILS && stored <= MAX_DETAILS ? stored : DETAILS_WIDTH;
 	});
-	const room = (element: HTMLElement): number => (element.closest("aside")?.parentElement as HTMLElement).clientWidth;
+	const room = (element: HTMLElement): number => element.closest("aside")!.parentElement!.clientWidth;
 	// The line sits on the details' left edge: dragging it left widens them.
 	const resize = useDragSeparator({
 		value: width,
