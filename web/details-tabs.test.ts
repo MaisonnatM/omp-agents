@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, newIdsByScope, openDetailsTab, showDetailsTab } from "./details-tabs";
+import { closeDetailsTab, decodeDetailsTabs, encodeDetailsTabs, newIdsByScope, newIdsOnOpen, openDetailsTab, showDetailsTab } from "./details-tabs";
 
 describe("decodeDetailsTabs", () => {
 	test("a tab name stored before tabs could close opens that tab", () => {
@@ -50,6 +50,18 @@ describe("newIdsByScope", () => {
 		// A link replaced by another at the same count is new.
 		expect(linked("session-1", ["ENG-1", "ENG-2", "ENG-4"])).toBe(true);
 		expect(linked("session-2", ["ENG-1"])).toBe(true);
+	});
+});
+
+describe("newIdsOnOpen", () => {
+	test("names a session's ids again each time another session was shown in between, but not on a reload of the same one", () => {
+		const linked = newIdsOnOpen();
+		expect(linked("session-1", [])).toBe(false);
+		expect(linked("session-1", ["ENG-1"])).toBe(true);
+		expect(linked("session-1", ["ENG-1"])).toBe(false);
+		expect(linked("session-2", [])).toBe(false);
+		expect(linked("session-1", ["ENG-1"])).toBe(true);
+		expect(linked("session-1", ["ENG-1", "ENG-2"])).toBe(true);
 	});
 });
 

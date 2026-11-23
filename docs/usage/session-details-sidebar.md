@@ -24,6 +24,7 @@
   Click a row to read that file's diff, with long lines wrapped; **Previous** and **Next** step through the files, and the back arrow returns to the list.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   A pull request the session only read shows only when the session's own prompt names it, as `#7049` or `PR 7049`; see [Pull requests](pull-requests.md).
+  The tab opens by itself, behind the tab on screen, each time you open a session with a pull request, and when the session gets a new one; close it and it stays closed until then.
   The pull requests the session worked on, such as one it opened, pushed, or edited, come before those its prompt only links or names, so the one it opened shows before the one the prompt linked.
   The first one shows until you pick another from the header's **N/M** stack menu or from its **Also on this session** list, which says whether the session submitted or worked on each pull request.
   The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
@@ -40,7 +41,7 @@
   The agent lists the changes in a `before-after` block, a JSON array of `{"title", "before", "after", "description"}` with absolute screenshot paths, which the reply then hides.
 - **Linear** shows a Linear issue: its id, which opens it in Linear, its status, when it last changed, its title, priority, assignee, project, and labels, then its description.
   It opens on the first issue the conversation links to, as `https://linear.app/<workspace>/issue/ENG-123`, and its count is the number of issues linked; with more than one, a menu beside the field picks another.
-  The tab opens by itself, behind the tab on screen, when the session's conversation links an issue it had not linked before, so its chip with the count shows in the tab row; once you close it, it stays closed until the session links another issue or you reload the page.
+  The tab opens by itself, behind the tab on screen, each time you open a session that links an issue, and when the conversation links an issue it had not linked before, so its chip with the count shows in the tab row; close it and it stays closed until then.
   The issue you typed in the field stays while you look at another tab.
   Type an id such as `ENG-123`, or paste an issue's link, in the field at the top and press Enter to show any other issue; it shows without joining the menu, and text that is neither says so under the field.
   The server reads the issue through the Linear MCP server omp uses, with omp's sign-in to it, so the tab needs Linear in [MCP servers](mcp-servers.md) and says so when omp has none.

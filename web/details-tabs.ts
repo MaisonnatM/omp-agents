@@ -71,3 +71,21 @@ export function newIdsByScope(): (scope: string, ids: readonly string[]) => bool
 		return named.size > before;
 	};
 }
+
+/**
+ * Like {@link newIdsByScope}, but remembers only the scope last shown, so showing a session again, as a click on it in
+ * the sidebar does, names its ids as new once more; a reloaded transcript or a subagent's view of the same session does not.
+ */
+export function newIdsOnOpen(): (scope: string, ids: readonly string[]) => boolean {
+	let shown: string | null = null;
+	let named = new Set<string>();
+	return (scope, ids) => {
+		if (scope !== shown) {
+			shown = scope;
+			named = new Set();
+		}
+		const before = named.size;
+		for (const id of ids) named.add(id);
+		return named.size > before;
+	};
+}
