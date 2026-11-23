@@ -31,9 +31,13 @@ interface SchemaOptions {
 	description?: string;
 }
 
-/** What a `before_agent_start` hook hands back: the system prompt the turn starts with. */
+/**
+ * What a `before_agent_start` hook hands back: the system prompt the turn starts with, and a message omp adds to the
+ * conversation before the turn's prompt, which `display: false` keeps out of the user's view.
+ */
 export interface PromptChange {
-	systemPrompt: string[];
+	systemPrompt?: string[];
+	message?: { customType: string; content: string; display: boolean };
 }
 
 /**
@@ -51,6 +55,8 @@ export interface ExtensionApi {
 		event: "before_agent_start",
 		handler: (event: { systemPrompt: string[] }, ctx: { cwd: string; agent: { kind: "main" | "sub" } }) => PromptChange | undefined | Promise<PromptChange | undefined>,
 	): void;
+	/** omp fires it once compaction replaced the conversation with its summary, so a message sent before it is gone. */
+	on(event: "session_compact", handler: () => void): void;
 	registerTool<Params>(tool: ExtensionTool<Params>): void;
 	/** omptype's TypeBox shim, `@oh-my-pi/omptype/typebox`. */
 	typebox: {
