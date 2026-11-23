@@ -17,6 +17,7 @@ import { applyPaneMessage, retainPanes, retainTrajectories, useShownConversation
 import { applyItems } from "./artifact-requests";
 import { DEFAULT_SPLIT_RATIOS, type SplitAxis, type SplitRatios } from "./pane-navigation";
 import {
+	hashForPage,
 	hashForView,
 	type Layout,
 	layoutAfterResumeAll,
@@ -119,7 +120,11 @@ function useOpenBot(page: Page | null, { bots, hosts, routines }: DashboardState
 
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
 export function useDashboard(): Dashboard {
-	const [state, dispatch] = useReducer(reduce, null, () => initialState(routeFromHash(location.hash), readSplitRatios()));
+	const [state, dispatch] = useReducer(reduce, null, () => {
+		// The dashboard opens on the Board's inbox, where sessions post what waits for you; a link with a hash opens what it names.
+		if (!location.hash) history.replaceState(null, "", hashForPage({ kind: "board", view: { kind: "inbox" }, thread: null }));
+		return initialState(routeFromHash(location.hash), readSplitRatios());
+	});
 	const socketRef = useRef<WebSocket | null>(null);
 	const layoutRef = useRef(state.layout);
 	layoutRef.current = state.layout;
