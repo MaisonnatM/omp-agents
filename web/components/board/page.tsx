@@ -293,8 +293,8 @@ function ThreadCard({ thread, state, byId, now, selected, onOpen, preview, menti
 			<span className={cn("mt-1 line-clamp-2 block text-sm leading-snug", unread > 0 ? "font-semibold" : "font-medium")}>{thread.title}</span>
 			{last && (
 				<span className="mt-1 line-clamp-2 block text-[0.8125rem] leading-snug text-muted-foreground">
-					<span className="text-foreground/80">{author?.name}: </span>
-					{last.text || attachmentLabel(last.attachment)}
+					<span className="text-foreground/80">{(last.text && feedLead(last.text)?.label) || author?.name}: </span>
+					{last.text ? (feedLead(last.text)?.body ?? last.text) : attachmentLabel(last.attachment)}
 				</span>
 			)}
 			<span className="mt-2 flex min-w-0 items-center gap-1.5">
@@ -517,14 +517,37 @@ function MessageRow({ msg, author, grouped, now, onAnswer, preset }: { msg: Mess
 						{msg.synced && <span className="text-3xs text-muted-foreground">via {msg.synced}</span>}
 					</p>
 				)}
-				{msg.text && (
-					<div className="text-sm leading-relaxed">
-						<MessageMarkdown text={msg.text} preset={preset} />
-					</div>
-				)}
+				{msg.text && <MessageBody text={msg.text} preset={preset} />}
 				{msg.attachment && <AttachmentCard attachment={msg.attachment} now={now} onAnswer={option => onAnswer(msg.id, option)} />}
 			</div>
 		</li>
+	);
+}
+
+/** The session feed's `@you waits on you: ` or `@you finished: ` lead, which `src/server/board-feed.ts` writes so the post counts as a mention. */
+const FEED_LEAD = /^@.+? (waits on you|finished): /;
+
+/** A session feed post's status and the text after its lead, `null` for any other message; a reply the feed cut mid-bold drops its unpaired `**`, which would show raw. */
+function feedLead(text: string): { label: string; tone: "green" | "amber"; body: string } | null {
+	const lead = FEED_LEAD.exec(text);
+	if (!lead) return null;
+	const rest = text.slice(lead[0].length);
+	const body = (rest.match(/\*\*/g)?.length ?? 0) % 2 === 0 ? rest : rest.replaceAll("**", "");
+	return lead[1] === "finished" ? { label: "Finished", tone: "green", body } : { label: "Waits on you", tone: "amber", body };
+}
+
+/** A message's text, with a session feed post's lead shown as a status chip instead of a repeated mention. */
+function MessageBody({ text, preset }: { text: string; preset: MarkdownPreset }) {
+	const lead = feedLead(text);
+	return (
+		<div className="text-sm leading-relaxed">
+			{lead && (
+				<span className="mt-0.5 mb-1 block">
+					<Chip tone={lead.tone}>{lead.label}</Chip>
+				</span>
+			)}
+			<MessageMarkdown text={lead?.body ?? text} preset={preset} />
+		</div>
 	);
 }
 
