@@ -68,6 +68,7 @@ describe("check commands", () => {
 		expect(isCheckCommand(["python3", "/h/.omp/agent/scripts/heavy.py", "bun run typecheck && bun run lint"], [])).toBe(true);
 		expect(isCheckCommand(["python3", "/h/heavy.py", "bun", "test"], [])).toBe(true);
 		expect(isCheckCommand(["python3", "/h/heavy.py", "bun run build"], [])).toBe(false);
+		expect(isCheckCommand(["python3", "heavy.py", "npm run lint && npm test", "2>&1"], [])).toBe(true);
 	});
 });
 

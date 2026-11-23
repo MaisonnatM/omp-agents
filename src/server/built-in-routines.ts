@@ -69,7 +69,7 @@ export const HARNESS_REVIEW_PROMPT = [
 	"1. Last week's verdict, as above.",
 	"2. The failures and escalations, grouped by cause, each group with its count, its repositories and pull requests, and one example.",
 	"3. Exactly one harness change, as a decision for me: the problem it fixes, the change (a skill, an extension, a check, or a rule), and what it costs. Do not make it.",
-	"   A replay loads no extension but `cache-tail.ts`, so it tests a skill, a rule, or a repository check, not an extension; say so when the change is one.",
+	"   A replay loads no extension but `cache-tail.ts`, so it tests a skill, a rule, or a repository check, not an extension; when the change is an extension, say so and name instead the `bun scripts/evals/run.ts` run that would measure it with the full harness, such as its `--disable-extensions <name>` arm, as `docs/architecture/evals.md` says, without running it.",
 	"4. Five past failures to replay to test that change: for each, its session id, repository, and pull request, what failed, and what the change should make happen instead.",
 	"   Pick sessions whose first request states the work, without pointing at `local://` or `agent://` files.",
 	"",

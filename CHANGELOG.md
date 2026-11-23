@@ -8,6 +8,8 @@ The dashboard shows the same lines in Settings › What's new.
 - The Weekly harness review now saves the five failures it picks so you can replay them once its proposed change lands, and the next week it tells you whether that change fixed each one.
 - The Weekly harness review now also counts pull requests in every repository whose fixes ran out of rounds or stalled, grouped by cause.
 - If you never edited the Weekly harness review's instructions, it now gets the newest ones by itself; ones you edited stay yours.
+- A new eval set replays 20 real past tasks to check that harness changes help, and can switch off one part at a time to see which parts still matter.
+- The safety checks are now tested against 50 real past commands, so a rule change that blocks the wrong thing shows up; this caught a way around the git hooks check and a missed warning when reading pull request text in a loop, both now fixed.
 - /ship now skips the plan contest and both code reviews for a small change, up to 50 changed lines in 3 files that touch no shared or schema file, so quick fixes ship faster and cost less.
 - Edits the plan already spelled out now go to a cheaper worker agent, while planning, design calls, and reviews stay on the strongest model.
 - Behind the scenes: the note about a session's todos now comes as a message instead of changing the agent's standing instructions, so those instructions stay the same in every session and are read from the cache, which costs less.
