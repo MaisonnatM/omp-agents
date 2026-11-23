@@ -17,7 +17,21 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import type { TraceLine } from "../templates/omp/agent/extensions/ship";
+
+/** The fields this script reads from a ship trace line (`TraceLine` in templates/omp/agent/extensions/ship.ts, which root typecheck cannot import). */
+interface TraceLine {
+	ts: string;
+	session: string;
+	repo?: string;
+	pr?: number;
+	stage: string;
+	model?: string;
+	tokens: number;
+	cost: number;
+	round?: number;
+	recorded: boolean;
+	refusal?: string;
+}
 
 const DAY = 86_400_000;
 const FIXES: Record<string, true> = { fix_ci: true, fix_comments: true };
