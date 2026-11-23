@@ -36,22 +36,25 @@ export function BoardList({ view, queue, query, onQuery, onCreateThread, ...prop
 }
 
 /** The ids of the threads `view` lists, top to bottom, which the next and previous thread shortcuts step through. */
-export function listedThreads({ view, state, index, queue, query }: { view: BoardView; state: BoardState; index: BoardIndex; queue: Message[]; query: string }): string[] {
+export function listedThreads({ view, state, index, queue, query, open }: { view: BoardView; state: BoardState; index: BoardIndex; queue: Message[]; query: string; open: string | null }): string[] {
 	switch (view.kind) {
 		case "inbox":
 			return queueThreads(index, queue).map(thread => thread.id);
 		case "scheduled":
 			return [...new Set(state.schedules.toSorted((a, b) => a.at - b.at).map(item => item.thread))];
 		case "channel":
-			return channelThreads(state, index, view.id, query).map(thread => thread.id);
+			return channelThreads(state, index, view.id, query, open).map(thread => thread.id);
 		case "member":
 			return queueThreads(index, index.queueByMember.get(view.id) ?? []).map(thread => thread.id);
 	}
 }
 
-function channelThreads(state: BoardState, index: BoardIndex, channel: string, query: string): Thread[] {
+/** A channel's threads, newest first; done ones show only while open or matched by a filter, so settled work leaves the list. */
+function channelThreads(state: BoardState, index: BoardIndex, channel: string, query: string, open: string | null): Thread[] {
 	const at = (thread: Thread) => index.lastByThread.get(thread.id)?.at ?? 0;
-	return state.threads.filter(thread => thread.channel === channel && thread.title.toLowerCase().includes(query.toLowerCase())).toSorted((a, b) => at(b) - at(a));
+	return state.threads
+		.filter(thread => thread.channel === channel && thread.title.toLowerCase().includes(query.toLowerCase()) && (thread.task !== "done" || query !== "" || thread.id === open))
+		.toSorted((a, b) => at(b) - at(a));
 }
 
 function queueThreads(index: BoardIndex, messages: Message[]): Thread[] {
@@ -121,7 +124,7 @@ function ChannelList({ channel: id, query: q, onQuery, onCreateThread, ...props 
 	const [naming, setNaming] = useState(false);
 	const channel = index.channelById.get(id);
 	if (!channel) return null;
-	const threads = channelThreads(state, index, id, q);
+	const threads = channelThreads(state, index, id, q, open);
 	const title = `#${channel.name}`;
 	return (
 		<ListFrame

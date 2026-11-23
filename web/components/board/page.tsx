@@ -46,7 +46,7 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 
 	const thread = open ? (index.threadById.get(open) ?? null) : null;
 	const inboxItems = [...lingering.filter(kept => !myQueue.some(msg => msg.id === kept.id)), ...myQueue].toSorted((a, b) => b.at - a.at);
-	const listed = listedThreads({ view, state, index, queue: inboxItems, query });
+	const listed = listedThreads({ view, state, index, queue: inboxItems, query, open });
 	const at = open ? listed.indexOf(open) : -1;
 	/** Opens the thread `by` rows below or above the open one, or the list's first or last when none of its threads is open. */
 	const step = (by: 1 | -1): boolean => {
