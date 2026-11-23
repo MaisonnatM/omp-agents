@@ -1,6 +1,7 @@
 /** The Board: channels and threads where people, omp sessions, and remote agents post, with an inbox per member; a message for a session wakes it. */
 import { IconArrowUp, IconCalendar1, IconCheckmark1, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconShieldCheck } from "central-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { type Attachment, type BoardChange, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
 import type { CoreData } from "../module-views";
@@ -107,10 +108,12 @@ function Board({ view: asked, core, state, onChange }: { view: BoardView; core: 
 					onCommand={(command, arg) => runCommand(thread.id, command, arg)}
 					onAnswer={answer}
 					onOpenThread={setOpen}
+					onBack={() => setOpen(null)}
 				/>
 			) : (
-				<div className="grid place-items-center text-sm text-muted-foreground">Pick a thread</div>
+				<div className="grid place-items-center text-sm text-muted-foreground @max-[46rem]:hidden max-phone:hidden">Pick a thread</div>
 			)}
+			</div>
 		</div>
 	);
 }
@@ -213,7 +216,7 @@ function Empty({ children }: { children: ReactNode }) {
 
 function Chip({ children, tone }: { children: ReactNode; tone?: "blue" | "green" | "amber" | "red" | "violet" }) {
 	const tones = { blue: "bg-sky-500/12 text-sky-700 dark:text-sky-300", green: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300", amber: "bg-amber-500/15 text-amber-800 dark:text-amber-300", red: "bg-red-500/12 text-red-700 dark:text-red-300", violet: "bg-violet-500/12 text-violet-700 dark:text-violet-300" };
-	return <span className={cn("inline-flex h-5 max-w-full items-center truncate rounded px-1.5 text-2xs font-medium", tone ? tones[tone] : "bg-foreground/[0.06] text-muted-foreground")}>{children}</span>;
+	return <span className={cn("inline-block h-5 min-w-0 truncate rounded px-1.5 text-2xs leading-5 font-medium", tone ? tones[tone] : "bg-foreground/[0.06] text-muted-foreground")}>{children}</span>;
 }
 
 const TASK_TONE = { open: "blue", claimed: "violet", review: "amber", done: "green", blocked: "red" } as const;
@@ -252,12 +255,12 @@ function ThreadCard({ thread, state, byId, now, selected, onOpen, preview, menti
 					{last.text || attachmentLabel(last.attachment)}
 				</span>
 			)}
-			<span className="mt-2 flex items-center gap-1.5">
+			<span className="mt-2 flex min-w-0 items-center gap-1.5">
 				<TaskChip thread={thread} byId={byId} now={now} />
 				{thread.labels.slice(0, 2).map(label => (
 					<Chip key={label}>{label}</Chip>
 				))}
-				<span className="ml-auto flex -space-x-1.5">
+				<span className="ml-auto flex shrink-0 -space-x-1.5">
 					{people.map(member => (
 						<span key={member.id} className="rounded-full ring-2 ring-background">
 							<Avatar member={member} size="sm" />
@@ -287,9 +290,11 @@ interface ThreadViewProps {
 	onCommand: (command: string, arg: string) => void;
 	onAnswer: (msgId: string, option: string) => void;
 	onOpenThread: (id: string) => void;
+	/** Back to the list, which the narrow page hides while a thread is open. */
+	onBack: () => void;
 }
 
-function ThreadView({ state, thread, byId, members, now, typing, onPost, onCommand, onAnswer, onOpenThread }: ThreadViewProps) {
+function ThreadView({ state, thread, byId, members, now, typing, onPost, onCommand, onAnswer, onOpenThread, onBack }: ThreadViewProps) {
 	const messages = state.messages.filter(msg => msg.thread === thread.id);
 	const channel = state.channels.find(item => item.id === thread.channel)!;
 	const scroller = useRef<HTMLDivElement>(null);
@@ -305,6 +310,9 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 	return (
 		<section aria-label={thread.title} className="flex min-h-0 min-w-0 flex-col">
 			<header className="flex min-h-(--page-header-height) shrink-0 items-center gap-3 border-b border-border px-6">
+				<Button variant="ghost" size="icon-compact" aria-label="Back to list" className="-ml-2 shrink-0 @min-[46rem]:hidden max-phone:inline-flex" onClick={onBack}>
+					<IconChevronLeft />
+				</Button>
 				<div className="min-w-0 flex-1">
 					<p className="flex items-center gap-1 text-2xs text-muted-foreground">
 						<IconHashtag className="size-3" />
@@ -320,6 +328,7 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 				</label>
 			</header>
 			<div className="flex min-h-0 flex-1">
+				<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 				<div ref={scroller} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
 					<ol className="mx-auto max-w-3xl px-6 py-6">
 						{shown.map((msg, i) => {
@@ -341,6 +350,8 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 							</li>
 						)}
 					</ol>
+				</div>
+				<Composer members={members} onPost={onPost} onCommand={onCommand} channel={channel.name} />
 				</div>
 				<aside className="w-64 shrink-0 overflow-y-auto border-l border-border px-4 py-5 text-sm max-[1400px]:hidden">
 					<SideHeading>Task</SideHeading>
@@ -388,7 +399,6 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 					)}
 				</aside>
 			</div>
-			<Composer members={members} onPost={onPost} onCommand={onCommand} channel={channel.name} />
 		</section>
 	);
 }
