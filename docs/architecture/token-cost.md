@@ -62,6 +62,8 @@ Cache writes by cause, from consecutive requests of one session:
   `pr_description` and `project_memory` stay, since subagents call them.
 - **`skill://Poteto Mode` no longer fails 37 times per 14 days.** pstack renamed its skill `poteto-mode`, and the kit's alias still told agents the old name; it now says that `skill://poteto-mode` opens pstack's file.
 - **The baseline is one command.** `scripts/token-audit/report.ts` prints every table above, and `scripts/token-audit/dump-request.ts` writes each request omp sends so the report can size it.
+- **A Bot's system prompt no longer changes from turn to turn.** The Bot extension used to put the Bot's name, job, memory, routines, and the other Bots in the system prompt, read again each turn, so every `remember` or saved routine rewrote the cached head of the next request.
+  The system prompt now holds only rules that are the same for every Bot, and the changing part comes as a hidden message sent only when it changed and again after compaction, as `todos.ts` sends a session's todos; see [Bots](bots.md).
 
 ## Proposals
 
@@ -111,6 +113,10 @@ The verdict per block of lines, for the proposal above:
 1. `bun scripts/token-audit/model-replay.ts candidates --repo <repository> > tasks.json` lists `poteto-agent` and `task` subagent prompts of the last 14 days in that repository.
    Each entry's base is the commit the prompt names, else the target branch at the time the worker started, and its `paths` are the checkouts the prompt names, which a replay points at its own clone.
    Prompts that point at `local://` or `agent://` files are left out, since those files lived in the parent session.
+   `candidates --sessions <id,...>` lists the sessions it names instead, whatever their age or agent, by their full id or its last 8 characters, main sessions included, and prints why it left one out.
+   A main session's prompt is its first request: the user's first message, or the skill they invoked as omp expanded it, where only the words the user wrote count for a named commit and for `local://` or `agent://` files.
+   A session whose worktree `<repository>-wt/<name>` is gone takes its base from the repository.
+   The weekly harness review lists the five failures it picks this way; see [Built-in routines](routines.md#built-in-routines).
 2. Keep the entries worth replaying: ones that change code, whose base is the state the worker saw.
    A worker on a feature branch saw commits main did not have yet; replayed from main, it cannot do the part that needs them, as the pilot's replays of `760ccfb8` reported.
 3. `bun scripts/token-audit/model-replay.ts run --tasks tasks.json --models anthropic/claude-opus-5-5:auto,anthropic/claude-sonnet-5-5:auto --out ~/.cache/omp-model-replay/<name>` runs the repository's `.omp/land.json` checks once at each base, then replays each task on each model under `--max-cost` (15 dollars) and `--max-time` (45 minutes).
@@ -127,6 +133,7 @@ The verdict per block of lines, for the proposal above:
 4. `bun scripts/token-audit/model-replay.ts judge --out ~/.cache/omp-model-replay/<name>` asks the judge model, Opus by default, to compare the `--baseline` model's diff, Opus by default, with each other model's, shown as A and B in random order, and to list each one's defects.
 5. The summary per model shows how many replays break nothing that worked at the base, empty changes, cost, requests, and minutes per task, and judge wins, ties, and losses.
    A test that already failed at the base, often from this computer's setup, is not counted against a replay that still fails it.
+   `summary --by-task` adds one row per task and model: whether it keeps the base's checks, how many checks that failed at the base now pass, and its checks, files changed, and cost.
    Swap a worker's model only when the cheaper model keeps the checks as often and loses no more judge verdicts than it wins, over at least 20 tasks.
 
 ## Gaps

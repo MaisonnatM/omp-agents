@@ -32,10 +32,11 @@ Each run replays the task the way [Worker model replay](token-cost.md#worker-mod
 - A config overlay pins every model role to `--model`, Opus by default, with no fallback.
 - `XDG_CONFIG_HOME` points at the run's folder, so the kit's extensions, such as `/ship`'s trace, write there and not to the user's own files.
 - After the run, the hidden tests are written from the landed commit over whatever the agent wrote, and the check runs outside the sandbox.
+- The run's folder keeps its prompt, omp's output and session files, `change.diff`, and `check.log`; the clone is removed once checked.
 
 Each run appends one line to `<out>/results.jsonl`, `~/.cache/omp-evals` by default: the task, arm, run number, model, `passed`, the failing test names, cost, requests, output tokens, which models answered, minutes, and the size of the change.
 A run already recorded is skipped, so a stopped run resumes.
-A run whose model could not answer, such as on a usage limit, is recorded with its `error`, left out of the summary, and retried next time; so is a run another model answered part of.
+A run whose model could not answer, such as on a usage limit, is recorded with its `error`, left out of the summary, and retried next time; a run another model answered part of is left out of the summary too.
 `--max-cost` (5 dollars) and `--max-time` (30 minutes) bound each run; the full set at 3 runs is 60 runs.
 
 `--dry-run` does everything but call the model: it prints the omp command, applies the landed change in place of the agent's, and runs the check, which must pass for every task; it records nothing.

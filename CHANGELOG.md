@@ -5,10 +5,20 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
-- Behind the scenes: a new eval set replays 20 real past tasks and checks each result with that task's own tests, so a change to the agents' setup can be measured instead of guessed, and it can switch off one part at a time to see which parts still earn their cost.
+- Behind the scenes: eval runs can no longer copy each other's work, post to Slack or Linear, or pick up the session they were started from, and their task prompts now spell out the exact names the tests expect; a first 5-task trial passed 1 to 2 of 5 for about $4 a round.
+- The safety check now lets an agent keep the dashboard token in a shell variable when it only goes into a request header, and /ship now counts `astro check` and `playwright test` as test runs.
+- The Weekly harness review now saves the five failures it picks so you can replay them once its proposed change lands, and the next week it tells you whether that change fixed each one.
+- The Weekly harness review now also counts pull requests in every repository whose fixes ran out of rounds or stalled, grouped by cause.
+- If you never edited the Weekly harness review's instructions, it now gets the newest ones by itself; ones you edited stay yours.
+- A new eval set replays 20 real past tasks to check that harness changes help, and can switch off one part at a time to see which parts still matter.
+- The safety checks are now tested against 50 real past commands, so a rule change that blocks the wrong thing shows up; this caught a way around the git hooks check and a missed warning when reading pull request text in a loop, both now fixed.
+- The dashboard now opens on the Board's Inbox.
+- Each session now posts on the Board, in its own thread in #sessions, when it asks you something or finishes a turn you did not see, so your Inbox lists what waits for you.
+- A new Board page in the docs explains channels, threads, tasks, and how messages reach sessions.
 - /ship now skips the plan contest and both code reviews for a small change, up to 50 changed lines in 3 files that touch no shared or schema file, so quick fixes ship faster and cost less.
 - Edits the plan already spelled out now go to a cheaper worker agent, while planning, design calls, and reviews stay on the strongest model.
 - Behind the scenes: the note about a session's todos now comes as a message instead of changing the agent's standing instructions, so those instructions stay the same in every session and are read from the cache, which costs less.
+- Behind the scenes: a Bot's name, job, memory, and routines now come as a message whenever they change, instead of rewriting the Bot's standing instructions every turn, so those instructions are read from the cache, which costs less.
 - Behind the scenes: a new metrics report shows, week by week, what each landed change cost, how often /ship steps pass, how often asking for help was worth it, and how often a person had to fix agent work afterwards.
 - /ship now checks that each step left the details the next step needs, and it reuses an existing pull request, Linear link, or Slack post instead of making a second one.
 - Independent checks and reviews now run side by side, and agents get a simple rule for how many helpers to start for a task.

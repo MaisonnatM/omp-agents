@@ -21,14 +21,17 @@ A Bot designer's loads `src/omp/designer-extension.ts` with no flags of its own:
 Any other start launches without the Bot extension; every session loads the Sport extension, `src/omp/sport-extension.ts`, as [Sport](sport.md) says.
 Once the session is live, `Bots` saves its session id on the Bot, and follows it after a `/move` or an edited prompt (`switched`).
 
-The extension adds to the main agent's system prompt on every turn the Bot's name, its job, its memory, its routines, and the other Bots, read again each turn, so a saved job or routine reaches the next turn.
-Each routine of the Bot is one short line, or **None yet.**, followed by one sentence on how a run acts and which tool creates, changes, or deletes one.
+The extension adds to the main agent's system prompt only what stays the same for the whole session: `BOT_RULES`, the same text for every Bot, which says how to remember, how routines run, and how to message another Bot.
+What changes mid-session, the Bot's name, its job, its memory, its routines, and the other Bots, goes in a hidden message (`display: false`, custom type `omp-agents.bot-state`) that starts with `# omp-agents Bot state`, which the rules name.
+The extension reads it again each turn, so a saved job, fact, or routine reaches the next turn, but sends it only when it differs from the last one it sent, and again after compaction (`session_compact`), which drops the last one from the conversation; a resumed session sends it at its first turn.
+So the system prompt stays the same bytes from turn to turn and its prompt cache keeps hitting, as [Token cost](token-cost.md) says.
+Each routine of the Bot is one short line in that message, or **None yet.**
 The line holds the routine's id, name, `enabled`, schedules, and triggers as one JSON object in the shapes `save_routine` takes, then its task's kind and the first 80 characters of its prompt or command, its whitespace collapsed, with `…` when it was cut.
 The extension parses `routines.json` with `parseRoutineSpec` and keeps the entries whose `botId` is the Bot's; a missing or unreadable file, or a session started without the `routines.json` flag, reads as no routines.
 The name, job, and memory need only the Bot's id, `bots.json`, and `memory.md` flags.
 Its `remember` tool appends `- YYYY-MM-DD fact` to `$XDG_DATA_HOME/omp-agents/bots/<id>/memory.md`, and nothing else writes that file.
 It refuses a fact longer than `MAX_FACT_LENGTH`, 500 characters, so each fact stays one short sentence.
-`readTail` in `src/read-tail.ts` reads only the file's newest whole lines within `MAX_MEMORY_BYTES`, 16 KB, of its end, so a memory that grows for months costs each turn the same; when it left older lines out, the prompt says so before the memory.
+`readTail` in `src/read-tail.ts` reads only the file's newest whole lines within `MAX_MEMORY_BYTES`, 16 KB, of its end, so a memory that grows for months costs each message the same; when it left older lines out, the message says so before the memory.
 
 The extension's `set_job` tool replaces the Bot's own job, and never writes `bots.json`.
 It takes one `job`, the whole job as Markdown, trims it, refuses one longer than `MAX_JOB_LENGTH`, 20,000 characters, the limit `parseBotSpec` holds a job the page saves to, and an empty one clears the job.
@@ -51,7 +54,7 @@ The extension's `stay_quiet` tool (`STAY_QUIET_TOOL` in `src/shared/sessions.ts`
 `turnUpdate` marks a `turn-ended` quiet when an assistant message of the run called it, and the server then leaves the session as unread as before the turn; see [Notifications](notifications.md).
 
 A `bot` socket message carries one `BotChange`.
-`save`, `remove`, `pin`, `move`, and `rename-section` go through the list registry, so every socket hears the new list as a `bots` message, with as much of each Bot's memory as the prompt carries, so the message stays as small as the prompt's.
+`save`, `remove`, `pin`, `move`, and `rename-section` go through the list registry, so every socket hears the new list as a `bots` message, with as much of each Bot's memory as its Bot state message carries, so the socket message stays as small as that one.
 The same message carries each Bot's last words, which `lastMessage` reads from the end of its session file, and the server sends it again as each turn of a Bot's conversation starts and ends, so the sidebar's previews and times follow the conversation.
 `Bots.msg` keeps each Bot's memory and last words as it read them, and reads one Bot's files again only when its conversation moved to another session or its session started or ended a turn or exited (`changed`), so a push reads one Bot's files, not every Bot's.
 `message` calls `Bots.message`, which answers once omp took the text: a follow-up in the live session, else a resume of the Bot's session followed by the text, else a new session in the Bot's workspace that starts with it.
@@ -68,8 +71,8 @@ The page's `#bots/<id>` shows the Bot's session through `ViewConversation`, the 
 ## Bot messages
 
 A Bot message is a message one Bot sends another, which wakes it, as Grok Bots hand work off.
-The prompt lists the other Bots, one line each, their `id`, `name`, and `kind` as one JSON object, then the first sentence of their job, `jobLine` in `src/shared/bots.ts`, or **No job yet.**; **None yet.** when there are none.
-One paragraph after it says how a Bot message reads, that the Bot's reply in its own conversation does not reach the sender, and that it messages the sender back only with a result or a question, never to thank or acknowledge.
+The Bot state message lists the other Bots, one line each, their `id`, `name`, and `kind` as one JSON object, then the first sentence of their job, `jobLine` in `src/shared/bots.ts`, or **No job yet.**; **None yet.** when there are none.
+The system prompt says how a Bot message reads, that the Bot's reply in its own conversation does not reach the sender, and that it messages the sender back only with a result or a question, never to thank or acknowledge.
 
 The extension's `message_bot` tool, `MESSAGE_BOT_TOOL`, takes `to`, a Bot's id, and `text`, Markdown.
 It reads `bots.json` at call time, refuses the Bot's own id and an id no Bot has, and checks the text with `parseBotMessageText`, which trims it and refuses an empty text, one longer than `MAX_BOT_MESSAGE_LENGTH`, 8,000 characters, and one that starts with `!` or `/`, which omp would run in the recipient's session as a shell command or a command.

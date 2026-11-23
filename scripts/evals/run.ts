@@ -166,6 +166,8 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 	const { diff, filesChanged, linesChanged } = changeSize(clone, task.base);
 	writeFileSync(join(dir, "change.diff"), diff);
 	const { passed, failures } = error ? { passed: false, failures: [] } : hiddenCheck(options.repo, task, clone, dir);
+	// Each clone holds its own node_modules; 60 runs of them fill a disk, and change.diff keeps what the agent did.
+	rmSync(clone, { recursive: true, force: true });
 	return {
 		at: new Date().toISOString(),
 		task: task.id,

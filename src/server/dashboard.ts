@@ -108,6 +108,7 @@ import { UsagePoll } from "./usage-poll";
 import { type Socket, Views } from "./views";
 import { parseClientMsg } from "./wire";
 import { adoptOldWorkspaces, WorkspacesFile } from "./workspaces-file";
+import { BoardFeed } from "./board-feed";
 import { BoardWake } from "./board-wake";
 import { type BoardChange, inBotsName } from "../shared/board";
 
@@ -192,6 +193,8 @@ export class Dashboard {
 	readonly #scheduledRunner: ScheduledRunner;
 	/** Wakes the sessions a Board message is for, and posts the Board's schedules as they come due. */
 	#boardWake: BoardWake | undefined;
+	/** Posts each session's questions and finished turns in its #sessions thread. */
+	#boardFeed: BoardFeed | undefined;
 	readonly #autoContinue: AutoContinue;
 	readonly #mergeQueue: MergeQueue;
 	readonly #mergeCleanup: MergeCleanup;
@@ -353,7 +356,10 @@ export class Dashboard {
 					if (placed) broadcasts.pushAll();
 				});
 			},
-			onRosterChange: () => this.#waits.check(),
+			onRosterChange: () => {
+				this.#waits.check();
+				this.#boardFeed?.check();
+			},
 			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
@@ -492,6 +498,14 @@ export class Dashboard {
 			active: () => ownerLock.held,
 			now: Date.now,
 		}));
+		this.#boardFeed = new BoardFeed({
+			state: () => modules.board.value,
+			hosts: () => sessions.rows(factsOf),
+			bots: () => this.#botsFile.value,
+			apply: change => void lists.applyModule("board", change),
+			active: () => ownerLock.held,
+			now: Date.now,
+		});
 		const boardTimer = setInterval(() => boardWake.fireDue(), 30_000);
 		stopping.addEventListener("abort", () => clearInterval(boardTimer));
 		this.#prWatches = new PullRequestWatches({
@@ -984,6 +998,7 @@ export class Dashboard {
 	#addBuiltInRoutines(): void {
 		addBuiltInRoutines(builtInRoutinesFile, {
 			hasBot: id => this.#botsFile.value.some(bot => bot.id === id),
+			routine: id => this.#routines.value.find(routine => routine.id === id),
 			saveBot: bot => this.#lists.apply("bots", { op: "save", bot }),
 			saveRoutine: routine => this.#lists.apply("routines", { op: "save", routine }),
 		});

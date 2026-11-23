@@ -58,9 +58,22 @@ function secretFile(path: string): ((what: string) => string) | undefined {
  */
 const HIDDEN_READS = [/Authorization:\s*Bearer\s+\$\(cat\s+("[^"]*"|'[^']*'|[^\s)]+)\)/g, /\b(?:export|env)\s+\$\([^)]*\)/g];
 
+/** A variable set to the dashboard token, `t=$(cat …/omp-agents/token)`, and the file it reads. */
+const TOKEN_VARIABLE = /\b([A-Za-z_]\w*)=\$\(cat\s+("[^"]*"|'[^']*'|[^\s)]+)\)/g;
+
+/** The line with each token variable masked when every use of it sits in a curl `Authorization: Bearer` header, so nothing prints it. */
+function maskTokenVariables(line: string): string {
+	return line.replace(TOKEN_VARIABLE, (whole, name: string, path: string) => {
+		if (!secretFile(path.replace(/^["']|["']$/g, ""))) return whole;
+		const uses = line.match(new RegExp(`\\$(?:\\{${name}\\}|${name}\\b)`, "g"))?.length ?? 0;
+		const inHeader = line.match(new RegExp(`Authorization:\\s*Bearer\\s+\\$(?:\\{${name}\\}|${name}\\b)`, "g"))?.length ?? 0;
+		return uses > 0 && uses === inHeader ? `${name}=TOKEN` : whole;
+	});
+}
+
 function secretRead(line: string): Verdict | undefined {
 	let shown = line;
-	if (split(line).some(words => program(words).words[0] === "curl")) shown = shown.replace(HIDDEN_READS[0]!, "Authorization: Bearer TOKEN");
+	if (split(line).some(words => program(words).words[0] === "curl")) shown = maskTokenVariables(shown).replace(HIDDEN_READS[0]!, "Authorization: Bearer TOKEN");
 	shown = shown.replace(HIDDEN_READS[1]!, "export");
 	for (const { words } of located(shown, null)) {
 		const [tool, ...args] = words;
@@ -92,8 +105,11 @@ function gitCommand(words: string[], dir: string | null): GitCommand | null {
 	for (; i < words.length && words[i]!.startsWith("-"); i++) {
 		const flag = words[i]!;
 		if (flag === "-C") at = within(at, words[++i]);
-		else if (flag === "-c") hooksMoved ||= /^core\.hookspath=/i.test(words[++i] ?? "");
-		else if (flag === "--git-dir" || flag === "--work-tree" || flag === "--namespace") i++;
+		else if (flag === "-c") {
+			// Read the setting even once hooks are moved, so the next `-c` value is not taken for the subcommand.
+			const setting = words[++i] ?? "";
+			hooksMoved ||= /^core\.hookspath=/i.test(setting);
+		} else if (flag === "--git-dir" || flag === "--work-tree" || flag === "--namespace") i++;
 	}
 	return { sub: words[i], args: words.slice(i + 1), at, hooksMoved };
 }

@@ -54,12 +54,15 @@ function loadedBot({ routines = true, job = "Watch the build.\nAsk before mergin
 		[BOT_FLAGS.routineInbox, inbox],
 	]);
 	for (const name of unset) flags.delete(name);
-	const { prompt, call } = loadExtension(botExtension, flags);
+	const { turn, compact, call } = loadExtension(botExtension, flags);
 	/** The requests the tools left in `inboxDir` for the dashboard, oldest first. */
 	const left = (inboxDir: string) => (existsSync(inboxDir) ? readdirSync(inboxDir).sort().map(name => (name.endsWith(".json") ? JSON.parse(readFileSync(join(inboxDir, name), "utf8")) : name)) : []);
 	return {
 		memory,
-		prompt,
+		turn,
+		compact,
+		/** The Bot state the next turn sends, `undefined` when it sends none. */
+		state: async () => (await turn())?.message?.content,
 		requests: () => left(inbox),
 		jobRequests: () => left(botInbox),
 		remember: (fact: string) => call("remember", { fact }),
@@ -70,49 +73,77 @@ function loadedBot({ routines = true, job = "Watch the build.\nAsk before mergin
 	};
 }
 
-test("a fact the Bot remembers lands in its memory as a dated line, and the next turn's system prompt carries it with its name, job, and own routines, a long command cut short", async () => {
+/** What the extension adds to every Bot's system prompt, the same bytes on every turn. */
+const RULES = [
+	"You are an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.",
+	"The newest message that starts with `# omp-agents Bot state` holds your name, your job, what you remember, your routines, and the other Bots as they are now; a new one comes whenever any of them changes.",
+	"When the user tells you something worth keeping across turns, such as a preference, a decision, or a fact about the work, call `remember` with it as one short sentence.",
+	"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create one, or to change one with its `id` and only the fields that change, and `delete_routine` to delete one.",
+	"Call `message_bot` to hand another Bot work that is its job. A message whose last line starts with `# omp-agents Bot message, sent by another Bot, not the user:` comes from the Bot that line names, not the user, and your reply in this conversation does not reach it. Call `message_bot` with its id only when you have a result or a question to send back, and never answer a message that needs no answer, such as thanks or an acknowledgment.",
+].join("\n");
+
+test("a fact the Bot remembers lands in its memory as a dated line, and the next turn's Bot state carries it with its name, job, and own routines, a long command cut short", async () => {
 	const bot = loadedBot();
 	setSystemTime(new Date("2026-05-03T10:00:00.000Z"));
 	expect(await bot.remember("  The user prefers\nshort answers. ")).toEqual({ content: [{ type: "text", text: "Remembered: The user prefers short answers." }], details: undefined });
 	expect(readFileSync(bot.memory, "utf8")).toBe("- 2026-05-03 The user prefers short answers.\n");
 
-	expect(await bot.prompt()).toEqual([
-		"base",
-		[
-			"You are Scout, an omp-agents Bot: a teammate the user keeps, with this one conversation they come back to.",
-			"Your job, and what you ask before doing:",
-			"Watch the build.\nAsk before merging.",
-			"What you remember from earlier turns:",
-			"- 2026-05-03 The user prefers short answers.",
-			"When the user tells you something worth keeping across turns, such as a preference, a decision, or a fact about the work, call `remember` with it as one short sentence.",
-			"Your routines, one per line: its fields as `save_routine` takes them, then its task's kind and its prompt or command, cut at 80 characters:",
-			'{"id":"r1","name":"Standup","enabled":false,"schedules":[{"kind":"weekly","days":[1,2,3,4,5],"time":{"hour":9,"minute":0}}],"triggers":[]} prompt: Post the standup.',
-			'{"id":"r3","name":"Nightly build","enabled":true,"schedules":[],"triggers":[{"kind":"pull-request"}]} command: bun install --frozen-lockfile && bun run build && bun test --coverage --reporter…',
-			"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create one, or to change one with its `id` and only the fields that change, and `delete_routine` to delete one.",
-			"The other Bots, one per line: its id, name, and kind, then its job's first sentence:",
-			'{"id":"relay","name":"Relay","kind":"pr-shepherd"} Relay the build reports.',
-			'{"id":"blank","name":"Blank","kind":"routines"} No job yet.',
-			"Call `message_bot` to hand another Bot work that is its job. A message whose last line starts with `# omp-agents Bot message, sent by another Bot, not the user:` comes from the Bot that line names, not the user, and your reply in this conversation does not reach it. Call `message_bot` with its id only when you have a result or a question to send back, and never answer a message that needs no answer, such as thanks or an acknowledgment.",
-		].join("\n"),
-	]);
+	expect(await bot.turn()).toEqual({
+		systemPrompt: ["base", RULES],
+		message: {
+			customType: "omp-agents.bot-state",
+			display: false,
+			content: [
+				"# omp-agents Bot state",
+				"You are Scout.",
+				"Your job, and what you ask before doing:",
+				"Watch the build.\nAsk before merging.",
+				"What you remember from earlier turns:",
+				"- 2026-05-03 The user prefers short answers.",
+				"Your routines, one per line: its fields as `save_routine` takes them, then its task's kind and its prompt or command, cut at 80 characters:",
+				'{"id":"r1","name":"Standup","enabled":false,"schedules":[{"kind":"weekly","days":[1,2,3,4,5],"time":{"hour":9,"minute":0}}],"triggers":[]} prompt: Post the standup.',
+				'{"id":"r3","name":"Nightly build","enabled":true,"schedules":[],"triggers":[{"kind":"pull-request"}]} command: bun install --frozen-lockfile && bun run build && bun test --coverage --reporter…',
+				"The other Bots, one per line: its id, name, and kind, then its job's first sentence:",
+				'{"id":"relay","name":"Relay","kind":"pr-shepherd"} Relay the build reports.',
+				'{"id":"blank","name":"Blank","kind":"routines"} No job yet.',
+			].join("\n"),
+		},
+	});
 });
 
-test("before the Bot remembers anything or has a routine its prompt says so, and a subagent it spawns gets no Bot prompt", async () => {
+test("the system prompt is byte-identical across turns while the memory changes, and the changed memory comes once as a hidden message, then again after compaction", async () => {
+	const bot = loadedBot();
+	const first = await bot.turn();
+	expect(first?.message?.content).toContain("What you remember from earlier turns:\nNothing yet.\n");
+
+	await bot.remember("The user ships on Fridays.");
+	const second = await bot.turn();
+	expect(second?.systemPrompt?.join("\n")).toBe(first?.systemPrompt?.join("\n"));
+	expect(second?.message).toEqual({ customType: "omp-agents.bot-state", display: false, content: expect.stringContaining(" The user ships on Fridays.\nYour routines") });
+
+	// The conversation already holds the unchanged state, so the next turn sends none.
+	expect(await bot.turn()).toEqual({ systemPrompt: first?.systemPrompt });
+	bot.compact();
+	expect(await bot.turn()).toEqual(second);
+});
+
+test("before the Bot remembers anything or has a routine its state says so, and a subagent it spawns gets no Bot prompt", async () => {
 	const bot = loadedBot({ routines: false, others: [] });
-	expect((await bot.prompt())?.[1]).toContain("What you remember from earlier turns:\nNothing yet.");
-	expect((await bot.prompt())?.[1]).toContain("cut at 80 characters:\nNone yet.\n");
-	expect((await bot.prompt())?.[1]).toContain("then its job's first sentence:\nNone yet.\n");
-	expect(await bot.prompt("sub")).toBeUndefined();
+	const state = await bot.state();
+	expect(state).toContain("What you remember from earlier turns:\nNothing yet.");
+	expect(state).toContain("cut at 80 characters:\nNone yet.\n");
+	expect(state).toEndWith("then its job's first sentence:\nNone yet.");
+	expect(await bot.turn("sub")).toBeUndefined();
 });
 
 test("a session the dashboard named no routine files for still gets its name, job, and memory, with no routines, and its routine tools refuse", async () => {
 	const bot = loadedBot({ unset: [BOT_FLAGS.routines, BOT_FLAGS.routineInbox] });
 	await bot.remember("The user prefers short answers.");
-	const prompt = (await bot.prompt())?.[1] ?? "";
-	expect(prompt).toStartWith("You are Scout, an omp-agents Bot");
-	expect(prompt).toContain("Your job, and what you ask before doing:\nWatch the build.\nAsk before merging.\n");
-	expect(prompt).toContain(" The user prefers short answers.\nWhen the user tells you");
-	expect(prompt).toContain("cut at 80 characters:\nNone yet.\n");
+	const state = (await bot.state()) ?? "";
+	expect(state).toStartWith("# omp-agents Bot state\nYou are Scout.\n");
+	expect(state).toContain("Your job, and what you ask before doing:\nWatch the build.\nAsk before merging.\n");
+	expect(state).toContain(" The user prefers short answers.\nYour routines");
+	expect(state).toContain("cut at 80 characters:\nNone yet.\n");
 	await expect(bot.saveRoutine({ name: "Digest", triggers: [{ kind: "slack" }], task: { kind: "prompt", prompt: "Sum up Slack." } })).rejects.toThrow("This session is not an omp-agents Bot, so it has no routines.");
 	await expect(bot.deleteRoutine("r1")).rejects.toThrow("This session is not an omp-agents Bot, so it has no routines.");
 });
@@ -124,18 +155,18 @@ test("a fact longer than one short sentence is refused and the memory keeps noth
 	expect(readFileSync(bot.memory, "utf8")).not.toContain("y");
 });
 
-test("a memory past the cap reaches the prompt as its newest facts with a note that older ones were cut, and a short one whole", async () => {
+test("a memory past the cap reaches the Bot state as its newest facts with a note that older ones were cut, and a short one whole", async () => {
 	const bot = loadedBot();
 	mkdirSync(dirname(bot.memory), { recursive: true });
 	const lines = Array.from({ length: 1000 }, (_, index) => `- 2026-05-03 Fact number ${index}.`);
 	writeFileSync(bot.memory, `${lines.join("\n")}\n`);
-	const prompt = (await bot.prompt())?.[1] ?? "";
-	expect(prompt).toContain("What you remember from earlier turns:\n(Older memory was cut to keep this prompt short; only the newest facts follow.)\n- 2026-05-03 Fact number");
-	expect(prompt).toContain("- 2026-05-03 Fact number 999.\nWhen the user tells you");
-	expect(prompt).not.toContain("Fact number 0.");
+	const state = (await bot.state()) ?? "";
+	expect(state).toContain("What you remember from earlier turns:\n(Older memory was cut to keep this prompt short; only the newest facts follow.)\n- 2026-05-03 Fact number");
+	expect(state).toContain("- 2026-05-03 Fact number 999.\nYour routines");
+	expect(state).not.toContain("Fact number 0.");
 
 	writeFileSync(bot.memory, `${lines.slice(0, 2).join("\n")}\n`);
-	expect((await bot.prompt())?.[1]).toContain(`What you remember from earlier turns:\n${lines.slice(0, 2).join("\n")}\nWhen the user tells you`);
+	expect(await bot.state()).toContain(`What you remember from earlier turns:\n${lines.slice(0, 2).join("\n")}\nYour routines`);
 });
 
 test("save_routine leaves the dashboard one request per call: a new routine of this Bot, enabled, then edits that keep every field they leave out", async () => {
@@ -188,12 +219,13 @@ test("the routine tools refuse another Bot's routine, an id no routine has, a ne
 	expect(bot.requests()).toEqual([]);
 });
 
-test("set_job leaves the dashboard one request with this Bot's new job, and the next prompt still reads the job from bots.json, which only the dashboard saves", async () => {
+test("set_job leaves the dashboard one request with this Bot's new job, and the next turn still reads the job from bots.json, which only the dashboard saves", async () => {
 	const bot = loadedBot({ job: "" });
-	expect((await bot.prompt())?.[1]).toContain("Your job, and what you ask before doing:\nNo job yet. Ask the user what it is, and what you should ask before doing, then call `set_job` with what they say.\n");
+	expect(await bot.state()).toContain("Your job, and what you ask before doing:\nNo job yet. Ask the user what it is, and what you should ask before doing, then call `set_job` with what they say.\n");
 	expect((await bot.setJob("  Triage the inbox.\nAsk before replying.\n")).content[0]?.text).toBe("Saved your job. The dashboard applies it, and while the dashboard is stopped the change waits for it.");
 	expect(bot.jobRequests()).toEqual([{ botId: "scout", job: "Triage the inbox.\nAsk before replying." }]);
-	expect((await bot.prompt())?.[1]).toContain("Your job, and what you ask before doing:\nNo job yet.");
+	// bots.json still holds no job, so the next turn has no new state to send.
+	expect(await bot.state()).toBeUndefined();
 });
 
 test("set_job with an empty job asks to clear it, and refuses a job past the page's limit or a session with no bot inbox, leaving nothing", async () => {
@@ -214,7 +246,7 @@ test("message_bot leaves the dashboard one request with the other Bot's id and t
 test("message_bot refuses this Bot itself, an id no Bot has, text that omp would run as a command, and a session with no bot inbox, leaving nothing", async () => {
 	const bot = loadedBot();
 	await expect(bot.messageBot("scout", "Hello me.")).rejects.toThrow("You cannot message yourself.");
-	await expect(bot.messageBot("ghost", "Hello?")).rejects.toThrow("No Bot has id ghost; the system prompt lists the other Bots.");
+	await expect(bot.messageBot("ghost", "Hello?")).rejects.toThrow("No Bot has id ghost; your Bot state lists the other Bots.");
 	await expect(bot.messageBot("relay", " !rm -rf ~")).rejects.toThrow("cannot start with ! or /");
 	await expect(bot.messageBot("relay", "x".repeat(MAX_BOT_MESSAGE_LENGTH + 1))).rejects.toThrow(`at most ${MAX_BOT_MESSAGE_LENGTH} characters`);
 	expect(bot.jobRequests()).toEqual([]);
