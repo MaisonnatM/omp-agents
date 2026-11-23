@@ -33,21 +33,21 @@ export const PRESENCE_COLOR: Record<Member["presence"], string> = {
 	asleep: "bg-zinc-400",
 };
 
-export function Avatar({ member, size }: { member: Member; size: "sm" | "md" }) {
-	const box = size === "sm" ? "size-6" : "size-8";
+export function Avatar({ member, size }: { member: Member; size: "xs" | "sm" | "md" }) {
+	const box = size === "xs" ? "size-4" : size === "sm" ? "size-6" : "size-8";
 	return (
 		<span className={cn("relative inline-flex shrink-0", box)}>
 			{member.kind === "human" ? (
 				<span
-					className={cn("grid size-full place-items-center rounded-full text-[0.7rem] font-semibold text-white", size === "md" && "text-xs")}
+					className={cn("grid size-full place-items-center rounded-full text-[0.7rem] font-semibold text-white", size === "md" && "text-xs", size === "xs" && "text-[0.45rem]")}
 					style={{ background: `oklch(0.62 0.13 ${member.look.hue})` }}
 				>
 					{member.initials}
 				</span>
 			) : (
-				<BotAvatar look={member.look} size={size === "sm" ? "header" : "row"} working={member.presence === "working"} className={size === "md" ? "size-8" : undefined} />
+				<BotAvatar look={member.look} size={size === "md" ? "row" : "header"} working={member.presence === "working"} className={size === "md" ? "size-8" : size === "xs" ? "size-4" : undefined} />
 			)}
-			<span className={cn("absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-background", PRESENCE_COLOR[member.presence], member.presence === "working" && "motion-safe:animate-pulse")} />
+			<span className={cn("absolute -right-0.5 -bottom-0.5 rounded-full", size === "xs" ? "size-1.5 ring-1 ring-sidebar" : "size-2.5 ring-2 ring-background", PRESENCE_COLOR[member.presence], member.presence === "working" && "motion-safe:animate-pulse")} />
 		</span>
 	);
 }

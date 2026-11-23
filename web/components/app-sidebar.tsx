@@ -138,22 +138,22 @@ function SidebarModes({ board, boardList, children }: { board: boolean; boardLis
 	const mode = board ? "board" : "sessions";
 	function pick(next: string) {
 		if (next === mode) return;
-		if (next === "board") location.hash = hashForPage({ kind: "board", view: { kind: "inbox" } });
+		if (next === "board") location.hash = hashForPage({ kind: "board", view: { kind: "inbox" }, thread: null });
 		else if (next === "sessions") location.hash = "";
 	}
 	return (
 		<>
-			<div className="mx-3 mt-1 mb-1 shrink-0">
+			<div className="mx-2 mt-1 shrink-0">
 				<SizeProvider size="compact">
 					<Tabs value={mode} onValueChange={pick}>
-						<TabsList aria-label="Sidebar" className="w-full *:flex-1">
+						<TabsList aria-label="Sidebar" className="w-full bg-sidebar-accent *:flex-1 *:justify-center *:text-[13px]">
 							<TabItem value="sessions" label="Sessions" />
 							<TabItem value="board" label="Board" />
 						</TabsList>
 					</Tabs>
 				</SizeProvider>
 			</div>
-			{board ? <SidebarContent className="px-1">{boardList}</SidebarContent> : children}
+			{board ? <SidebarContent>{boardList}</SidebarContent> : children}
 		</>
 	);
 }

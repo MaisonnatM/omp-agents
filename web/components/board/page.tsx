@@ -1,8 +1,10 @@
 /** The Board: channels and threads where people, omp sessions, and remote agents post, with an inbox per member; a message for a session wakes it. */
-import { IconArrowUp, IconCalendar1, IconCheckmark1, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconShieldCheck } from "central-icons";
+import { IconArrowUp, IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconShieldCheck } from "central-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
+import { hashForPage } from "../../routing";
 import { type Attachment, type BoardChange, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
 import type { CoreData } from "../module-views";
 import { type BoardRoute, type BoardView, resolveBoardView } from "./module";
@@ -27,11 +29,11 @@ const lastIn = (state: BoardState, threadId: string): Message | undefined => sta
 
 export function BoardPage({ route, core, state, onChange }: { route: BoardRoute; core: CoreData; state: BoardState | null; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	if (!state) return <div className="grid h-full place-items-center text-sm text-muted-foreground">Loading the board…</div>;
-	return <Board view={route.view} core={core} state={state} onChange={change => void onChange(change)} />;
+	return <Board view={route.view} open={route.thread} core={core} state={state} onChange={change => void onChange(change)} />;
 }
 
-function Board({ view: asked, core, state, onChange }: { view: BoardView; core: CoreData; state: BoardState; onChange: (change: BoardChange) => void }) {
-	const [open, setOpen] = useState<string | null>(null);
+function Board({ view: asked, open, core, state, onChange }: { view: BoardView; open: string | null; core: CoreData; state: BoardState; onChange: (change: BoardChange) => void }) {
+	const setOpen = (thread: string | null) => (location.hash = hashForPage({ kind: "board", view: asked, thread }));
 	/** Inbox items you read this visit, which stay listed until you leave the page, as a mail inbox keeps a message you just opened. */
 	const [lingering, setLingering] = useState<Message[]>([]);
 	const now = useNow();
@@ -92,9 +94,25 @@ function Board({ view: asked, core, state, onChange }: { view: BoardView; core: 
 	const thread = state.threads.find(item => item.id === open) ?? null;
 	const inboxItems = [...lingering.filter(kept => !myQueue.some(msg => msg.id === kept.id)), ...myQueue].toSorted((a, b) => b.at - a.at);
 	const working = thread ? members.find(member => member.sessionId && member.presence === "working" && state.messages.some(msg => msg.thread === thread.id && msg.author === member.id)) : undefined;
+	if (!thread && view.kind === "inbox" && inboxItems.length === 0)
+		return (
+			<Empty className="h-full">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<IconBell />
+					</EmptyMedia>
+					<EmptyTitle>Inbox zero</EmptyTitle>
+					<EmptyDescription>Agents will ping you here.</EmptyDescription>
+				</EmptyHeader>
+			</Empty>
+		);
 	return (
-		<div className="grid h-full min-h-0 grid-cols-[minmax(20rem,26rem)_minmax(0,1fr)] max-phone:grid-cols-1">
-			<ListColumn state={state} members={members} byId={byId} view={view} open={open} onOpen={setOpen} now={now} queue={inboxItems} />
+		<div className="@container h-full min-h-0">
+			<div className="grid h-full min-h-0 grid-cols-[minmax(14rem,26rem)_minmax(0,1fr)] max-phone:grid-cols-1 @max-[46rem]:grid-cols-1">
+				{/* Too narrow for the list beside a 30rem thread: an open thread takes the page, with a way back to the list. */}
+				<div className={cn("grid min-h-0 min-w-0", thread && "@max-[46rem]:hidden max-phone:hidden")}>
+					<ListColumn state={state} members={members} byId={byId} view={view} open={open} onOpen={setOpen} now={now} queue={inboxItems} />
+				</div>
 			{thread ? (
 				<ThreadView
 					key={thread.id}
@@ -128,7 +146,7 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 	if (view.kind === "inbox") {
 		const me = byId.get(state.me)!;
 		const groups = Map.groupBy(queue, msg => msg.thread);
-		body = groups.size === 0 ? <Empty>Inbox zero. Agents will ping you here.</Empty> : [...groups].map(([threadId, msgs]) => {
+		body = groups.size === 0 ? <ListEmpty>Inbox zero. Agents will ping you here.</ListEmpty> : [...groups].map(([threadId, msgs]) => {
 			const thread = state.threads.find(item => item.id === threadId)!;
 			return <ThreadCard key={threadId} thread={thread} state={state} byId={byId} now={now} selected={open === threadId} onOpen={onOpen} preview={msgs.at(-1)} mention={msgs.some(msg => isMention(msg.text, me))} />;
 		});
@@ -183,7 +201,7 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 					</div>
 				)}
 				<p className="px-4 pt-4 pb-1 text-2xs font-medium tracking-wide text-muted-foreground uppercase">Their queue</p>
-				{waiting.length === 0 ? <Empty>Nothing waiting.</Empty> : [...Map.groupBy(waiting, msg => msg.thread)].map(([threadId, msgs]) => <ThreadCard key={threadId} thread={state.threads.find(item => item.id === threadId)!} state={state} byId={byId} now={now} selected={open === threadId} onOpen={onOpen} preview={msgs.at(-1)} mention={msgs.some(msg => isMention(msg.text, member))} />)}
+				{waiting.length === 0 ? <ListEmpty>Nothing waiting.</ListEmpty> : [...Map.groupBy(waiting, msg => msg.thread)].map(([threadId, msgs]) => <ThreadCard key={threadId} thread={state.threads.find(item => item.id === threadId)!} state={state} byId={byId} now={now} selected={open === threadId} onOpen={onOpen} preview={msgs.at(-1)} mention={msgs.some(msg => isMention(msg.text, member))} />)}
 			</>
 		);
 	}
@@ -210,7 +228,7 @@ function presenceLine(member: Member) {
 	return { working: "Working now", idle: "Idle, will pick up new messages", asking: "Waiting on an answer", asleep: "Asleep, messages queue", online: "Online", away: "Away" }[member.presence];
 }
 
-function Empty({ children }: { children: ReactNode }) {
+function ListEmpty({ children }: { children: ReactNode }) {
 	return <p className="px-4 py-10 text-center text-sm text-muted-foreground">{children}</p>;
 }
 
@@ -309,17 +327,17 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 
 	return (
 		<section aria-label={thread.title} className="flex min-h-0 min-w-0 flex-col">
-			<header className="flex min-h-(--page-header-height) shrink-0 items-center gap-3 border-b border-border px-6">
+			<header className="flex h-(--page-header-height) shrink-0 items-center gap-3 border-b border-border px-6">
 				<Button variant="ghost" size="icon-compact" aria-label="Back to list" className="-ml-2 shrink-0 @min-[46rem]:hidden max-phone:inline-flex" onClick={onBack}>
 					<IconChevronLeft />
 				</Button>
 				<div className="min-w-0 flex-1">
-					<p className="flex items-center gap-1 text-2xs text-muted-foreground">
+					<h2 className="truncate text-sm font-semibold">{thread.title}</h2>
+					<p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
 						<IconHashtag className="size-3" />
 						{channel.name}
 						{channel.sync && <span>· synced to {channel.sync}</span>}
 					</p>
-					<h2 className="truncate text-sm font-semibold">{thread.title}</h2>
 				</div>
 				<TaskChip thread={thread} byId={byId} now={now} />
 				<label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground select-none">

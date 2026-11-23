@@ -6,7 +6,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import { useContext, useState } from "react";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
-import { hideTab, moveTab, ROWLESS_TAB, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
+import { hideTab, moveTab, ROWLESS_TABS, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
 import { type Theme, THEMES, useTheme } from "../../theme";
 import { playSound, useSessionNotifications } from "../../use-attention";
 import { useSkills } from "../../use-skills";
@@ -50,7 +50,7 @@ function SidebarTabs() {
 		>
 			<ShownOrderList
 				rows={layout.flatMap(({ tab, hidden }) => {
-					if (tab === ROWLESS_TAB) return [];
+					if (ROWLESS_TABS.has(tab)) return [];
 					const row = TAB_ROWS[tab];
 					return [{
 						key: tab,

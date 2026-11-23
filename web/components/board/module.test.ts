@@ -2,16 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { seed } from "../../../src/shared/board";
 import { BOARD_PAGE, type BoardRoute, resolveBoardView } from "./module";
 
-const { parse, rest } = BOARD_PAGE.address;
-const roundTrip = (route: BoardRoute) => parse(rest(route), new URLSearchParams());
+const { parse, rest, query } = BOARD_PAGE.address;
+const roundTrip = (route: BoardRoute) => parse(rest(route), new URLSearchParams(query(route) ?? ""));
 
 describe("Board address", () => {
 	test("each view survives its own address", () => {
 		for (const route of [
-			{ view: { kind: "inbox" } },
-			{ view: { kind: "scheduled" } },
-			{ view: { kind: "channel", id: "c-dev" } },
-			{ view: { kind: "member", id: "session/a b" } },
+			{ view: { kind: "inbox" }, thread: null },
+			{ view: { kind: "inbox" }, thread: "t-1" },
+			{ view: { kind: "scheduled" }, thread: null },
+			{ view: { kind: "channel", id: "c-dev" }, thread: "t/a b" },
+			{ view: { kind: "member", id: "session/a b" }, thread: null },
 		] satisfies BoardRoute[]) {
 			expect(roundTrip(route)).toEqual(route);
 		}
@@ -19,7 +20,7 @@ describe("Board address", () => {
 
 	test("an address it does not know opens the inbox", () => {
 		for (const bad of ["nope", "channel", "channel/", "member", "channel/%E0%A4%A", "channel/a/b"]) {
-			expect(parse(bad, new URLSearchParams())).toEqual({ view: { kind: "inbox" } });
+			expect(parse(bad, new URLSearchParams())).toEqual({ view: { kind: "inbox" }, thread: null });
 		}
 	});
 });
