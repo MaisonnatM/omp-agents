@@ -306,6 +306,8 @@ export function isCheckCommand(words: string[], declared: string[][]): boolean {
 	if (name === "go") return sub === "test" || sub === "vet";
 	if (name === "make" || name === "just") return CHECK_SCRIPT.test(sub);
 	if (/^python3?$/.test(name)) return sub === "-m" && CHECK_PROGRAMS[script] === true;
+	if (name === "astro") return sub === "check";
+	if (name === "playwright") return sub === "test";
 	if (name === "uv") return sub === "run" && isCheckCommand(w.slice(2), declared);
 	return false;
 }
