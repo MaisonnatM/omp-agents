@@ -1,5 +1,5 @@
 /** The Board's reply box: the session composer, with the Board's members behind `@` and its commands behind `/`. */
-import { type KeyboardEvent, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { InputMessage } from "@/components/ui/input-message";
 import { BOARD_COMMANDS, type BoardCommand, type Member, parseCommand } from "../../../src/shared/board";
 import { boardMenu, type BoardTrigger, boardTrigger } from "../../board-composer";
@@ -9,7 +9,8 @@ import type { PromptEditorHandle } from "../prompt-editor";
 
 const QUICK = BOARD_COMMANDS.filter(command => command.quick);
 
-export function Composer({ members, tokenize, channel, onPost, onCommand }: { members: readonly Member[]; tokenize: Tokenize; channel: string; onPost: (text: string) => void; onCommand: (command: BoardCommand, arg: string) => void }) {
+/** `picker`, when given, leads the composer's left slot, such as the workspace a first message starts its session in. */
+export function Composer({ members, tokenize, channel, picker, onPost, onCommand }: { members: readonly Member[]; tokenize: Tokenize; channel: string; picker?: ReactNode; onPost: (text: string) => void; onCommand: (command: BoardCommand, arg: string) => void }) {
 	const [text, setText] = useState("");
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const completion = useCompletionMenu<BoardTrigger>({
@@ -46,7 +47,7 @@ export function Composer({ members, tokenize, channel, onPost, onCommand }: { me
 					minRows={2}
 					placeholder={`Reply in #${channel}. @ to ping a person or agent, / for a workflow`}
 					editorProps={{ ...completion.editorProps, onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void completion.onMenuKeyDown(event) }}
-					leftSlot={QUICK.map(({ name }) => (
+					leftSlot={<>{picker}{QUICK.map(({ name }) => (
 						<button
 							key={name}
 							type="button"
@@ -59,7 +60,7 @@ export function Composer({ members, tokenize, channel, onPost, onCommand }: { me
 						>
 							/{name}
 						</button>
-					))}
+					))}</>}
 				/>
 			</div>
 		</div>

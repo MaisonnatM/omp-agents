@@ -30,13 +30,13 @@ export function startsSession(state: BoardState, members: readonly Member[], msg
 	return !state.messages.some(other => other.thread === msg.thread && members.find(member => member.id === other.author)?.kind !== "human");
 }
 
-/** Where a session started from `thread` runs: its project's newest live session's directory, else the first workspace, else home. */
-function startPlace(state: BoardState, deps: BoardWakeDeps, thread: string): { cwd: string; projectId: string | null } {
-	const channelId = state.threads.find(item => item.id === thread)?.channel;
+/** Where a session started from `msg` runs: its project's newest live session's directory, else the directory `msg` picked, else the first workspace, else home. */
+function startPlace(state: BoardState, deps: BoardWakeDeps, msg: Message): { cwd: string; projectId: string | null } {
+	const channelId = state.threads.find(item => item.id === msg.thread)?.channel;
 	const project = state.channels.find(item => item.id === channelId && item.project && !item.project.archivedAt);
 	const hosts = deps.hosts();
 	const projectHost = project?.project?.sessionIds.toReversed().flatMap(id => hosts.find(host => host.sessionId === id) ?? [])[0];
-	return { cwd: projectHost?.cwd ?? deps.workspaces()[0] ?? "~", projectId: project?.id ?? null };
+	return { cwd: projectHost?.cwd ?? msg.cwd ?? deps.workspaces()[0] ?? "~", projectId: project?.id ?? null };
 }
 
 /** What a woken session reads: where the message is, who wrote it, and how to answer. */
@@ -93,7 +93,7 @@ export class BoardWake {
 
 	/** Starts a session on `msg` and posts its first line in the thread, which makes it the thread's member. */
 	#start(state: BoardState, members: readonly Member[], msg: Message): void {
-		const { cwd, projectId } = startPlace(state, this.#deps, msg.thread);
+		const { cwd, projectId } = startPlace(state, this.#deps, msg);
 		const title = state.threads.find(item => item.id === msg.thread)?.title ?? "Board thread";
 		this.#starting.add(msg.thread);
 		this.#deps

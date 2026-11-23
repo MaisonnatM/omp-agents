@@ -75,7 +75,8 @@ function Board({ view: asked, open, core, state, onChange }: { view: BoardView; 
 					members={members}
 					now={now}
 					typing={working}
-					onPost={text => onChange({ op: "post", message: { id: crypto.randomUUID(), thread: thread.id, author: state.me, at: Date.now(), text } })}
+					workspaces={core.workspaces}
+					onPost={(text, cwd) => onChange({ op: "post", message: { id: crypto.randomUUID(), thread: thread.id, author: state.me, at: Date.now(), text, ...(cwd ? { cwd } : {}) } })}
 					onCommand={(command: BoardCommand, arg: string) => onChange({ op: "all", changes: commandChanges({ members, me: state.me, thread, command, arg, now: Date.now(), newId: () => crypto.randomUUID() }) })}
 					onClose={() => setOpen(null)}
 					onPrevious={at > 0 ? () => step(-1) : undefined}

@@ -46,7 +46,7 @@ function board(hosts: RosterHost[] = [], start: (cwd: string, projectId: string 
 		active: () => true,
 		now: () => 1,
 	});
-	const post = (id: string, thread: string, text: string, author = state.me) => apply({ op: "post", message: { id, thread, author, at: 1, text } satisfies Message });
+	const post = (id: string, thread: string, text: string, cwd?: string) => apply({ op: "post", message: { id, thread, author: state.me, at: 1, text, ...(cwd ? { cwd } : {}) } satisfies Message });
 	return { post, started, woken, state: () => state };
 }
 
@@ -68,6 +68,12 @@ describe("a person's message in a thread with no agent", () => {
 		const { post, started } = board([host("s-old", "/code/proj")]);
 		post("m1", "t-p", "Start on step one");
 		expect(started.map(({ cwd, projectId }) => ({ cwd, projectId }))).toEqual([{ cwd: "/code/proj", projectId: "c-proj" }]);
+	});
+
+	test("outside a project, runs in the workspace the message picked", () => {
+		const { post, started } = board();
+		post("m1", "t-a", "Go", "/code/other");
+		expect(started.map(item => item.cwd)).toEqual(["/code/other"]);
 	});
 
 	test("a message that mentions a live session wakes it and starts nothing", () => {
