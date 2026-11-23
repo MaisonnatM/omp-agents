@@ -65,7 +65,8 @@ Cache writes by cause, from consecutive requests of one session:
 
 ## Proposals
 
-Ranked by expected saving; none is applied, because each needs an evaluation of quality the repository does not have yet.
+Ranked by expected saving; each needs an evaluation of quality the repository does not have yet.
+The worker-model proposal is applied in part: the kit's `poteto-worker` agent runs fully specified edits on `anthropic/claude-sonnet-5-5:medium`, while `poteto-agent` and `task` stay on the session's model until the replay below backs a wider swap.
 
 | Proposal | Saving per 14 days | Risk | Owner |
 | --- | --- | --- | --- |

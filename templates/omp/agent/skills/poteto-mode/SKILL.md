@@ -25,15 +25,17 @@ omp's `task` call has no `readonly`, `environment`, or `run_in_background` field
 | --- | --- |
 | `subagent_type: "poteto-agent"`, `generalPurpose`, any single role, `claude-opus-*`, `grok-*`, `auto`, `inherit-parent` | `poteto-agent` (runs on the parent's model) |
 | A second opinion, the arena cross-judge, or a panel slot that should use a different model family | `poteto-agent-codex` (`openai-codex/gpt-6.1-sol:xhigh`) |
+| An editing worker whose task the parent fully specified: every file, the change in each, and the check that proves it done | `poteto-worker` (`anthropic/claude-sonnet-5-5:medium`) |
 | `subagent_type: "comment-sicko"` | `comment-sicko` |
 | Read-only bulk lookup with no judgment in it | `scout` |
 
 - **Panels.** Panel lines (arena runners, architect runners, interrogate reviewers) use one subagent per entry. Alternate `poteto-agent` and `poteto-agent-codex`, so that a two-entry panel spans both model families. If a spawn of `poteto-agent-codex` fails because Codex has no quota left, run that slot on `poteto-agent` and say that the panel ran on a single model family.
 - **`readonly: true`.** Write "read-only: report findings, edit nothing" into the assignment, and keep the spawn on `poteto-agent` so that it runs at full model strength.
+- **Planner and workers.** The session plans, decides the design, and reviews on its strong model. Once the plan names every file and change, hand mechanical edits to `poteto-worker`; keep anything with an open design choice, an unknown bug cause, or a review on `poteto-agent`. A worker that reports an open question goes back to the planner, not to another worker. If a `poteto-worker` spawn fails because Anthropic has no quota left, run that task on `poteto-agent`.
 - **`environment: "cloud"`.** omp has no cloud agents. Give each worker its own worktree: `isolated: true` from a session that sits in a worktree, or a worktree per worker named by absolute path when the session is on `main`. `task.maxConcurrency` is 8, so wider fan-outs queue, and nothing is wrong when they do.
 - **`run_in_background: true`.** omp spawns in the background by default, and results arrive by themselves. Block only with `wait`.
 - **Resume or message an agent.** Use `write agent://<id>`, or the Agent Hub (`Alt+A`) for a parked agent. Check on a running agent by reading `agent://<id>` without resuming it.
-- **`pstack-models.mdc` and `/setup-pstack`.** omp does not read Cursor rules, so ignore every `pstack-models.mdc` line and its Cursor default slugs. To change a role's model on omp, first read `~/.omp/agent/docs/model-routing.md`. Then set `task.agentModelOverrides` for `poteto-agent` or `poteto-agent-codex` with `omp config set`, using a selector that `omp models --json` lists, and read the setting back.
+- **`pstack-models.mdc` and `/setup-pstack`.** omp does not read Cursor rules, so ignore every `pstack-models.mdc` line and its Cursor default slugs. To change a role's model on omp, first read `~/.omp/agent/docs/model-routing.md`. Then set `task.agentModelOverrides` for `poteto-agent`, `poteto-agent-codex`, or `poteto-worker` with `omp config set`, using a selector that `omp models --json` lists, and read the setting back.
 
 ## Tool and path map
 

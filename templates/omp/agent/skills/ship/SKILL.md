@@ -43,6 +43,7 @@ flowchart TD
 2. **Plan.** Choose how to build the change before anyone writes code.
    If the issue, or the PR body when there is no issue, already has a plan from an earlier run, use that plan and skip to the next step.
    When ship starts after code already exists, such as at a late request to open a PR, still grill, but only on the choices the code left open or made silently; record them, write a plan of what the code does, skip the arena, and resume at the stage the git and GitHub state shows.
+   When the change is small, at most 50 changed lines in at most 3 files, none of them a schema, a public interface such as an API definition, a migration, `package.json`, or a file `.omp/review-paths` lists, take the fast path: skip the arena and the critic, write the one plan yourself with the `technical-writing` skill, and say in one line of the report that the fast path applied.
    Read `skill://technical-writing` and `skill://arena`, which pstack provides through the kit's `pstack-skills` extension; if either read fails, name the missing skill, tell the user to run the starter kit's installer, and stop.
    Read the issue, or the user's request when there is none, and the code it touches.
    Then read `skill://grill-with-docs` and follow it to grill the user on the change until its frontier is empty; it writes settled terms to `GLOSSARY.md` and each choice where the `decision-records` skill says.
@@ -63,8 +64,9 @@ flowchart TD
    `goal` is one sentence, `files_to_change` lists repository-relative paths, `test_first` names the test path written and committed before the code, which a bug fix always has, or is `null`, and `done_when` lists at least one check that shows the change is done.
    A test file HEAD already has goes in `files_to_change` only with a constraint `test-change: <why the behavior changes on purpose>`; `ship_stage` refuses implement without a valid contract.
    The contract and the rejected list show on every `ship_stage` read and come back into context after a compaction or a resume, so implement, reviews, and fixes follow them.
-3. **Implement.** Delegate to `poteto-agent`, isolated or in place per the Git safety rule in `AGENTS.md`.
+3. **Implement.** Delegate to `poteto-worker` when the plan and contract name every file and the change in each, or to `poteto-agent` when implementing still needs design calls or debugging, isolated or in place per the Git safety rule in `AGENTS.md`.
    Give it the chosen plan and the contract, and tell it to implement the change in this session's checkout but stop before opening a PR.
+   When a worker reports a question the plan left open, answer it in this session and send the answer back, or move that task to `poteto-agent`.
    For a bug fix, tell it to write the failing test first, run it to see it fail, and commit only that test before it writes the fix.
    Integrate its changes.
    When the change adds more than about 500 hand-written lines, not counting tests and generated files, run a duplication pass before the checks.
@@ -80,7 +82,8 @@ flowchart TD
    Confirm its draft state with `gh pr view --json number,isDraft,url`, then call `ship_stage({stage:"interface_review", output:{draft_pr:{pr:<number>, url:"<url>"}}})`.
    A successful `gh pr create` also records this transition and its output.
    Link the PR on a Linear issue only when `get_issue` shows no attachment or link with the PR's URL, and when a `ship_stage` read lists no `linear` post for the PR; after linking, record it with `ship_stage({posted:{kind:"linear", ref:"<PR URL>"}})`.
-5. **Interface review.** If the repository commits no `.omp/ui-paths`, or the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"thermonuclear", output:{interface_review:{verdicts:[]}}})` and say in one line of the report that the review was skipped and why.
+5. **Interface review.** If the `ship_stage` status says the reviews are skipped on the fast path, because GitHub shows the PR within the small-change limits of step 2, skip this stage and step 6: run no reviewer, call `ship_stage({stage:"ready_gate", output:{ready_gate:{checks}}})`, which records both reviews as skipped with no verdicts, and say in one line of the report that the fast path applied.
+   If the repository commits no `.omp/ui-paths`, or the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"thermonuclear", output:{interface_review:{verdicts:[]}}})` and say in one line of the report that the review was skipped and why.
    Otherwise wait until the user approves the direction, as `# Before any pull request` in `APPEND_SYSTEM.md` says, since interface findings can redesign the UI.
    Then run `interface-reviewer` on `pr <number>` and, unless step 6 skips the Thermonuclear review, `thermonuclear-reviewer` on `pr://<number>/diff`, in one `task` call: one judges the UI against the app's design system and the other the code's quality, so neither waits for the other.
    Pass it the contract's `done_when` list from `ship_stage`, and resolve every line and bullet it marks `BLOCKING` before you move on.
