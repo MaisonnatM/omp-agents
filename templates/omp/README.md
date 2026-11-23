@@ -53,10 +53,11 @@ Settings, in `config.yml`:
 
 Files, in `agent/`:
 
-- `AGENTS.md`: worktree and force-push safety, the rule that sends every UI change through the `design-workflow` skill, the rule that runs builds, test suites, and browser runs through `scripts/heavy.py`, plus conditional pointers for model routing, reviews, and decision records.
+- `AGENTS.md`: worktree and force-push safety, test-server ports, the rule that runs builds, test suites, and browser runs through `scripts/heavy.py`, pasted secrets, and dashboard projects, plus conditional pointers for the dashboard, plans, UI changes through the `design-workflow` skill, model routing, reviews, and decision records.
   Read the matching reference under `~/.omp/agent/docs/` before taking that branch of the workflow, regardless of the repository's working directory.
 - `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear and interface reviews, proof boxes, PR descriptions, and PR screenshots.
   These references load on demand rather than in every session's context.
+- `skills/headless-browser/`, `skills/dashboard-update/`, and `skills/presenting-a-plan/`: what `AGENTS.md` points to for opening web pages headless, loading new commits into the dashboard, and the shape of a plan shown to the user.
 - `scripts/heavy.py`: `python3 ~/.omp/agent/scripts/heavy.py <command>` runs a heavy command, such as a build, a test suite, or a Playwright run, once one of the slots every session on the computer shares is free, so parallel sessions cannot pile builds onto the machine until tools time out.
   There are `OMP_HEAVY_SLOTS` slots, by default a third of the CPU cores and at least one; each is an `flock` on a file in `/tmp/omp-heavy-<uid>`, or `OMP_HEAVY_DIR`, which the system releases when the holder ends, however it ends.
   A waiting command prints once that it is queued and what holds each slot, and again when it starts; one argument runs through `/bin/sh -c`, for `&&` and pipes, and a heavy command started inside another runs at once in its parent's slot.
@@ -71,6 +72,7 @@ Files, in `agent/`:
   `APPEND_SYSTEM.md` has the agent start it on its own for a request that will end in a pull request, unless the user says "no ship".
   The skill holds the procedure and is tagged `workflow` in its `metadata.tags`, so the dashboard's Settings › Workflows lists and edits it; the command only tells the session to follow the skill for the issue it names.
   The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
+  At the plan stage the agent records a contract, the goal, constraints, files to change, the test to write first, and the checks that show it done, and implementing waits until it has one; each approach a reviewer or the user rejects joins a list, and both come back into the agent's context after a compaction or a resume.
   When the repository commits `.omp/review-paths`, the gate asks for the thermonuclear checkbox only when a changed file matches one of its globs; a repository without the file reviews every PR.
   The interface review has the opposite default: the gate asks for the `- [x] Interface review` checkbox only when the repository commits `.omp/ui-paths` and a changed file matches one of its globs.
   Recording `thermonuclear` or `ready_gate` checks the box of each review before it that the PR needs in the PR body, ticking the template's `- [ ]` box or appending it, through the same checked edit as `pr_description`.
@@ -132,6 +134,9 @@ Files, in `agent/`:
 - `extensions/session-trailer.ts`: adds an `Omp-Session: <session id>` trailer to every commit an omp session makes, through a config-based `prepare-commit-msg` git hook set in omp's environment, which runs beside a repository's own hooks, husky's included.
   `git log --format='%h %(trailers:key=Omp-Session,valueonly)'` names each commit's session, and `omp -r <session id>` reopens it.
   A git without config-based hooks ignores it.
+- `extensions/bash-guard.ts`, with `extensions/bash-guard/rules.ts`: blocks a bash or `read` call that `AGENTS.md` forbids before it runs, with the reason and what to do instead.
+  It blocks printing a `.env` file (not `.env.example` and other templates) or the dashboard's token, except the token inside a curl `Authorization` header as `AGENTS.md` shows; `--no-verify`, `git commit -n`, and `-c core.hooksPath` on a commit or push; a server on a default port through `--port`, `PORT=`, a dev server's `-p`, or `python -m http.server`; and `kill`, `pkill`, `killall`, or `osascript quit` aimed at the omp-agents dashboard by its port, name, or pid.
+  A force push or delete that reaches `main` or `master` asks the user first, outside a repository that lands through `land`, whose gate refuses every push to its target.
 - `extensions/worktree-guard.ts`: keeps agents from changing a checkout under each other.
   It blocks every `edit` or `write` in a repository's main checkout while it is on its default branch (`origin/HEAD`, else `main` or `master`), and tells the agent to work in a linked worktree; on any other branch the main checkout is edited in place, as `AGENTS.md` asks.
   The omp process that last changed a checkout, a session with its subagents, owns it, and `omp-checkout-owner.json` in the checkout's git dir names its pid.
@@ -171,7 +176,8 @@ Files, in `agent/`:
 ## Maintainer git profile
 
 `bun run omp-template --maintainer` also copies [`maintainer/`](maintainer) on top of the same relative paths.
-The profile includes `AGENTS.md` for local-main pushing and worktree cleanup, `docs/git-workflow.md` for worktrees, rebases, draft-first PRs, and stacks with `git` and `gh`, `skills/mma-mode/` for maintainer steering, and `skills/best-in-class-approach/`, the quality bar mma-mode stacks for build and review.
+The profile includes `AGENTS.md` for the session's project, local-main pushing, and worktree cleanup, `docs/git-workflow.md` for worktrees, rebases, draft-first PRs, and stacks with `git` and `gh`, `skills/mma-mode/` for maintainer steering, and `skills/best-in-class-approach/`, the quality bar mma-mode stacks for build and review.
+It also adds the skills its `AGENTS.md` points to: `session-project` for moving a session to another project, `linear-tickets` for reusing a task's ticket and linking its PR, and `docs-and-changelog` for when a change needs a docs or changelog edit.
 Mma-mode resolves poteto by URI and loads only references matching the current task instead of a monolithic contract.
 It also includes two scripts, run with `python3 ~/.omp/agent/scripts/<name>`: `prune-git-branches.py`, which with `--apply` removes merged worktrees and local branches whose upstream is gone (a dry run without it), and `session-speed.py`, which compares agent time per prompt before and after a config cutover.
 The default install does not copy those files.

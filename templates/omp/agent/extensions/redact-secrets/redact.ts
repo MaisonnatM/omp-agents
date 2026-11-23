@@ -37,6 +37,7 @@ const SHAPED: Rule[] = [
 	token("gh[pousr]_", "[A-Za-z0-9]{30,}", "github token"),
 	token("github_pat_", "[A-Za-z0-9_]{30,}", "github token"),
 	token("glpat-", "[A-Za-z0-9_-]{20,}", "gitlab token"),
+	token("lin_api_", "[A-Za-z0-9]{30,}", "linear api key"),
 	token("xox[abposr]-", "[A-Za-z0-9-]{10,}", "slack token"),
 	token("npm_", "[A-Za-z0-9]{36}", "npm token"),
 	token("sb_secret_", "[A-Za-z0-9_-]{20,}", "supabase secret key"),
@@ -48,6 +49,8 @@ const SHAPED: Rule[] = [
 		label: "aws secret access key",
 	},
 	token("eyJ", "[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}", "jwt token"),
+	// After the shaped keys, so `Bearer sk-ant-…` names the key's kind; a `$TOKEN` or `$(cat …)` is no value.
+	{ re: /((?<![A-Za-z0-9_])Bearer\s+)([A-Za-z0-9._~+/-]{20,}=*)(?![A-Za-z0-9._~+/=-])/gi, label: "bearer token" },
 	{
 		re: /((?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|rediss?|amqps?|mssql|sqlserver|cockroachdb)(?:\+[a-z0-9]+)?:\/\/[^\s:/@'"<>]*:)([^\s@'"<>]+)(?=@)/gi,
 		label: "database password",

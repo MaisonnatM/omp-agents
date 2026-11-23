@@ -7,7 +7,8 @@ Why it works this way, and what it leaves, is in the [decision record](../decisi
 ## What counts as a secret
 
 `redact-secrets/redact.ts` holds the patterns.
-Keys whose shape gives them away are found in any text: Stripe `sk_live_`, `sk_test_`, `rk_live_`, `rk_test_`, `pk_live_`, and `whsec_`; Anthropic `sk-ant-` and OpenAI `sk-`; GitHub `ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, and `github_pat_`; GitLab, Slack, npm, Supabase `sb_secret_`, Google `GOCSPX-` and `AIza`, AWS `AKIA` and `ASIA` key ids, JWTs, and PEM private keys.
+Keys whose shape gives them away are found in any text: Stripe `sk_live_`, `sk_test_`, `rk_live_`, `rk_test_`, `pk_live_`, and `whsec_`; Anthropic `sk-ant-` and OpenAI `sk-`; GitHub `ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, and `github_pat_`; GitLab, Slack `xox?-`, npm, Supabase `sb_secret_`, Linear `lin_api_`, Google `GOCSPX-` and `AIza`, AWS `AKIA` and `ASIA` key ids, JWTs, PEM private keys, and the token of a `Bearer` header.
+`templates/omp/redact-shapes.test.ts` checks each shape, and that `Bearer $TOKEN` and `Bearer $(cat …)` stay.
 An AWS secret access key counts after a name such as `aws_secret_access_key`, or as a 40-character run with both letter cases on the same line as a key id, which leaves git hashes alone.
 A database URL counts for its password only, `postgres://app:[redacted secret: database password]@host`, for Postgres, MySQL, MariaDB, MongoDB, Redis, AMQP, SQL Server, and CockroachDB.
 In what the user wrote, and only there, a `password`, `passwd`, `passphrase`, `mot de passe`, or `mdp` pair counts, quoted or up to the next space, as does an upper-case name ending in a secret word, such as `ADMIN_PASSWORD=` or `SENTRY_TOKEN:`, with a value of at least 8 characters.

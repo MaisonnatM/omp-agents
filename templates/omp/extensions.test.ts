@@ -23,8 +23,10 @@ let confirmations = 0;
 const executed = [];
 let activeTools = ["artifact", "read"];
 const entries = [];
+// Each message the extension sent, with its delivery options.
+const sent = [];
 // input.usage lists the session's cumulative usage each read returns, as omp's usage statistics report it.
-const sessionManager = { getSessionId: () => input.sessionId ?? "session", getArtifactsDir: () => input.artifactsDir ?? null, getUsageStatistics: () => input.usage?.shift() ?? { totalTokens: 0, cost: 0 } };
+const sessionManager = { getSessionId: () => input.sessionId ?? "session", getArtifactsDir: () => input.artifactsDir ?? null, getUsageStatistics: () => input.usage?.shift() ?? { totalTokens: 0, cost: 0 }, getBranch: () => entries };
 // Loads an extension as one omp session does and returns its handlers by event name.
 function load(extension) {
 	const hooks = {};
@@ -36,6 +38,11 @@ function load(extension) {
 		getActiveTools() { return activeTools; },
 		async setActiveTools(names) { activeTools = names; },
 		appendEntry(customType, data) { entries.push({ type: "custom", customType, data }); },
+		// An idle session appends a next-turn message to its file, as omp does.
+		sendMessage(message, options) {
+			sent.push({ message, options });
+			if (options?.deliverAs === "nextTurn") entries.push({ type: "custom_message", customType: message.customType, content: message.content });
+		},
 		// input.byArg answers by an argument anywhere in the call, such as "n=53" for one PR's read; input.responses answers by subcommand, such as "pr view" or "repo view", or "env -u GITHUB_TOKEN pr view" for gh run without that variable; input.at answers by directory first; input.response answers the rest.
 		async exec(command, args, options) {
 			// gh run as "env -u NAME… gh args" is recorded as "env -u NAME… args".
@@ -123,8 +130,17 @@ if (input.subToolStart) {
 } else if (input.runs) {
 	// Several calls in one session, one after another, or all at once with parallel, as an agent's parallel tool calls run.
 	// A run with $tool calls the tool of that name, and one with $prompt starts a user turn, whose text is the message the extension adds.
-	const ctx = { cwd: input.cwd ?? process.cwd(), hasUI: false, mode: "interactive", sessionManager, agent: { kind: input.agent ?? "main" } };
-	const call = async ({ $tool, $prompt, ...params }) => {
+	// A run with $event emits that session event; with $reload the extension loads again first, as a resumed session does, and session_compact first appends a compaction entry, as omp does.
+	const ctx = { cwd: input.cwd ?? process.cwd(), hasUI: false, mode: "interactive", sessionManager, agent: { kind: input.agent ?? "main" }, setInterval() {}, isIdle: () => true };
+	let session = hooks;
+	let reloads = 0;
+	const call = async ({ $tool, $prompt, $event, $reload, ...params }) => {
+		if ($event) {
+			if ($reload) session = load((await import(process.argv[3] + "?reload" + ++reloads)).default);
+			if ($event === "session_compact") entries.push({ type: "compaction" });
+			await session[$event]({ type: $event }, ctx);
+			return { content: [] };
+		}
 		if (!$prompt) return ($tool ? tools[$tool] : tool).execute("call", params, undefined, undefined, ctx);
 		const added = await hooks.before_agent_start({ type: "before_agent_start", reason: "user" }, ctx);
 		return { content: [{ text: added?.message.content ?? null }] };
@@ -132,7 +148,7 @@ if (input.subToolStart) {
 	const results = [];
 	if (input.parallel) results.push(...(await Promise.all(input.runs.map(call))));
 	else for (const params of input.runs) results.push(await call(params));
-	console.log(JSON.stringify({ runs: results.map(result => ({ isError: result.isError ?? false, text: result.content?.[0]?.text ?? null, details: result.details ?? null })), executed, entries }));
+	console.log(JSON.stringify({ runs: results.map(result => ({ isError: result.isError ?? false, text: result.content?.[0]?.text ?? null, details: result.details ?? null })), executed, entries, sent }));
 } else if (input.run) {
 	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: input.cwd ?? process.cwd(), hasUI: false, sessionManager });
 	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null }, text: result.content?.[0]?.text ?? null, executed }));
@@ -152,6 +168,7 @@ function exercise(name: "artifact" | "ship" | "todos" | "project" | "worktree-gu
 	results: (string | null)[];
 	executed: string[][];
 	entries: { customType: string; data: unknown }[];
+	sent: { message: { customType: string; content: string; display: boolean }; options: { deliverAs?: string } }[];
 	activeTools: string[];
 } {
 	// A config directory of the call's own unless the test passes one, so what an extension records there, such as the ship trace, reaches no other test or the user's.
@@ -615,6 +632,67 @@ describe("ship_stage review gates", () => {
 	test("the user's approval of more rounds starts the fix over", () => {
 		const { runs } = exercise("ship", { runs: [...Array(6).fill(fixCi), { ...fixCi, moreRounds: true }], cwd: checkout(), response: failing });
 		expect(runs.map(run => run.isError)).toEqual([false, false, false, false, false, true, false]);
+	});
+});
+
+describe("ship_stage contract", () => {
+	const contract = { goal: "Refuse a contract without checks", constraints: ["Keep the tool's schema"], files_to_change: ["src/a.ts", "src/new.test.ts"], test_first: "src/new.test.ts", done_when: ["bun test passes"] };
+	// git's answer naming the files HEAD has among those asked for.
+	const atHead = (...files: string[]) => ({ "ls-tree --full-tree": { code: 0, stdout: files.map(file => `${file}\n`).join(""), stderr: "" } });
+
+	test.each([
+		["an empty goal", { ...contract, goal: " " }, "contract.goal: must be non-empty"],
+		["no done_when", { ...contract, done_when: [] }, "contract.done_when: must be at least length 1"],
+		["an absolute path", { ...contract, files_to_change: ["/etc/passwd"] }, "contract.files_to_change.0: must be repository-relative"],
+		["a path through ..", { ...contract, files_to_change: ["src/../../x.ts"] }, "contract.files_to_change.0: must be repository-relative"],
+	])("a contract with %s is refused and the plan stays without one", (_, invalid, reason) => {
+		const { runs, entries } = exercise("ship", { runs: [{ stage: "plan" }, { stage: "plan", contract: invalid }], cwd: checkout() });
+		expect(runs[1]).toMatchObject({ isError: true });
+		expect(runs[1]!.text).toContain(reason);
+		expect(JSON.stringify(entries)).not.toContain("contract");
+	});
+
+	test("a contract changing a test HEAD already has is refused unless a constraint names test-change", () => {
+		const old = { ...contract, files_to_change: ["src/old.test.ts"] };
+		const refused = exercise("ship", { runs: [{ stage: "plan", contract: old }], cwd: checkout(), responses: atHead("src/old.test.ts") });
+		expect(refused.runs[0]).toMatchObject({ isError: true });
+		expect(refused.runs[0]!.text).toContain("files_to_change holds src/old.test.ts, which HEAD already has");
+		expect(refused.executed).toEqual([["ls-tree", "--full-tree", "-r", "--name-only", "HEAD", "--", "src/old.test.ts"]]);
+		const allowed = exercise("ship", { runs: [{ stage: "plan", contract: { ...old, constraints: ["test-change: the refusal text changes on purpose"] } }], cwd: checkout(), responses: atHead("src/old.test.ts") });
+		expect(allowed.runs[0]!.isError).toBe(false);
+		expect(allowed.executed).toEqual([]);
+	});
+
+	test("a contract adding a test HEAD lacks is recorded and shows on every read", () => {
+		const { runs } = exercise("ship", { runs: [{ stage: "plan", contract }, {}], cwd: checkout(), responses: atHead() });
+		expect(runs.map(run => run.isError)).toEqual([false, false]);
+		expect(runs[1]!.text).toContain("Contract goal: Refuse a contract without checks\nConstraints:\n- Keep the tool's schema\nFiles to change:\n- src/a.ts\n- src/new.test.ts\nTest first: src/new.test.ts\nDone when:\n- bun test passes");
+	});
+
+	test("implement is refused until the plan records a contract", () => {
+		const { runs } = exercise("ship", { runs: [{ stage: "plan" }, { stage: "implement" }, { stage: "plan", contract }, { stage: "implement" }], cwd: checkout(), responses: atHead() });
+		expect(runs.map(run => run.isError)).toEqual([false, true, false, false]);
+		expect(runs[1]!.text).toStartWith("Record the plan's contract before implementing");
+		expect(runs[3]).toMatchObject({ details: { state: { stage: "implement" } } });
+	});
+
+	test("rejected approaches dedupe, survive a reload, and come back once after a resume and after each compaction", () => {
+		const { runs, sent } = exercise("ship", {
+			runs: [
+				{ stage: "plan", contract }, { rejected: "Poll GitHub" }, { rejected: "  poll  github " }, { rejected: "A second queue" },
+				{ $event: "session_start", $reload: true }, {}, { $event: "session_start", $reload: true }, { $event: "session_compact" },
+			],
+			cwd: checkout(), responses: atHead(),
+		});
+		expect(runs[5]!.text).toContain("Rejected approaches, never to propose again:\n- Poll GitHub\n- A second queue");
+		expect(runs[5]!.text?.match(/poll github/gi)).toHaveLength(1);
+		expect(sent).toHaveLength(2);
+		for (const { message, options } of sent) {
+			expect(message).toMatchObject({ customType: "omp-ship.brief", display: false });
+			expect(message.content).toContain("Contract goal: Refuse a contract without checks");
+			expect(message.content).toContain("- A second queue");
+			expect(options).toEqual({ deliverAs: "nextTurn" });
+		}
 	});
 });
 

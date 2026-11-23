@@ -9,6 +9,7 @@ Then read the section for the work: [Changelog](#changelog), [Tests and lint](#t
 - Add or update tests for behavior you change.
 - Add lines to `CHANGELOG.md` in every change that reaches `main`, as [Changelog](#changelog) says.
 - Run `bun test`, `bun run typecheck`, and `bun run lint` and fix what they report.
+  Read test results through `bun run test:agent [bun test args]`, which runs `bun test` and prints only a `PASS n FAIL m SKIP k (Ns)` line and one `ERROR <file> > <test> > <first line>` line per failure, and exits as `bun test` does.
   After you change `desktop/`, run `bun install --cwd desktop --frozen-lockfile` once and `bun run --cwd desktop typecheck`.
 - Update `docs/usage/` when the interface changes, `docs/architecture/` when the server or a protocol changes, and `docs/code-layout/` when you add, move, or remove a file, or change what one does, including its [Interface map](docs/code-layout.md#interface-map) entry.
   Each of `docs/usage.md`, `docs/architecture.md`, and `docs/code-layout.md` lists its directory's files, one per feature; add a file there when you add one, and split a file before it reaches the 32 KiB that `src/docs.test.ts` allows.
