@@ -887,7 +887,7 @@ export class Dashboard {
 			}
 			case "turn-ended": {
 				// A quiet turn, such as a Bot's routine run that found nothing, leaves the session as unread as before it.
-				this.#sessions.turnEnded(instanceId, update.quiet ? null : { at: Date.now(), reply: update.reply });
+				this.#sessions.turnEnded(instanceId, update.quiet ? null : { at: Date.now(), reply: update.reply, suggestions: update.suggestions });
 				// A session started here that a usage limit or a transient fault stopped is held for its continue.
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);

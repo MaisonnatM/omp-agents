@@ -6,8 +6,8 @@ import type { RunTurn } from "./routine-health";
 import { entryTime, tailEntries, textOf } from "./session-entries";
 import { readRoutineMessage } from "./shared/routine-message";
 import { type Delivery, type MessageQueue, type PromptImage, type RosterHost, type SessionFacts, STAY_QUIET_TOOL, type UserAnswer, type WithdrawnMessage } from "./shared/sessions";
-import { skillInvocation } from "./shared/transcript";
-import { isUserPrompt, skillArgs, splitSuggestions } from "./transcript";
+import { skillInvocation, splitSuggestions } from "./shared/transcript";
+import { isUserPrompt, skillArgs } from "./transcript";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -26,23 +26,26 @@ export type LiveUpdate =
 
 /**
  * The main agent's turn started, or ran to its end; `reply` is its last text without suggested prompts, `null` when it ended on none,
- * `failure` how a provider's error ended it, `null` when it ended any other way, and `quiet` whether it called
- * {@link STAY_QUIET_TOOL}, so it leaves the session as unread as it was before the turn.
+ * `suggestions` the prompts that text ended on, `failure` how a provider's error ended it, `null` when it ended any other way, and
+ * `quiet` whether it called {@link STAY_QUIET_TOOL}, so it leaves the session as unread as it was before the turn.
  */
-export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; failure: TurnFailure | null; quiet: boolean };
+export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; suggestions?: string[]; failure: TurnFailure | null; quiet: boolean };
 
-/** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
-function lastReply(messages: unknown): string | null {
+/** The last assistant message among `messages` that has text, split from the prompts it suggests; `null` when none has text. */
+function lastReply(messages: unknown): { body: string; suggestions: string[] } | null {
 	if (!Array.isArray(messages)) return null;
 	for (const message of messages.toReversed()) {
 		if (!isObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;
 		const text = message.content
 			.flatMap(block => (isObject(block) && block.type === "text" && typeof block.text === "string" && block.text.trim() ? [block.text] : []))
 			.join("\n\n");
-		if (text) return splitSuggestions(text).body;
+		if (text) return splitSuggestions(text);
 	}
 	return null;
 }
+
+/** `reply`'s suggested prompts as an optional field, absent when it offers none. */
+const offered = (reply: { suggestions: string[] } | null): { suggestions?: string[] } => (reply?.suggestions.length ? { suggestions: reply.suggestions } : {});
 
 /** Whether an assistant message among `messages` called {@link STAY_QUIET_TOOL}. */
 const stayedQuiet = (messages: unknown): boolean =>
@@ -59,13 +62,16 @@ export function turnUpdate(event: unknown): TurnUpdate | null {
 	if (event.type === "agent_start") return { kind: "turn-started" };
 	if (event.type !== "agent_end") return null;
 	const gaveTurnBack = event.isTerminal !== false || event.awaitingAsyncWork === true;
-	return gaveTurnBack ? { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages), quiet: stayedQuiet(event.messages) } : null;
+	if (!gaveTurnBack) return null;
+	const last = lastReply(event.messages);
+	return { kind: "turn-ended", reply: last?.body ?? null, ...offered(last), failure: turnFailureOf(event.messages), quiet: stayedQuiet(event.messages) };
 }
 
-/** A turn that ended: when, in ms since the epoch, and its last reply, `null` when it ended on none. */
+/** A turn that ended: when, in ms since the epoch, its last reply, `null` when it ended on none, and the prompts that reply suggests. */
 export interface EndedTurn {
 	at: number;
 	reply: string | null;
+	suggestions?: string[];
 }
 
 /**
@@ -94,7 +100,9 @@ export function endedTurn(sessionFile: string, since = Number.NEGATIVE_INFINITY)
 		return null;
 	}
 	const at = lastAt ?? promptedAt;
-	return at === null || at <= since || stayedQuiet(newestFirst) ? null : { at, reply: lastReply(newestFirst.toReversed()) };
+	if (at === null || at <= since || stayedQuiet(newestFirst)) return null;
+	const last = lastReply(newestFirst.toReversed());
+	return { at, reply: last?.body ?? null, ...offered(last) };
 }
 
 /**

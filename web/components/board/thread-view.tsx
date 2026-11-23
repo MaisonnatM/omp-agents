@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { boardTokens } from "../../board-composer";
 import { boardMessagePreset, type MarkdownPreset, MessageMarkdown } from "../message-markdown";
 import { BOARD_COMMANDS, type BoardCommand, type BoardIndex, type BoardState, type Member, type Message, repeatLabel, type Thread } from "../../../src/shared/board";
+import { splitSuggestions } from "../../../src/shared/transcript";
 import { AttachmentCard } from "./attachments";
 import { Composer } from "./composer";
 import { Avatar, Chip, feedLead, leaseLabel, relTime, TaskChip } from "./parts";
@@ -78,6 +79,9 @@ export function ThreadView({ state, index, thread, members, now, typing, workspa
 	}, [messages.length, typing]);
 	const shown = showInternal ? messages : messages.filter(msg => !msg.internal);
 	const schedules = state.schedules.filter(item => item.thread === thread.id);
+	// The prompts the thread's last message suggests, offered as replies while an agent wrote it.
+	const last = messages.at(-1);
+	const prompts = last && byId.get(last.author)?.kind !== "human" ? splitSuggestions(last.text).suggestions : [];
 
 	return (
 		<section aria-label={thread.title} className="flex min-h-0 min-w-0 flex-col">
@@ -142,7 +146,7 @@ export function ThreadView({ state, index, thread, members, now, typing, workspa
 						)}
 					</ol>
 				</div>
-				<Composer members={members} tokenize={tokenize} picker={picker} onPost={post} onCommand={onCommand} channel={channel} />
+				<Composer members={members} tokenize={tokenize} picker={picker} prompts={prompts} onPost={post} onCommand={onCommand} channel={channel} />
 				</div>
 				<aside
 					aria-label="Details"
@@ -221,8 +225,9 @@ function MessageRow({ msg, author, grouped, now, preset }: { msg: Message; autho
 	);
 }
 
-/** A message's text, with a session feed post's lead shown as a status chip instead of a repeated mention. */
-function MessageBody({ text, preset }: { text: string; preset: MarkdownPreset }) {
+/** A message's text without the prompts it suggests, which the composer offers, and with a session feed post's lead shown as a status chip instead of a repeated mention. */
+function MessageBody({ text: full, preset }: { text: string; preset: MarkdownPreset }) {
+	const text = splitSuggestions(full).body;
 	const lead = feedLead(text);
 	return (
 		<div className="text-sm leading-relaxed">

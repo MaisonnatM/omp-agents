@@ -12,6 +12,27 @@ import { readRoutineMessage, type RoutineMessage } from "./routine-message";
 export const TEXT_FILE_EXTENSIONS: readonly string[] = ["md", "markdown", "txt", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "xml", "diff", "patch"];
 /** The most bytes of a text file that `GET /api/file` reads. */
 export const MAX_TEXT_FILE_BYTES = 1024 * 1024;
+
+/** The numbered list the reply ends on after a `Suggestions:` heading, or none. */
+const SUGGESTIONS_HEADING = /^\s*Suggestions:\s*$/;
+const SUGGESTION_LINE = /^\s*\d+\.\s+(.+?)\s*$/;
+
+/** Whether a reply ends on a numbered `Suggestions:` block and, if so, the lines the body keeps and the prompts it offers. */
+export function splitSuggestions(text: string): { body: string; suggestions: string[] } {
+	const suggestions: string[] = [];
+	for (let end = text.length; end > 0; ) {
+		const start = text.lastIndexOf("\n", end - 1) + 1;
+		const line = text.slice(start, end);
+		end = start - 1;
+		if (line.trim() === "") continue;
+		const match = SUGGESTION_LINE.exec(line);
+		if (match) suggestions.unshift(match[1]);
+		else if (suggestions.length > 0 && SUGGESTIONS_HEADING.test(line)) return { body: text.slice(0, start).trimEnd(), suggestions };
+		else break;
+	}
+	return { body: text, suggestions: [] };
+}
+
 /** A text file that `GET /api/file` read: at most its first `MAX_TEXT_FILE_BYTES`, then `truncated`. */
 export interface TextFile {
 	/** Absolute, with `~` and a relative path resolved. */
