@@ -14,9 +14,10 @@
  *
  * With `--github <owner/repo>`, for the pull requests GitHub merged in each period, fetched with `gh` and cached under `~/.cache/omp-agents/harness-metrics/`:
  * - Cost per merged PR: the PR's sessions are those of the ship trace lines naming the repository and its number; each session's spend counts once per period, as above.
- * - CI first-pass rate: the PR's first CI commit is its earliest commit that has a check run that was not cancelled.
- *   It passed first time when, for each check (a name within a check suite), the earliest non-cancelled run concluded success, neutral, or skipped; reruns after it do not count.
- *   Every check run counts, not only required ones; a PR with more than 100 commits is read from its first 100, and a force push hides the commits it replaced.
+ * - CI first-pass rate: only required checks count, as GitHub's `isRequired` for the PR says today; a gate such as `human-review` that no rule requires does not.
+ *   The PR's first CI commit is its earliest commit that has a required check run that was not cancelled.
+ *   It passed first time when, for each required check (a name within a check suite), the earliest non-cancelled run concluded success, neutral, or skipped; reruns after it do not count.
+ *   A PR none of whose commits ran a required check is counted apart, as having no required checks; a PR with more than 100 commits is read from its first 100, and a force push hides the commits it replaced.
  * - Review rounds: `CHANGES_REQUESTED` reviews plus the trace's recorded `fix_comments` rounds, per merged PR.
  * - Human edits, a proxy: a merged PR is edited when one of its commits carries no `Omp-Session` trailer.
  */
@@ -73,12 +74,13 @@ export interface PeriodReport {
 	github?: GithubReport;
 }
 
-/** One check run on a commit; `suite` tells apart same-named checks of different workflows. */
+/** One check run on a commit; `suite` tells apart same-named checks of different workflows, and `required` is whether a rule requires it for the PR. */
 export interface CheckRun {
 	name: string;
 	suite: number;
 	startedAt: string;
 	conclusion: string | null;
+	required: boolean;
 }
 
 /** A pull request GitHub merged. */
@@ -88,7 +90,7 @@ export interface MergedPr {
 	changesRequested: number;
 	/** Its commits, oldest first, with each one's `Omp-Session` trailers. */
 	commits: { sha: string; sessions: string[] }[];
-	/** The check runs of its first CI commit; undefined when no commit had any. */
+	/** The check runs of its first CI commit, required or not, or of its first commit with any check run when none ran a required one; undefined when no commit had any. */
 	firstCi?: CheckRun[];
 }
 
@@ -96,7 +98,7 @@ export interface GithubReport {
 	repo: string;
 	merged: number;
 	cost: { priced: number; usd: number; perPr: number | null };
-	ciFirstPass: { judged: number; passed: number; rate: number | null };
+	ciFirstPass: { judged: number; passed: number; rate: number | null; noRequired: number };
 	reviewRounds: { changesRequested: number; fixRounds: number; perPr: number | null };
 	humanEdits: { edited: number; rate: number | null };
 }
@@ -229,7 +231,7 @@ export function firstPass(runs: CheckRun[]): boolean | undefined {
 function githubReport(repo: string, prs: MergedPr[], trace: TraceLine[], spend: (session: string) => number | undefined, from: number, to: number): GithubReport {
 	const merged = prs.filter(pr => pr.mergedAt >= from && pr.mergedAt < to);
 	const counted = new Set<string>();
-	const out = { priced: 0, usd: 0, judged: 0, passed: 0, changesRequested: 0, fixRounds: 0, edited: 0 };
+	const out = { priced: 0, usd: 0, judged: 0, passed: 0, noRequired: 0, changesRequested: 0, fixRounds: 0, edited: 0 };
 	for (const pr of merged) {
 		const lines = trace.filter(l => l.repo === repo && l.pr === pr.number);
 		const priced = [...new Set(lines.map(l => l.session))].filter(s => spend(s) !== undefined);
@@ -239,7 +241,9 @@ function githubReport(repo: string, prs: MergedPr[], trace: TraceLine[], spend: 
 			counted.add(session);
 			out.usd += spend(session) ?? 0;
 		}
-		const passed = pr.firstCi && firstPass(pr.firstCi);
+		const required = pr.firstCi?.filter(run => run.required);
+		if (pr.firstCi && required?.length === 0) out.noRequired++;
+		const passed = required && firstPass(required);
 		if (passed !== undefined) out.judged++;
 		if (passed) out.passed++;
 		out.changesRequested += pr.changesRequested;
@@ -250,7 +254,7 @@ function githubReport(repo: string, prs: MergedPr[], trace: TraceLine[], spend: 
 		repo,
 		merged: merged.length,
 		cost: { priced: out.priced, usd: out.usd, perPr: ratio(out.usd, out.priced) },
-		ciFirstPass: { judged: out.judged, passed: out.passed, rate: ratio(out.passed, out.judged) },
+		ciFirstPass: { judged: out.judged, passed: out.passed, rate: ratio(out.passed, out.judged), noRequired: out.noRequired },
 		reviewRounds: { changesRequested: out.changesRequested, fixRounds: out.fixRounds, perPr: ratio(out.changesRequested + out.fixRounds, merged.length) },
 		humanEdits: { edited: out.edited, rate: ratio(out.edited, merged.length) },
 	};
@@ -320,22 +324,41 @@ async function cached(file: string, maxAge: number, fetch: () => Promise<{ text:
 	return text;
 }
 
-/** A commit's check runs, reruns included; cached for good once every run completed. */
-async function checkRuns(repo: string, sha: string): Promise<CheckRun[]> {
-	const text = await cached(join(CACHE, repo.replace("/", "_"), "check-runs", `${sha}.jsonl`), Number.POSITIVE_INFINITY, async () => {
+const CHECK_RUNS_QUERY = `query($owner: String!, $name: String!, $oid: GitObjectID!, $pr: Int!) {
+  repository(owner: $owner, name: $name) { object(oid: $oid) { ... on Commit {
+    checkSuites(first: 100) { nodes { databaseId
+      checkRuns(first: 100, filterBy: { checkType: ALL }) { nodes { name startedAt status conclusion isRequired(pullRequestNumber: $pr) } } } } } } }
+}`;
+
+/** A commit's check runs, reruns included, each marked required or not for pull request `pr`; cached for good once every run completed. */
+async function checkRuns(repo: string, pr: number, sha: string): Promise<CheckRun[]> {
+	const [owner = "", name = ""] = repo.split("/");
+	const text = await cached(join(CACHE, repo.replace("/", "_"), "check-runs", `${pr}-${sha}.jsonl`), Number.POSITIVE_INFINITY, async () => {
 		const text = await gh([
 			"api",
-			"--paginate",
-			`repos/${repo}/commits/${sha}/check-runs?filter=all&per_page=100`,
+			"graphql",
+			"-f",
+			`query=${CHECK_RUNS_QUERY}`,
+			"-f",
+			`owner=${owner}`,
+			"-f",
+			`name=${name}`,
+			"-f",
+			`oid=${sha}`,
+			"-F",
+			`pr=${pr}`,
 			"--jq",
-			".check_runs[] | {name, suite: .check_suite.id, startedAt: .started_at, status, conclusion}",
+			".data.repository.object.checkSuites.nodes[] | .databaseId as $suite | .checkRuns.nodes[] | {name, suite: $suite, startedAt, status: (.status | ascii_downcase), conclusion: (.conclusion | if . then ascii_downcase else null end), required: .isRequired}",
 		]);
-		return { text, keep: !text.includes('"status":"queued"') && !text.includes('"status":"in_progress"') };
+		return { text, keep: !/"status":"(?!completed")/.test(text) };
 	});
 	return text
 		.split("\n")
 		.filter(Boolean)
-		.map(line => JSON.parse(line) as CheckRun);
+		.map(line => {
+			const { status: _, ...run } = JSON.parse(line) as CheckRun & { status: string };
+			return run;
+		});
 }
 
 /** The pull requests `repo` merged since `since`, each with its first CI commit's check runs; the list is cached for an hour. */
@@ -349,12 +372,16 @@ export async function fetchMergedPrs(repo: string, since: number): Promise<Merge
 	const queue = [...prs];
 	const worker = async () => {
 		for (let pr = queue.shift(); pr; pr = queue.shift()) {
+			let anyRuns: CheckRun[] | undefined;
 			for (const { sha } of pr.commits) {
-				const runs = await checkRuns(repo, sha);
-				if (firstPass(runs) === undefined) continue;
-				pr.firstCi = runs;
-				break;
+				const runs = await checkRuns(repo, pr.number, sha);
+				if (firstPass(runs.filter(run => run.required)) !== undefined) {
+					pr.firstCi = runs;
+					break;
+				}
+				if (!anyRuns && firstPass(runs) !== undefined) anyRuns = runs;
 			}
+			pr.firstCi ??= anyRuns;
 		}
 	};
 	await Promise.all(Array.from({ length: 8 }, worker));
@@ -413,7 +440,7 @@ export function formatTable(periods: PeriodReport[]): string {
 		rows.push(
 			[`Merged PRs in ${repo}`, of(g => String(g.merged))],
 			["Cost per merged PR", of(g => (g.cost.perPr === null ? "n/a" : `$${g.cost.perPr.toFixed(2)} (${g.cost.priced} priced)`))],
-			["CI first-pass rate", of(g => `${pct(g.ciFirstPass.rate)} (${g.ciFirstPass.passed}/${g.ciFirstPass.judged})`)],
+			["CI first-pass rate (required checks)", of(g => `${pct(g.ciFirstPass.rate)} (${g.ciFirstPass.passed}/${g.ciFirstPass.judged}${g.ciFirstPass.noRequired > 0 ? `, ${g.ciFirstPass.noRequired} with no required checks` : ""})`)],
 			[
 				"Review rounds per merged PR",
 				of(g => (g.reviewRounds.perPr === null ? "n/a" : `${g.reviewRounds.perPr.toFixed(2)} (${g.reviewRounds.changesRequested} changes requested, ${g.reviewRounds.fixRounds} fix rounds)`)),

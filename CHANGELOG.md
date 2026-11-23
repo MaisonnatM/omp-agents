@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- Behind the scenes: the metrics report's first-pass rate for a GitHub repository now counts only the checks a pull request must pass to merge, so gates like `human-review` no longer pull it down, and it says how many pull requests had no required checks.
 - In the Board's #sessions threads, each post now opens with a "Waits on you" or "Finished" chip instead of repeating your @name, and a reply cut off mid-bold no longer shows stray `**`.
 - Behind the scenes: the metrics report can now also measure a GitHub repository's merged pull requests week by week: what each one cost, how often its checks passed the first time, how many review rounds it took, and how often a person added a commit.
 - Behind the scenes: the eval set can now also replay merged yampa pull requests, each started from its Linear ticket and passed only when that pull request's own tests pass, run 3 times to show how often a task passes at least once; the first yampa set has 18 of its planned 20 tasks.
