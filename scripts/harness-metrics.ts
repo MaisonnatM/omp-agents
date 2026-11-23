@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 
 /** The fields this script reads from a ship trace line (`TraceLine` in templates/omp/agent/extensions/ship.ts, which root typecheck cannot import). */
-interface TraceLine {
+export interface TraceLine {
 	ts: string;
 	session: string;
 	repo?: string;

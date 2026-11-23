@@ -3,8 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { TraceLine } from "../templates/omp/agent/extensions/ship";
-import { formatTable, parseGitLog, readSpend, report } from "./harness-metrics";
+import { formatTable, parseGitLog, readSpend, report, type TraceLine } from "./harness-metrics";
 
 const NOW = Date.parse("2026-11-23T00:00:00Z");
 const A = "01a20000-0000-7000-8000-00000000000a";
