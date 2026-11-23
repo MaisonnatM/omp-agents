@@ -382,7 +382,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
-			joinProject: (projectId, sessionId) => applyModuleNow("projects", { op: "join", projectId, sessionId }),
+			joinProject: (projectId, sessionId) => applyModuleNow("board", { op: "join", channel: projectId, sessionId }),
 			joinFor: (request, instanceId) => this.#joinFor(request, instanceId),
 			admit: this.#admit,
 			restoreWorktree: sessionIds => this.#worktrees.checkout(() => restoreEndedWorktree(this.#endedWorktrees.of(sessionIds))),

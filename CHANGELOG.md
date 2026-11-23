@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- A project is now a Board channel: its plan steps are task threads you tick by marking them done, its log is the channel's messages, and your existing projects move there once when the dashboard starts.
+- Agents now manage projects with the board tool's projects, project, goal, decide, join, leave, step, rename, archive, restore, and reopen actions, which replace project_list and project_update.
+- A session in a project now posts its questions and finished turns in the project's channel, and its brief shows the channel's 10 newest messages.
 - Fixed: on a wide window you can now close an open Board thread, with the X at the top right of the thread or Esc.
 - You can step through the Board's threads with the up and down arrows beside the thread title, or with J and K, or the arrow keys.
 - An open Board thread now has a Mark done button beside its title, which settles it as /done does.

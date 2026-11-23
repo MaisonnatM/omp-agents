@@ -1,10 +1,9 @@
-/** The Projects module's page half, which `WEB_MODULES` in `web/modules.ts` lists; its components are in this folder. See docs/architecture/projects.md. */
+/** The Projects page, which `WEB_MODULES` in `web/modules.ts` lists: a view of the Board's project channels, whose state and changes are the Board module's. See docs/architecture/projects.md. */
 import { IconFlag1 } from "central-icons";
-import { applyProjectChange, type ProjectChange, type ProjectList } from "../../../src/shared/projects";
 import { decodeSegment } from "../../hash-segment";
-import type { StoredPageModule } from "../../modules";
+import type { PageModule } from "../../modules";
 
-/** The Projects page: every project, or project `open`'s page. */
+/** The Projects page: every project, or the page of project channel `open`. */
 export interface ProjectsRoute {
 	open: string | null;
 }
@@ -28,14 +27,13 @@ export type ProjectsControlId =
 	| "projects.session.new"
 	| "projects.archive";
 
-export const PROJECTS_PAGE: StoredPageModule<"projects", ProjectsRoute, ProjectList, ProjectChange, never, ProjectsControlId> = {
+export const PROJECTS_PAGE: PageModule<"projects", ProjectsRoute, never, ProjectsControlId> = {
 	id: "projects",
 	tab: { label: "Projects", icon: IconFlag1, place: 80 },
 	about: "Efforts that span sessions and workspaces, each with a goal, a plan, decisions, and a log every session in it gets at its start.",
-	offNote: "While Projects is off, the sidebar no longer groups sessions by project; sessions already in one still get its brief.",
 	listsItself: true,
 	home: { open: null },
-	/** `#projects` lists every project, and `#projects/<id>` opens that project's page. */
+	/** `#projects` lists every project, and `#projects/<channelId>` opens that project's page. */
 	address: {
 		parse: rest => ({ open: rest ? decodeSegment(rest) : null }),
 		rest: route => (route.open === null ? null : encodeURIComponent(route.open)),
@@ -71,10 +69,4 @@ export const PROJECTS_PAGE: StoredPageModule<"projects", ProjectsRoute, ProjectL
 		{ id: "projects.session.new", label: "Project New session button", area: "Projects" },
 		{ id: "projects.archive", label: "Project Archive and Restore button", area: "Projects" },
 	],
-	store: {
-		apply(list, change) {
-			const applied = applyProjectChange(list, change);
-			return "ok" in applied ? applied.ok : null;
-		},
-	},
 };

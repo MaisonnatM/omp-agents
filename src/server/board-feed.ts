@@ -1,12 +1,13 @@
 /**
  * Posts each live session's turns on the Board, so the Board lists what waits for the user: when a session asks a
- * question, and when it finishes a turn that left a reply, it posts in its own thread in #sessions, mentioning the
- * user. The session is the author, and an agent's message wakes only the members it mentions, so no session wakes.
+ * question, and when it finishes a turn that left a reply, it posts in its own thread, mentioning the user. That
+ * thread opens in the session's project channel when it is in a project, else in #sessions, and stays where it opened.
+ * The session is the author, and an agent's message wakes only the members it mentions, so no session wakes.
  * A Bot's conversation posts nothing: its routine runs would bury the rest.
  */
 import { randomUUID } from "node:crypto";
 import type { BoardEnv } from "../board-module";
-import { sessionMember } from "../shared/board";
+import { projectOfSession, sessionMember } from "../shared/board";
 import type { RosterHost } from "../shared/sessions";
 
 export const SESSIONS_CHANNEL = { id: "c-sessions", name: "sessions", about: "Each session's thread: what it asks you and when it finishes." } as const;
@@ -67,13 +68,14 @@ export class BoardFeed {
 		const last = state.messages.findLast(msg => msg.thread === thread);
 		if (last?.text === text) return;
 		const at = this.#deps.now();
-		// The user may have made a #sessions of their own; the feed posts there rather than fail on the name.
-		let channel = state.channels.find(item => item.name === SESSIONS_CHANNEL.name)?.id;
-		if (!channel) {
-			channel = SESSIONS_CHANNEL.id;
-			this.#deps.apply({ op: "channel", channel: { ...SESSIONS_CHANNEL } });
-		}
 		if (!state.threads.some(item => item.id === thread)) {
+			let channel = projectOfSession(state, host.sessionId)?.id;
+			// The user may have made a #sessions of their own; the feed posts there rather than fail on the name.
+			channel ??= state.channels.find(item => item.name === SESSIONS_CHANNEL.name)?.id;
+			if (!channel) {
+				channel = SESSIONS_CHANNEL.id;
+				this.#deps.apply({ op: "channel", channel: { ...SESSIONS_CHANNEL } });
+			}
 			this.#deps.apply({ op: "thread", thread: { id: thread, channel, title: sessionMember(host).name, task: null, lease: null, createdAt: at } });
 		}
 		this.#deps.apply({ op: "post", message: { id: randomUUID(), thread, author: sessionMember(host).id, at, text } });
