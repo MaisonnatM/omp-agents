@@ -26,6 +26,7 @@ describe("untrustedFetch", () => {
 			"gh api graphql -f query='{ repository(owner:\"o\", name:\"r\") { pullRequest(number: 7) { reviewThreads(first: 50) { nodes { comments(first: 9) { nodes { body } } } } } } }'",
 			"cd app && env -u GITHUB_TOKEN gh pr view 7 --comments | head -50",
 			"gh api repos/o/r/issues/4/comments 2>/dev/null",
+			"for n in 4 5; do gh pr view $n --json body; done",
 		]) {
 			expect(untrustedFetch(line), line).toBeDefined();
 		}

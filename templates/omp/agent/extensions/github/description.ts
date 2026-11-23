@@ -11,7 +11,7 @@ export type DescriptionChange =
 	| { kind: "append"; text: string }
 	| { kind: "replace-text"; oldText: string; newText: string }
 	| { kind: "replace"; original: string; body: string; allowEmpty?: boolean }
-	| { kind: "check"; boxes: string[] };
+	| { kind: "check"; boxes: string[]; note?: string };
 export interface DescriptionIO {
 	/** Must be a successful, uncached read, not stdout from an unchecked command. */
 	read(): Promise<DescriptionSnapshot>;
@@ -27,13 +27,23 @@ export function descriptionSnapshot(value: unknown): DescriptionSnapshot {
 	return { body: value.body ?? "", updatedAt: value.updated_at };
 }
 
-/** `body` with each checked `- [x] …` box of `boxes` present: an unchecked `- [ ] …` line of the same text is checked, and a box the body lacks is appended. */
-export function checkBoxes(body: string, boxes: string[]): string {
+/**
+ * `body` with each checked `- [x] …` box of `boxes` present, followed by ` (note)` when `note` is given.
+ * The first line holding the box, checked or unchecked, becomes that box, keeping its prefix and its text after the box except a ` (…)` note right after it, which `note` replaces or, with no `note`, drops;
+ * a box the body lacks is appended.
+ */
+export function checkBoxes(body: string, boxes: string[], note?: string): string {
 	return boxes.reduce((text, box) => {
-		if (text.includes(box)) return text;
+		const want = note === undefined ? box : `${box} (${note})`;
 		const unchecked = box.replace("- [x]", "- [ ]");
-		if (text.includes(unchecked)) return text.replace(unchecked, () => box);
-		return text + (text && !text.endsWith("\n") ? "\n" : "") + box;
+		const lines = text.split("\n");
+		const at = lines.findIndex(line => line.includes(box) || line.includes(unchecked));
+		if (at < 0) return text + (text && !text.endsWith("\n") ? "\n" : "") + want;
+		const line = lines[at];
+		const found = line.includes(box) ? box : unchecked;
+		const start = line.indexOf(found);
+		lines[at] = line.slice(0, start) + want + line.slice(start + found.length).replace(/^ \([^)]*\)/, "");
+		return lines.join("\n");
 	}, body);
 }
 
@@ -61,7 +71,7 @@ export async function editDescription(identity: string, change: DescriptionChang
 				body = change.body;
 				break;
 			case "check":
-				body = checkBoxes(original.body, change.boxes);
+				body = checkBoxes(original.body, change.boxes, change.note);
 				break;
 		}
 		if (!body.trim() && !(change.kind === "replace" && change.allowEmpty === true)) throw new Error("Refusing an unintended empty PR description; nothing was written.");

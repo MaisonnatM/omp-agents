@@ -5,6 +5,11 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- A new eval set replays 20 real past tasks to check that harness changes help, and can switch off one part at a time to see which parts still matter.
+- `bun run metrics` shows the cost per landed change, how often a land passes on the first try, how often agents rightly asked for help, and how much you edited after them.
+- The safety checks are now tested against 50 real past commands, so a rule change that blocks the wrong thing shows up.
+- Small changes in /ship can skip the design and code-quality reviews, and editing helpers run on a cheaper model while the planner keeps the stronger one.
+- Agent instructions now keep the parts that change from turn to turn at the end, so more of each request is reused from cache.
 - /ship now checks that each step left the details the next step needs, and it reuses an existing pull request, Linear link, or Slack post instead of making a second one.
 - Independent checks and reviews now run side by side, and agents get a simple rule for how many helpers to start for a task.
 - Text from issues, pull request comments, and web pages is now read by a helper that cannot run any tools, so instructions hidden in that text cannot make an agent act.

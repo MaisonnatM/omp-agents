@@ -14,6 +14,7 @@ A pull request needs the thermonuclear review when its repository commits no `.o
 The file lists one glob per line, matched against repository-relative paths; `#` starts a comment and blank lines are ignored.
 When the file exists and the pull request touches none of its globs, skip the review and the Thermonuclear stage, and say so in one line of the report.
 The ship extension reads the file from the checkout and the changed files from GitHub, and asks for the checkbox only when the review applies; it asks for it whenever GitHub lists fewer files than the pull request changes.
+Under `/ship`, a small change, at most 50 changed lines in 3 files touching no migration, auth, `.omp/`, CI workflow, or secrets path, may skip this review and the interface review, unless it changes a file `.omp/review-paths` lists; the ship skill says how, and the box then carries the note `(skipped: small change)`.
 
 ## Interface review
 

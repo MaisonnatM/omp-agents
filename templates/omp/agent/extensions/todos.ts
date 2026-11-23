@@ -1,8 +1,8 @@
 // The `user_todo` tool: lets an agent read the omp-agents dashboard's Todo list, add a todo for a step outside the
 // session that only the user can take, check one off, edit one's title, notes, due day, section, or Workspace, delete
 // one, and add a section. A todo added here starts its sessions in this session's Workspace unless the agent names another.
-// A session is told at each prompt which open todo links to it and which open todos it added, so it checks them off
-// once done and does not add them twice.
+// A session is told, at the first prompt and whenever it changed since, which open todo links to it and which open
+// todos it added, so it checks them off once done and does not add them twice.
 // Changes go to the dashboard's todo inbox, one file each, which the dashboard server applies and deletes, so it
 // stays the only writer of todos.json and a todo filed while it is down waits for it.
 import { randomUUID } from "node:crypto";
@@ -16,6 +16,7 @@ import { findSection, type Section, sectionFor } from "./todos/sections";
 const TODOS_FILE = join(CONFIG_DIR, "todos.json");
 const INBOX_DIR = join(CONFIG_DIR, "todo-inbox");
 const INBOX = inbox<Change>(INBOX_DIR);
+const TODOS_NOTE_TYPE = "omp-agents.todos";
 
 interface Leaf {
 	id: string;
@@ -231,8 +232,10 @@ export default function todos(pi: ExtensionAPI) {
 			}
 		},
 	});
-	// Read on every prompt, so a todo linked, added, or checked mid-session shows in the next turn.
-	pi.on("before_agent_start", (event, ctx) => {
+	// Read on every prompt, so a todo linked, added, or checked mid-session shows in the next turn. The note rides in the
+	// conversation and only when it changed: in the system prompt, each change rewrote the cached prompt and conversation.
+	let noted = "";
+	pi.on("before_agent_start", (_event, ctx) => {
 		const { linked, added } = todosOf(readList(), ctx.sessionManager.getSessionId());
 		const notes: string[] = [];
 		if (linked)
@@ -244,7 +247,13 @@ export default function todos(pi: ExtensionAPI) {
 			notes.push(
 				`This session added these todos to the user's list, still open:\n${filed.map(todo => `- ${todo.text} (${todoFacts(todo)})`).join("\n")}\nCheck one off with the user_todo tool once the user has done it or it no longer applies, and do not add it again.`,
 			);
-		if (notes.length === 0) return;
-		return { systemPrompt: [...event.systemPrompt, ...notes] };
+		const note = notes.length > 0 ? notes.join("\n\n") : noted && "No open todo links to this session or was added by it any more.";
+		if (note === noted) return;
+		noted = notes.length > 0 ? note : "";
+		return { message: { customType: TODOS_NOTE_TYPE, content: note, display: false } };
+	});
+	// Compaction drops the note from the conversation, so the next prompt sends it again.
+	pi.on("session_compact", () => {
+		noted = "";
 	});
 }

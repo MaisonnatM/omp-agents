@@ -14,7 +14,8 @@ modelRoles:
   commit: anthropic/claude-haiku-5-5
   tiny: anthropic/claude-haiku-5-5
   judge: anthropic/claude-haiku-5-5
-  task: anthropic/claude-opus-5-5:auto
+  # Editing workers: the bundled `task` agent and `poteto-agent`. The planning session stays on `default`.
+  task: anthropic/claude-sonnet-5-5:auto
 
 retry:
   # Skip a provider whose plan reports no quota left; a plain API key stays eligible.

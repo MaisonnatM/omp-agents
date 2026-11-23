@@ -65,10 +65,26 @@ omp config get retry.paidFallback
 - `default`: the session model, memory phase 1, `design-critic`, `untrusted-reader`, and `security-reviewer`, which inherits because it has no model frontmatter.
 - `smol`: `scout`, `sonic`, memory phase 2, and prewalk target.
 - `slow`: `reviewer`.
-- `task`: the bundled `task` agent.
+- `task`: the bundled `task` agent and `poteto-agent`, the editing workers.
 - `plan`: plan mode, `thermonuclear-reviewer`, and `interface-reviewer`.
 - `thermo_review`: `thermo-nuclear-code-quality-review`; keep it on the `plan` model so both thermonuclear agents grade alike.
 - `advisor`, `vision`, `commit`, `tiny`: advisor runtime, image turns, commit messages, and titles, memory, and auto-thinking.
 - `judge`: the `:auto` effort classifier, unexpected-stop detection, and eval `judge()`.
 
-The `council` agent reads no role: the council skill passes one model per provider on each spawn, which `task.perCallModelAllow` limits to its three, and its Gemini Pro member spends Cursor quota with no fallback.
+The `council` agent reads no role: the council skill passes one model per provider on each spawn, which `task.perCallModelAllow` must list, and its Gemini Pro member spends Cursor quota with no fallback.
+
+## Planner and workers
+
+The session that plans runs on `default`; the workers it spawns to edit run on `task`, which the starter config sets to Sonnet, half Opus's price per token.
+A worker carries out a plan the planner settled, so it needs less judgment than the plan did.
+The kit has not measured Sonnet's worker quality yet: `docs/architecture/token-cost.md` in omp-agents holds the replay that decides it.
+
+Pass `model: "anthropic/claude-opus-5-5:auto"` on a `poteto-agent` or `task` spawn when its output is judgment rather than edits to a settled plan:
+
+- a panel line: an arena or architect runner, an interrogate reviewer, or a cross-judge on the Anthropic side;
+- a read-only review or second opinion;
+- a diagnosis with no repro, or a design choice the brief leaves open;
+- a brief a `task`-role worker already failed once.
+
+A per-call model skips the role's fallback chain, so check `omp usage` first when Anthropic quota is low, and leave the spawn on its role when it is.
+To move every worker back to Opus, set the `task` role, not `task.agentModelOverrides`, so `poteto-agent` and `task` stay on one model.

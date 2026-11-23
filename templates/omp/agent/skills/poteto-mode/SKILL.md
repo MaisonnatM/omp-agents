@@ -19,17 +19,18 @@ pstack is written for Cursor. On omp, the routes below replace every Cursor tool
 
 ## Subagents and models
 
-omp's `task` call has no `readonly`, `environment`, or `run_in_background` field, and its per-spawn `model` accepts only the council's three models (`task.perCallModelAllow`). The agent you pick sets the model, so map pstack roles to agents:
+omp's `task` call has no `readonly`, `environment`, or `run_in_background` field, and its per-spawn `model` accepts only the models `task.perCallModelAllow` lists. The agent you pick sets the model, so map pstack roles to agents:
 
 | pstack role or default model | omp agent |
 | --- | --- |
-| `subagent_type: "poteto-agent"`, `generalPurpose`, any single role, `claude-opus-*`, `grok-*`, `auto`, `inherit-parent` | `poteto-agent` (runs on the parent's model) |
+| `subagent_type: "poteto-agent"`, `generalPurpose`, any single role, `claude-opus-*`, `grok-*`, `auto`, `inherit-parent` | `poteto-agent` (runs on the `task` role model, cheaper than the planner's) |
 | A second opinion, the arena cross-judge, or a panel slot that should use a different model family | `poteto-agent-codex` (`openai-codex/gpt-6.1-sol:xhigh`) |
 | `subagent_type: "comment-sicko"` | `comment-sicko` |
 | Read-only bulk lookup with no judgment in it | `scout` |
 
+- **Planner and workers.** The session that plans stays on its own model; `poteto-agent` runs on the `task` role. Pass `model: "anthropic/claude-opus-5-5:auto"` on a `poteto-agent` spawn whose output is judgment rather than an edit to a settled plan: a panel line, a read-only review, a diagnosis with no repro, a design choice left open, or a brief a `task`-role worker already failed once. `~/.omp/agent/docs/model-routing.md` says why.
 - **Panels.** Panel lines (arena runners, architect runners, interrogate reviewers) use one subagent per entry. Alternate `poteto-agent` and `poteto-agent-codex`, so that a two-entry panel spans both model families. If a spawn of `poteto-agent-codex` fails because Codex has no quota left, run that slot on `poteto-agent` and say that the panel ran on a single model family.
-- **`readonly: true`.** Write "read-only: report findings, edit nothing" into the assignment, and keep the spawn on `poteto-agent` so that it runs at full model strength.
+- **`readonly: true`.** Write "read-only: report findings, edit nothing" into the assignment, and spawn `poteto-agent` with the planner's model, as **Planner and workers** says.
 - **`environment: "cloud"`.** omp has no cloud agents. Give each worker its own worktree: `isolated: true` from a session that sits in a worktree, or a worktree per worker named by absolute path when the session is on `main`. `task.maxConcurrency` is 8, so wider fan-outs queue, and nothing is wrong when they do.
 - **`run_in_background: true`.** omp spawns in the background by default, and results arrive by themselves. Block only with `wait`.
 - **Resume or message an agent.** Use `write agent://<id>`, or the Agent Hub (`Alt+A`) for a parked agent. Check on a running agent by reading `agent://<id>` without resuming it.

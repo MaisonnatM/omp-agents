@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import { commands, located } from "./shell/commands";
+import { commands, located, positionals } from "./shell/commands";
 import { quotaExhausted } from "./github/access";
 import { type GhCredential, GhRunner, rejectedCredential, TOKEN_VARIABLE } from "./github/runner";
 import { descriptionSnapshot, editDescription } from "./github/description";
@@ -35,16 +35,48 @@ interface Review {
 	pathsFile: string;
 	/** Needed when the repository commits no `pathsFile`. */
 	withoutPaths: boolean;
+	/** A changed file matching the committed `pathsFile` forbids skipping the review on a small change. */
+	matchForbidsSkip: boolean;
 }
 /** Each review by the stage that runs it. */
 export const REVIEWS = {
-	interface_review: { label: "Interface review", box: "- [x] Interface review", pathsFile: ".omp/ui-paths", withoutPaths: false },
-	thermonuclear: { label: "Thermonuclear", box: "- [x] Thermo-nuclear code quality review", pathsFile: ".omp/review-paths", withoutPaths: true },
+	interface_review: { label: "Interface review", box: "- [x] Interface review", pathsFile: ".omp/ui-paths", withoutPaths: false, matchForbidsSkip: false },
+	thermonuclear: { label: "Thermonuclear", box: "- [x] Thermo-nuclear code quality review", pathsFile: ".omp/review-paths", withoutPaths: true, matchForbidsSkip: true },
 } as const satisfies Partial<Record<Stage, Review>>;
 export type ReviewStage = keyof typeof REVIEWS;
 const isReviewStage = (stage: string): stage is ReviewStage => Object.hasOwn(REVIEWS, stage);
 /** The review stages in workflow order. */
 const REVIEW_STAGES = STAGES.filter(isReviewStage);
+/** The note a review's box carries in the PR body when the fast path skipped it. */
+export const SKIPPED = "skipped: small change";
+/** The most a small change may touch for its reviews to be skipped. */
+export const SMALL_CHANGE = { lines: 50, files: 3 } as const;
+/** Paths no small change may touch, however few its lines: migrations, auth, agent config, CI workflows, and secrets. */
+export const RISKY_PATHS = ["**/migrations/**", "**/*migration*", "**/auth/**", "**/*auth*", "**/.omp/**", "**/.github/workflows/**", "**/.env*", "**/*secret*"] as const;
+const RISKY_GLOBS = RISKY_PATHS.map(glob => new Bun.Glob(glob));
+/** A file a PR changes, with the lines GitHub counts when it reports them. */
+export interface ChangedFile {
+	path: string;
+	additions?: number;
+	deletions?: number;
+}
+
+/** Why a PR changing `files`, of `changedFiles` in all, is not a small change, or `null` when it is: every file listed with its line count, within `SMALL_CHANGE`, and none matching `RISKY_PATHS`. */
+export function whyNotSmall(files: ChangedFile[], changedFiles: number): string | null {
+	if (files.length < changedFiles) return `GitHub listed ${files.length} of its ${changedFiles} changed files`;
+	if (changedFiles > SMALL_CHANGE.files) return `it changes ${changedFiles} files, over ${SMALL_CHANGE.files}`;
+	let lines = 0;
+	for (const file of files) {
+		if (file.additions === undefined || file.deletions === undefined) return `GitHub reported no line count for ${file.path}`;
+		lines += file.additions + file.deletions;
+	}
+	if (lines > SMALL_CHANGE.lines) return `it changes ${lines} lines, over ${SMALL_CHANGE.lines}`;
+	const risky = files.filter(file => RISKY_GLOBS.some(glob => glob.match(file.path))).map(file => file.path);
+	return risky.length > 0 ? `${risky.join(", ")} ${risky.length === 1 ? "matches" : "match"} a high-risk path` : null;
+}
+
+/** How the agent skips `stage`'s review on a small change. */
+const fastPath = (stage: ReviewStage) => `If the status says the PR is a small change, you may skip this review instead: pass output {${stage}: {verdicts: [], skipped: 'small change'}} with the next stage, which writes \`(${SKIPPED})\` after the review's box.`;
 /** Each review's state for one PR: whether its changed files call for it, and whether its body has the box. */
 export type Reviews = Record<ReviewStage, { needed: boolean; done: boolean }>;
 
@@ -75,8 +107,8 @@ const NEXT: Record<Stage, string> = {
 	plan: "Choose how to build the change as the ship skill's Plan step says, then record ship_stage({stage: 'implement'}).",
 	implement: "Implement the plan and commit on the work's branch. Do not open a PR in this stage.",
 	draft_pr: "If ship_stage named an open PR for the branch, reuse it: push the branch and record ship_stage({stage: 'interface_review'}). Otherwise push the branch and run `gh pr create --draft`. Reference the issue, or put the plan in the body without one, as the ship skill's Draft PR step says.",
-	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. Otherwise wait until the user approves the direction, then spawn \`interface-reviewer\` on the PR and, unless the ${REVIEWS.thermonuclear.label} is not needed, \`thermonuclear-reviewer\` on the PR diff, in one \`task\` call, apply both reviews' findings in one fresh agent, push, then record ship_stage({stage: 'thermonuclear'}), which checks \`${REVIEWS.interface_review.box}\` in the PR body.`,
-	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. Otherwise, if thermonuclear-reviewer already ran alongside the ${REVIEWS.interface_review.label}, run it again on the interface fix commits alone unless they changed only copy, tokens, or styles; if not, wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff; apply the findings, push, then record ship_stage({stage: 'ready_gate'}), which checks \`${REVIEWS.thermonuclear.box}\` in the PR body. If the ${REVIEWS.interface_review.label} was needed and the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
+	interface_review: `If the status says the ${REVIEWS.interface_review.label} is not needed because \`${REVIEWS.interface_review.pathsFile}\` lists no changed file, record ship_stage({stage: 'thermonuclear'}) and move on. ${fastPath("interface_review")} Otherwise wait until the user approves the direction, then spawn \`interface-reviewer\` on the PR and, unless the ${REVIEWS.thermonuclear.label} is not needed or skipped, \`thermonuclear-reviewer\` on the PR diff, in one \`task\` call, apply both reviews' findings in one fresh agent, push, then record ship_stage({stage: 'thermonuclear'}), which checks \`${REVIEWS.interface_review.box}\` in the PR body.`,
+	thermonuclear: `If the status says the ${REVIEWS.thermonuclear.label} is not needed because \`${REVIEWS.thermonuclear.pathsFile}\` lists no changed file, skip the review. ${fastPath("thermonuclear")} Otherwise, if thermonuclear-reviewer already ran alongside the ${REVIEWS.interface_review.label}, run it again on the interface fix commits alone unless they changed only copy, tokens, or styles; if not, wait until the user approves the direction, then run thermonuclear-reviewer on the PR diff; apply the findings, push, then record ship_stage({stage: 'ready_gate'}), which checks \`${REVIEWS.thermonuclear.box}\` in the PR body. If the ${REVIEWS.interface_review.label} was needed and the body has an unchecked \`${PROOF_BOX}\` box, do what the repository asks for it, then check it.`,
 	ready_gate: `When the ${REVIEWS.interface_review.label} was needed, make sure the PR body has no unchecked \`${PROOF_BOX}\` box. Then run \`gh pr ready <N>\` without asking first: the command itself asks the user to approve.`,
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
@@ -93,6 +125,8 @@ export interface PrStatus {
 	approved: boolean;
 	checks: "pass" | "fail" | "pending" | "none";
 	reviews: Reviews;
+	/** Why the PR is not a small change, from `whyNotSmall`, or `null` when it is, so its reviews may be skipped. */
+	notSmall: string | null;
 }
 
 export interface ShipState {
@@ -145,8 +179,8 @@ export interface ReviewVerdict {
 export interface StageOutputs {
 	implement?: { files_changed: string[]; checks_run: CheckRun[] };
 	draft_pr?: { pr: number; url: string };
-	interface_review?: { verdicts: ReviewVerdict[] };
-	thermonuclear?: { verdicts: ReviewVerdict[] };
+	interface_review?: { verdicts: ReviewVerdict[]; skipped?: string };
+	thermonuclear?: { verdicts: ReviewVerdict[]; skipped?: string };
 	ready_gate?: { checks: CheckRun[] };
 }
 export type OutputStage = keyof StageOutputs;
@@ -155,8 +189,8 @@ export type OutputStage = keyof StageOutputs;
 const OUTPUT_FIELDS: Record<OutputStage, string> = {
 	implement: "files_changed: [repository-relative paths], checks_run: [{command, result}]",
 	draft_pr: "pr: <number>, url: <the PR's URL>",
-	interface_review: "verdicts: [{finding, verdict: fixed | dismissed | deferred}], empty when the review was skipped or found nothing",
-	thermonuclear: "verdicts: [{finding, verdict: fixed | dismissed | deferred}], empty when the review was skipped or found nothing",
+	interface_review: "verdicts: [{finding, verdict: fixed | dismissed | deferred}], empty when the review was skipped or found nothing; skipped: '<reason>' only to skip a small change's review",
+	thermonuclear: "verdicts: [{finding, verdict: fixed | dismissed | deferred}], empty when the review was skipped or found nothing; skipped: '<reason>' only to skip a small change's review",
 	ready_gate: "checks: [{command, result}]",
 };
 
@@ -272,7 +306,9 @@ export function isCheckCommand(words: string[], declared: string[][]): boolean {
 	const heavy = w.findIndex(word => word.endsWith("heavy.py"));
 	if (heavy !== -1 && heavy <= 1) {
 		const rest = w.slice(heavy + 1);
-		return rest.length === 1 ? commands(rest[0]).some(inner => isCheckCommand(inner, declared)) : isCheckCommand(rest, declared);
+		// The shell applies redirections such as `2>&1`, so heavy.py gets the script alone.
+		const script = positionals(rest);
+		return script.length === 1 ? commands(script[0]).some(inner => isCheckCommand(inner, declared)) : isCheckCommand(rest, declared);
 	}
 	if (w.length === 0) return false;
 	if (declared.some(check => check.every((word, i) => w[i] === word))) return true;
@@ -401,7 +437,7 @@ export interface Need {
 
 const PR_QUERY = `query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){
 state isDraft mergeable mergeStateStatus reviewDecision body changedFiles
-files(first:100){nodes{path}}
+files(first:100){nodes{path additions deletions}}
 reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
 commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:100){totalCount nodes{
 ... on CheckRun{name status conclusion} ... on StatusContext{context state}}}}}}}}}}`;
@@ -427,7 +463,7 @@ interface PrResponse {
 	reviewDecision: string | null;
 	body: string;
 	changedFiles: number;
-	files: { nodes: { path: string }[] };
+	files: { nodes: ChangedFile[] };
 	reviewThreads: { nodes: { isResolved: boolean }[]; pageInfo: { hasNextPage: boolean } };
 	commits: { nodes: { commit: { statusCheckRollup: CheckRollup | null } }[] };
 }
@@ -461,6 +497,7 @@ function checksOf(rollup: CheckRollup | null | undefined, approved: boolean): Pr
 export function parsePr(pr: PrResponse, read: (pathsFile: string) => string | undefined): PrStatus {
 	const approved = pr.reviewDecision === "APPROVED";
 	const threads = pr.reviewThreads.nodes;
+	const notSmall = whyNotSmall(pr.files.nodes, pr.changedFiles);
 	return {
 		state: pr.state,
 		draft: pr.isDraft,
@@ -471,7 +508,8 @@ export function parsePr(pr: PrResponse, read: (pathsFile: string) => string | un
 		changesRequested: pr.reviewDecision === "CHANGES_REQUESTED",
 		approved,
 		checks: checksOf(pr.commits.nodes[0]?.commit.statusCheckRollup, approved),
-		reviews: reviewsOf(pr.body, pr.files.nodes.map(file => file.path), pr.changedFiles, read),
+		reviews: reviewsOf(pr.body, pr.files.nodes.map(file => file.path), pr.changedFiles, read, notSmall === null),
+		notSmall,
 	};
 }
 
@@ -576,6 +614,7 @@ export function renderLines(s: ShipState): string[] {
 		if (review?.needed && !review.done && reviewsBefore(s.stage).includes(stage) && at <= STAGES.indexOf("ready_gate")) lines.push(`${label} checkbox missing from the PR body`);
 		if (review && !review.needed && s.stage === stage) lines.push(`${label} not needed: \`${pathsFile}\` lists no changed file`);
 	}
+	if (isReviewStage(s.stage) && s.prStatus?.notSmall === null) lines.push(`Small change: at most ${SMALL_CHANGE.lines} lines in ${SMALL_CHANGE.files} files, no high-risk path; its reviews may be skipped`);
 	if (s.note) lines.push(`Note: ${s.note}`);
 	return lines;
 }
@@ -607,6 +646,12 @@ export function ghPr(words: string[], sub: "create" | "ready"): string[] | undef
 	let i = 2;
 	while (/^(?:-R|--repo(?:=|$))/.test(words[i] ?? "")) i += words[i] === "-R" || words[i] === "--repo" ? 2 : 1;
 	return words[i] === sub ? [...words.slice(2, i), ...words.slice(i + 1)] : undefined;
+}
+
+/** Whether a command's words open a PR that is not a draft, which the tool_call gate blocks. */
+export function opensLivePr(words: string[]): boolean {
+	const create = ghPr(words, "create");
+	return create !== undefined && !create.some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="));
 }
 
 /** The `gh pr view` selector for `gh pr ready <args>`: its first positional (number, URL, or branch) and `--repo`; redirections and other flags drop. */
@@ -658,9 +703,24 @@ export function reviewNeeded(review: Review, paths: string | undefined, files: s
 	return files.some(file => globs.some(glob => glob.match(file)));
 }
 
-/** Each review's state for a PR with this body that changes `files`; `read` returns the text of a paths file in the checkout, `undefined` when it has none. */
-export function reviewsOf(body: string, files: string[], changedFiles: number, read: (pathsFile: string) => string | undefined): Reviews {
-	return byReview(stage => ({ needed: reviewNeeded(REVIEWS[stage], read(REVIEWS[stage].pathsFile), files, changedFiles), done: body.includes(REVIEWS[stage].box) }));
+/**
+ * Each review's state for a PR with this body that changes `files`; `read` returns the text of a paths file in the checkout, `undefined` when it has none.
+ * A review is done when the body holds its box, or, while the PR is `small` and `skippable` allows it, its box with the `SKIPPED` note, which stops counting once the PR grows.
+ */
+export function reviewsOf(body: string, files: string[], changedFiles: number, read: (pathsFile: string) => string | undefined, small = false): Reviews {
+	const lines = body.split("\n");
+	return byReview(stage => {
+		const paths = read(REVIEWS[stage].pathsFile);
+		const needed = reviewNeeded(REVIEWS[stage], paths, files, changedFiles);
+		const marked = lines.filter(line => line.includes(REVIEWS[stage].box));
+		const done = marked.some(line => !line.includes(`(${SKIPPED})`)) || (small && skippable(stage, paths, needed) && marked.length > 0);
+		return { needed, done };
+	});
+}
+
+/** Whether a small change may skip `review`: not when `matchForbidsSkip` and the review is `needed` under its committed paths file, so a changed file matches it. */
+function skippable(review: ReviewStage, paths: string | undefined, needed: boolean): boolean {
+	return !(REVIEWS[review].matchForbidsSkip && paths !== undefined && needed);
 }
 
 /** The reviews whose stages come before `stage`. */
@@ -765,7 +825,7 @@ export default function ship(pi: ExtensionAPI) {
 		reviewDecision: z.string().nullable(),
 		body: z.string(),
 		changedFiles: z.number().int(),
-		files: z.object({ nodes: z.array(z.object({ path: z.string() })) }),
+		files: z.object({ nodes: z.array(z.object({ path: z.string(), additions: z.number().int().optional(), deletions: z.number().int().optional() })) }),
 		reviewThreads: z.object({ nodes: z.array(z.object({ isResolved: z.boolean() })), pageInfo: z.object({ hasNextPage: z.boolean() }) }),
 		commits: z.object({ nodes: z.array(z.object({ commit: z.object({ statusCheckRollup: z.object({
 			state: z.string(),
@@ -780,6 +840,7 @@ export default function ship(pi: ExtensionAPI) {
 		unresolvedThreads: z.number().int(), moreThreads: z.boolean(), changesRequested: z.boolean(), approved: z.boolean(),
 		checks: z.enum(["pass", "fail", "pending", "none"]),
 		reviews: z.object(byReview(() => z.object({ needed: z.boolean(), done: z.boolean() }))),
+		notSmall: z.string().nullable(),
 	});
 	const fixRoundsSchema = z.object({ rounds: z.number().int(), counts: z.array(z.number()) });
 	// omp's zod reports a failed check as "must be <message>" and uses a field's description as that message, so the checked fields carry no description of their own.
@@ -792,7 +853,7 @@ export default function ship(pi: ExtensionAPI) {
 		done_when: z.array(filled).min(1),
 	});
 	const checkRunSchema = z.object({ command: filled, result: filled });
-	const verdictsSchema = z.object({ verdicts: z.array(z.object({ finding: filled, verdict: z.enum(["fixed", "dismissed", "deferred"]) })) });
+	const verdictsSchema = z.object({ verdicts: z.array(z.object({ finding: filled, verdict: z.enum(["fixed", "dismissed", "deferred"]) })), skipped: filled.optional() });
 	const outputSchema = z.object({
 		implement: z.object({ files_changed: z.array(z.string().refine(repoRelative, "repository-relative, with no `..`")).min(1), checks_run: z.array(checkRunSchema).min(1) }).optional(),
 		draft_pr: z.object({ pr: z.number().int(), url: z.string() }).refine(({ pr, url }) => prOfUrl(url)?.pr === pr, { message: "the URL of PR `pr`, as https://github.com/owner/name/pull/<pr>", path: ["url"] }).optional(),
@@ -815,7 +876,7 @@ export default function ship(pi: ExtensionAPI) {
 		spent: z.object({ tokens: z.number(), cost: z.number() }).optional().catch(undefined),
 		updatedAt: z.string(),
 	});
-	const viewSchema = z.object({ body: z.string(), changedFiles: z.number().int(), files: z.array(z.object({ path: z.string() })), url: z.string() });
+	const viewSchema = z.object({ body: z.string(), changedFiles: z.number().int(), files: z.array(z.object({ path: z.string(), additions: z.number().int().optional(), deletions: z.number().int().optional() })), url: z.string() });
 	let state: ShipState | undefined;
 	let lastRefresh = 0;
 	let lastSummary = "";
@@ -974,7 +1035,7 @@ export default function ship(pi: ExtensionAPI) {
 			};
 		}
 		const { body, files, changedFiles } = parsed.data;
-		const reason = publishBlocker(body, reviewsOf(body, files.map(file => file.path), changedFiles, checkoutReader(dir)));
+		const reason = publishBlocker(body, reviewsOf(body, files.map(file => file.path), changedFiles, checkoutReader(dir), whyNotSmall(files, changedFiles) === null));
 		return reason ? { kind: "block", reason } : { kind: "ask" };
 	}
 
@@ -1002,8 +1063,7 @@ export default function ship(pi: ExtensionAPI) {
 		const input = event.input;
 		if (typeof input.command !== "string") return;
 		for (const { words, dir } of located(input.command, typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : ctx.cwd)) {
-			const create = ghPr(words, "create");
-			if (create && !create.some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="))) {
+			if (opensLivePr(words)) {
 				return { block: true, reason: "Blocked: open PRs as drafts (`gh pr create --draft`). A PR goes live only after the ready gate, and after each review its changed files call for." };
 			}
 			const ready = ghPr(words, "ready");
@@ -1056,7 +1116,7 @@ export default function ship(pi: ExtensionAPI) {
 		moreRounds: z.boolean().optional().describe("With fix_ci or fix_comments: the user approved more rounds after ship_stage stopped the fix; starts its rounds over"),
 		contract: contractSchema.optional().describe("At the plan stage, required before implement, replacing any earlier one: goal, one sentence; constraints, rules the change keeps, naming `test-change: <reason>` to change an existing test; files_to_change, repository-relative paths; test_first, the test path written and committed before the code, which a bug fix needs, or null; done_when, at least one check that shows the change done"),
 		rejected: filled.optional().describe("One approach a reviewer or the user rejected, with why; added to the run's rejected list"),
-		output: outputSchema.optional().describe("The output of each stage this call finishes, keyed by stage; advancing to a stage needs the output of the stage before it. implement: {files_changed, checks_run: [{command, result}]}; draft_pr: {pr, url}; interface_review and thermonuclear: {verdicts: [{finding, verdict: fixed, dismissed, or deferred}]}, empty when skipped; ready_gate: {checks: [{command, result}]}"),
+		output: outputSchema.optional().describe("The output of each stage this call finishes, keyed by stage; advancing to a stage needs the output of the stage before it. implement: {files_changed, checks_run: [{command, result}]}; draft_pr: {pr, url}; interface_review and thermonuclear: {verdicts: [{finding, verdict: fixed, dismissed, or deferred}]}, empty when skipped, plus skipped: '<reason>' to skip a small change's review; ready_gate: {checks: [{command, result}]}"),
 		posted: z.object({ kind: postKind, pr: z.number().int().optional(), ref: filled }).optional().describe("A Slack post or Linear link you just made for a PR: kind, ref (its permalink or URL), and pr, which defaults to the run's PR. Recording a kind already recorded for that PR is a no-op that says not to post again"),
 		stop: z.boolean().optional().describe("End the workflow in this session, as when the user says 'no ship'"),
 	});
@@ -1080,6 +1140,7 @@ export default function ship(pi: ExtensionAPI) {
 			"Pass contract at the plan stage: implement is refused without one. Pass rejected for each approach a reviewer or the user rejects. Both show on every read and come back after a compaction or a resume.",
 			"draft_pr and ready_gate are refused until a test, typecheck, or lint bash command exits 0 in this session after the last edit, write, or task call; with a contract's test_first, draft_pr is also refused until a branch commit changing only that test comes before the first commit changing code.",
 			"Advancing to draft_pr, interface_review, thermonuclear, ready_gate, or live is refused until the stage before it has its output, passed as output keyed by that stage; `gh pr ready` is blocked until the ready gate's output is recorded. draft_pr reuses the branch's open PR when one exists.",
+			`A small change, at most ${SMALL_CHANGE.lines} changed lines in ${SMALL_CHANGE.files} files touching no high-risk path, may skip the interface and thermonuclear reviews: pass skipped: '<reason>' with empty verdicts in that review's output, and its box gets the note \`(${SKIPPED})\`; skipping is refused for any other PR, and a skipped box stops counting once the PR grows past the limits.`,
 			"Pass posted after each Slack post or Linear link you make for a PR; every read lists them, and recording one again is a no-op.",
 			"Every call naming a stage appends a line to the ship trace, with the outputs it carried.",
 		].join(" "),
@@ -1167,6 +1228,22 @@ export default function ship(pi: ExtensionAPI) {
 				?? (verified === "draft_pr" && state?.contract ? await testOrderRefusal(state.contract, ctx.cwd) : undefined);
 			if (refusal) return { content: [{ type: "text" as const, text: refusal }], isError: true };
 		}
+		const outputs: StageOutputs = { ...state?.outputs, ...output };
+		// A skip this call claims, or one recorded before whose box this call checks, holds only while the PR is still a small change.
+		const checking = stage === "ready_gate" || (stage !== undefined && isReviewStage(stage)) ? reviewsBefore(stage) : [];
+		const skips = REVIEW_STAGES.filter(review => outputs[review]?.skipped && (output?.[review] || checking.includes(review)));
+		if (skips.length > 0) {
+			const why = refreshFailure ? `GitHub's status is stale: ${refreshFailure}` : state?.prStatus ? state.prStatus.notSmall : "GitHub has reported no status for this PR";
+			if (why !== null) {
+				const reviews = skips.map(review => `the ${LABEL[review]}`).join(" and ");
+				return { content: [{ type: "text" as const, text: `${stage ?? "The output"} is not recorded: ${reviews} may be skipped only on a small change, at most ${SMALL_CHANGE.lines} changed lines in ${SMALL_CHANGE.files} files touching no high-risk path, and ${why}. Run the review and pass its verdicts without skipped.` }], isError: true };
+			}
+			const read = checkoutReader(ctx.cwd);
+			const forbidden = skips.find(review => !skippable(review, read(REVIEWS[review].pathsFile), state?.prStatus?.reviews[review].needed ?? true));
+			if (forbidden) {
+				return { content: [{ type: "text" as const, text: `${stage ?? "The output"} is not recorded: the ${LABEL[forbidden]} may not be skipped, since a changed file matches the repository's ${REVIEWS[forbidden].pathsFile}. Run the review and pass its verdicts without skipped.` }], isError: true };
+			}
+		}
 		let checked = "";
 		let reused = "";
 		if (stage || issue || pr || repo || note !== undefined || contract || rejected || output || posted) {
@@ -1177,19 +1254,25 @@ export default function ship(pi: ExtensionAPI) {
 				}
 				const unchecked = status ? reviewsBefore(stage).filter(review => status.reviews[review].needed && !status.reviews[review].done) : [];
 				if (state && status && unchecked.length > 0) {
-					// Recording a stage declares the reviews before it done, so their boxes go in the PR body; a box the body already holds, such as one GitHub's status read missed just after an edit, stays as it is.
+					// Recording a stage declares the reviews before it done, so their boxes go in the PR body, with the skip note on those the fast path skipped; a box the body already holds, such as one GitHub's status read missed just after an edit, stays as it is.
 					const path = `repos/${state.repo}/pulls/${state.pr}`;
-					const boxes = unchecked.map(review => `\`${REVIEWS[review].box}\``).join(" and ");
-					try {
-						const { changed } = await editDescription(`${state.repo}-${state.pr}`, { kind: "check", boxes: unchecked.map(review => REVIEWS[review].box) }, {
-							read: async () => descriptionSnapshot(await runner.json(["api", path], ctx.cwd)),
-							write: async body => {
-								await runner.json(["api", "-X", "PATCH", path, "-f", `body=${body}`], ctx.cwd);
-							},
-						});
-						if (changed) checked = `Checked ${boxes} in the PR body.\n`;
-					} catch (error) {
-						return { content: [{ type: "text" as const, text: `Could not check ${boxes} in the PR body, so ${stage} is not recorded: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+					const groups = [
+						{ reviews: unchecked.filter(review => !outputs[review]?.skipped), note: undefined },
+						{ reviews: unchecked.filter(review => outputs[review]?.skipped), note: SKIPPED },
+					].filter(group => group.reviews.length > 0);
+					for (const { reviews, note } of groups) {
+						const boxes = reviews.map(review => `\`${REVIEWS[review].box}${note ? ` (${note})` : ""}\``).join(" and ");
+						try {
+							const { changed } = await editDescription(`${state.repo}-${state.pr}`, { kind: "check", boxes: reviews.map(review => REVIEWS[review].box), note }, {
+								read: async () => descriptionSnapshot(await runner.json(["api", path], ctx.cwd)),
+								write: async body => {
+									await runner.json(["api", "-X", "PATCH", path, "-f", `body=${body}`], ctx.cwd);
+								},
+							});
+							if (changed) checked += `Checked ${boxes} in the PR body.\n`;
+						} catch (error) {
+							return { content: [{ type: "text" as const, text: `Could not check ${boxes} in the PR body, so ${stage} is not recorded: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+						}
 					}
 					save(ctx, { ...state, prStatus: { ...status, reviews: byReview(review => (unchecked.includes(review) ? { ...status.reviews[review], done: true } : status.reviews[review])) } });
 				}

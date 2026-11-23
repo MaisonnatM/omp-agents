@@ -66,6 +66,7 @@ describe("skipped hooks", () => {
 			"git commit -anm wip",
 			"git -C /repo push --no-verify origin feature",
 			"git -c core.hooksPath=/dev/null commit -m wip",
+			"git -c core.hooksPath=/dev/null -c user.name=x commit -m wip",
 			"cd /repo && git commit -n -m x",
 		]) {
 			expect(blocked(line), line).toBe(true);

@@ -1,0 +1,233 @@
+[
+	{
+		"id": "board-create",
+		"base": "0aa5b96e046e8f2a9bcd7ed5d823c3ac6c964b2f",
+		"landed": "a73e9fd3b8a9d9e252844935c9f61359e2d568a8",
+		"landedAt": "2026-11-23",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nBoard: create channels and threads\n\n- An empty Board had no op to add a channel or thread, so nothing could be posted.\n- Adds `channel` and `thread` Board changes, a + beside Channels, and New thread in a channel's header.\n\nBoard tool: create a thread\n\n- Agents can open a thread in a channel, with an optional first message.\n",
+		"hiddenTests": [
+			"src/shared/board.test.ts"
+		],
+		"check": "bun test ./src/shared/board.test.ts"
+	},
+	{
+		"id": "board-no-demo",
+		"base": "5df3b138a14e946673d71896668c263ae2905a02",
+		"landed": "f8a071f13eb251633291510ae0d4a1a2a813847a",
+		"landedAt": "2026-11-23",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nStart the Board empty instead of with demo data\n\n- `seed` becomes `emptyBoard`: one `general` channel and the user, no threads, messages, schedules, or demo members.\n\nUse emptyBoard in the Bot roster test\n\nMark Board test fixture changes\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { emptyBoard } from \"src/shared/board.ts\"\n",
+		"hiddenTests": [
+			"src/server/board-wake.test.ts",
+			"web/components/board/module.test.ts"
+		],
+		"check": "bun test ./src/server/board-wake.test.ts ./web/components/board/module.test.ts"
+	},
+	{
+		"id": "session-open-links",
+		"base": "50683c495383b4bc25f68dc741207e2892226a6b",
+		"landed": "d590abc67274c20011ba947db4ee82e5bf1d4b61",
+		"landedAt": "2026-11-23",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nOpen the PRs and Linear tabs when a session with them opens\n\n- newIdsOnOpen remembers only the last session shown, so each open adds the tabs again\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { newIdsOnOpen } from \"web/details-tabs.ts\"\n",
+		"hiddenTests": [
+			"web/details-tabs.test.ts"
+		],
+		"check": "bun test ./web/details-tabs.test.ts"
+	},
+	{
+		"id": "drop-projects-tab",
+		"base": "1d914e3069df817e9bc8fd9c9427ce47f83857dd",
+		"landed": "50683c495383b4bc25f68dc741207e2892226a6b",
+		"landedAt": "2026-11-23",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nDrop the Projects row from the sidebar page list\n\nDrop the Projects row from Settings › Preferences sidebar tabs\n",
+		"hiddenTests": [
+			"web/sidebar-tabs.test.ts"
+		],
+		"check": "bun test ./web/sidebar-tabs.test.ts"
+	},
+	{
+		"id": "weekend-retro-fixes",
+		"base": "ca510af3b080951096ea729b0534a4c054c85bc6",
+		"landed": "1d914e3069df817e9bc8fd9c9427ce47f83857dd",
+		"landedAt": "2026-11-23",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nProjects: list the open projects when project_update names none from a session in none\n",
+		"hiddenTests": [
+			"templates/omp/extensions.test.ts"
+		],
+		"check": "bun test ./templates/omp/extensions.test.ts"
+	},
+	{
+		"id": "agent-todo-sections",
+		"base": "f2694917688fdd88ec30a5cceeff0c30abb5a44c",
+		"landed": "33bab2482510432b635820377137453e658a9377",
+		"landedAt": "2026-11-20",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nLet agents add a Todo section through user_todo\n\nApply thermonuclear review: findSection, pure sectionsOf, one-line section names, sections tests\n",
+		"hiddenTests": [
+			"src/server/todo-inbox.test.ts",
+			"templates/omp/extensions.test.ts"
+		],
+		"check": "bun test ./src/server/todo-inbox.test.ts ./templates/omp/extensions.test.ts"
+	},
+	{
+		"id": "pr-your-move-actions",
+		"base": "a221f578d815e5d26db5ac9aaa9dcf5c5bf55417",
+		"landed": "4d6b6701714f64b305b19f156a08cbad4588b377",
+		"landedAt": "2026-11-20",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nPull requests: bulk fix buttons on Your move headings\n\n- Reply N, Fix CI N, Rebase N start the move's quick action on every waiting row after an inline confirm\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { bulkMoves } from \"web/pull-requests-model.ts\"\n",
+		"hiddenTests": [
+			"web/pull-requests-model.test.ts"
+		],
+		"check": "bun test ./web/pull-requests-model.test.ts"
+	},
+	{
+		"id": "approved-skip-ask-human",
+		"base": "8025343ff7dfc7eb5dd3e5fecab9539b1baae4d4",
+		"landed": "340af6e127e19f44705a4fac6a850bab41c3b3f9",
+		"landedAt": "2026-11-20",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nPull requests: keep ask-human pull requests out of Approved\n",
+		"hiddenTests": [
+			"src/pull-requests.test.ts",
+			"web/pull-requests-model.test.ts"
+		],
+		"check": "bun test ./src/pull-requests.test.ts ./web/pull-requests-model.test.ts"
+	},
+	{
+		"id": "agent-schedule-send",
+		"base": "196b3357af58ea9790e49729af506d7f9642121b",
+		"landed": "8025343ff7dfc7eb5dd3e5fecab9539b1baae4d4",
+		"landedAt": "2026-11-19",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nLet agents schedule follow-up sends to their own session\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { SessionFollowUps } from \"src/server/session-follow-ups.ts\"\n",
+		"hiddenTests": [
+			"src/server/session-follow-ups.test.ts"
+		],
+		"check": "bun test ./src/server/session-follow-ups.test.ts"
+	},
+	{
+		"id": "remove-omp-memory-tabs",
+		"base": "98a84e5ba10c51e793a63e35d5672bd93bfdd704",
+		"landed": "b02f28f51ada7a92e842ca7ce6b3c896de8a3c16",
+		"landedAt": "2026-11-19",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nMemory: drop the omp memory tab; the page opens on Project memory\n\nProject memory: All projects in the repository picker\n\nProject memory: open on All projects\n",
+		"hiddenTests": [
+			"web/components/memory/memory-routes.test.ts"
+		],
+		"check": "bun test ./web/components/memory/memory-routes.test.ts"
+	},
+	{
+		"id": "memory-side-panel",
+		"base": "ccaa43b714ee49159a3ea7cbe8eb18244134b17f",
+		"landed": "b9b2ca3923bba3124d8e1fb0beb6daf61604eebb",
+		"landedAt": "2026-11-19",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nOpen project memory in a side panel like Bookmarks\n\n- Project memory uses ListSplit instead of the Drawer sheet; Escape closes via memoryProjectClose.\n- Delete the now-unused Drawer component.\n\nNudge agents to record a project memory before ending a session\n\n- The project-memory extension blocks a session's first end_session once when it wrote no memory.\n",
+		"hiddenTests": [
+			"templates/omp/project-memory.test.ts",
+			"web/shortcuts.test.ts"
+		],
+		"check": "bun test ./templates/omp/project-memory.test.ts ./web/shortcuts.test.ts"
+	},
+	{
+		"id": "ship-review-gate",
+		"base": "207c9d5ca3a1883863bf59572cd8d38e5a37f3ef",
+		"landed": "ccaa43b714ee49159a3ea7cbe8eb18244134b17f",
+		"landedAt": "2026-11-19",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nfix(ship): treat a failing review gate as waiting for review, not Fix CI\n\nship_stage reads each head-commit check; a failing human-review or approval check no longer files the PR under fix_ci, matching the dashboard's checksOf.\n",
+		"hiddenTests": [
+			"templates/omp/extensions.test.ts"
+		],
+		"check": "bun test ./templates/omp/extensions.test.ts"
+	},
+	{
+		"id": "agent-speed",
+		"base": "ac60371efc4933c5b67ff05686e275ff51b0c8b8",
+		"landed": "ad2c11024bd2dba94d543fc8a9e196a11fce5b9e",
+		"landedAt": "2026-11-19",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nNudge Claude to batch tool calls and widen heavy slots\n\n- agent-pace extension appends elapsed time and Anthropic's batching nudge to tool-results messages\n- heavy.py defaults to a third of CPU cores\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { NUDGE, PaceNotes } from \"templates/omp/agent/extensions/agent-pace/notes.ts\"\n",
+		"hiddenTests": [
+			"templates/omp/agent-pace.test.ts"
+		],
+		"check": "bun test ./templates/omp/agent-pace.test.ts"
+	},
+	{
+		"id": "ask-multi-select",
+		"base": "3bcb2088a7e909c4dae6fa2d33ad09075b79e416",
+		"landed": "7105e78077dc9a8a97350191ef3bd63292d89f08",
+		"landedAt": "2026-11-19",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nShow step-by-step multi-select asks as checkboxes with a Done button\n\n- parse omp's selectionMarker, markableCount, and checkedIndices into checkboxes and checked\n- render checkbox rows in QuestionOptions multi mode, tick picks at once, and move action rows to footer buttons\n\nDraw a checkbox mark on each multi-select question row\n\n- ticked rows show a filled box with a checkmark, in step-by-step and whole-form questions\n",
+		"hiddenTests": [
+			"src/user-requests.test.ts",
+			"web/attention.test.ts",
+			"web/components/user-request.test.tsx"
+		],
+		"check": "bun test ./src/user-requests.test.ts ./web/attention.test.ts ./web/components/user-request.test.tsx"
+	},
+	{
+		"id": "stale-integrations-cache",
+		"base": "7221cf751af0505ef37a294abdc834f0cb13c7b4",
+		"landed": "ec529d7811a6eb87345f8c84f64da73acc0d93dd",
+		"landedAt": "2026-11-16",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nKeep only current integrations in the cached Integrations answer\n\n- The page crashed on start for anyone whose cache predated the Gmail, Google Calendar, and Linear removal:\n  `fields` lets unknown keys through, so Get started's `Object.values(answer.integrations)` read `.connection.kind` of a stale Gmail record.\n- `decodeIntegrationsAnswer` now rebuilds the answer from the integrations this version knows.\n",
+		"hiddenTests": [
+			"src/shared/cache-decoders.test.ts"
+		],
+		"check": "bun test ./src/shared/cache-decoders.test.ts"
+	},
+	{
+		"id": "tab-history",
+		"base": "9b043f21f916a5e74ab17bb67600b1a22b34c12b",
+		"landed": "4bdf19b6ab33fe6c4939b8ee27519811de1de652",
+		"landedAt": "2026-11-16",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nGive each header tab its own Back and Forward\n\nDrop Cmd+L for a header tab's Copy URL\n\nMaxence chose to keep Copy URL in the tab's menu only, so Cmd+L stays the\nbrowser's address bar key. A new record overrides the duplicated-tab\nrecord's Cmd+L consequence.\n\nTrim CHANGELOG.md to its size limit\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { HeaderTabVisit, stepHeaderTab, TAB_HISTORY_LIMIT } from \"web/header-tabs.ts\"\n",
+		"hiddenTests": [
+			"web/header-tabs.test.ts",
+			"web/shortcuts.test.ts"
+		],
+		"check": "bun test ./web/header-tabs.test.ts ./web/shortcuts.test.ts"
+	},
+	{
+		"id": "tickets-no-sidebar",
+		"base": "2f0d0029d276ae0525305347954f619cad857c5e",
+		"landed": "9b043f21f916a5e74ab17bb67600b1a22b34c12b",
+		"landedAt": "2026-11-16",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nTickets: drop the sidebar list, tab reopens the last issue\n\nRename the Tickets tab and page to Linear tickets\n\nName the Linear tickets groups in the palette and Keyboard\n",
+		"hiddenTests": [
+			"web/command-palette.test.ts",
+			"web/document-title.test.ts",
+			"web/page-list.test.ts"
+		],
+		"check": "bun test ./web/command-palette.test.ts ./web/document-title.test.ts ./web/page-list.test.ts"
+	},
+	{
+		"id": "idle-session-stop",
+		"base": "0714c91d14b897f5d01ca7e5e2ba85656827fe9d",
+		"landed": "2f0d0029d276ae0525305347954f619cad857c5e",
+		"landedAt": "2026-11-16",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nStop an idle session's omp after a setting's hours, keeping its worktree\n\nDefault the idle session stop to 12 hours\n",
+		"hiddenTests": [
+			"src/server/process-settings-file.test.ts",
+			"src/server/session-processes.test.ts"
+		],
+		"check": "bun test ./src/server/process-settings-file.test.ts ./src/server/session-processes.test.ts"
+	},
+	{
+		"id": "tab-reopen-pin",
+		"base": "c60da41e948aa4dfdb58cb5df89ac3a81c221d2d",
+		"landed": "00e1d91994ce39f26e94bd4e774e4b5768996225",
+		"landedAt": "2026-11-16",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nHeader tabs: Duplicate tab, Copy URL, Close tabs to the right\n\nThe tab menu now lists Capy's items in its order. Duplicate tab copies a\ntab right after it, a pinned one's copy first of the unpinned; a session\nmay then show in two tabs, and going to it from the copy stays there.\nCopy URL, and Cmd+L for the tab on screen, copy its dashboard address.\nClose tabs to the right keeps pinned tabs.\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { closeRightHeaderTabs, duplicateHeaderTab } from \"web/header-tabs.ts\"\n",
+		"hiddenTests": [
+			"web/header-tabs.test.ts",
+			"web/shortcuts.test.ts"
+		],
+		"check": "bun test ./web/header-tabs.test.ts ./web/shortcuts.test.ts"
+	},
+	{
+		"id": "settings-search",
+		"base": "e6006e641030cae30d8b794e6da8ca272a299990",
+		"landed": "7fbb2d63fb3b788148a4cefb9e5ec1954cbbe284",
+		"landedAt": "2026-11-16",
+		"prompt": "Make this change in the repository in the current directory. Its author described it in these commit messages:\n\nAdd a search field to Settings and focus the new-session composer when its project changes\n\nOpen the first matching section on Enter in Settings search\n\nDocument Enter in Settings search\n\nMark the Settings search's Enter target and keep a reconnect from moving the caret\n\nTests will check it through these imports, so give the new code these names and paths:\n- import { settingsMatching } from \"web/routing.ts\"\n",
+		"hiddenTests": [
+			"web/routing.test.ts"
+		],
+		"check": "bun test ./web/routing.test.ts"
+	}
+]

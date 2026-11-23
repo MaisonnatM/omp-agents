@@ -92,8 +92,11 @@ function gitCommand(words: string[], dir: string | null): GitCommand | null {
 	for (; i < words.length && words[i]!.startsWith("-"); i++) {
 		const flag = words[i]!;
 		if (flag === "-C") at = within(at, words[++i]);
-		else if (flag === "-c") hooksMoved ||= /^core\.hookspath=/i.test(words[++i] ?? "");
-		else if (flag === "--git-dir" || flag === "--work-tree" || flag === "--namespace") i++;
+		else if (flag === "-c") {
+			// Read the setting even once hooks are moved, so the next `-c` value is not taken for the subcommand.
+			const setting = words[++i] ?? "";
+			hooksMoved ||= /^core\.hookspath=/i.test(setting);
+		} else if (flag === "--git-dir" || flag === "--work-tree" || flag === "--namespace") i++;
 	}
 	return { sub: words[i], args: words.slice(i + 1), at, hooksMoved };
 }
