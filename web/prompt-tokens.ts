@@ -114,11 +114,11 @@ const chipNode = ({ kind, label, target }: PromptToken): MdNode => ({
 	data: { hName: "span", hProperties: { dataChip: kind, dataLabel: label, dataTarget: target } },
 });
 
-function chipText(node: MdNode): MdNode[] {
+function chipText(node: MdNode, tokenize: Tokenize): MdNode[] {
 	const text = node.value ?? "";
 	const nodes: MdNode[] = [];
 	let at = 0;
-	for (const token of promptTokens(text, { leading: node.position?.start.offset === 0 })) {
+	for (const token of tokenize(text, { leading: node.position?.start.offset === 0 })) {
 		if (token.start > at) nodes.push({ type: "text", value: text.slice(at, token.start) });
 		nodes.push(chipNode(token));
 		at = token.end;
@@ -127,20 +127,23 @@ function chipText(node: MdNode): MdNode[] {
 	return nodes;
 }
 
-function chipTree(parent: MdNode, source: string): void {
+function chipTree(parent: MdNode, source: string, tokenize: Tokenize): void {
 	if (!parent.children) return;
 	parent.children = parent.children.flatMap(node => {
-		if (node.type === "text") return chipText(node);
+		if (node.type === "text") return chipText(node, tokenize);
 		if (node.type === "link" || node.type === "inlineCode") {
 			// A pull request or person is a markdown link, and a Browser annotation a code span, which the parser has already taken apart: match its source.
 			const written = source.slice(node.position?.start.offset, node.position?.end.offset);
-			const [token] = promptTokens(written, { leading: false });
+			const [token] = tokenize(written, { leading: false });
 			return token && token.start === 0 && token.end === written.length ? [chipNode(token)] : [node];
 		}
-		chipTree(node, source);
+		chipTree(node, source, tokenize);
 		return [node];
 	});
 }
 
-/** A remark plugin that makes each reference in a sent prompt a chip, as the composer showed it. */
-export const remarkPromptChips = () => (tree: MdNode, file: { value: unknown }) => chipTree(tree, String(file.value));
+/** A remark plugin that makes each reference `tokenize` finds in sent text a chip, as the composer showed it. */
+export const remarkChips = (tokenize: Tokenize) => () => (tree: MdNode, file: { value: unknown }) => chipTree(tree, String(file.value), tokenize);
+
+/** `remarkChips` for omp's prompt grammar. */
+export const remarkPromptChips = remarkChips(promptTokens);

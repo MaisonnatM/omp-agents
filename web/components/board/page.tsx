@@ -4,6 +4,7 @@ import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState, type R
 import { InputMessage } from "@/components/ui/input-message";
 import type { MenuOption } from "../../mentions";
 import { CompletionPopup } from "../completion-popup";
+import { boardMessagePreset, type MarkdownPreset, MessageMarkdown } from "../message-markdown";
 import type { PromptEditorHandle } from "../prompt-editor";
 import type { PromptToken, Tokenize } from "../../prompt-tokens";
 import { Button } from "@/components/ui/button";
@@ -355,6 +356,8 @@ interface ThreadViewProps {
 
 function ThreadView({ state, thread, byId, members, now, typing, onPost, onCommand, onAnswer, onOpenThread, onBack }: ThreadViewProps) {
 	const messages = state.messages.filter(msg => msg.thread === thread.id);
+	const tokenize = useMemo(() => boardTokens(members), [members]);
+	const preset = useMemo(() => boardMessagePreset(tokenize), [tokenize]);
 	const channel = state.channels.find(item => item.id === thread.channel)!;
 	const scroller = useRef<HTMLDivElement>(null);
 	const [showInternal, setShowInternal] = useState(true);
@@ -414,7 +417,7 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 						{shown.map((msg, i) => {
 							const prev = shown[i - 1];
 							const grouped = prev && prev.author === msg.author && msg.at - prev.at < 10 * 60_000;
-							return <MessageRow key={msg.id} msg={msg} author={byId.get(msg.author)} grouped={!!grouped} now={now} onAnswer={onAnswer} me={state.me} />;
+							return <MessageRow key={msg.id} msg={msg} author={byId.get(msg.author)} grouped={!!grouped} now={now} onAnswer={onAnswer} preset={preset} />;
 						})}
 						{typing && (
 							<li className="flex items-center gap-3 pt-4 text-xs text-muted-foreground">
@@ -516,7 +519,7 @@ function DepRow({ label, thread, onOpen }: { label: string; thread: Thread; onOp
 	);
 }
 
-function MessageRow({ msg, author, grouped, now, onAnswer, me }: { msg: Message; author?: Member; grouped: boolean; now: number; onAnswer: (id: string, option: string) => void; me: string }) {
+function MessageRow({ msg, author, grouped, now, onAnswer, preset }: { msg: Message; author?: Member; grouped: boolean; now: number; onAnswer: (id: string, option: string) => void; preset: MarkdownPreset }) {
 	return (
 		<li className={cn("group flex gap-3 rounded-lg px-2 -mx-2", grouped ? "pt-1" : "pt-4", msg.internal && "bg-[repeating-linear-gradient(135deg,transparent,transparent_6px,color-mix(in_oklab,var(--muted)_60%,transparent)_6px,color-mix(in_oklab,var(--muted)_60%,transparent)_7px)]")}>
 			<span className="w-8 shrink-0">{!grouped && author && <Avatar member={author} size="md" />}</span>
@@ -530,20 +533,15 @@ function MessageRow({ msg, author, grouped, now, onAnswer, me }: { msg: Message;
 						{msg.synced && <span className="text-3xs text-muted-foreground">via {msg.synced}</span>}
 					</p>
 				)}
-				{msg.text && <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderText(msg.text, msg.author === me)}</p>}
+				{msg.text && (
+					<div className="text-sm leading-relaxed">
+						<MessageMarkdown text={msg.text} preset={preset} />
+					</div>
+				)}
 				{msg.attachment && <AttachmentCard attachment={msg.attachment} now={now} onAnswer={option => onAnswer(msg.id, option)} />}
 			</div>
 		</li>
 	);
-}
-
-function renderText(text: string, mine: boolean): ReactNode {
-	return text.split(/(@[\p{L}'][\p{L}'\- ]*?(?=[\s,.?!:]|$)|`[^`]+`|\/[a-z]+\b)/u).map((part, i) => {
-		if (part.startsWith("@")) return <span key={i} className={cn("rounded px-0.5 font-medium", mine ? "bg-primary/10 text-primary" : "bg-amber-500/15 text-amber-800 dark:text-amber-300")}>{part}</span>;
-		if (part.startsWith("`")) return <code key={i} className="rounded bg-muted px-1 font-mono text-[0.8em]">{part.slice(1, -1)}</code>;
-		if (/^\/[a-z]+$/.test(part) && COMMANDS.some(command => `/${command.name}` === part)) return <span key={i} className="font-mono text-[0.85em] font-medium text-violet-700 dark:text-violet-300">{part}</span>;
-		return part;
-	});
 }
 
 function AttachmentCard({ attachment, now, onAnswer }: { attachment: Attachment; now: number; onAnswer: (option: string) => void }) {

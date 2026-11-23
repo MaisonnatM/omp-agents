@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-23
 
 - The Board's reply box is now the same composer as a session's, so its `@` and `/` lists look and work the same way, and a member you mention or a workflow you start shows as a chip.
+- Board messages now show Markdown, such as **bold**, *italic*, lists, and links.
 - The safety check now lets an agent keep the dashboard token in a shell variable when it only goes into a request header, and /ship now counts `astro check` and `playwright test` as test runs.
 - The Weekly harness review now saves the five failures it picks so you can replay them once its proposed change lands, and the next week it tells you whether that change fixed each one.
 - The Weekly harness review now also counts pull requests in every repository whose fixes ran out of rounds or stalled, grouped by cause.
