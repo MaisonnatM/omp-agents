@@ -84,6 +84,24 @@ export function UnderToasts({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Keeps `--toasts-clearance` on the page root at the height the toast stack takes from the bottom of the window, `0px` with no toast,
+ * so a bottom-right composer, such as the Board's, can lift clear of them instead of hiding under them.
+ */
+function measureStack(stack: HTMLDivElement | null): (() => void) | void {
+	if (!stack) return;
+	const root = document.documentElement.style;
+	const observer = new ResizeObserver(() => {
+		const { height, bottom } = stack.getBoundingClientRect();
+		root.setProperty("--toasts-clearance", height > 0 ? `${Math.ceil(height + innerHeight - bottom)}px` : "0px");
+	});
+	observer.observe(stack);
+	return () => {
+		observer.disconnect();
+		root.removeProperty("--toasts-clearance");
+	};
+}
+
+/**
  * Every toast of the page, stacked at the bottom right, the newest last, each under its source when it has one; on a
  * phone, where a second toast would bury the page, only the newest, at the top, clear of the composer, and the next
  * one waits under it. A toast that never times out gets a round close button on its corner, shown on hover or focus,
@@ -94,7 +112,7 @@ export function Toaster() {
 	return (
 		<Toast.Provider toastManager={toasts} limit={phone ? 1 : undefined}>
 			<Toast.Portal>
-				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-phone:top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))] max-phone:right-2 max-phone:bottom-auto max-phone:max-w-[calc(100vw-1rem)]">
+				<div ref={measureStack} className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-phone:top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))] max-phone:right-2 max-phone:bottom-auto max-phone:max-w-[calc(100vw-1rem)]">
 					<Toast.Viewport className="flex w-full flex-col-reverse gap-2">
 						<ToastList />
 					</Toast.Viewport>

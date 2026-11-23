@@ -10,6 +10,11 @@ The dashboard shows the same lines in Settings › What's new.
 - Agents are now stopped before risky shell commands, such as pushing straight to main, skipping git hooks, stopping the dashboard, using a default server port, or reading secret files.
 - Behind the scenes: the always-loaded agent instructions are about half as long; rare rules moved into skills that load only when needed.
 - Behind the scenes: `bun run test:agent` prints a one-line test summary and one line per failure, so agents read results faster.
+- Board: a new page of channels and threads where you, your sessions, and remote agents post; the dashboard saves it in `board.json`, and a message that mentions a session wakes it, resuming it if it ended.
+- Board: every session gets a `board` tool to read threads, post, claim or settle a task, and report workflow steps.
+- Board: the left sidebar has a Sessions | Board switch at its top; on Board it lists your inbox, schedules, channels, people, agents, and sessions, and each has its own address, such as `#board/channel/<id>`; an open thread adds `?thread=<id>`.
+- Board: the reply box moves up while a toast shows instead of hiding under it, and an expired task lease now reads "lease expired".
+- Board: your Bots are members too; they list under Agents, the @ menu offers them, and mentioning one wakes its conversation, starting it if it has none, so it answers in the thread.
 - /ship now stops a session after five rounds of fixing failed checks or review comments, or sooner when the count stops going down, and asks you before trying again.
 - /ship now writes one line per step with the model, tokens, and cost to a log in your omp-agents settings folder, so you can see what each pull request cost.
 - Behind the scenes: landing now refuses a change that edits an existing test unless a commit explains why, so an agent cannot make tests pass by rewriting them.

@@ -94,12 +94,15 @@ export function moveTab(layout: TabLayout, tab: SidebarTab, by: -1 | 1): TabLayo
 /** `layout` with `tab` hidden or shown. */
 export const hideTab = (layout: TabLayout, tab: SidebarTab, hidden: boolean): TabLayout => layout.map(entry => (entry.tab === tab ? { tab, hidden } : entry));
 
-/** The tab with no row in the page list or in Settings › Preferences: the sidebar's own Projects section, just below the list, already lists the projects and starts a new one. */
-export const ROWLESS_TAB: SidebarTab = "projects";
+/**
+ * The tabs with no row in the page list or in Settings › Preferences: the sidebar's own Projects section, just below the list, already lists the projects
+ * and starts a new one, and the sidebar's Sessions | Board switch opens the Board.
+ */
+export const ROWLESS_TABS: ReadonlySet<SidebarTab> = new Set<SidebarTab>(["projects", "board"]);
 
-/** The tabs shown, in order: those the user did not hide, less the `absent` ones, whose module is turned off, and the {@link ROWLESS_TAB}. */
+/** The tabs shown, in order: those the user did not hide, less the `absent` ones, whose module is turned off, and the {@link ROWLESS_TABS}. */
 export const shownTabs = (layout: TabLayout, absent: ReadonlySet<SidebarTab>): SidebarTab[] =>
-	layout.filter(({ tab, hidden }) => !hidden && !absent.has(tab) && tab !== ROWLESS_TAB).map(({ tab }) => tab);
+	layout.filter(({ tab, hidden }) => !hidden && !absent.has(tab) && !ROWLESS_TABS.has(tab)).map(({ tab }) => tab);
 
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.

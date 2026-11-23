@@ -16,6 +16,7 @@ const DEFAULT: TabLayout = [
 	{ tab: "bots", hidden: false },
 	{ tab: "todo", hidden: false },
 	{ tab: "sport", hidden: false },
+	{ tab: "board", hidden: false },
 	{ tab: "memory", hidden: false },
 	{ tab: "projects", hidden: false },
 ];
@@ -47,6 +48,7 @@ test("decoding keeps each known tab once, drops a stored tab of a page that left
 		{ tab: "bots", hidden: false },
 		{ tab: "sport", hidden: true },
 		{ tab: "todo", hidden: false },
+		{ tab: "board", hidden: false },
 		{ tab: "memory", hidden: false },
 		{ tab: "projects", hidden: false },
 	]);
@@ -67,7 +69,7 @@ test("a layout stored with the Notes tab drops it and keeps every other tab wher
 	const saved = ["pull-requests", "bots", "sessions", "notes", "todo", "sport"].map(tab => ({ tab, hidden: tab === "notes" }));
 	expect(decodeTabLayout(JSON.stringify(saved))).toEqual(DEFAULT);
 	const todoFirst = ["todo", "pull-requests", "notes", "bots", "sessions", "sport"].map(tab => ({ tab, hidden: false }));
-	expect(decodeTabLayout(JSON.stringify(todoFirst)).map(({ tab }) => tab)).toEqual(["todo", "pull-requests", "bots", "sport", "memory", "projects"]);
+	expect(decodeTabLayout(JSON.stringify(todoFirst)).map(({ tab }) => tab)).toEqual(["todo", "pull-requests", "bots", "sport", "board", "memory", "projects"]);
 });
 
 test("a stored layout decodes back to itself", () => {
@@ -78,8 +80,8 @@ test("a stored layout decodes back to itself", () => {
 test("moveTab swaps a tab with its neighbor and leaves a tab at either end where it is", () => {
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", -1)).toBe(DEFAULT_TAB_LAYOUT);
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "projects", 1)).toBe(DEFAULT_TAB_LAYOUT);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "sport", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "bots", "sport", "todo", "memory", "projects"]);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["bots", "pull-requests", "todo", "sport", "memory", "projects"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "sport", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "bots", "sport", "todo", "board", "memory", "projects"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["bots", "pull-requests", "todo", "sport", "board", "memory", "projects"]);
 });
 
 test("hideTab hides and shows any tab", () => {
@@ -95,7 +97,7 @@ test("shownTabs drops hidden and absent tabs and Projects, and keeps the order",
 
 test("a saved order that still has Todo immediately before Notes puts it just before Sport", () => {
 	const saved = ["sessions", "todo", "notes", "bots", "pull-requests", "sport"].map(tab => ({ tab, hidden: false }));
-	expect(decodeTabLayout(JSON.stringify(saved)).map(({ tab }) => tab)).toEqual(["bots", "pull-requests", "todo", "sport", "memory", "projects"]);
+	expect(decodeTabLayout(JSON.stringify(saved)).map(({ tab }) => tab)).toEqual(["bots", "pull-requests", "todo", "sport", "board", "memory", "projects"]);
 });
 
 test("a layout stored in the old order, Todo in the bar before Notes, puts Todo just before Sport and keeps what was hidden", () => {

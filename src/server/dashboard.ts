@@ -105,6 +105,8 @@ import { UsagePoll } from "./usage-poll";
 import { type Socket, Views } from "./views";
 import { parseClientMsg } from "./wire";
 import { adoptOldWorkspaces, WorkspacesFile } from "./workspaces-file";
+import { BoardWake } from "./board-wake";
+import { type BoardChange, inBotsName } from "../shared/board";
 
 /** What the dashboard publishes through once the server listens. */
 type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
@@ -183,6 +185,8 @@ export class Dashboard {
 	/** What the bell's checks saw last, which tells the routines' triggers what is new. */
 	readonly #triggerWatch = new TriggerWatch();
 	readonly #scheduledRunner: ScheduledRunner;
+	/** Wakes the sessions a Board message is for, and posts the Board's schedules as they come due. */
+	#boardWake: BoardWake | undefined;
 	readonly #autoContinue: AutoContinue;
 	readonly #mergeQueue: MergeQueue;
 	readonly #mergeCleanup: MergeCleanup;
@@ -322,7 +326,10 @@ export class Dashboard {
 					return true;
 				},
 			},
-		}, modules, kind => this.#broadcasts.pushList(kind)));
+		}, modules, kind => {
+			this.#broadcasts.pushList(kind);
+			if (kind === "board") this.#boardWake?.check();
+		}));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
@@ -346,7 +353,8 @@ export class Dashboard {
 			lists.applyModule(id, change);
 			return modules[id].flush();
 		};
-		const modulesInboxes = moduleInboxes(modules, applyModuleNow, { active: () => ownerLock.held });
+		// The `board` tool posts as its session, so a Bot's conversation posts in the Bot's name.
+		const modulesInboxes = moduleInboxes(modules, (id, change) => applyModuleNow(id, id === "board" ? (inBotsName(change as BoardChange, this.#botsFile.value) as typeof change) : change), { active: () => ownerLock.held });
 		const routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
 		const botInbox = new BotInbox(
 			botInboxDir,
@@ -463,6 +471,18 @@ export class Dashboard {
 			now: Date.now,
 			onChange: () => broadcasts.pushList("scheduled"),
 		}));
+		const boardWake = (this.#boardWake = new BoardWake({
+			state: () => modules.board.value,
+			hosts: () => sessions.rows(factsOf),
+			bots: () => this.#botsFile.value,
+			apply: change => void lists.applyModule("board", change),
+			wake: async (sessionId, text) => (await reach(sessionId)).prompt(null, text, [], "followUp"),
+			wakeBot: async (botId, text) => void (await this.#bots.message(botId, text)),
+			active: () => ownerLock.held,
+			now: Date.now,
+		}));
+		const boardTimer = setInterval(() => boardWake.fireDue(), 30_000);
+		stopping.addEventListener("abort", () => clearInterval(boardTimer));
 		const autoContinue = (this.#autoContinue = new AutoContinue({
 			file: scheduled,
 			plans: async () => {

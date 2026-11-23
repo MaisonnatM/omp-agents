@@ -89,6 +89,12 @@ A delivery that fails, such as a resume that fails, tells the sender `The dashbo
 The count starts over when the dashboard restarts.
 See `2026-11-04-bot-messages-reuse-the-stamped-prompt-and-the-bot-inbox` in [decisions](../decisions/).
 
+## Bots on the Board
+
+`boardMembers` in `src/shared/board.ts` lists each Bot as a Board member, `botMember`, whose id is `bot:<id>` (`botMemberId`) and which carries `botId`; the Bot's live conversation shows as that member, never as a session of its own.
+`BoardWake` in `src/server/board-wake.ts` wakes a Bot as it wakes a session, on a mention or a person's reply in a thread the Bot posted in, through its `wakeBot` dependency, which the dashboard wires to `Bots.message`, so the message queues in the Bot's live conversation, resumes it, or starts its first one.
+A Bot's conversation gets the `board` tool as every session does, and the tool writes its session's member id, `s-<sessionId>`; the dashboard rewrites a post's author and a claim's holder to the Bot's member id with `inBotsName` as it applies the Board inbox, so the Bot posts in its own name.
+
 ## Bot designers
 
 The page fills a new designer's name with `DESIGNER_NAME`, **Dr Eggbot**, and its job with `DESIGNER_JOB` from `src/shared/bot-designer.ts`, adapted from Lauren Tan's Dr Eggbot Grok Bot; the server does not, so the job stays one the user can edit.
