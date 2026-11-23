@@ -4,7 +4,7 @@
 
 When the user invokes `thermo-nuclear-code-quality-review`, asks for a thermonuclear review, or requests a deep code quality audit, spawn `task` with `agent: "thermonuclear-reviewer"`; it is read-only, so it runs without `isolated` in the session's checkout.
 Its `model: "@plan"` frontmatter follows `modelRoles.plan` and that role's fallback chain on any provider.
-Pass the review scope and user arguments, then relay the findings verbatim.
+Pass the review scope, the user arguments, and, in `/ship`, the contract's `done_when` list from `ship_stage`, then relay the findings verbatim.
 Run the skill through this agent, not in the session model.
 Apply the findings, commit and push, then add its checkbox as [Review checkboxes](#review-checkboxes) says.
 
@@ -21,12 +21,20 @@ A pull request needs the interface review only when its repository commits `.omp
 `.omp/ui-paths` has the same format as `.omp/review-paths`, and the ship extension also asks for the checkbox whenever GitHub lists fewer files than the pull request changes.
 A linked worktree missing one of these files reads its main checkout's, so a repository you do not want to carry your setup can keep them uncommitted in the main checkout, listed in `.git/info/exclude`.
 The `/ship` Interface review stage runs before the Thermonuclear one, so the code quality review sees the interface fixes.
-Spawn `task` with `agent: "interface-reviewer"` and `pr <N>` as the assignment; it is read-only and runs the user's `interface-review` skill in full mode, which hands off to `better-interface` and the `better-*` skills.
+Spawn `task` with `agent: "interface-reviewer"` and `pr <N>` as the assignment, plus, in `/ship`, the contract's `done_when` list from `ship_stage`; it is read-only and runs the user's `interface-review` skill in full mode, which hands off to `better-interface` and the `better-*` skills.
 It then checks the change against the app's own design system, which it reads from the repository: the shared component library, design tokens, component variants, icon library, written conventions, and sibling screens.
 It flags a raw element where a shared component exists, a component that duplicates one, a shared component used against its siblings' pattern, hard-coded values where a token exists, and layout, state, or copy that departs from sibling screens, each citing the component, token, or sibling it should match.
 It also lists, under **New patterns**, each kind of UI the change presents in a new way where the app has one established way, such as a list shown as cards in an app whose lists are all tables, even when the PR justifies it.
 When a read fails, the agent names the missing skill and stops without reviewing.
 Apply the findings in a fresh agent, commit and push, then add its checkbox as [Review checkboxes](#review-checkboxes) says.
+
+## Reviewer replies
+
+`thermonuclear-reviewer`, `interface-reviewer`, and `design-critic` reply in one shape, with no preamble.
+First comes one line per criterion, `BLOCKING <criterion>: <one-line reason>` or `APPROVE <criterion>: <one-line reason>`, judged against the `done_when` list the assignment passes, or against the request when it passes none.
+Then come at most 5 bullets of other findings, each tagged `BLOCKING` or `NIT`.
+Each reviewer's skill still decides what counts as a finding and how severe it is; the shape replaces only the report format.
+Resolve every `BLOCKING` line and bullet before the stage moves on, and say which `NIT` bullets you left and why.
 
 ## Stalled review and fix agents
 

@@ -136,6 +136,153 @@ export function plannedTestEdits(contract: Contract): string[] {
 	return contract.files_to_change.filter(path => /\.test\.tsx?$/.test(path));
 }
 
+/** The stages that claim the change works, so each needs a passing check after the last file change. */
+export const VERIFIED_STAGES: readonly Stage[] = ["draft_pr", "ready_gate"];
+/** Tools whose call may change files in the checkout; a `task` subagent may edit, so it counts too. */
+const EDIT_TOOLS: Record<string, true> = { edit: true, write: true, ast_edit: true, notebook: true, task: true };
+/** A package script that checks the change, such as `test`, `test:agent`, `typecheck`, or `lint`. */
+const CHECK_SCRIPT = /^(?:test|typecheck|lint|check|tsc|verify)(?:[:._-]|$)/;
+/** A program that is itself a check. */
+const CHECK_PROGRAMS: Record<string, true> = { tsc: true, vitest: true, jest: true, pytest: true, eslint: true, biome: true, mypy: true, ruff: true };
+/** Words in front of the program they run, which a check may sit behind. */
+const PREFIXES: Record<string, true> = { time: true, nice: true, nohup: true, command: true, exec: true };
+
+/** One tool call of the session, with whether its result was an error. */
+export interface ToolRun {
+	name: string;
+	input: Record<string, unknown>;
+	ok: boolean;
+}
+
+/** The fields of a session entry's message that `toolRuns` reads; omp's `SessionEntry` holds them. */
+interface BranchMessage {
+	role: string;
+	content?: unknown;
+	toolName?: string;
+	toolCallId?: string;
+	isError?: boolean;
+}
+
+/** The tool calls in `entries`, a session branch, in the order their results arrived. */
+export function toolRuns(entries: readonly { type: string; message?: BranchMessage }[]): ToolRun[] {
+	const inputs = new Map<string, Record<string, unknown>>();
+	const runs: ToolRun[] = [];
+	for (const { type, message } of entries) {
+		if (type !== "message" || !message) continue;
+		if (message.role === "assistant" && Array.isArray(message.content)) {
+			for (const block of message.content) {
+				if (block?.type === "toolCall" && typeof block.id === "string") inputs.set(block.id, block.arguments ?? {});
+			}
+		} else if (message.role === "toolResult" && message.toolName) {
+			runs.push({ name: message.toolName, input: inputs.get(message.toolCallId ?? "") ?? {}, ok: message.isError !== true });
+		}
+	}
+	return runs;
+}
+
+/** The single commands a repository's `.omp/land.json` lists as checks, each as its words; a shell line that runs several commands is left out. */
+export function declaredChecks(landJson: string | undefined): string[][] {
+	if (!landJson) return [];
+	let checks: unknown;
+	try {
+		checks = (JSON.parse(landJson) as { checks?: unknown }).checks;
+	} catch {
+		return [];
+	}
+	if (!Array.isArray(checks)) return [];
+	return checks.flat().flatMap(check => {
+		if (typeof check !== "string") return [];
+		const ran = commands(check);
+		return ran.length === 1 && ran[0].length >= 2 ? ran : [];
+	});
+}
+
+/** Whether a command's `words` run a test, typecheck, or lint: one `declared` by the repository, a package `test` script or one named like a check, or a checker such as `tsc`; `heavy.py` and prefixes like `time` are looked through. */
+export function isCheckCommand(words: string[], declared: string[][]): boolean {
+	let w = words;
+	while (w.length > 0 && PREFIXES[w[0]]) w = w.slice(1);
+	if (w[0] === "timeout") w = w.slice(2);
+	const heavy = w.findIndex(word => word.endsWith("heavy.py"));
+	if (heavy !== -1 && heavy <= 1) {
+		const rest = w.slice(heavy + 1);
+		return rest.length === 1 ? commands(rest[0]).some(inner => isCheckCommand(inner, declared)) : isCheckCommand(rest, declared);
+	}
+	if (w.length === 0) return false;
+	if (declared.some(check => check.every((word, i) => w[i] === word))) return true;
+	const [run, sub = "", script = ""] = w;
+	const name = run.split("/").pop() ?? run;
+	if (CHECK_PROGRAMS[name]) return true;
+	if (/^(?:bunx|npx|pnpx|uvx)$/.test(name)) return isCheckCommand(w.slice(1), declared);
+	if (/^(?:bun|npm|pnpm|yarn)$/.test(name)) return sub === "test" || (sub === "run" ? CHECK_SCRIPT.test(script) : name !== "bun" && name !== "npm" && CHECK_SCRIPT.test(sub));
+	if (name === "cargo") return /^(?:test|check|clippy|nextest)$/.test(sub);
+	if (name === "go") return sub === "test" || sub === "vet";
+	if (name === "make" || name === "just") return CHECK_SCRIPT.test(sub);
+	if (/^python3?$/.test(name)) return sub === "-m" && CHECK_PROGRAMS[script] === true;
+	if (name === "uv") return sub === "run" && isCheckCommand(w.slice(2), declared);
+	return false;
+}
+
+/**
+ * Why `stage` may not be recorded yet, or `undefined` when it may: a stage that claims the change works needs a bash check,
+ * such as the tests or the typecheck, that exited 0 in this session after the last tool call that may have changed files.
+ */
+export function verificationRefusal(stage: Stage, runs: ToolRun[], declared: string[][]): string | undefined {
+	let lastEdit: ToolRun | undefined;
+	let checked = false;
+	for (const run of runs) {
+		if (EDIT_TOOLS[run.name] && (run.ok || run.name === "task")) {
+			lastEdit = run;
+			checked = false;
+		} else if (run.name === "bash" && run.ok && run.input.async !== true && typeof run.input.command === "string" && commands(run.input.command).some(words => isCheckCommand(words, declared))) {
+			checked = true;
+		}
+	}
+	if (checked) return undefined;
+	const since = lastEdit ? ` since the last \`${lastEdit.name}\` call` : "";
+	const checks = declared.length > 0 ? `, such as ${declared.map(words => `\`${words.join(" ")}\``).join(", ")} from .omp/land.json,` : "";
+	return `${stage} is not recorded: no test, typecheck, or lint command passed in this session${since}, so nothing shows the change works. Run the repository's checks${checks} in this session with bash and without async, fix what fails, then record ${stage} again and quote each check's result line in your report.`;
+}
+
+/** One commit of the branch with the files it changes. */
+export interface BranchCommit {
+	sha: string;
+	files: string[];
+}
+
+/** The commits of `git log --reverse --no-merges --format=%x00%h --name-only`, oldest first. */
+export function parseBranchLog(stdout: string): BranchCommit[] {
+	return stdout.split("\0").slice(1).map(chunk => {
+		const [sha, ...files] = chunk.split("\n").map(line => line.trim()).filter(Boolean);
+		return { sha, files };
+	});
+}
+
+/** Whether `path` is a test file by its name or directory. */
+export function isTestFile(path: string): boolean {
+	return /(?:^|\/)(?:tests?|__tests__|spec)\/|[._-](?:test|spec)\.[^/]+$|(?:^|\/)test_[^/]+\.py$/.test(path);
+}
+
+/**
+ * Why a branch with a `test_first` contract may not get its draft PR, or `undefined` when it may: a commit changing only the test
+ * `test_first` names, or any test file when it names no path the branch changes, must come before the first commit changing code; Markdown is not code.
+ */
+export function testFirstRefusal(contract: Contract, commits: BranchCommit[], base: string): string | undefined {
+	const test = contract.test_first;
+	if (!test) return undefined;
+	const changed = [...new Set(commits.flatMap(commit => commit.files))];
+	const named = changed.filter(path => test.includes(path));
+	const isTest = named.length > 0 ? (path: string) => named.includes(path) : isTestFile;
+	const isCode = (path: string) => !isTestFile(path) && !/\.mdx?$/i.test(path);
+	const firstTest = commits.findIndex(commit => commit.files.some(isTest) && !commit.files.some(isCode));
+	const firstCode = commits.findIndex(commit => commit.files.some(isCode));
+	if (firstTest !== -1 && (firstCode === -1 || firstTest < firstCode)) return undefined;
+	const tests = (named.length > 0 ? named : changed.filter(isTestFile)).map(path => `\`${path}\``).join(", ");
+	const found = firstCode === -1 || !tests
+		? `no commit on this branch changes ${tests || "a test file"} on its own`
+		: `${commits[firstCode].sha} changes code before any commit that changes only ${tests}`;
+	return `draft_pr is not recorded: the contract's test_first is "${test}", but ${found}. A bug fix commits its failing test first, so the history shows the test failing before the fix. Run \`git reset --soft ${base}\`, commit only the test (\`git commit -m "<test subject>" -- <test file>\`), check that it fails, commit the rest, then record draft_pr again.`;
+}
+
 /** `rejected` with `approach` appended, unless it already holds it, ignoring case and spacing. */
 export function withRejected(rejected: string[] | undefined, approach: string): string[] {
 	const key = (text: string) => text.trim().replace(/\s+/g, " ").toLowerCase();
@@ -820,7 +967,7 @@ export default function ship(pi: ExtensionAPI) {
 		note: z.string().optional().describe("One-line status note; empty string clears it"),
 		count: z.number().int().min(0).optional().describe("With fix_ci or fix_comments: how many checks fail, or review comments are open, as this round starts"),
 		moreRounds: z.boolean().optional().describe("With fix_ci or fix_comments: the user approved more rounds after ship_stage stopped the fix; starts its rounds over"),
-		contract: contractSchema.optional().describe("At the plan stage, required before implement, replacing any earlier one: goal, one sentence; constraints, rules the change keeps, naming `test-change: <reason>` to change an existing test; files_to_change, repository-relative paths; test_first, the test written before the code or null; done_when, at least one check that shows the change done"),
+		contract: contractSchema.optional().describe("At the plan stage, required before implement, replacing any earlier one: goal, one sentence; constraints, rules the change keeps, naming `test-change: <reason>` to change an existing test; files_to_change, repository-relative paths; test_first, the test path written and committed before the code, which a bug fix needs, or null; done_when, at least one check that shows the change done"),
 		rejected: filled.optional().describe("One approach a reviewer or the user rejected, with why; added to the run's rejected list"),
 		stop: z.boolean().optional().describe("End the workflow in this session, as when the user says 'no ship'"),
 	});
@@ -842,6 +989,7 @@ export default function ship(pi: ExtensionAPI) {
 			"Call with stop: true when the user says 'no ship'; the widget, the gates, and the dashboard's Ship card then drop the run.",
 			`fix_ci and fix_comments run in rounds per PR: pass count each round; after ${FIX_BUDGET} rounds, or when count did not shrink for ${STALL_ROUNDS} rounds in a row, the round is refused until the user approves moreRounds.`,
 			"Pass contract at the plan stage: implement is refused without one. Pass rejected for each approach a reviewer or the user rejects. Both show on every read and come back after a compaction or a resume.",
+			"draft_pr and ready_gate are refused until a test, typecheck, or lint bash command exits 0 in this session after the last edit, write, or task call; with a contract's test_first, draft_pr is also refused until a branch commit changing only that test comes before the first commit changing code.",
 			"Every call naming a stage appends a line to the ship trace.",
 		].join(" "),
 		parameters: toolParamsSchema,
@@ -904,6 +1052,12 @@ export default function ship(pi: ExtensionAPI) {
 		await refreshNow(ctx);
 		if (refreshFailure && stage && NEEDS_CURRENT_STATUS.includes(stage)) {
 			return { content: [{ type: "text" as const, text: `Cannot advance using stale GitHub status: ${refreshFailure}` }], isError: true };
+		}
+		const verified = VERIFIED_STAGES.find(claim => claim === stage);
+		if (verified) {
+			const refusal = verificationRefusal(verified, toolRuns(ctx.sessionManager.getBranch()), declaredChecks(checkoutReader(ctx.cwd)(".omp/land.json")))
+				?? (verified === "draft_pr" && state?.contract ? await testOrderRefusal(state.contract, ctx.cwd) : undefined);
+			if (refusal) return { content: [{ type: "text" as const, text: refusal }], isError: true };
 		}
 		let checked = "";
 		if (stage || issue || pr || repo || note !== undefined || contract || rejected) {
@@ -982,5 +1136,22 @@ export default function ship(pi: ExtensionAPI) {
 		const existing = r.code === 0 ? r.stdout.split("\n").filter(Boolean) : [];
 		if (existing.length === 0) return undefined;
 		return `The contract is not recorded: files_to_change holds ${existing.join(", ")}, which HEAD already has, and a test that exists guards behavior. Leave it out, or add a constraint \`test-change: <why the behavior changes on purpose>\`.`;
+	}
+
+	/** Why `contract`'s branch may not get its draft PR: with a `test_first`, a commit changing only that test must come before the code. */
+	async function testOrderRefusal(contract: Contract, cwd: string): Promise<string | undefined> {
+		if (!contract.test_first) return undefined;
+		let base: string | undefined;
+		for (const ref of ["origin/HEAD", "origin/main", "origin/master", "main", "master"]) {
+			const r = await pi.exec("git", ["merge-base", "HEAD", ref], { cwd });
+			if (r.code === 0 && r.stdout.trim()) {
+				base = r.stdout.trim().slice(0, 12);
+				break;
+			}
+		}
+		if (!base) return `draft_pr is not recorded: the contract's test_first is "${contract.test_first}", and this checkout has no main or master branch to read the branch's commits from. Fetch the default branch, then record draft_pr again.`;
+		const log = await pi.exec("git", ["log", "--reverse", "--no-merges", "--format=%x00%h", "--name-only", `${base}..HEAD`], { cwd });
+		if (log.code !== 0) return `draft_pr is not recorded: \`git log ${base}..HEAD\` failed, so the test-first order cannot be checked: ${log.stderr.trim()}`;
+		return testFirstRefusal(contract, parseBranchLog(log.stdout), base);
 	}
 }

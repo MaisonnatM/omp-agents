@@ -69,6 +69,7 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 		case "dashboard-failed":
 			return { logo: sparkles, label: "omp-agents" };
 		case "stopped":
+		case "routine-health":
 			return { logo: <IconExclamationCircle className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
 		default: {
 			const unhandled: never = notice;
@@ -89,7 +90,7 @@ export function NoticeOrigin({ notice }: { notice: Notice }) {
 }
 const BADGE = "absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full ring-2 ring-popover";
 
-/** A notice's picture: who it comes from with a badge for its source; an update's, a stopped session's, or a move nobody made's source tile; or a provider's logo with a warning badge. */
+/** A notice's picture: who it comes from with a badge for its source; an update's, a warning's (a stopped session or a routine run that exited early), or a move nobody made's source tile; or a provider's logo with a warning badge. */
 function Face({ face }: { face: NoticeFace }) {
 	switch (face.kind) {
 		case "update":
@@ -98,7 +99,7 @@ function Face({ face }: { face: NoticeFace }) {
 					<IconSparklesTwo className="m-auto size-4 text-violet-600 dark:text-violet-400" />
 				</span>
 			);
-		case "stopped":
+		case "warning":
 			return (
 				<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-amber-500/10">
 					<IconExclamationCircle className="m-auto size-4 text-amber-600 dark:text-amber-400" />

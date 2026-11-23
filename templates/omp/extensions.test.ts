@@ -22,7 +22,8 @@ const tools = {};
 let confirmations = 0;
 const executed = [];
 let activeTools = ["artifact", "read"];
-const entries = [];
+// input.entries seeds the session branch, such as the tool calls a stage gate reads.
+const entries = [...(input.entries ?? [])];
 // Each message the extension sent, with its delivery options.
 const sent = [];
 // input.usage lists the session's cumulative usage each read returns, as omp's usage statistics report it.
@@ -494,9 +495,14 @@ describe("ship_stage review gates", () => {
 	// GitHub's REST answer for the PR body that the box check reads.
 	const restRead = (body: string) => ({ code: 0, stderr: "", stdout: JSON.stringify({ body, updated_at: "2026-11-10T12:00:00Z" }) });
 	const patched = { code: 0, stdout: "{}", stderr: "" };
+	// A session branch where `bun test` passed, which the verified stages need.
+	const entries = [
+		{ type: "message", message: { role: "assistant", content: [{ type: "toolCall", id: "t", name: "bash", arguments: { command: "bun test" } }] } },
+		{ type: "message", message: { role: "toolResult", toolCallId: "t", toolName: "bash", isError: false } },
+	];
 	// Records `stage` for a PR with this body changing `file`, checked from a checkout with `reviewPaths` and `uiPaths`.
 	const record = (stage: string, body: string, file: string, reviewPaths?: string, uiPaths?: string) => exercise("ship", {
-		run: true, cwd: checkout(reviewPaths, uiPaths), params: { stage, pr: 7, repo: "owner/name" },
+		run: true, cwd: checkout(reviewPaths, uiPaths), params: { stage, pr: 7, repo: "owner/name" }, entries,
 		responses: { "api graphql": prRead(body, file), "api repos/owner/name/pulls/7": restRead(body), "api -X": patched },
 	}, quotaConfig());
 	// The body the box check wrote, or null when it wrote none.
@@ -504,7 +510,7 @@ describe("ship_stage review gates", () => {
 
 	test("a box GitHub's status read misses but the PR body holds is left as it is", () => {
 		const result = exercise("ship", {
-			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
+			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" }, entries,
 			responses: { "api graphql": prRead("Unreviewed PR", "README.md"), "api repos/owner/name/pulls/7": restRead(THERMONUCLEAR_BOX), "api -X": patched },
 		}, quotaConfig());
 		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
@@ -551,7 +557,7 @@ describe("ship_stage review gates", () => {
 
 	test("a PR body the box check cannot read leaves the stage unrecorded", () => {
 		const result = exercise("ship", {
-			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
+			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" }, entries,
 			responses: { "api graphql": prRead("Unreviewed PR", "README.md"), "api repos/owner/name/pulls/7": { code: 0, stdout: "{}", stderr: "" }, "api -X": patched },
 		}, quotaConfig());
 		expect(result.run).toEqual({ isError: true, stage: null });

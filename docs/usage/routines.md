@@ -66,6 +66,14 @@
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
+- Once a day, and as it starts, the dashboard that runs the routines checks the runs of the last day and raises one notification, under **Routines** in [Notifications](notifications.md), for the runs that exited early.
+  A run exited early when it errored, its Bot's turn ended with no reply and without staying quiet, it took less than a quarter of the routine's usual time, or it started an hour or more after its schedule said.
+  A routine whose next run is an hour or more overdue counts as missing its schedule too.
+- The dashboard adds one routine of its own, **Weekly harness review**, once, with a Bot named **Harness review** that works in the omp-agents checkout.
+  It is paused; turn it on to run it on Mondays at 9:00.
+  Each run reads the last week of `ship-trace.jsonl` beside the access token, `LEARNINGS.md`, the failed merges, and the failed routine runs, groups the failures by cause, proposes exactly one harness change as a decision for you, and lists five past failures to replay to test that change.
+  It edits nothing.
+  If you delete it, it does not come back.
 - Routines made before every routine had a Bot move to Bots as the dashboard that runs the routines starts or takes over.
   Each one goes to one Bot named **Routines**, made once, which works in the first routine's workspace, else your home directory.
   A command that ran in another workspace now starts with `cd` into it, and a prompt that did starts by naming it; a prompt's skill moves into the message as `/skill:` and its name.

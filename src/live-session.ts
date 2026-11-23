@@ -2,9 +2,12 @@
 import { isObject } from "./json";
 import type { HostSnapshot } from "./omp/collab";
 import { type TurnFailure, turnFailureOf } from "./omp/turn-failure";
-import { entryTime, tailEntries } from "./session-entries";
+import type { RunTurn } from "./routine-health";
+import { entryTime, tailEntries, textOf } from "./session-entries";
+import { readRoutineMessage } from "./shared/routine-message";
 import { type Delivery, type MessageQueue, type PromptImage, type RosterHost, type SessionFacts, STAY_QUIET_TOOL, type UserAnswer, type WithdrawnMessage } from "./shared/sessions";
-import { isUserPrompt, splitSuggestions } from "./transcript";
+import { skillInvocation } from "./shared/transcript";
+import { isUserPrompt, skillArgs, splitSuggestions } from "./transcript";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -92,6 +95,39 @@ export function endedTurn(sessionFile: string, since = Number.NEGATIVE_INFINITY)
 	}
 	const at = lastAt ?? promptedAt;
 	return at === null || at <= since || stayedQuiet(newestFirst) ? null : { at, reply: lastReply(newestFirst.toReversed()) };
+}
+
+/**
+ * The turn that answered routine `routineId`'s run at `at` in session file `sessionFile`: the messages between that run's
+ * stamped prompt and the next prompt, read as {@link turnUpdate} reads an `agent_end`'s, and the time from the prompt to
+ * the last of them. `null` when the file is gone or unreadable, or its tail holds no such prompt with a time.
+ */
+export function routineTurn(sessionFile: string, routineId: string, at: number): RunTurn | null {
+	const newestFirst: unknown[] = [];
+	let lastAt: number | null = null;
+	try {
+		for (const entry of tailEntries(sessionFile)) {
+			const message = entry.type === "message" && isObject(entry.message) ? entry.message : entry.type === "custom_message" ? entry : null;
+			if (message === null) continue;
+			if (!isUserPrompt(message)) {
+				newestFirst.push(message);
+				lastAt ??= entryTime(entry);
+				continue;
+			}
+			const skill = entry.type === "custom_message" && isObject(entry.details) && typeof entry.details.name === "string" ? entry.details.name : null;
+			const sent = readRoutineMessage(skill === null ? textOf(message.content) : skillInvocation(skill, skillArgs(message)));
+			const promptedAt = entryTime(entry);
+			if (sent?.routine.id === routineId && sent.at === at && promptedAt !== null) {
+				const messages = newestFirst.toReversed();
+				return { replied: lastReply(messages) !== null, quiet: stayedQuiet(messages), failed: turnFailureOf(messages) !== null, ms: (lastAt ?? promptedAt) - promptedAt };
+			}
+			newestFirst.length = 0;
+			lastAt = null;
+		}
+	} catch {
+		return null;
+	}
+	return null;
 }
 
 /** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */

@@ -15,7 +15,8 @@ import { fullyAwake } from "../full-wake";
 import { loadPullRequests, mergedPullRequests, repoOf } from "../pull-requests";
 import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
 import { errorText } from "../json";
-import type { LiveSession } from "../live-session";
+import { type LiveSession, routineTurn } from "../live-session";
+import { earlyRuns } from "../routine-health";
 import { startDictation } from "../omp/dictation";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
@@ -25,7 +26,7 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, directoryOf, displayPath, endedWorktreesFile, HOME, interruptedFile, machineFile, mergesFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, builtInRoutinesFile, directoryOf, displayPath, endedWorktreesFile, HOME, interruptedFile, machineFile, mergesFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
 import { type ModuleChanges, moduleInboxes, moduleJoins, openModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
@@ -49,6 +50,7 @@ import { Worktrees } from "../worktrees";
 import { WorktreeOccupants } from "./worktree-occupants";
 import { BotInbox } from "./bot-inbox";
 import { Bots, startingRoutine } from "./bots";
+import { addBuiltInRoutines } from "./built-in-routines";
 import { BotsFile } from "./bots-file";
 import { Broadcasts } from "./broadcasts";
 import { EndInbox } from "./end-inbox";
@@ -60,7 +62,7 @@ import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops, repeat } from "./loops";
 import { MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, HEALTH_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
 import { PinsFile } from "./pins-file";
 import { PrivateSessions } from "./private-sessions";
@@ -88,6 +90,7 @@ import type { SelfUpdate } from "./self-update";
 import { EndedWorktrees, endSession, restoreEndedWorktree } from "./session-end";
 import { ProjectTrustFile } from "./project-trust-file";
 import { SessionFollowUps } from "./session-follow-ups";
+import { PullRequestWatches, PullRequestWatchesFile } from "./pull-request-watches";
 import { SessionMoves } from "./session-moves";
 import { SessionWaits } from "./session-waits";
 import { SessionFiles } from "./session-files";
@@ -155,6 +158,8 @@ export class Dashboard {
 		schedule: change => this.#lists.apply("scheduled", change),
 		now: Date.now,
 	});
+	/** The pull requests sessions watch, which the activity check's list wakes them about; the constructor builds it once it can reach a session. */
+	readonly #prWatches: PullRequestWatches;
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
 	readonly #integrations: Integrations = createIntegrations();
@@ -264,6 +269,7 @@ export class Dashboard {
 					const list = await loadPullRequests(this.knownWorkspaces(), false);
 					const agent = agentOn(sessions.rows(factsOf));
 					this.#triggerWatch.learn(pullRequestSightings(list, agent));
+					this.#prWatches.learn(list);
 					return { list, agent };
 				},
 				slack: async () => {
@@ -287,6 +293,11 @@ export class Dashboard {
 					interrupted.midTurn().map(sessionId => {
 						const saved = files.savedOf(sessionId);
 						return { sessionId, title: saved?.title ?? null, cwdDisplay: saved ? displayPath(saved.cwd) : null };
+					}),
+				earlyRuns: () =>
+					earlyRuns(routines.value, Date.now(), (sessionId, routineId, at) => {
+						const path = files.pathOf(sessionId);
+						return path === null ? null : routineTurn(path, routineId, at);
 					}),
 				now: Date.now,
 			},
@@ -483,6 +494,14 @@ export class Dashboard {
 		}));
 		const boardTimer = setInterval(() => boardWake.fireDue(), 30_000);
 		stopping.addEventListener("abort", () => clearInterval(boardTimer));
+		this.#prWatches = new PullRequestWatches({
+			file: new PullRequestWatchesFile(pullRequestWatchesFile),
+			hosts: () => sessions.rows(factsOf),
+			isBot: request => this.#bots.botOf(request) !== null,
+			wake: async (sessionId, text) => (await reach(sessionId)).prompt(null, text, [], "followUp"),
+			active: () => ownerLock.held,
+			now: Date.now,
+		});
 		const autoContinue = (this.#autoContinue = new AutoContinue({
 			file: scheduled,
 			plans: async () => {
@@ -569,8 +588,8 @@ export class Dashboard {
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
 			onActivityTick: async () => {
-				// The routines' triggers read these checks, so the server that runs them checks without a page too, but only what an enabled routine watches.
-				const watched = ownerLock.held ? watchedKinds(routines.value) : [];
+				// The routines' triggers and the pull request watches read these checks, so the server that runs them checks without a page too, but only what they watch.
+				const watched = ownerLock.held ? [...watchedKinds(routines.value), ...(this.#prWatches.watching() ? ["pull-request" as const] : [])] : [];
 				const kinds = broadcasts.listening() ? ACTIVITY_KINDS : ACTIVITY_KINDS.filter(kind => watched.includes(kind));
 				this.#activityFresh = kinds.length === ACTIVITY_KINDS.length;
 				if (kinds.length > 0) await notices.check(kinds);
@@ -585,7 +604,9 @@ export class Dashboard {
 				if (ownerLock.held) await this.#processWatch.tick();
 			},
 			onDailyTick: async () => {
-				if (ownerLock.held) this.#pruneActivity();
+				if (!ownerLock.held) return;
+				this.#pruneActivity();
+				await notices.check(HEALTH_KINDS);
 			},
 		});
 		this.#requests = new RequestLedger(createClientHandler({
@@ -734,6 +755,8 @@ export class Dashboard {
 		if (this.#ownerLock.held) {
 			this.#clearOldDone();
 			this.#pruneActivity();
+			// A restart starts the daily loop over, so the heartbeat runs now too; the runs it finds name its one notice, which a second look at them keeps.
+			void this.#notices.check(HEALTH_KINDS);
 		}
 		this.#loops.start();
 		this.#stopMergeQueue = repeat("merge queue", () => this.#mergeQueue.tick(), MERGE_QUEUE_TICK_MS, 0);
@@ -892,6 +915,7 @@ export class Dashboard {
 			this.#moves.join(request, instanceId),
 			this.#waits.join(request, instanceId),
 			this.#followUps.join(request, instanceId),
+			this.#prWatches.join(request, instanceId),
 			...moduleJoins(this.#preferences.value),
 		];
 		return {
@@ -931,6 +955,7 @@ export class Dashboard {
 			this.#routines.reload();
 			this.#bots.reload();
 			this.#migrateRoutines();
+			this.#addBuiltInRoutines();
 			this.#todos.reload();
 			this.#broadcasts.pushList("routines");
 			this.#broadcasts.pushList("bots");
@@ -952,6 +977,15 @@ export class Dashboard {
 	#migrateRoutines(): void {
 		this.#routines.migrate(bot => {
 			if (!this.#botsFile.value.some(({ id }) => id === bot.id)) this.#lists.apply("bots", { op: "save", bot });
+		});
+	}
+
+	/** Adds the built-in routines not added before, disabled, each with its Bot unless that Bot exists; only the server that runs routines adds them. */
+	#addBuiltInRoutines(): void {
+		addBuiltInRoutines(builtInRoutinesFile, {
+			hasBot: id => this.#botsFile.value.some(bot => bot.id === id),
+			saveBot: bot => this.#lists.apply("bots", { op: "save", bot }),
+			saveRoutine: routine => this.#lists.apply("routines", { op: "save", routine }),
 		});
 	}
 

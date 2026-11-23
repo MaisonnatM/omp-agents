@@ -10,6 +10,7 @@ import type { DashboardNews, DashboardUpdateOutcome } from "../shared/dashboard-
 import type { PlanUsage } from "../shared/models";
 import type { CreditsSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
 import { usesClause } from "../shared/notices";
+import type { EarlyRun } from "../routine-health";
 import type { SlackFound } from "../slack-messages";
 
 export interface NoticeSources {
@@ -38,6 +39,8 @@ export interface NoticeSources {
 	creditRuns(): Promise<Omit<CreditsSubject, "kind">[]>;
 	/** The interrupted dashboard sessions that stopped while their turn ran. */
 	stoppedSessions(): StoppedSession[];
+	/** The routine runs that exited early, which the daily heartbeat lists. */
+	earlyRuns(): EarlyRun[];
 	now(): number;
 }
 
@@ -51,6 +54,8 @@ export const ACTIVITY_KINDS = ["pull-request", "slack"] as const satisfies reado
 export const PROVIDER_KINDS = ["plan", "credits"] as const satisfies readonly NoticeKind[];
 /** The kinds the stopped-sessions check looks for. */
 export const STOPPED_KINDS = ["stopped"] as const satisfies readonly NoticeKind[];
+/** The kinds the routines' daily heartbeat looks for. */
+export const HEALTH_KINDS = ["routine-health"] as const satisfies readonly NoticeKind[];
 
 const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
@@ -97,6 +102,7 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	plan: "used-up plans",
 	credits: "providers out of credits",
 	stopped: "sessions that stopped mid-turn",
+	"routine-health": "routine runs that exited early",
 };
 
 /**
@@ -158,6 +164,12 @@ function stoppedNotices(sessions: StoppedSession[], at: number): Unscoped[] {
 	if (sessions.length === 0) return [];
 	const sorted = sessions.toSorted((a, b) => a.sessionId.localeCompare(b.sessionId));
 	return [{ id: `stopped:${sorted.map(({ sessionId }) => sessionId).join(",")}`, at, kind: "stopped", sessions: sorted }];
+}
+
+/** One notice for every run in `runs`, none when it is empty. Its id names each run and why, so a run that exits early later makes it news again. */
+function healthNotices(runs: EarlyRun[], at: number): Unscoped[] {
+	if (runs.length === 0) return [];
+	return [{ id: `routine-health:${runs.map(run => `${run.routineId}@${run.at}:${run.exit}`).join(",")}`, at, kind: "routine-health", runs }];
 }
 
 export class Notices {
@@ -303,6 +315,8 @@ export class Notices {
 				);
 			case "stopped":
 				return all(stoppedNotices(this.#sources.stoppedSessions(), this.#sources.now()), false);
+			case "routine-health":
+				return all(healthNotices(this.#sources.earlyRuns(), this.#sources.now()), false);
 		}
 	}
 

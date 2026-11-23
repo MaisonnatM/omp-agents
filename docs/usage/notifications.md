@@ -5,7 +5,7 @@
   The tab, filters, and grouping stay in this browser.
   The header's search keeps the notices whose headline, text, or source name holds every word you type, and **Mark all as read** marks the shown unread ones.
   When the search or the filters leave nothing, the list says so with a button that clears them, and focus moves to the list.
-- Five sources feed it.
+- Six sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
     Every two minutes while a page is open, and as soon as a page opens after none was, the server reads the pull requests of the workspaces that the Pull requests page covers.
@@ -26,20 +26,22 @@
       A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
   - **Sessions**: the sessions the dashboard started that stopped mid-turn, working or waiting on a question, without **Archive session**, as one notice, **2 sessions stopped mid-turn**, that names them as the sidebar's past sessions do.
     They are the interrupted sessions of the sessions sidebar whose turn ran, checked as the dashboard starts, every minute, and each time one stops, resumes, or moves to past.
-- **All**, **GitHub**, **Slack**, **Providers**, **Sessions**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
+  - **Routines**: the routine runs that exited early, as one notice, **2 routine runs exited early**, that names each routine and why: it **errored**, **ended with no reply**, **ended far sooner than usual**, or **missed its schedule**.
+    The dashboard that runs the routines checks the runs of the last day once a day and as it starts; see [Routines](routines.md).
+- **All**, **GitHub**, **Slack**, **Providers**, **Sessions**, **Routines**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
   The tabs scroll sideways when they do not fit, and the one you pick scrolls into view.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
 - A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in your default browser, and a provider's opens **Settings › Providers**.
-  Selecting an update's notice marks it read, and a stopped sessions' notice opens the first session it names.
+  Selecting an update's notice marks it read, a stopped sessions' notice opens the first session it names, and a routines' notice opens the first routine it names.
   **Mark all as read**, at the top right of the page, marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
   **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once the dashboard took the merge, which it makes at once or once GitHub allows it; when the dashboard refuses it, a toast says why.
 - The stopped sessions' notice offers **Continue all**, on the toast or on the Notifications page, which resumes every session it lists and sends each the prompt `continue`, as the sidebar's **Resume all** does, and marks the notice read.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
-  Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, omp for an update of omp or a model, or omp-agents for its own and for stopped sessions.
-  A pull request's, Slack message's, provider's, or stopped sessions' toast shows only within 15 minutes of its news, and **Open** opens what it is about.
-  A pull request's, Slack message's, or provider's toast closes after a few seconds; an update's or stopped sessions' stays until you dismiss it.
+  Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, omp for an update of omp or a model, or omp-agents for its own, for stopped sessions, and for routine runs that exited early.
+  A pull request's, Slack message's, provider's, stopped sessions', or routines' toast shows only within 15 minutes of its news, and **Open** opens what it is about.
+  A pull request's, Slack message's, or provider's toast closes after a few seconds; an update's, stopped sessions', or routines' stays until you dismiss it.
 - **Update**, on the toast or in the bell, runs the update; the notice shows its progress, then what changed or why it failed, and a failed update can run again.
   - For omp, it runs `omp update`, which installs the newest release.
     Restart omp-agents to load it, since the running server keeps the omp it started with.

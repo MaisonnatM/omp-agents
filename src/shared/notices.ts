@@ -1,8 +1,9 @@
 /**
  * What the bell lists: a newer omp, routed model, or omp-agents build, a pull request whose next move is yours, a Slack message that
- * waits on you, a provider that stopped serving (a used-up plan window or prepaid credits that ran out), and the
- * dashboard sessions that stopped mid-turn.
+ * waits on you, a provider that stopped serving (a used-up plan window or prepaid credits that ran out), the dashboard
+ * sessions that stopped mid-turn, and the routine runs that exited early.
  */
+import type { EarlyRun } from "../routine-health";
 import type { DashboardCommits, DashboardFailed } from "./dashboard-update";
 import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
@@ -102,7 +103,13 @@ export interface StoppedSubject {
 	sessions: StoppedSession[];
 }
 
-export type NoticeSubject = UpdateSubject | UndoneSubject | PullRequestSubject | SlackSubject | ProviderSubject | StoppedSubject;
+/** The routine runs the daily heartbeat found that exited early, oldest first. */
+export interface RoutineHealthSubject {
+	kind: "routine-health";
+	runs: EarlyRun[];
+}
+
+export type NoticeSubject = UpdateSubject | UndoneSubject | PullRequestSubject | SlackSubject | ProviderSubject | StoppedSubject | RoutineHealthSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -119,6 +126,7 @@ export type Notice = { id: string; at: number; seen: boolean; read: boolean } & 
 	| SlackSubject
 	| ProviderSubject
 	| StoppedSubject
+	| RoutineHealthSubject
 );
 
 /** `update` installs the release, rewrites the routing, or pulls omp-agents and restarts it; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */

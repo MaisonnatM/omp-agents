@@ -65,6 +65,8 @@ export const botsDir = join(dataDir, "bots");
 export const privateSessionsDir = join(dataDir, "private-sessions", String(portFromEnv()));
 /** The messages and session starts that wait for their time, beside {@link tokenFile}. */
 export const scheduledFile = join(configDir, "scheduled.json");
+/** The pull requests sessions watch through `watch_pull_request`, with what each last saw, beside {@link tokenFile}. */
+export const pullRequestWatchesFile = join(configDir, "pull-request-watches.json");
 /** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */
 export const workspacesFile = join(configDir, "workspaces.json");
 /** Where an older version kept the {@link workspacesFile} list, beside {@link tokenFile}; the server moves it at startup. */
@@ -87,6 +89,8 @@ export const noticesFile = join(configDir, "notices.json");
 export const sourceControlFile = join(configDir, "source-control.json");
 /** The merges that wait until GitHub allows them, beside {@link tokenFile}. */
 export const mergesFile = join(configDir, "merges.json");
+/** The ids of the built-in routines the dashboard added once, so one you delete stays deleted, beside {@link tokenFile}. */
+export const builtInRoutinesFile = join(configDir, "built-in-routines.json");
 /** The review drafts that Review sessions wrote for the user to post, and which session reviews which pull request, beside {@link tokenFile}. */
 export const reviewDraftsFile = join(configDir, "review-drafts.json");
 /** Settings sync's remote, branch, left-out items, and last outcome, beside {@link tokenFile}. */

@@ -1,12 +1,13 @@
 # Notifications
 
 `src/server/notices.ts` owns the bell's notices: what the last checks found, the status of each update a page started, and which notices the user saw, read, or cleared, which it keeps in `notices.json` beside the access token.
-Each kind has its own check, and `src/server/loops.ts` runs five of them.
+Each kind has its own check, and `src/server/loops.ts` runs six of them.
 The update check (`UPDATE_KINDS`) runs at startup and every six hours, whether or not a page is connected, and again after each update that succeeds.
-The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket listens, or on the owner while an enabled routine has a Slack or pull request trigger ([Triggers](routines.md#triggers)), and when a socket opens unless it ran since the last tick that found none.
+The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket listens, or on the owner while an enabled routine has a Slack or pull request trigger ([Triggers](routines.md#triggers)) or a session watches a pull request ([Scheduled sends](scheduled-sends.md)), and when a socket opens unless it ran since the last tick that found none.
 The provider check (`PROVIDER_KINDS`) runs after each `omp usage` run of the usage tick, every minute while a socket listens, and when a socket opens unless it succeeded since the last tick that found none; a continue's own run skips it ([Plan quota](plan-quota.md)).
 The dashboard check (`DASHBOARD_KINDS`) runs at startup and every five minutes, whether or not a page is connected: `SelfUpdate.newCommits` fetches the branch the server runs from origin and counts the commits past the running one.
 The stopped check (`STOPPED_KINDS`) runs at startup once the session files are listed, on the minute tick, and each time the sessions that stopped mid-turn change ([Dashboard sessions](dashboard-sessions.md)).
+The heartbeat check (`HEALTH_KINDS`) runs on the server that owns the unattended work, at startup and on the daily tick ([Routine heartbeat](routines.md#routine-heartbeat)).
 
 - `latestOmp` in `src/omp/release.ts` asks `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts` for the newest release on omp's `update.channel`, unless `startup.checkUpdate` is off.
   `installedOmp` reads the version from the installed package's `package.json` on each check, so the check is right after an update, before a restart.
@@ -31,11 +32,13 @@ The stopped check (`STOPPED_KINDS`) runs at startup once the session files are l
 - The stopped notice lists `InterruptedSessions.midTurn`, the interrupted dashboard sessions whose turn ran when they stopped, each with its listed session file's title and `cwdDisplay`, `null` without a listed file; none gives no notice.
   `presentNotice` names each as the sidebar names a past session: its title, else its folder's name, else **Untitled session**.
   Its **Continue all** sends the sidebar's `resume-all` with the notice's session ids.
+- The heartbeat notice lists `earlyRuns` in `src/routine-health.ts`, the routine runs that exited early, oldest first; none gives no notice.
+  `presentNotice` heads it **N routine runs exited early**, lists each routine's name with why, and links to the first routine's open row.
 
 A check that fails keeps what the last one found for its kind, and the marks for it, and logs each distinct error once.
 A repository GitHub did not answer for keeps its pull requests' notices the same way.
 A notice whose update runs or ran stays after a check stops finding it, so the page shows how the update ended.
-A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `dashboard:<running commit>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, `credits:<provider>`, or `stopped:<session ids>`, sorted and joined with commas.
+A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `dashboard:<running commit>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, `credits:<provider>`, `stopped:<session ids>`, sorted and joined with commas, or `routine-health:<routine id>@<run>:<why>` for each run it lists, joined with commas.
 The dashboard notice names the running commit rather than origin's, so new commits raise its count instead of toasting again, and only a restart onto another commit makes a new one.
 A stopped notice that only lists fewer sessions than the one it replaces takes that one's seen, read, and cleared marks (`#carryStoppedMarks`), so a session that runs again does not toast the rest again, while a session that stops makes news.
 A plan notice's id leaves out the reset time, which a provider may report a little differently on each run, and a credits notice's leaves out its first failure, which moves once that failure is older than the day the check reads; the window's reset or a request that works ends the notice, and the next time it comes after its marks lapse is news.

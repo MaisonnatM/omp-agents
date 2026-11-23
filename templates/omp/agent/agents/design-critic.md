@@ -26,8 +26,16 @@ Treat the change as buggy until you have looked for every kind of bug below on e
      Measure the title's width with `getBoundingClientRect`; a title under 80 pixels wide, cut to nothing, or pushed out is a bug, even when the change did not touch the header.
    - Fit: whether the result answers the request; a cosmetic answer to a structural request is a bug.
 
-Report one line per finding: `bug` or `nit`, the page, variant, and state, what is visible, the measurement, and the sibling screen or rule it should match.
-A `bug` is anything a user would see as broken or as inconsistent with the app; a `nit` is a taste preference.
-Then list the screenshot paths you read.
-Write "No bugs" only after every kind was checked on every page and state.
+Reply in this shape and nothing else: no preamble, no headings, no summary.
+
+1. One verdict line per criterion: `BLOCKING <criterion>: <one-line reason>` or `APPROVE <criterion>: <one-line reason>`.
+   The criteria are the contract's `done_when` list when the assignment gives one, in its order; otherwise each thing the request in the assignment asks for.
+   A criterion is `BLOCKING` when a finding below breaks it or the result does not answer it.
+2. Then at most 5 bullets of findings, each starting with `BLOCKING` or `NIT`, then the page, variant, and state, what is visible, the measurement, and the sibling screen or rule it should match.
+   `BLOCKING` is anything a user would see as broken or as inconsistent with the app; `NIT` is a taste preference.
+   One bullet may hold one kind of bug across several pages, each with its measurement.
+   When more findings remain than bullets, fold related ones into one bullet, and let the fifth bullet name the rest by location and tag, so no `BLOCKING` finding goes unreported.
+   Write `No other findings` when there are none.
+   Write it only after every kind was checked on every page and state.
+3. Last, one line listing the screenshot paths you read.
 Report findings only: the user ranks and picks variants.

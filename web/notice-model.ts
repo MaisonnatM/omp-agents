@@ -7,10 +7,11 @@ import { hashForSession } from "../src/shared/sessions";
 import { folderName, providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
-import { hashForPullRequests, hashForSettings } from "./routing";
+import { hashForBotRoutine, hashForPullRequests, hashForSettings } from "./routing";
+import type { EarlyExit } from "../src/routine-health";
 
 /** The bell's filters, each a source of notices. */
-export type NoticeSource = "github" | "slack" | "providers" | "sessions" | "updates";
+export type NoticeSource = "github" | "slack" | "providers" | "sessions" | "routines" | "updates";
 
 /** Where a notice leads: a dashboard hash, or a page outside the dashboard that opens in a new tab. */
 export type NoticeLink = { href: string; external: boolean };
@@ -18,7 +19,7 @@ export type NoticeLink = { href: string; external: boolean };
 /** Who a notice's picture shows. */
 export type NoticeFace =
 	| { kind: "update" }
-	| { kind: "stopped" }
+	| { kind: "warning" }
 	| { kind: "provider"; provider: string; window: "plan" | "credits" }
 	| { kind: "move"; move: YourMove; person: { name: string; avatarUrl: string | null } | null }
 	| { kind: "slack"; person: { name: string; avatarUrl: string | null } };
@@ -60,6 +61,9 @@ export interface NoticePresentation {
 
 /** How long a news toast stays. */
 export const TOAST_MS = 6_000;
+
+/** Why a routine's run exited early, as the bell words it after the routine's name. */
+const EXIT_LABEL: Record<EarlyExit, string> = { errored: "errored", "no-reply": "ended with no reply", short: "ended far sooner than usual", missed: "missed its schedule" };
 
 /** Each of your moves as the bell words it. */
 export const MOVE_HEADLINE: Record<YourMove, string> = {
@@ -151,9 +155,24 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				preview: notice.sessions.map(({ title, cwdDisplay }) => title ?? (cwdDisplay === null ? undefined : folderName(cwdDisplay)) ?? "Untitled session").join(" · "),
 				// The first session it names, where you see how far its turn got before you continue it.
 				link: first ? { href: hashForSession(first.sessionId), external: false } : null,
-				face: { kind: "stopped" },
+				face: { kind: "warning" },
 				action: { kind: "continue-all", sessionIds: notice.sessions.map(({ sessionId }) => sessionId) },
 				// It comes at the server's start, which you may not watch.
+				toast: { kind: "news", timeout: 0 },
+			};
+		}
+		case "routine-health": {
+			const count = notice.runs.length;
+			const [first] = notice.runs;
+			return {
+				...NEWS,
+				source: "routines",
+				headline: count === 1 ? "1 routine run exited early" : `${count} routine runs exited early`,
+				preview: notice.runs.map(({ name, exit }) => `${name} ${EXIT_LABEL[exit]}`).join(" · "),
+				// The first routine it names, whose runs show what went wrong.
+				link: first ? { href: hashForBotRoutine(first.botId, { kind: "open", id: first.routineId }), external: false } : null,
+				face: { kind: "warning" },
+				// It comes once a day, which you may not watch.
 				toast: { kind: "news", timeout: 0 },
 			};
 		}
