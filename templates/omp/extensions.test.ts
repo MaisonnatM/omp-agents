@@ -500,9 +500,15 @@ describe("ship_stage review gates", () => {
 		{ type: "message", message: { role: "assistant", content: [{ type: "toolCall", id: "t", name: "bash", arguments: { command: "bun test" } }] } },
 		{ type: "message", message: { role: "toolResult", toolCallId: "t", toolName: "bash", isError: false } },
 	];
+	// The output of the stage before each stage these tests record, which ship needs before it records the stage.
+	const before: Record<string, object> = {
+		thermonuclear: { interface_review: { verdicts: [] } },
+		ready_gate: { thermonuclear: { verdicts: [] } },
+		live: { ready_gate: { checks: [{ command: "bun test", result: "3 pass, 0 fail" }] } },
+	};
 	// Records `stage` for a PR with this body changing `file`, checked from a checkout with `reviewPaths` and `uiPaths`.
 	const record = (stage: string, body: string, file: string, reviewPaths?: string, uiPaths?: string) => exercise("ship", {
-		run: true, cwd: checkout(reviewPaths, uiPaths), params: { stage, pr: 7, repo: "owner/name" }, entries,
+		run: true, cwd: checkout(reviewPaths, uiPaths), params: { stage, pr: 7, repo: "owner/name", output: before[stage] }, entries,
 		responses: { "api graphql": prRead(body, file), "api repos/owner/name/pulls/7": restRead(body), "api -X": patched },
 	}, quotaConfig());
 	// The body the box check wrote, or null when it wrote none.
@@ -510,7 +516,7 @@ describe("ship_stage review gates", () => {
 
 	test("a box GitHub's status read misses but the PR body holds is left as it is", () => {
 		const result = exercise("ship", {
-			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" }, entries,
+			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name", output: before.ready_gate }, entries,
 			responses: { "api graphql": prRead("Unreviewed PR", "README.md"), "api repos/owner/name/pulls/7": restRead(THERMONUCLEAR_BOX), "api -X": patched },
 		}, quotaConfig());
 		expect(result.run).toEqual({ isError: false, stage: "ready_gate" });
@@ -557,7 +563,7 @@ describe("ship_stage review gates", () => {
 
 	test("a PR body the box check cannot read leaves the stage unrecorded", () => {
 		const result = exercise("ship", {
-			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name" }, entries,
+			run: true, cwd: checkout(), params: { stage: "ready_gate", pr: 7, repo: "owner/name", output: before.ready_gate }, entries,
 			responses: { "api graphql": prRead("Unreviewed PR", "README.md"), "api repos/owner/name/pulls/7": { code: 0, stdout: "{}", stderr: "" }, "api -X": patched },
 		}, quotaConfig());
 		expect(result.run).toEqual({ isError: true, stage: null });
@@ -569,14 +575,14 @@ describe("ship_stage review gates", () => {
 		["live", "Run `gh pr ready 7`"],
 		["fix_ci", "Do the work without recording it"],
 	])("recording %s on a draft names the next step instead of failing", (stage, next) => {
-		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage, pr: 7, repo: "owner/name" }, response: prRead(THERMONUCLEAR_BOX, "README.md") });
+		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage, pr: 7, repo: "owner/name", output: before[stage] }, response: prRead(THERMONUCLEAR_BOX, "README.md") });
 		expect(result.run.isError).toBe(false);
 		expect(result.text).toStartWith(`PR #7 is still a draft, so ${stage} is not recorded and the stage stays`);
 		expect(result.text).toContain(next);
 	});
 
 	test("recording live on a PR under review records it", () => {
-		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage: "live", pr: 7, repo: "owner/name" }, response: prRead(THERMONUCLEAR_BOX, "README.md", false) });
+		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage: "live", pr: 7, repo: "owner/name", output: before.live }, response: prRead(THERMONUCLEAR_BOX, "README.md", false) });
 		expect(result.run).toEqual({ isError: false, stage: "live" });
 	});
 
@@ -588,14 +594,14 @@ describe("ship_stage review gates", () => {
 		const check = (name: string, conclusion: string | null) => ({ name, status: conclusion ? "COMPLETED" : "IN_PROGRESS", conclusion });
 		const nodes = [check("human-review", "FAILURE"), check("run-tests", "SUCCESS"), check("lint", lint)];
 		const rollup = { state: "FAILURE", contexts: { totalCount: nodes.length, nodes } };
-		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage: "live", pr: 7, repo: "owner/name" }, response: prRead(THERMONUCLEAR_BOX, "README.md", false, rollup) });
+		const result = exercise("ship", { run: true, cwd: checkout(), params: { stage: "live", pr: 7, repo: "owner/name", output: before.live }, response: prRead(THERMONUCLEAR_BOX, "README.md", false, rollup) });
 		expect(result.text).toContain(`Live: ${summary}`);
 	});
 
 	test("quota exhaustion exposes stale status and cannot advance the ready gate", () => {
 		const result = exercise("ship", {
 			run: true,
-			params: { stage: "ready_gate", pr: 7, repo: "owner/name" },
+			params: { stage: "ready_gate", pr: 7, repo: "owner/name", output: before.ready_gate },
 			sequence: [
 				{ code: 1, stdout: JSON.stringify({ data: { repository: null }, errors: [{ type: "RATE_LIMITED", message: "API rate limit exceeded" }] }), stderr: "" },
 				{ code: 0, stdout: JSON.stringify({ resources: { graphql: { remaining: 0, reset: Math.floor(Date.now() / 1000) + 3600 } } }), stderr: "" },
@@ -615,13 +621,13 @@ describe("ship_stage review gates", () => {
 	test("each call naming a stage appends a trace line with what the session spent since the previous one", () => {
 		const env = quotaConfig();
 		exercise("ship", {
-			runs: [{ stage: "live", pr: 7, repo: "owner/name" }, { ...fixCi, count: 2 }, {}],
+			runs: [{ stage: "live", pr: 7, repo: "owner/name", output: before.live }, { ...fixCi, count: 2 }, {}],
 			usage: [{ totalTokens: 100, cost: 0.5 }, { totalTokens: 250, cost: 1.25 }],
 			cwd: checkout(), response: failing,
 		}, env);
 		const lines = readFileSync(join(env.XDG_CONFIG_HOME!, "omp-agents/ship-trace.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line));
 		expect(lines.map(({ ts, ...line }) => (expect(Date.parse(ts)).not.toBeNaN(), line))).toEqual([
-			{ session: "session", repo: "owner/name", pr: 7, stage: "live", tokens: 100, cost: 0.5, checks: "fail", recorded: true },
+			{ session: "session", repo: "owner/name", pr: 7, stage: "live", tokens: 100, cost: 0.5, checks: "fail", recorded: true, output: before.live },
 			{ session: "session", repo: "owner/name", pr: 7, stage: "fix_ci", tokens: 150, cost: 0.75, round: 1, checks: "fail", recorded: true },
 		]);
 	});

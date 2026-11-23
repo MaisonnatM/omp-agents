@@ -26,7 +26,7 @@ jobs:
       # The server and most tests import omp's own modules from its installed package, which needs no install script.
       - run: bun install -g --ignore-scripts @oh-my-pi/pi-coding-agent@19.0.1
       - run: bun install --frozen-lockfile
-      - run: bun test
+      - run: bun test --parallel
       - run: bun run typecheck
       - run: bun run lint
       # The desktop shell is its own package; Electron downloads its binary only on first launch, so this installs no app.
