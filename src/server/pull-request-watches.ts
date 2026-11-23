@@ -1,11 +1,12 @@
 /**
  * The `watch_pull_request` tool a dashboard session gets, and the watches it saves in `pull-request-watches.json`: each
- * pull request list the activity check reads, the one the Pull requests page and the bell share, wakes a watching
- * session with one follow-up when its pull request's checks finish, its review decision or unresolved thread count
- * changes, or it merges or closes, so an agent that waits on a pull request ends its turn instead of polling.
+ * pull request list the activity check reads, the one the Pull requests page and the bell share, wakes the one session
+ * watching a pull request with one follow-up when it needs that session to act: its checks fail, its unresolved review
+ * thread count grows, a reviewer requests changes, or it merges or closes. A change that wakes must last
+ * {@link CHANGE_HOLD_MS} first, so a flapping check wakes nothing, and the wake names only the net change.
  */
 import { ReducerFile } from "../fs";
-import { arrayOf, errorText, fields, isNumber, isObject, isString, nullable, oneOf } from "../json";
+import { arrayOf, errorText, fields, isBoolean, isNumber, isObject, isString, nullable, oneOf, optional } from "../json";
 import type { RpcHostTool } from "../omp/module-types/rpc";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import {
@@ -37,12 +38,17 @@ export interface WatchedState {
 	unresolved: number;
 }
 
-/** Session `sessionId`'s watch on `pr`, saved at `since`; `seen` is its state in the last list that held it, `null` before one did. */
+/**
+ * Session `sessionId`'s watch on `pr`, saved at `since`; `seen` is the state the session last knew, its state in the
+ * last list that held it unless a change that wakes is held, `null` before a list held it. `ready` also wakes the
+ * session when the pull request becomes ready to merge, for a session told to merge it then.
+ */
 export interface PullRequestWatch {
 	sessionId: string;
 	pr: PullRequest;
 	since: number;
 	seen: WatchedState | null;
+	ready?: boolean;
 }
 
 export type WatchChange = { op: "watch"; watch: PullRequestWatch } | { op: "unwatch"; sessionId: string; pr: PullRequest };
@@ -51,6 +57,7 @@ const isWatch = fields<PullRequestWatch>({
 	sessionId: isString,
 	pr: fields<PullRequest>({ owner: isString, repo: isString, number: isNumber }),
 	since: isNumber,
+	ready: optional(isBoolean),
 	seen: nullable(
 		fields<WatchedState>({
 			state: oneOf(["open", "draft", "merged"]),
@@ -61,13 +68,21 @@ const isWatch = fields<PullRequestWatch>({
 	),
 });
 
-const isOf = (watch: PullRequestWatch, sessionId: string, pr: PullRequest): boolean => watch.sessionId === sessionId && samePullRequest(watch.pr, pr);
-
-/** `watches` after `change`: a session watches a pull request once, a new watch replacing its old one. */
+/** `watches` after `change`: one session watches a pull request, the latest to call the tool, its watch replacing any other. */
 export function applyWatch(watches: PullRequestWatch[], change: WatchChange): PullRequestWatch[] {
-	if (change.op === "watch") return [...watches.filter(watch => !isOf(watch, change.watch.sessionId, change.watch.pr)), change.watch];
-	const kept = watches.filter(watch => !isOf(watch, change.sessionId, change.pr));
+	if (change.op === "watch") return [...watches.filter(watch => !samePullRequest(watch.pr, change.watch.pr)), change.watch];
+	const kept = watches.filter(watch => !(watch.sessionId === change.sessionId && samePullRequest(watch.pr, change.pr)));
 	return kept.length === watches.length ? watches : kept;
+}
+
+/** The newest watch of each pull request in `watches`, which a file saved before one session watched each may hold several of. */
+function newestOfEach(watches: PullRequestWatch[]): Set<PullRequestWatch> {
+	const newest = new Map<string, PullRequestWatch>();
+	for (const watch of watches) {
+		const other = newest.get(prKey(watch.pr));
+		if (!other || watch.since >= other.since) newest.set(prKey(watch.pr), watch);
+	}
+	return new Set(newest.values());
 }
 
 export class PullRequestWatchesFile extends ReducerFile<PullRequestWatch[], [WatchChange]> {
@@ -88,46 +103,72 @@ export const watchedStateOf = (pr: PullRequestSummary): WatchedState => ({ state
 const describe = (pr: PullRequest): string => `${pullRequestName(pr)} (${pullRequestUrl(pr)})`;
 const words = (value: string): string => value.replaceAll("-", " ");
 
-/** What a watch does with one list that answered for its repository: the state it keeps, the message it wakes its session with, and whether it ends. */
+/** How long a change that wakes must last, from the first list that showed it, before it wakes; one undone sooner wakes nothing. */
+export const CHANGE_HOLD_MS = 60_000;
+
+/**
+ * What a watch does with one list that answered for its repository: the state it keeps, the message it wakes its
+ * session with, whether it ends, and since when it holds a change that wakes, `null` when it holds none.
+ */
 export interface WatchStep {
 	seen: WatchedState | null;
 	wake: string | null;
 	ends: boolean;
+	held: number | null;
+}
+
+const mergeReady = (state: WatchedState): boolean => state.review === "approved" && (state.checks === "passing" || state.checks === "none");
+
+/**
+ * Whether going from `was` to `current` needs the session to act: checks failing, more unresolved review threads,
+ * changes requested, or, for a `ready` watch, the pull request becoming ready to merge. Checks passing, an approval,
+ * threads resolved, checks running again after a push, and a draft flag only update what the watch knows.
+ */
+function needsAction(was: WatchedState, current: WatchedState, ready: boolean): boolean {
+	return (
+		(current.checks === "failing" && was.checks !== "failing") ||
+		current.unresolved > was.unresolved ||
+		(current.review === "changes-requested" && was.review !== "changes-requested") ||
+		(ready && mergeReady(current) && !mergeReady(was))
+	);
 }
 
 /**
- * The step of `watch` for a list whose answer for its repository holds `found`, or lacks its pull request. Checks that
- * start running again after a push wake nothing, so a push wakes the session once its checks finish; a draft flag
- * changing wakes nothing either.
+ * The step of `watch` for a list read at `now` whose answer for its repository holds `found`, or lacks its pull request,
+ * when it has held a change that wakes since `held`. Such a change wakes once a list at least {@link CHANGE_HOLD_MS}
+ * later still shows it, naming every net change since the state the session last knew; a merge or close wakes at once.
  */
-export function watchStep(watch: PullRequestWatch, found: PullRequestSummary | undefined, now: number): WatchStep {
+export function watchStep(watch: PullRequestWatch, found: PullRequestSummary | undefined, now: number, held: number | null): WatchStep {
 	const name = describe(watch.pr);
 	if (!found) {
 		if (watch.seen)
 			return {
 				seen: watch.seen,
 				ends: true,
+				held: null,
 				wake: `Pull request ${name} left the dashboard's pull request list, most likely closed without merging, so the dashboard stopped watching it. Check its state with gh before acting on it.`,
 			};
-		if (now - watch.since < UNLISTED_GRACE_MS) return { seen: null, wake: null, ends: false };
+		if (now - watch.since < UNLISTED_GRACE_MS) return { seen: null, wake: null, ends: false, held: null };
 		return {
 			seen: null,
 			ends: true,
+			held: null,
 			wake: `The dashboard never saw pull request ${name} in its pull request list, which holds only your open pull requests and those asking for your review in a workspace's repository, so it stopped watching it. Check on it yourself.`,
 		};
 	}
 	const current = watchedStateOf(found);
-	if (current.state === "merged") return { seen: current, ends: true, wake: `Pull request ${name} merged, so the dashboard stopped watching it.` };
+	if (current.state === "merged") return { seen: current, ends: true, held: null, wake: `Pull request ${name} merged, so the dashboard stopped watching it.` };
 	const was = watch.seen;
-	if (!was) return { seen: current, wake: null, ends: false };
+	if (!was || !needsAction(was, current, watch.ready === true)) return { seen: current, wake: null, ends: false, held: null };
+	if (held === null || now - held < CHANGE_HOLD_MS) return { seen: was, wake: null, ends: false, held: held ?? now };
 	const changes: string[] = [];
-	if (current.checks !== was.checks && current.checks !== "pending") changes.push(`checks ${words(was.checks)} → ${words(current.checks)}`);
+	if (current.checks !== was.checks) changes.push(`checks ${words(was.checks)} → ${words(current.checks)}`);
 	if (current.review !== was.review) changes.push(`review decision ${words(was.review)} → ${words(current.review)}`);
 	if (current.unresolved !== was.unresolved) changes.push(`unresolved review threads ${was.unresolved} → ${current.unresolved}`);
-	if (changes.length === 0) return { seen: current, wake: null, ends: false };
 	return {
 		seen: current,
 		ends: false,
+		held: null,
 		wake: `Pull request ${name} changed: ${changes.join("; ")}. Act on it now. The dashboard keeps watching it until it merges or closes; call ${WATCH_PULL_REQUEST_TOOL} with stop to end the watch sooner.`,
 	};
 }
@@ -152,6 +193,8 @@ export class PullRequestWatches {
 	readonly #deps: PullRequestWatchesDeps;
 	/** The last list {@link learn} read, which gives a new watch its starting state. */
 	#latest: PullRequestList | null = null;
+	/** Since when each watched pull request, by {@link prKey}, holds a change that wakes; the owner keeps it in memory, so a restart holds it again. */
+	#held = new Map<string, number>();
 
 	constructor(deps: PullRequestWatchesDeps) {
 		this.#deps = deps;
@@ -169,8 +212,9 @@ export class PullRequestWatches {
 	}
 
 	/**
-	 * Steps every watch whose repository `list` answered for, saves what changed, and then wakes each session its step
-	 * names, once: a save that fails wakes nothing, since the next list would wake for the same change again.
+	 * Steps the newest watch of each pull request whose repository `list` answered for, drops the older ones, saves what
+	 * changed, and then wakes each session its step names, once: a save that fails wakes nothing, since the next list
+	 * would wake for the same change again.
 	 */
 	learn(list: PullRequestList): void {
 		this.#latest = list;
@@ -178,18 +222,28 @@ export class PullRequestWatches {
 		const answered = new Map(list.repos.flatMap(repo => ("pullRequests" in repo ? [[repoKey(repo), repo.pullRequests] as const] : [])));
 		const now = this.#deps.now();
 		let wakes: [sessionId: string, text: string][] = [];
+		let held = new Map<string, number>();
 		try {
 			this.#deps.file.update(watches => {
 				wakes = [];
-				let changed = false;
+				held = new Map();
+				const newest = newestOfEach(watches);
+				let changed = newest.size !== watches.length;
 				const next = watches.flatMap(watch => {
+					if (!newest.has(watch)) return [];
+					const key = prKey(watch.pr);
 					const prs = answered.get(repoKey(watch.pr));
-					if (!prs) return [watch];
-					const step = watchStep(
-						watch,
-						prs.find(pr => samePullRequest(pr, watch.pr)),
-						now,
-					);
+					const step = prs
+						? watchStep(
+								watch,
+								prs.find(pr => samePullRequest(pr, watch.pr)),
+								now,
+								this.#held.get(key) ?? null,
+							)
+						: null;
+					const since = step ? step.held : this.#held.get(key);
+					if (since != null) held.set(key, since);
+					if (!step) return [watch];
 					if (step.wake) wakes.push([watch.sessionId, step.wake]);
 					if (step.ends) {
 						changed = true;
@@ -205,6 +259,7 @@ export class PullRequestWatches {
 			console.error(`omp-agents: saving the pull request watches failed, so none woke: ${errorText(err)}`);
 			return;
 		}
+		this.#held = held;
 		for (const [sessionId, text] of wakes) {
 			this.#deps.wake(sessionId, text).catch((err: unknown) => console.error(`omp-agents: a pull request watch could not wake session ${sessionId}: ${errorText(err)}`));
 		}
@@ -223,7 +278,10 @@ export class PullRequestWatches {
 			name: WATCH_PULL_REQUEST_TOOL,
 			label: "Watch pull request",
 			description: [
-				"Watch a GitHub pull request so the dashboard wakes this session with one message when its checks finish passing or failing, its review decision changes, its unresolved review thread count changes, or it merges or closes.",
+				"Watch a GitHub pull request so the dashboard wakes this session with one message when it needs you to act: its checks fail, its unresolved review thread count grows, a reviewer requests changes, or it merges or closes.",
+				"Checks passing, an approval, and resolved threads wake nothing, unless you pass `ready: true`, for a pull request you were asked to merge once it passes and is approved.",
+				"A change wakes only once it has lasted a minute, so a check that fails and passes again wakes nothing, and the message names the net change.",
+				"One session watches a pull request: calling it takes the watch over from any other session.",
 				"Use it instead of sleeping, polling gh, or scheduling follow-ups while you wait on a pull request; end your turn after calling it.",
 				"The dashboard reads its pull request list every few minutes, the one its Pull requests page shows: your open pull requests and those asking for your review, in a workspace's repository.",
 				"A merge or close ends the watch; `stop: true` ends it sooner.",
@@ -232,16 +290,18 @@ export class PullRequestWatches {
 				type: "object",
 				properties: {
 					url: { type: "string", description: "The pull request's address, such as https://github.com/owner/repo/pull/12." },
+					ready: { type: "boolean", description: "True to also be woken when it becomes ready to merge: checks passing and approved." },
 					stop: { type: "boolean", description: "True to stop watching it instead." },
 				},
 				required: ["url"],
 				additionalProperties: false,
 			},
 			loadMode: "essential",
-			execute: async ({ url, stop }) => {
+			execute: async ({ url, ready, stop }) => {
 				const pr = typeof url === "string" ? pullRequestOfUrl(url.trim()) : null;
 				if (!pr) throw new Error("url must be a GitHub pull request address, such as https://github.com/owner/repo/pull/12.");
 				if (stop !== undefined && typeof stop !== "boolean") throw new Error("stop must be true or false.");
+				if (ready !== undefined && typeof ready !== "boolean") throw new Error("ready must be true or false.");
 				const host = this.#deps.hosts().find(row => row.instanceId === caller);
 				if (!host) throw new Error("This session is not listed yet; try again in a moment.");
 				const name = describe(pr);
@@ -251,11 +311,15 @@ export class PullRequestWatches {
 				const last = this.#lastSeen(pr);
 				if (last?.state === "merged") return `${name} already merged; there is nothing to watch.`;
 				const seen = last ? watchedStateOf(last) : null;
-				this.#deps.file.apply({ op: "watch", watch: { sessionId: host.sessionId, pr: { owner: pr.owner, repo: pr.repo, number: pr.number }, since: this.#deps.now(), seen } });
+				this.#deps.file.reload();
+				const other = this.#deps.file.value.find(watch => samePullRequest(watch.pr, pr) && watch.sessionId !== host.sessionId);
+				const watch: PullRequestWatch = { sessionId: host.sessionId, pr: { owner: pr.owner, repo: pr.repo, number: pr.number }, since: this.#deps.now(), seen };
+				this.#deps.file.apply({ op: "watch", watch: ready ? { ...watch, ready } : watch });
 				const start = seen
-					? `As of the dashboard's last read: checks ${words(seen.checks)}, review decision ${words(seen.review)}, ${seen.unresolved} unresolved review threads; a change from this wakes you.`
+					? `As of the dashboard's last read: checks ${words(seen.checks)}, review decision ${words(seen.review)}, ${seen.unresolved} unresolved review threads; a change from this that needs you wakes you.`
 					: "The dashboard has not listed it yet; its next read takes its state then as the starting point.";
-				return `Watching ${name} (${prKey(pr)}). ${start} End your turn now; the message arrives as your next prompt.`;
+				const takeover = other ? ` It took the watch over from session ${other.sessionId}, which it no longer wakes.` : "";
+				return `Watching ${name} (${prKey(pr)}).${takeover} ${start} End your turn now; the message arrives as your next prompt.`;
 			},
 		};
 	}

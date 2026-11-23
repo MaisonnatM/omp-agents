@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-23
 decision-makers: agent
+superseded-by: 2026-11-23-a-pull-request-watch-wakes-one-session-only-to-act
 ---
 
 # A session watches a pull request through the activity check's list
