@@ -23,7 +23,9 @@ Landed merges carry their own proof: the tests they added or changed fail before
 ## Consequences
 
 The prompt lists each import a hidden test makes of a name the base lacks, so a run is not failed for naming a new export differently.
-Runs reuse the replay helpers, now in `scripts/evals/replay.ts`, with the full harness loaded instead of `model-replay.ts`'s bare one.
+It also lists the other names and quoted texts the hidden tests share with the landed change and the base lacks, word for word: in the pilot, 2 of 5 runs failed on a setting key or a tool parameter the commit messages never named.
+That hands a run part of the interface the tests pin, which a person asking for the change would also have said; the tests' assertions and cases stay hidden.
+Runs reuse the replay helpers, now in `scripts/evals/replay.ts`, with the full harness loaded instead of `model-replay.ts`'s bare one, except the user's MCP servers, which a run turns off so it cannot post to Slack or Linear.
 The decay check turns one component off through omp's own `disabledExtensions` setting rather than a second loading mechanism.
 `XDG_CONFIG_HOME` points at each run's folder, so the kit's extensions keep their state, such as the ship trace, out of the user's files.
 

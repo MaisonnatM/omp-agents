@@ -8,7 +8,7 @@ import { boardMessagePreset, type MarkdownPreset, MessageMarkdown } from "../mes
 import { type BoardCommand, type BoardIndex, type BoardState, type Member, type Message, repeatLabel, type Thread } from "../../../src/shared/board";
 import { AttachmentCard } from "./attachments";
 import { Composer } from "./composer";
-import { Avatar, leaseLabel, relTime, TaskChip } from "./parts";
+import { Avatar, Chip, feedLead, leaseLabel, relTime, TaskChip } from "./parts";
 
 interface ThreadViewProps {
 	state: BoardState;
@@ -175,13 +175,24 @@ function MessageRow({ msg, author, grouped, now, preset }: { msg: Message; autho
 						{msg.internal && <span className="text-3xs font-medium text-muted-foreground">internal · not synced</span>}
 					</p>
 				)}
-				{msg.text && (
-					<div className="text-sm leading-relaxed">
-						<MessageMarkdown text={msg.text} preset={preset} />
-					</div>
-				)}
+				{msg.text && <MessageBody text={msg.text} preset={preset} />}
 				{msg.attachment && <AttachmentCard attachment={msg.attachment} now={now} />}
 			</div>
 		</li>
+	);
+}
+
+/** A message's text, with a session feed post's lead shown as a status chip instead of a repeated mention. */
+function MessageBody({ text, preset }: { text: string; preset: MarkdownPreset }) {
+	const lead = feedLead(text);
+	return (
+		<div className="text-sm leading-relaxed">
+			{lead && (
+				<span className="mt-0.5 mb-1 block">
+					<Chip tone={lead.tone}>{lead.label}</Chip>
+				</span>
+			)}
+			<MessageMarkdown text={lead?.body ?? text} preset={preset} />
+		</div>
 	);
 }

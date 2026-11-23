@@ -1,6 +1,6 @@
 /**
- * Measures the agent harness per period from records that already exist: the ship trace, the target branch's git history, and omp-stats' spend.
- * Usage: `bun run metrics [--json] [--period-days 7] [--periods 4] [--repo <path>]... [--branch main] [--trace <file>] [--stats <db>]`.
+ * Measures the agent harness per period from records that already exist: the ship trace, the target branch's git history, omp-stats' spend, and, with `--github`, a repository's merged pull requests.
+ * Usage: `bun run metrics [--json] [--period-days 7] [--periods 4] [--repo <path>]... [--branch main] [--trace <file>] [--stats <db>] [--github <owner/repo>]`.
  *
  * - Cost per landed change: landed changes are the branch's first-parent commits carrying an `Omp-Session` trailer or the `land` tool's `Land <branch>` subject, plus ship traces' first recorded `merged` stage per PR.
  *   A landing without a trailer, from before the trailer hook or a session outside omp, has no session to price.
@@ -11,9 +11,17 @@
  *   With no later recorded stage it stays open.
  * - Human edits, a proxy: agents' branch commits carry no `Omp-Session` trailer either, so only the branch's first-parent commits that are not landings count as a person's.
  *   A landing counts as edited when such a commit touches one of its files within `--edit-days` after it.
+ *
+ * With `--github <owner/repo>`, for the pull requests GitHub merged in each period, fetched with `gh` and cached under `~/.cache/omp-agents/harness-metrics/`:
+ * - Cost per merged PR: the PR's sessions are those of the ship trace lines naming the repository and its number; each session's spend counts once per period, as above.
+ * - CI first-pass rate: the PR's first CI commit is its earliest commit that has a check run that was not cancelled.
+ *   It passed first time when, for each check (a name within a check suite), the earliest non-cancelled run concluded success, neutral, or skipped; reruns after it do not count.
+ *   Every check run counts, not only required ones; a PR with more than 100 commits is read from its first 100, and a force push hides the commits it replaced.
+ * - Review rounds: `CHANGES_REQUESTED` reviews plus the trace's recorded `fix_comments` rounds, per merged PR.
+ * - Human edits, a proxy: a merged PR is edited when one of its commits carries no `Omp-Session` trailer.
  */
 import { Database } from "bun:sqlite";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -62,6 +70,35 @@ export interface PeriodReport {
 	stagePass: { calls: number; recorded: number; rate: number | null; byStage: Record<string, { calls: number; recorded: number }> };
 	escalations: { total: number; actedOn: number; dismissed: number; open: number; accuracy: number | null };
 	humanEdits: { personCommits: number; landings: number; edited: number; rate: number | null; withinDays: number };
+	github?: GithubReport;
+}
+
+/** One check run on a commit; `suite` tells apart same-named checks of different workflows. */
+export interface CheckRun {
+	name: string;
+	suite: number;
+	startedAt: string;
+	conclusion: string | null;
+}
+
+/** A pull request GitHub merged. */
+export interface MergedPr {
+	number: number;
+	mergedAt: number;
+	changesRequested: number;
+	/** Its commits, oldest first, with each one's `Omp-Session` trailers. */
+	commits: { sha: string; sessions: string[] }[];
+	/** The check runs of its first CI commit; undefined when no commit had any. */
+	firstCi?: CheckRun[];
+}
+
+export interface GithubReport {
+	repo: string;
+	merged: number;
+	cost: { priced: number; usd: number; perPr: number | null };
+	ciFirstPass: { judged: number; passed: number; rate: number | null };
+	reviewRounds: { changesRequested: number; fixRounds: number; perPr: number | null };
+	humanEdits: { edited: number; rate: number | null };
 }
 
 const ratio = (part: number, whole: number) => (whole > 0 ? part / whole : null);
@@ -151,8 +188,8 @@ function humanEditReport(repos: Commit[][], from: number, to: number, withinDays
 	return { ...report, rate: ratio(report.edited, report.landings) };
 }
 
-/** `periods` back-to-back periods of `periodDays` each, oldest first, the last ending at `now`. */
-export function report(sources: Sources, now: number, periodDays: number, periods: number, editDays: number): PeriodReport[] {
+/** `periods` back-to-back periods of `periodDays` each, oldest first, the last ending at `now`; `github` adds the merged pull requests of that repository. */
+export function report(sources: Sources, now: number, periodDays: number, periods: number, editDays: number, github?: { repo: string; prs: MergedPr[] }): PeriodReport[] {
 	const landed = landings(sources);
 	const spend = spendOf(sources);
 	return Array.from({ length: periods }, (_, i) => {
@@ -169,8 +206,54 @@ export function report(sources: Sources, now: number, periodDays: number, period
 			stagePass: stagePassReport(sources.trace.filter(l => within(time(l)))),
 			escalations: escalationReport(sources.trace, from, to),
 			humanEdits: humanEditReport(sources.repos, from, to, editDays),
+			...(github && { github: githubReport(github.repo, github.prs, sources.trace, spend, from, to) }),
 		};
 	});
+}
+
+const PASSED: Record<string, true> = { success: true, neutral: true, skipped: true };
+
+/** Whether a commit's checks passed first time: each check's earliest non-cancelled run passed; undefined when no run counts. */
+export function firstPass(runs: CheckRun[]): boolean | undefined {
+	const first = new Map<string, CheckRun>();
+	for (const run of runs) {
+		if (run.conclusion === "cancelled") continue;
+		const key = `${run.suite}/${run.name}`;
+		const seen = first.get(key);
+		if (!seen || Date.parse(run.startedAt) < Date.parse(seen.startedAt)) first.set(key, run);
+	}
+	if (first.size === 0) return undefined;
+	return [...first.values()].every(run => run.conclusion !== null && PASSED[run.conclusion]);
+}
+
+function githubReport(repo: string, prs: MergedPr[], trace: TraceLine[], spend: (session: string) => number | undefined, from: number, to: number): GithubReport {
+	const merged = prs.filter(pr => pr.mergedAt >= from && pr.mergedAt < to);
+	const counted = new Set<string>();
+	const out = { priced: 0, usd: 0, judged: 0, passed: 0, changesRequested: 0, fixRounds: 0, edited: 0 };
+	for (const pr of merged) {
+		const lines = trace.filter(l => l.repo === repo && l.pr === pr.number);
+		const priced = [...new Set(lines.map(l => l.session))].filter(s => spend(s) !== undefined);
+		if (priced.length > 0) out.priced++;
+		for (const session of priced) {
+			if (counted.has(session)) continue;
+			counted.add(session);
+			out.usd += spend(session) ?? 0;
+		}
+		const passed = pr.firstCi && firstPass(pr.firstCi);
+		if (passed !== undefined) out.judged++;
+		if (passed) out.passed++;
+		out.changesRequested += pr.changesRequested;
+		out.fixRounds += lines.filter(l => l.stage === "fix_comments" && l.recorded).length;
+		if (pr.commits.some(c => c.sessions.length === 0)) out.edited++;
+	}
+	return {
+		repo,
+		merged: merged.length,
+		cost: { priced: out.priced, usd: out.usd, perPr: ratio(out.usd, out.priced) },
+		ciFirstPass: { judged: out.judged, passed: out.passed, rate: ratio(out.passed, out.judged) },
+		reviewRounds: { changesRequested: out.changesRequested, fixRounds: out.fixRounds, perPr: ratio(out.changesRequested + out.fixRounds, merged.length) },
+		humanEdits: { edited: out.edited, rate: ratio(out.edited, merged.length) },
+	};
 }
 
 export function readTrace(file: string): TraceLine[] {
@@ -179,6 +262,103 @@ export function readTrace(file: string): TraceLine[] {
 		.split("\n")
 		.filter(Boolean)
 		.map(line => JSON.parse(line) as TraceLine);
+}
+
+/** A merged pull request as `MERGED_PRS_QUERY` returns it. */
+interface PrNode {
+	number: number;
+	mergedAt: string;
+	reviews: { nodes: { state: string }[] };
+	commits: { nodes: { commit: { oid: string; message: string } }[] };
+}
+
+const TRAILER = /^Omp-Session:\s*(\S+)\s*$/gm;
+
+/** Reads `gh api graphql --paginate --jq '.data.search.nodes[]'` output, one pull request per line. */
+export function parseMergedPrs(text: string): MergedPr[] {
+	return text
+		.split("\n")
+		.filter(Boolean)
+		.map(line => {
+			const node = JSON.parse(line) as PrNode;
+			return {
+				number: node.number,
+				mergedAt: Date.parse(node.mergedAt),
+				changesRequested: node.reviews.nodes.filter(r => r.state === "CHANGES_REQUESTED").length,
+				commits: node.commits.nodes.map(({ commit }) => ({ sha: commit.oid, sessions: [...commit.message.matchAll(TRAILER)].map(m => m[1]!) })),
+			};
+		});
+}
+
+const MERGED_PRS_QUERY = `query($q: String!, $endCursor: String) {
+  search(query: $q, type: ISSUE, first: 50, after: $endCursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes { ... on PullRequest { number mergedAt
+      reviews(first: 100) { nodes { state } }
+      commits(first: 100) { nodes { commit { oid message } } } } }
+  }
+}`;
+
+const CACHE = join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "omp-agents", "harness-metrics");
+const HOUR = 3_600_000;
+
+async function gh(args: string[]): Promise<string> {
+	const child = Bun.spawn(["gh", ...args], { stdout: "pipe", stderr: "pipe" });
+	const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+	if (code !== 0) throw new Error(`gh ${args.slice(0, 2).join(" ")}: ${err.trim()}`);
+	return out;
+}
+
+/** `fetch`'s text, cached at `file` when it says to keep it; a cached copy older than `maxAge` milliseconds is fetched again. */
+async function cached(file: string, maxAge: number, fetch: () => Promise<{ text: string; keep: boolean }>): Promise<string> {
+	if (existsSync(file) && Date.now() - statSync(file).mtimeMs < maxAge) return readFileSync(file, "utf8");
+	const { text, keep } = await fetch();
+	if (keep) {
+		mkdirSync(join(file, ".."), { recursive: true });
+		writeFileSync(file, text);
+	}
+	return text;
+}
+
+/** A commit's check runs, reruns included; cached for good once every run completed. */
+async function checkRuns(repo: string, sha: string): Promise<CheckRun[]> {
+	const text = await cached(join(CACHE, repo.replace("/", "_"), "check-runs", `${sha}.jsonl`), Number.POSITIVE_INFINITY, async () => {
+		const text = await gh([
+			"api",
+			"--paginate",
+			`repos/${repo}/commits/${sha}/check-runs?filter=all&per_page=100`,
+			"--jq",
+			".check_runs[] | {name, suite: .check_suite.id, startedAt: .started_at, status, conclusion}",
+		]);
+		return { text, keep: !text.includes('"status":"queued"') && !text.includes('"status":"in_progress"') };
+	});
+	return text
+		.split("\n")
+		.filter(Boolean)
+		.map(line => JSON.parse(line) as CheckRun);
+}
+
+/** The pull requests `repo` merged since `since`, each with its first CI commit's check runs; the list is cached for an hour. */
+export async function fetchMergedPrs(repo: string, since: number): Promise<MergedPr[]> {
+	const day = new Date(since).toISOString().slice(0, 10);
+	const text = await cached(join(CACHE, repo.replace("/", "_"), `merged-since-${day}.jsonl`), HOUR, async () => ({
+		text: await gh(["api", "graphql", "--paginate", "-f", `query=${MERGED_PRS_QUERY}`, "-f", `q=repo:${repo} is:pr is:merged merged:>=${day}`, "--jq", ".data.search.nodes[]"]),
+		keep: true,
+	}));
+	const prs = parseMergedPrs(text).filter(pr => pr.mergedAt >= since);
+	const queue = [...prs];
+	const worker = async () => {
+		for (let pr = queue.shift(); pr; pr = queue.shift()) {
+			for (const { sha } of pr.commits) {
+				const runs = await checkRuns(repo, sha);
+				if (firstPass(runs) === undefined) continue;
+				pr.firstCi = runs;
+				break;
+			}
+		}
+	};
+	await Promise.all(Array.from({ length: 8 }, worker));
+	return prs;
 }
 
 /** The `git log` format `parseGitLog` reads; `--name-only` lists each commit's files after it. */
@@ -227,6 +407,20 @@ export function formatTable(periods: PeriodReport[]): string {
 		["Person commits", p => String(p.humanEdits.personCommits)],
 		[`Landings a person edited within ${periods[0]?.humanEdits.withinDays ?? 0}d`, p => `${pct(p.humanEdits.rate)} (${p.humanEdits.edited}/${p.humanEdits.landings})`],
 	];
+	const repo = periods[0]?.github?.repo;
+	if (repo) {
+		const of = (cell: (g: GithubReport) => string) => (p: PeriodReport) => (p.github ? cell(p.github) : "n/a");
+		rows.push(
+			[`Merged PRs in ${repo}`, of(g => String(g.merged))],
+			["Cost per merged PR", of(g => (g.cost.perPr === null ? "n/a" : `$${g.cost.perPr.toFixed(2)} (${g.cost.priced} priced)`))],
+			["CI first-pass rate", of(g => `${pct(g.ciFirstPass.rate)} (${g.ciFirstPass.passed}/${g.ciFirstPass.judged})`)],
+			[
+				"Review rounds per merged PR",
+				of(g => (g.reviewRounds.perPr === null ? "n/a" : `${g.reviewRounds.perPr.toFixed(2)} (${g.reviewRounds.changesRequested} changes requested, ${g.reviewRounds.fixRounds} fix rounds)`)),
+			],
+			["Merged PRs with a person's commit", of(g => `${pct(g.humanEdits.rate)} (${g.humanEdits.edited}/${g.merged})`)],
+		);
+	}
 	const table = [["Metric", ...periods.map(p => `${p.start.slice(0, 10)}..${p.end.slice(0, 10)}`)], ...rows.map(([label, cell]) => [label, ...periods.map(cell)])];
 	const widths = table[0]!.map((_, i) => Math.max(...table.map(r => r[i]!.length)));
 	return table.map(r => r.map((c, i) => c.padEnd(widths[i]!)).join("  ").trimEnd()).join("\n");
@@ -243,6 +437,7 @@ if (import.meta.main) {
 			branch: { type: "string", default: "main" },
 			trace: { type: "string", default: join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "omp-agents", "ship-trace.jsonl") },
 			stats: { type: "string", default: join(homedir(), ".omp", "stats.db") },
+			github: { type: "string" },
 		},
 	});
 	const periodDays = Number(values["period-days"]);
@@ -254,6 +449,7 @@ if (import.meta.main) {
 		repos: values.repo.map(repo => readRepo(repo, values.branch, since)),
 		spend: readSpend(values.stats),
 	};
-	const result = report(sources, now, periodDays, periods, Number(values["edit-days"]));
+	const github = values.github ? { repo: values.github, prs: await fetchMergedPrs(values.github, since) } : undefined;
+	const result = report(sources, now, periodDays, periods, Number(values["edit-days"]), github);
 	console.log(values.json ? JSON.stringify(result, null, 2) : formatTable(result));
 }

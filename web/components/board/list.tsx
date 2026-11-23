@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 import { type BoardIndex, type BoardState, isMention, type Member, type Message, repeatLabel, type Thread } from "../../../src/shared/board";
 import { attachmentLabel } from "./attachments";
 import type { BoardView } from "./module";
-import { Avatar, Chip, NameDialog, relTime, TaskChip } from "./parts";
+import { Avatar, Chip, feedLead, NameDialog, relTime, TaskChip } from "./parts";
+import { plainMarkdown } from "../../labels";
 
 /** What every list reads: the board, its index, the open thread, and the clock. */
 interface ListProps {
@@ -211,8 +212,8 @@ function ThreadCard({ thread, index, now, selected, onOpen, preview, mention }: 
 			<span className={cn("mt-1 line-clamp-2 block text-sm leading-snug", unread > 0 ? "font-semibold" : "font-medium")}>{thread.title}</span>
 			{last && (
 				<span className="mt-1 line-clamp-2 block text-[0.8125rem] leading-snug text-muted-foreground">
-					<span className="text-foreground/80">{author?.name}: </span>
-					{last.text || attachmentLabel(last.attachment)}
+					<span className="text-foreground/80">{(last.text && feedLead(last.text)?.label) || author?.name}: </span>
+					{last.text ? plainMarkdown(feedLead(last.text)?.body ?? last.text) : attachmentLabel(last.attachment)}
 				</span>
 			)}
 			<span className="mt-2 flex min-w-0 items-center gap-1.5">

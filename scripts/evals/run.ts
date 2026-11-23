@@ -61,7 +61,9 @@ export interface ArmSummary {
 }
 
 const FULL = "full";
-const CHECK_TIMEOUT_MS = 300_000;
+/** A Python check builds its virtual environment in the fresh clone first, which takes minutes on a cold cache. */
+const CHECK_TIMEOUT_MS = 900_000;
+const DEFAULT_OUT = join(homedir(), ".cache", "omp-evals");
 
 export function arms(extensions: string[], skills: string[]): Arm[] {
 	return [
@@ -94,13 +96,34 @@ export function summarize(rows: EvalRow[]): ArmSummary[] {
 		.sort((a, b) => (a.arm === FULL ? -1 : b.arm === FULL ? 1 : a.arm.localeCompare(b.arm)));
 }
 
+/**
+ * The unbiased pass@k of one task with `n` runs of which `c` passed: the chance that at least one of `k` runs drawn
+ * without replacement passes, 1 - C(n-c, k) / C(n, k). Null when the task has fewer than `k` runs.
+ */
+export function passAtK(n: number, c: number, k: number): number | null {
+	if (k < 1 || n < k) return null;
+	if (n - c < k) return 1;
+	let allFail = 1;
+	for (let i = n - c + 1; i <= n; i++) allFail *= 1 - k / i;
+	return 1 - allFail;
+}
+
+/** pass@k averaged over the tasks of `rows` that have at least `k` scored runs; null when none has. */
+export function passAtKRate(rows: EvalRow[], k: number): number | null {
+	const scores = [...Map.groupBy(rows.filter(scored), row => row.task).values()]
+		.map(runs => passAtK(runs.length, runs.filter(row => row.passed).length, k))
+		.filter(score => score !== null);
+	return scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null;
+}
+
 function printSummary(rows: EvalRow[]): void {
 	const signed = (value: number | null, digits: number, scale = 1) => (value === null ? "" : `${value >= 0 ? "+" : ""}${(value * scale).toFixed(digits)}`);
 	console.table(
 		summarize(rows).map(s => ({
 			arm: s.arm,
 			runs: s.runs,
-			"pass %": (s.passRate * 100).toFixed(0),
+			"pass@1 %": (s.passRate * 100).toFixed(0),
+			"pass@3 %": ((rate: number | null) => (rate === null ? "" : (rate * 100).toFixed(0)))(passAtKRate(rows.filter(row => row.arm === s.arm), 3)),
 			"Δ pass pts": signed(s.passRateDelta, 0, 100),
 			"$ per run": s.costPerRun.toFixed(2),
 			"Δ $ per run": signed(s.costDelta, 2),
@@ -122,7 +145,9 @@ function hiddenCheck(repo: string, task: EvalTask, clone: string, dir: string): 
 	writeHiddenTests(repo, task, clone);
 	const run = sh(task.check, clone, {}, CHECK_TIMEOUT_MS);
 	writeFileSync(join(dir, "check.log"), `$ ${task.check}\n${run.output}\n${run.ok ? "passed" : "FAILED"}\n`);
-	return { passed: run.ok, failures: [...run.output.matchAll(/^\(fail\) (.+?)(?: \[[\d.]+m?s\])?$/gm)].map(match => match[1]!) };
+	// bun test prints `(fail) name`; pytest prints `FAILED path::test - why` and `ERROR path::test`.
+	const failures = [...run.output.matchAll(/^\(fail\) (.+?)(?: \[[\d.]+m?s\])?$|^(?:FAILED|ERROR) (\S+)/gm)].map(match => (match[1] ?? match[2])!);
+	return { passed: run.ok, failures: [...new Set(failures)] };
 }
 
 interface Options {
@@ -131,24 +156,29 @@ interface Options {
 	model: string;
 	maxCost: string;
 	maxTime: string;
+	/** `mcp:<server>` ids for every MCP server the user's omp configures: a run must not post to Slack or Linear, nor wait on their startup. */
+	noMcp: string[];
 }
 
 function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun: boolean): EvalRow {
 	const dir = join(options.out, arm.name, task.id.replace(/[^\w.-]+/g, "_"), String(run));
 	rmSync(dir, { recursive: true, force: true });
-	const clone = prepare(options.repo, task.base, dir);
+	const repo = task.repo ?? options.repo;
+	const clone = prepare(repo, task.base, dir);
 	writeFileSync(join(dir, "prompt.md"), task.prompt);
 	const sessions = join(dir, "sessions");
-	const args = ["-p", "--model", options.model, "--config", pinnedConfig(options.model, dir, arm.disabled), "--session-dir", sessions, "--no-title"];
+	const config = pinnedConfig(options.model, dir, [...arm.disabled, ...options.noMcp]);
+	const args = ["-p", "--model", options.model, "--config", config, "--session-dir", sessions, "--no-title"];
 	args.push("--max-cost", options.maxCost, "--max-time", options.maxTime, task.prompt);
-	const { sandboxArgs, env } = confined(options.repo, dir, args);
+	// Hiding every eval folder keeps a run from copying another run's change, or a dry run's landed one, from its clone.
+	const { sandboxArgs, env } = confined(repo, dir, args, [options.out, DEFAULT_OUT]);
 	// The kit's extensions keep their state, such as the ship trace, under XDG_CONFIG_HOME; a run writes its own.
 	env.XDG_CONFIG_HOME = join(dir, "config");
 	const started = Date.now();
 	let exitCode: number | null = 0;
 	if (dryRun) {
 		console.error(`  would run in ${clone}: sandbox-exec ${sandboxArgs.slice(2, -1).join(" ")} <prompt.md>`);
-		const patch = spawnSync("git", ["diff", "--binary", task.base, task.landed], { cwd: options.repo, maxBuffer: 1 << 28 }).stdout;
+		const patch = spawnSync("git", ["diff", "--binary", task.base, task.landed], { cwd: repo, maxBuffer: 1 << 28 }).stdout;
 		const apply = spawnSync("git", ["apply"], { cwd: clone, input: patch, encoding: "utf8" });
 		if (apply.status !== 0) throw new Error(`the landed change does not apply at the base: ${apply.stderr}`);
 	} else {
@@ -160,8 +190,8 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 	const error = dryRun ? null : endedOnError(sessions);
 	const { diff, filesChanged, linesChanged } = changeSize(clone, task.base);
 	writeFileSync(join(dir, "change.diff"), diff);
-	const { passed, failures } = error ? { passed: false, failures: [] } : hiddenCheck(options.repo, task, clone, dir);
-	// Each clone holds its own node_modules; 60 runs of them fill a disk, and change.diff keeps what the agent did.
+	const { passed, failures } = error ? { passed: false, failures: [] } : hiddenCheck(repo, task, clone, dir);
+	// Each clone holds its own node_modules or .venv; 60 runs of them fill a disk, and change.diff keeps what the agent did.
 	rmSync(clone, { recursive: true, force: true });
 	return {
 		at: new Date().toISOString(),
@@ -191,7 +221,7 @@ if (import.meta.main) {
 			model: { type: "string", default: "anthropic/claude-opus-5-5:auto" },
 			"disable-extensions": { type: "string", default: "" },
 			"disable-skills": { type: "string", default: "" },
-			out: { type: "string", default: join(homedir(), ".cache", "omp-evals") },
+			out: { type: "string", default: DEFAULT_OUT },
 			"max-cost": { type: "string", default: "5" },
 			"max-time": { type: "string", default: "30m" },
 			"dry-run": { type: "boolean", default: false },
@@ -210,7 +240,16 @@ if (import.meta.main) {
 	const only = values.only ? new Set(values.only.split(",")) : null;
 	const tasks = (JSON.parse(readFileSync(values.tasks, "utf8")) as EvalTask[]).filter(task => !only || only.has(task.id));
 	const list = (text: string) => text.split(",").filter(Boolean);
-	const options: Options = { repo, out, model: values.model, maxCost: values["max-cost"], maxTime: values["max-time"] };
+	const mcpFile = join(homedir(), ".omp", "agent", "mcp.json");
+	const mcpServers = existsSync(mcpFile) ? Object.keys((JSON.parse(readFileSync(mcpFile, "utf8")) as { mcpServers?: object }).mcpServers ?? {}) : [];
+	const options: Options = {
+		repo,
+		out,
+		model: values.model,
+		maxCost: values["max-cost"],
+		maxTime: values["max-time"],
+		noMcp: mcpServers.map(name => `mcp:${name}`),
+	};
 	const done = new Set(readRows(resultsFile).filter(row => !row.error).map(row => `${row.arm}\t${row.task}\t${row.run}\t${row.model}`));
 	const dryRows: EvalRow[] = [];
 	for (const arm of arms(list(values["disable-extensions"]), list(values["disable-skills"]))) {
