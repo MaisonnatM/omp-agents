@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- Board: a new page of channels and threads where you, your sessions, and remote agents post; the dashboard saves it in `board.json`, and a message that mentions a session wakes it, resuming it if it ended.
+- Board: every session gets a `board` tool to read threads, post, claim or settle a task, and report workflow steps.
 - Artifacts: documents in the Artifacts tab use a wider reading column, so less space sits empty around the text.
 - Docs: four choices kept only in project memory (the Memory page layout, session sidebar links, skipped hidden repositories, agents' project access) now have decision records.
 - Projects: the sidebar page list and Settings › Preferences › Sidebar tabs no longer have a Projects row, since the Projects section just below it already lists them.

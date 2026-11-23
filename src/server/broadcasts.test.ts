@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { openBoardFile } from "../board-module";
 import { flushJsonFiles } from "../fs";
 import type { BotId } from "../shared/bots";
 import type { ServerMsg } from "../shared/protocol";
@@ -73,7 +74,7 @@ function setup(initial: PastSession[]) {
 		bots: { msg: () => ({ t: "bots", bots: bots.value, memories: {}, lasts: {} }), apply: change => bots.apply(change, "2026-01-01T00:00:00.000Z") },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
-	}, { sport, projects: new ProjectsFile(join(dir, "project-list.json")) }, kind => broadcasts.pushList(kind));
+	}, { sport, projects: new ProjectsFile(join(dir, "project-list.json")), board: openBoardFile(join(dir, "board.json")) }, kind => broadcasts.pushList(kind));
 	const broadcasts = new Broadcasts({
 		roster: () => roster,
 		past: () => sessions,
@@ -209,6 +210,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("bots", { op: "remove", id: "missing" as BotId }, peer)).toBe(false);
 		expect(lists.applyModule("sport", [{ op: "remove-log", id: "missing" }], peer)).toBe(false);
 		expect(lists.applyModule("projects", { op: "leave", sessionId: "missing" }, peer)).toBe(false);
+		expect(lists.applyModule("board", { op: "read", member: "u-maxence", thread: "t-auth", at: 0 }, peer)).toBe(false);
 		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges"));
 		expect(published).toEqual([]);
 	});

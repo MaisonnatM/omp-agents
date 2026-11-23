@@ -1,4 +1,4 @@
-/** The Board prototype: one place where people, local sessions, and remote agents post in channels and threads, with an inbox per member that wakes them. */
+/** The Board: channels and threads where people, omp sessions, and remote agents post, with an inbox per member; a message for a session wakes it. */
 import {
 	IconArrowUp,
 	IconBell,
@@ -14,39 +14,38 @@ import {
 } from "central-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { type Attachment, type BoardChange, type BoardState, boardMembers, isMention, LEASE_MS, type Member, type Message, queueOf, repeatLabel, type Thread, unreadIn } from "../../../src/shared/board";
 import { BotAvatar } from "../bots/bot-avatar";
 import type { CoreData } from "../module-views";
 import type { BoardRoute } from "./module";
-import {
-	type Attachment,
-	type BoardState,
-	COMMANDS,
-	type Member,
-	type Message,
-	type Thread,
-	isMention,
-	lastMessage,
-	markRead,
-	mentionsOf,
-	newId,
-	queueOf,
-	relTime,
-	seed,
-	sessionMembers,
-	STORAGE_KEY,
-	unreadIn,
-} from "./model";
 
-function load(): BoardState {
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		if (raw) {
-			const parsed = JSON.parse(raw) as BoardState;
-			if (parsed.version === 1) return parsed;
-		}
-	} catch {}
-	return seed(Date.now());
+const COMMANDS = [
+	{ name: "review", about: "Run the review panel on this thread and post the verdict here" },
+	{ name: "implement", about: "Have an agent claim this task, build it, and report back" },
+	{ name: "grill", about: "Stress-test the plan in this thread with two models" },
+	{ name: "schedule", about: "Post to an agent later: /schedule @name text in 10m, or every 2h" },
+	{ name: "claim", about: "Take this task with a one-hour lease" },
+	{ name: "done", about: "Settle this task, which opens the tasks waiting on it" },
+] as const;
+
+const WORKFLOW_STEPS: Record<string, string[]> = {
+	review: ["Interface review", "Thermonuclear review", "Cross-judge (Codex)"],
+	grill: ["Claude grills", "Codex grills", "Merge findings"],
+	implement: ["Claim task", "Implement", "Open PR", "Report back"],
+};
+
+const MIN = 60_000;
+const UNITS: Record<string, number> = { m: MIN, h: 60 * MIN, d: 24 * 60 * MIN };
+
+function relTime(at: number, now: number): string {
+	const delta = at - now;
+	const abs = Math.abs(delta);
+	if (abs < MIN) return "now";
+	const unit = abs < UNITS.h! ? `${Math.round(abs / MIN)}m` : abs < UNITS.d! ? `${Math.round(abs / UNITS.h!)}h` : `${Math.round(abs / UNITS.d!)}d`;
+	return delta > 0 ? `in ${unit}` : unit;
 }
+
+const lastIn = (state: BoardState, threadId: string): Message | undefined => state.messages.findLast(msg => msg.thread === threadId);
 
 function useNow(ms = 15_000) {
 	const [now, setNow] = useState(Date.now);
@@ -59,98 +58,73 @@ function useNow(ms = 15_000) {
 
 type View = { kind: "inbox" } | { kind: "scheduled" } | { kind: "channel"; id: string } | { kind: "member"; id: string };
 
-export function BoardPage({ core }: { route: BoardRoute; core: CoreData }) {
-	const [state, setState] = useState(load);
+export function BoardPage({ core, state, onChange }: { route: BoardRoute; core: CoreData; state: BoardState | null; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+	if (!state) return <div className="grid h-full place-items-center text-sm text-muted-foreground">Loading the board…</div>;
+	return <Board core={core} state={state} onChange={change => void onChange(change)} />;
+}
+
+function Board({ core, state, onChange }: { core: CoreData; state: BoardState; onChange: (change: BoardChange) => void }) {
 	const [view, setView] = useState<View>({ kind: "inbox" });
-	const [open, setOpen] = useState<string | null>("t-auth");
-	const [typing, setTyping] = useState<Record<string, string>>({});
+	const [open, setOpen] = useState<string | null>(null);
 	/** Inbox items you read this visit, which stay listed until you leave the page, as a mail inbox keeps a message you just opened. */
 	const [lingering, setLingering] = useState<Message[]>([]);
 	const now = useNow();
-	useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(state)), [state]);
 
-	const members = useMemo(() => [...state.extraMembers, ...sessionMembers(core.hosts)], [state.extraMembers, core.hosts]);
+	const members = useMemo(() => boardMembers(state, core.hosts), [state, core.hosts]);
 	const byId = useMemo(() => new Map(members.map(member => [member.id, member])), [members]);
 	const me = byId.get(state.me)!;
+	const myQueue = queueOf(state, me);
 
 	useEffect(() => {
 		if (!open) return;
-		const fresh = queueOf(state, members, state.me).filter(msg => msg.thread === open);
+		const fresh = myQueue.filter(msg => msg.thread === open);
 		if (fresh.length === 0) return;
 		setLingering(prev => [...prev, ...fresh.filter(msg => !prev.some(kept => kept.id === msg.id))]);
-		setState(prev => markRead(prev, prev.me, open, Date.now()));
+		onChange({ op: "read", member: state.me, thread: open, at: Math.max(...fresh.map(msg => msg.at)) });
 	}, [open, state.messages.length]);
 
 	function post(threadId: string, text: string, extra: Partial<Message> = {}) {
-		const msg: Message = { id: newId("m"), thread: threadId, author: state.me, at: Date.now(), text, ...extra };
-		setState(prev => markRead({ ...prev, messages: [...prev.messages, msg] }, prev.me, threadId, msg.at));
-		for (const agent of mentionsOf(text, members).filter(member => member.kind !== "human")) {
-			if (agent.presence === "asleep") continue;
-			setTimeout(() => setTyping(prev => ({ ...prev, [threadId]: agent.id })), 500);
-			setTimeout(() => {
-				setTyping(prev => {
-					const { [threadId]: _, ...rest } = prev;
-					return rest;
-				});
-				const reply: Message = { id: newId("m"), thread: threadId, author: agent.id, at: Date.now(), text: agentReply(text, agent) };
-				setState(prev => ({ ...prev, messages: [...prev.messages, reply] }));
-			}, 2200);
-		}
+		onChange({ op: "post", message: { id: crypto.randomUUID(), thread: threadId, author: state.me, at: Date.now(), text, ...extra } });
 	}
 
 	function runCommand(threadId: string, command: string, arg: string) {
 		const thread = state.threads.find(item => item.id === threadId)!;
 		if (command === "claim") {
-			setThread(threadId, { task: "claimed", lease: { by: state.me, until: Date.now() + 3_600_000 } });
+			onChange({ op: "task", thread: threadId, task: "claimed", lease: { by: state.me, until: Date.now() + LEASE_MS } });
 			post(threadId, "Claimed. Lease 1h.");
 		} else if (command === "done") {
-			setThread(threadId, { task: "done", lease: null });
+			onChange({ op: "task", thread: threadId, task: "done", lease: null });
 			post(threadId, arg || "Done.");
 		} else if (command === "schedule") {
-			const to = mentionsOf(arg, members)[0] ?? byId.get("a-factory")!;
-			const at = Date.now() + 5 * 60_000;
-			setState(prev => ({ ...prev, schedules: [...prev.schedules, { id: newId("s"), thread: threadId, to: to.id, text: arg.replace(`@${to.name}`, "").trim() || "Check back on this thread.", at, every: null }] }));
-			post(threadId, `Scheduled for @${to.name}`, { internal: true, attachment: { kind: "schedule", text: arg || "Check back on this thread.", at, every: null } });
+			const to = members.find(member => isMention(arg, member));
+			if (!to) return post(threadId, "/schedule needs an @member to post to.", { internal: true });
+			const every = arg.match(/\bevery (\d+)\s*([mhd])\b/);
+			const after = arg.match(/\bin (\d+)\s*([mhd])\b/);
+			const step = (match: RegExpMatchArray) => Number(match[1]) * UNITS[match[2]!]!;
+			const repeat = every ? step(every) : null;
+			const at = Date.now() + (after ? step(after) : (repeat ?? 5 * MIN));
+			const text = arg.replace(`@${to.name}`, "").replace(/\b(every|in) \d+\s*[mhd]\b/g, "").trim() || "Check back on this thread.";
+			onChange({ op: "schedule", schedule: { id: crypto.randomUUID(), thread: threadId, by: state.me, to: to.id, text, at, every: repeat } });
+			post(threadId, `Scheduled for ${to.name}`, { internal: true, attachment: { kind: "schedule", text, at, every: repeat } });
 		} else {
-			const steps = command === "review" ? ["Interface review", "Thermonuclear review", "Cross-judge (Codex)"] : command === "grill" ? ["Claude grills", "Codex grills", "Merge findings"] : ["Claim task", "Implement", "Open PR", "Report back"];
-			const id = newId("m");
-			const msg: Message = { id, thread: threadId, author: state.me, at: Date.now(), text: `/${command}${arg ? ` ${arg}` : ""}`, attachment: { kind: "workflow", command: `/${command}`, steps: steps.map((label, i) => ({ label, state: i === 0 ? "running" : "queued" })) } };
-			setState(prev => ({ ...prev, messages: [...prev.messages, msg] }));
-			steps.forEach((_, i) =>
-				setTimeout(
-					() =>
-						setState(prev => ({
-							...prev,
-							messages: prev.messages.map(item =>
-								item.id === id && item.attachment?.kind === "workflow" ? { ...item, attachment: { ...item.attachment, steps: item.attachment.steps.map((step, j) => ({ ...step, state: j <= i ? "done" : j === i + 1 ? "running" : "queued" })) } } : item,
-							),
-						})),
-					1400 * (i + 1),
-				),
-			);
-			if (thread.task === "open" && command === "implement") setThread(threadId, { task: "claimed", lease: { by: "a-factory", until: Date.now() + 3_600_000 } });
+			// The workflow goes to the agent it mentions, else to the agent holding the task.
+			const holder = thread.lease ? byId.get(thread.lease.by) : undefined;
+			const target = members.find(member => member.kind !== "human" && isMention(arg, member)) ?? (holder?.kind === "human" ? undefined : holder);
+			const text = `/${command}${target && !isMention(arg, target) ? ` @${target.name}` : ""}${arg ? ` ${arg}` : ""}`;
+			post(threadId, text, { attachment: { kind: "workflow", command: `/${command}`, steps: WORKFLOW_STEPS[command]!.map(label => ({ label, state: "queued" })) } });
 		}
 	}
 
-	function setThread(id: string, patch: Partial<Thread>) {
-		setState(prev => {
-			const threads = prev.threads.map(thread => (thread.id === id ? { ...thread, ...patch } : thread));
-			// A task's dependents open once it is done.
-			const settled = new Set(threads.filter(thread => thread.task === "done").map(thread => thread.id));
-			return { ...prev, threads: threads.map(thread => (thread.task === "blocked" && thread.blockedBy.every(dep => settled.has(dep)) ? { ...thread, task: "open" } : thread)) };
-		});
-	}
-
-	function answer(msgId: string, option: string) {
-		const msg = state.messages.find(item => item.id === msgId)!;
-		setState(prev => ({ ...prev, messages: prev.messages.map(item => (item.id === msgId && item.attachment?.kind === "question" ? { ...item, attachment: { ...item.attachment, picked: option } } : item)) }));
-		const asker = byId.get(msg.author);
-		post(msg.thread, `@${asker?.name ?? "agent"} ${option}.`);
+	function answer(messageId: string, option: string) {
+		const asked = state.messages.find(msg => msg.id === messageId)!;
+		onChange({ op: "answer", message: messageId, option });
+		// The answer mentions who asked, which wakes them.
+		post(asked.thread, `@${byId.get(asked.author)?.name ?? asked.author} ${option}.`);
 	}
 
 	const thread = state.threads.find(item => item.id === open) ?? null;
-	const myQueue = queueOf(state, members, state.me);
 	const inboxItems = [...lingering.filter(kept => !myQueue.some(msg => msg.id === kept.id)), ...myQueue].toSorted((a, b) => b.at - a.at);
+	const working = thread ? members.find(member => member.sessionId && member.presence === "working" && state.messages.some(msg => msg.thread === thread.id && msg.author === member.id)) : undefined;
 
 	return (
 		<div className="grid h-full min-h-0 grid-cols-[15rem_minmax(20rem,26rem)_minmax(0,1fr)] max-phone:grid-cols-1">
@@ -164,7 +138,7 @@ export function BoardPage({ core }: { route: BoardRoute; core: CoreData }) {
 					byId={byId}
 					members={members}
 					now={now}
-					typing={typing[thread.id] ? byId.get(typing[thread.id]!) : undefined}
+					typing={working}
 					onPost={text => post(thread.id, text)}
 					onCommand={(command, arg) => runCommand(thread.id, command, arg)}
 					onAnswer={answer}
@@ -177,11 +151,6 @@ export function BoardPage({ core }: { route: BoardRoute; core: CoreData }) {
 	);
 }
 
-function agentReply(text: string, agent: Member): string {
-	if (/review|look/i.test(text)) return "On it. I'll post the verdict here when both reviewers finish.";
-	if (/\?/.test(text)) return "Short answer: yes, with one caveat. Writing it up in this thread now.";
-	return `Got it, picking this up. ${agent.sessionId ? "Queued for my next turn." : "Lease taken for 1h."}`;
-}
 
 /* ───────────────────────────── Rail ───────────────────────────── */
 
@@ -229,11 +198,11 @@ function Rail({ state, members, view, onView, me, now, inboxCount }: { state: Bo
 				})}
 				<RailHeading>People</RailHeading>
 				{humans.map(member => (
-					<MemberRow key={member.id} member={member} isMe={member.id === me.id} queued={queueOf(state, members, member.id).length} selected={sel({ kind: "member", id: member.id })} onClick={() => onView({ kind: "member", id: member.id })} />
+					<MemberRow key={member.id} member={member} isMe={member.id === me.id} queued={queueOf(state, member).length} selected={sel({ kind: "member", id: member.id })} onClick={() => onView({ kind: "member", id: member.id })} />
 				))}
 				<RailHeading>Agents</RailHeading>
 				{agents.map(member => (
-					<MemberRow key={member.id} member={member} queued={queueOf(state, members, member.id).length} selected={sel({ kind: "member", id: member.id })} onClick={() => onView({ kind: "member", id: member.id })} />
+					<MemberRow key={member.id} member={member} queued={queueOf(state, member).length} selected={sel({ kind: "member", id: member.id })} onClick={() => onView({ kind: "member", id: member.id })} />
 				))}
 			</div>
 		</nav>
@@ -334,7 +303,7 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 		const groups = Map.groupBy(queue, msg => msg.thread);
 		body = groups.size === 0 ? <Empty>Inbox zero. Agents will ping you here.</Empty> : [...groups].map(([threadId, msgs]) => {
 			const thread = state.threads.find(item => item.id === threadId)!;
-			return <ThreadCard key={threadId} thread={thread} state={state} byId={byId} now={now} selected={open === threadId} onOpen={onOpen} preview={msgs.at(-1)} mention={msgs.some(msg => isMention(msg, me))} />;
+			return <ThreadCard key={threadId} thread={thread} state={state} byId={byId} now={now} selected={open === threadId} onOpen={onOpen} preview={msgs.at(-1)} mention={msgs.some(msg => isMention(msg.text, me))} />;
 		});
 	} else if (view.kind === "scheduled") {
 		title = "Scheduled";
@@ -354,7 +323,7 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 						</span>
 						<span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">{item.text}</span>
 						<span className="mt-1.5 flex gap-1.5">
-							<Chip>{item.every ?? "once"}</Chip>
+							<Chip>{item.every ? repeatLabel(item.every) : "once"}</Chip>
 							<Chip>{state.threads.find(thread => thread.id === item.thread)?.title}</Chip>
 						</span>
 					</span>
@@ -365,11 +334,11 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 		const channel = state.channels.find(item => item.id === view.id)!;
 		title = `#${channel.name}`;
 		meta = channel.about;
-		const threads = state.threads.filter(thread => thread.channel === channel.id && thread.title.toLowerCase().includes(q.toLowerCase())).toSorted((a, b) => (lastMessage(state, b.id)?.at ?? 0) - (lastMessage(state, a.id)?.at ?? 0));
+		const threads = state.threads.filter(thread => thread.channel === channel.id && thread.title.toLowerCase().includes(q.toLowerCase())).toSorted((a, b) => (lastIn(state, b.id)?.at ?? 0) - (lastIn(state, a.id)?.at ?? 0));
 		body = threads.map(thread => <ThreadCard key={thread.id} thread={thread} state={state} byId={byId} now={now} selected={open === thread.id} onOpen={onOpen} />);
 	} else {
 		const member = byId.get(view.id)!;
-		const waiting = queueOf(state, members, member.id);
+		const waiting = queueOf(state, member);
 		title = member.name;
 		meta = member.kind === "human" ? "Person" : `${member.harness}`;
 		body = (
@@ -387,7 +356,7 @@ function ListColumn({ state, members, byId, view, open, onOpen, now, queue }: { 
 					</div>
 				)}
 				<p className="px-4 pt-4 pb-1 text-2xs font-medium tracking-wide text-muted-foreground uppercase">Their queue</p>
-				{waiting.length === 0 ? <Empty>Nothing waiting.</Empty> : [...Map.groupBy(waiting, msg => msg.thread)].map(([threadId, msgs]) => <ThreadCard key={threadId} thread={state.threads.find(item => item.id === threadId)!} state={state} byId={byId} now={now} selected={open === threadId} onOpen={onOpen} preview={msgs.at(-1)} mention={msgs.some(msg => isMention(msg, member))} />)}
+				{waiting.length === 0 ? <Empty>Nothing waiting.</Empty> : [...Map.groupBy(waiting, msg => msg.thread)].map(([threadId, msgs]) => <ThreadCard key={threadId} thread={state.threads.find(item => item.id === threadId)!} state={state} byId={byId} now={now} selected={open === threadId} onOpen={onOpen} preview={msgs.at(-1)} mention={msgs.some(msg => isMention(msg.text, member))} />)}
 			</>
 		);
 	}
@@ -433,7 +402,7 @@ function TaskChip({ thread, byId, now }: { thread: Thread; byId: Map<string, Mem
 }
 
 function ThreadCard({ thread, state, byId, now, selected, onOpen, preview, mention }: { thread: Thread; state: BoardState; byId: Map<string, Member>; now: number; selected: boolean; onOpen: (id: string) => void; preview?: Message; mention?: boolean }) {
-	const last = preview ?? lastMessage(state, thread.id);
+	const last = preview ?? lastIn(state, thread.id);
 	const author = last ? byId.get(last.author) : undefined;
 	const unread = unreadIn(state, thread.id);
 	const people = [...new Set(state.messages.filter(msg => msg.thread === thread.id).map(msg => msg.author))].slice(0, 4).flatMap(id => byId.get(id) ?? []);
@@ -586,7 +555,7 @@ function ThreadView({ state, thread, byId, members, now, typing, onPost, onComma
 								<div key={item.id} className="mb-2 rounded-md border border-border p-2 text-xs">
 									<p className="flex items-center gap-1 text-muted-foreground">
 										<IconClock className="size-3" />
-										{relTime(item.at, now)} · {item.every ?? "once"} · {byId.get(item.to)?.name}
+										{relTime(item.at, now)} · {item.every ? repeatLabel(item.every) : "once"} · {byId.get(item.to)?.name}
 									</p>
 									<p className="mt-1">{item.text}</p>
 								</div>
@@ -724,7 +693,7 @@ function AttachmentCard({ attachment, now, onAnswer }: { attachment: Attachment;
 				<div className={cn(frame, "flex items-center gap-3 p-3 text-sm")}>
 					<IconCalendar1 className="size-4 text-muted-foreground" />
 					<span className="min-w-0 flex-1 truncate">{attachment.text}</span>
-					<Chip>{attachment.every ?? relTime(attachment.at, now)}</Chip>
+					<Chip>{attachment.every ? repeatLabel(attachment.every) : relTime(attachment.at, now)}</Chip>
 				</div>
 			);
 		case "question":

@@ -2,6 +2,7 @@
  * The modules the dashboard is built with, and what a module gives the server: a feature beside the core, such as Sport,
  * which the core reaches only through this list. The page's half is `web/modules.ts`; see docs/architecture/modules.md.
  */
+import { BOARD_MODULE } from "./board-module";
 import { MEMORY_MODULE } from "./memory-module";
 import type { InboxOptions, JsonInboxDir } from "./server/json-inbox";
 import type { RouteKit, Routes } from "./server/route-kit";
@@ -56,7 +57,7 @@ export interface ModuleCore {
 export type StoredModule<Id extends string, Value, Change> = Omit<ServerModule<Id>, "store"> & { readonly store: ModuleStore<Value, Change> };
 
 /** Every module, by id: adding one is adding its definition here and its page's to `WEB_MODULES` in `web/modules.ts`. */
-export const SERVER_MODULES = { sport: SPORT_MODULE, memory: MEMORY_MODULE, projects: PROJECTS_MODULE };
+export const SERVER_MODULES = { sport: SPORT_MODULE, memory: MEMORY_MODULE, projects: PROJECTS_MODULE, board: BOARD_MODULE };
 SERVER_MODULES satisfies { readonly [I in ModuleId]: ServerModule<I> };
 
 type Modules = typeof SERVER_MODULES;
