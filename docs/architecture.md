@@ -28,6 +28,8 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Analytics](architecture/analytics.md)
   - [Context sources](architecture/analytics.md#context-sources)
 - [Token cost](architecture/token-cost.md)
+- [Evals](architecture/evals.md)
+  - [The decay check](architecture/evals.md#the-decay-check)
 - [Activity](architecture/activity.md)
 - [Routines](architecture/routines.md)
   - [Routines from before Bots](architecture/routines.md#routines-from-before-bots)

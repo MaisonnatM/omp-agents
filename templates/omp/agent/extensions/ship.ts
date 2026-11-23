@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
-import { commands, located } from "./shell/commands";
+import { commands, located, positionals } from "./shell/commands";
 import { quotaExhausted } from "./github/access";
 import { type GhCredential, GhRunner, rejectedCredential, TOKEN_VARIABLE } from "./github/runner";
 import { descriptionSnapshot, editDescription } from "./github/description";
@@ -291,7 +291,9 @@ export function isCheckCommand(words: string[], declared: string[][]): boolean {
 	const heavy = w.findIndex(word => word.endsWith("heavy.py"));
 	if (heavy !== -1 && heavy <= 1) {
 		const rest = w.slice(heavy + 1);
-		return rest.length === 1 ? commands(rest[0]).some(inner => isCheckCommand(inner, declared)) : isCheckCommand(rest, declared);
+		// The shell applies redirections such as `2>&1`, so heavy.py gets the script alone.
+		const script = positionals(rest);
+		return script.length === 1 ? commands(script[0]).some(inner => isCheckCommand(inner, declared)) : isCheckCommand(rest, declared);
 	}
 	if (w.length === 0) return false;
 	if (declared.some(check => check.every((word, i) => w[i] === word))) return true;
@@ -623,6 +625,12 @@ function report(s: ShipState | undefined): string {
 		if (needs.length > 0) lines.push(`First need: ${LABEL[needs[0].kind]}. Record it with ship_stage({stage: '${needs[0].kind}'}).`);
 	}
 	return lines.join("\n");
+}
+
+/** Whether a command's words open a PR that is not a draft, which the tool_call gate blocks. */
+export function opensLivePr(words: string[]): boolean {
+	const create = ghPr(words, "create");
+	return create !== undefined && !create.some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="));
 }
 
 /** The arguments of `gh pr <sub>` when the command's words run it, including any `-R` given before `<sub>`, else `undefined`. */
@@ -1055,8 +1063,7 @@ export default function ship(pi: ExtensionAPI) {
 		const input = event.input;
 		if (typeof input.command !== "string") return;
 		for (const { words, dir } of located(input.command, typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : ctx.cwd)) {
-			const create = ghPr(words, "create");
-			if (create && !create.some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="))) {
+			if (opensLivePr(words)) {
 				return { block: true, reason: "Blocked: open PRs as drafts (`gh pr create --draft`). A PR goes live only after the ready gate, and after each review its changed files call for." };
 			}
 			const ready = ghPr(words, "ready");

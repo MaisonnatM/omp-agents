@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { checkRead } from "../bash-guard/rules";
-import { program, split } from "../shell/commands";
+import { located } from "../shell/commands";
 
 /** The agent definition name, as `ctx.agent.name` reports it. */
 export const READER = "untrusted-reader";
@@ -72,12 +72,13 @@ const savesOutput = (word: string) => /^(?:1|&)?>{1,2}(?!&)/.test(word);
 
 /**
  * The `gh` command of a bash line that prints text other people wrote, such as `gh pr view`, or `undefined`.
+ * Commands are read past wrappers and shell keywords, so `for n in 1 2; do gh pr view $n; done` counts.
  * A line whose `gh` command, or a command after it, sends its output to a file prints nothing, so it is not one.
  */
 export function untrustedFetch(line: string): string | undefined {
-	const all = split(line);
+	const all = located(line, null).map(({ words }) => words);
 	for (let i = 0; i < all.length; i++) {
-		const words = program(all[i]!).words;
+		const words = all[i]!;
 		if (words[0] !== "gh" || !printsAuthored(words.slice(1))) continue;
 		if (all.slice(i).some(command => command.some(savesOutput))) continue;
 		return words.slice(0, 3).join(" ");
