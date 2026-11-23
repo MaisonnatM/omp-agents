@@ -8,7 +8,7 @@ import { MenuGroup, MenuGroupLabel, MenuItem, MenuLinkItem, MenuSeparator } from
 import { activityControl } from "../activity";
 import { isPhonePage } from "../api";
 import type { Artifact } from "../artifacts-model";
-import { addDetailsTab, newIdsByScope, revealDetailsTab } from "../details-tabs";
+import { addDetailsTab, newIdsByScope, newIdsOnOpen, revealDetailsTab } from "../details-tabs";
 import { type BeforeAfter, changeKey, latestBeforeAfter, sameChanges } from "../before-after";
 import { type PaneData, useArtifacts, useLinkedIssues, usePaneSelect, useShowConversation } from "../pane-store";
 import type { ModelList } from "../reads";
@@ -216,10 +216,15 @@ interface SessionDetailsProps extends Pick<SessionWork, "view" | "sessionId" | "
 
 const SUBAGENT_TAB = "subagent";
 
-/** The Linear issues each session linked while the page is open, kept across its views, which mount the sidebar afresh, and its transcript's reloads. */
-const linkedBefore = newIdsByScope();
+/** The Linear issues the session on screen linked, named anew each time a session is shown, so opening one with an issue opens the **Linear** tab. */
+const linkedBefore = newIdsOnOpen();
 
-/** The screen changes each session listed while the page is open, by {@link changeKey}, kept as {@link linkedBefore} is. */
+/** The pull requests the session on screen worked on, kept as {@link linkedBefore} is, so opening one with a pull request opens the **PRs** tab. */
+const submittedBefore = newIdsOnOpen();
+
+const pullRequestKey = ({ owner, repo, number }: LinkedPullRequest): string => `${owner}/${repo}#${number}`;
+
+/** The screen changes each session listed while the page is open, by {@link changeKey}, so a closed **Review** tab stays closed until a new one. */
 const listedBefore = newIdsByScope();
 
 /**
@@ -262,7 +267,9 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 			},
 		[opened],
 	);
-	const pullRequests = row?.pullRequests ?? [];
+	const pullRequests = useMemo(() => row?.pullRequests ?? [], [row?.pullRequests]);
+	const pullRequestKeys = useMemo(() => pullRequests.map(pullRequestKey), [pullRequests]);
+	useOpenTabOnNew(submittedBefore, scope, pullRequestKeys, "pull-requests");
 	// The row's directory, unlike `cwd`, outlives an ended live session, whose changed files still resolve against it.
 	const session = useMemo<ChangesSession>(() => ({ sessionId, cwd: row?.cwd ?? null, facts: row }), [sessionId, row]);
 	const tabs = [
