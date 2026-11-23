@@ -127,6 +127,8 @@ export interface Contract {
 	/** The test written before the code, or `null` when the change starts without one. */
 	test_first: string | null;
 	done_when: string[];
+	/** The Linear issue the contract was drafted from, or `null` for a run without one. */
+	source: string | null;
 }
 
 /** One check a stage ran, with the result line it printed. */
@@ -220,6 +222,13 @@ export function repoRelative(path: string): boolean {
 export function plannedTestEdits(contract: Contract): string[] {
 	if (contract.constraints.some(constraint => /test-change/i.test(constraint))) return [];
 	return contract.files_to_change.filter(path => /\.test\.tsx?$/.test(path));
+}
+
+/** Why `contract` may not stand for a run on `issue`: a run with a ticket drafts its contract from that ticket, and names it as the source. */
+export function contractSourceRefusal(contract: Contract, issue: string | undefined): string | undefined {
+	if (!issue || contract.source?.trim().toUpperCase() === issue.trim().toUpperCase()) return undefined;
+	const found = contract.source ? `names ${contract.source} as its source` : "names no source";
+	return `The contract is not recorded: this run ships ${issue}, but the contract ${found}. Draft its goal, files_to_change, and done_when from ${issue}'s description and acceptance criteria, then record it again with source: "${issue}".`;
 }
 
 /** The stages that claim the change works, so each needs a passing check after the last file change. */
@@ -371,6 +380,29 @@ export function testFirstRefusal(contract: Contract, commits: BranchCommit[], ba
 		? `no commit on this branch changes ${tests || "a test file"} on its own`
 		: `${commits[firstCode].sha} changes code before any commit that changes only ${tests}`;
 	return `draft_pr is not recorded: the contract's test_first is "${test}", but ${found}. A bug fix commits its failing test first, so the history shows the test failing before the fix. Run \`git reset --soft ${base}\`, commit only the test (\`git commit -m "<test subject>" -- <test file>\`), check that it fails, commit the rest, then record draft_pr again.`;
+}
+
+/** Lockfiles and generated files, which a change rewrites as a side effect of the files it plans. */
+const SIDE_EFFECT_FILE = /(?:^|\/)(?:bun\.lockb?|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|uv\.lock|poetry\.lock|Pipfile\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock)$|(?:^|\/)(?:__generated__|generated|__snapshots__)\/|\.(?:generated|gen)\.[^/]+$|\.snap$/;
+
+/** Whether `path` is `entry`, lies under the directory `entry`, or matches `entry` as a glob, where `**` spans directories and `*` and `?` do not. */
+export function inScope(path: string, entry: string): boolean {
+	const glob = entry.trim().replace(/^\.\//, "").replace(/\/+$/, "");
+	const pattern = glob.replace(/\*\*\/|\*\*|\*|\?|[.+^${}()|[\]\\]/g, token => ({ "**/": "(?:.*/)?", "**": ".*", "*": "[^/]*", "?": "[^/]" })[token] ?? `\\${token}`);
+	return new RegExp(`^${pattern}(?:/.*)?$`).test(path);
+}
+
+/** The files of `changed` outside `contract`'s files_to_change, apart from lockfiles and generated files; none when a constraint names `scope-change`. */
+export function strayFiles(contract: Contract, changed: string[]): string[] {
+	if (contract.constraints.some(constraint => /scope-change/i.test(constraint))) return [];
+	return changed.filter(path => !SIDE_EFFECT_FILE.test(path) && !contract.files_to_change.some(entry => inScope(path, entry)));
+}
+
+/** Why `stage` may not be recorded for a branch changing `changed` against `base`, or `undefined` when every file is one the contract plans. */
+export function scopeRefusal(stage: Stage, contract: Contract, changed: string[], base: string): string | undefined {
+	const stray = strayFiles(contract, changed);
+	if (stray.length === 0) return undefined;
+	return `${stage} is not recorded: the branch changes ${stray.map(path => `\`${path}\``).join(", ")} against ${base}, outside the contract's files_to_change. Take them out of the branch, undoing each one's changes against ${base} and deleting the ones it adds, then commit; or, when the change needs them, record the contract again with ship_stage({contract}), listing them or a glob that covers them in files_to_change, or adding a constraint \`scope-change: <why the change grew>\`. Then record ${stage} again.`;
 }
 
 /** `rejected` with `approach` appended, unless it already holds it, ignoring case and spacing. */
@@ -853,6 +885,7 @@ export default function ship(pi: ExtensionAPI) {
 		files_to_change: z.array(z.string().refine(repoRelative, "repository-relative, with no `..`")).default(() => []),
 		test_first: z.string().nullable().default(() => null),
 		done_when: z.array(filled).min(1),
+		source: z.string().nullable().default(() => null),
 	});
 	const checkRunSchema = z.object({ command: filled, result: filled });
 	const verdictsSchema = z.object({ verdicts: z.array(z.object({ finding: filled, verdict: z.enum(["fixed", "dismissed", "deferred"]) })), skipped: z.literal("fast-path").optional() });
@@ -1116,7 +1149,7 @@ export default function ship(pi: ExtensionAPI) {
 		note: z.string().optional().describe("One-line status note; empty string clears it"),
 		count: z.number().int().min(0).optional().describe("With fix_ci or fix_comments: how many checks fail, or review comments are open, as this round starts"),
 		moreRounds: z.boolean().optional().describe("With fix_ci or fix_comments: the user approved more rounds after ship_stage stopped the fix; starts its rounds over"),
-		contract: contractSchema.optional().describe("At the plan stage, required before implement, replacing any earlier one: goal, one sentence; constraints, rules the change keeps, naming `test-change: <reason>` to change an existing test; files_to_change, repository-relative paths; test_first, the test path written and committed before the code, which a bug fix needs, or null; done_when, at least one check that shows the change done"),
+		contract: contractSchema.optional().describe("At the plan stage, required before implement, replacing any earlier one: goal, one sentence; constraints, rules the change keeps, naming `test-change: <reason>` to change an existing test and `scope-change: <reason>` to change files outside files_to_change; files_to_change, repository-relative paths or globs; test_first, the test path written and committed before the code, which a bug fix needs, or null; done_when, at least one check that shows the change done; source, the run's Linear issue identifier the contract was drafted from, required when the run has an issue, or null"),
 		rejected: filled.optional().describe("One approach a reviewer or the user rejected, with why; added to the run's rejected list"),
 		output: outputSchema.optional().describe("The output of each stage this call finishes, keyed by stage; advancing to a stage needs the output of the stage before it. implement: {files_changed, checks_run: [{command, result}]}; draft_pr: {pr, url}; interface_review and thermonuclear: {verdicts: [{finding, verdict: fixed, dismissed, or deferred}]}, empty when skipped, and recorded for you on the fast path; ready_gate: {checks: [{command, result}]}"),
 		posted: z.object({ kind: postKind, pr: z.number().int().optional(), ref: filled }).optional().describe("A Slack post or Linear link you just made for a PR: kind, ref (its permalink or URL), and pr, which defaults to the run's PR. Recording a kind already recorded for that PR is a no-op that says not to post again"),
@@ -1140,7 +1173,7 @@ export default function ship(pi: ExtensionAPI) {
 			"Call with stop: true when the user says 'no ship'; the widget, the gates, and the dashboard's Ship card then drop the run.",
 			`fix_ci and fix_comments run in rounds per PR: pass count each round; after ${FIX_BUDGET} rounds, or when count did not shrink for ${STALL_ROUNDS} rounds in a row, the round is refused until the user approves moreRounds.`,
 			"Pass contract at the plan stage: implement is refused without one. Pass rejected for each approach a reviewer or the user rejects. Both show on every read and come back after a compaction or a resume.",
-			"draft_pr and ready_gate are refused until a test, typecheck, or lint bash command exits 0 in this session after the last edit, write, or task call; with a contract's test_first, draft_pr is also refused until a branch commit changing only that test comes before the first commit changing code.",
+			"draft_pr and ready_gate are refused until a test, typecheck, or lint bash command exits 0 in this session after the last edit, write, or task call, and while the branch changes a file outside the contract's files_to_change other than a lockfile or generated file, unless a constraint names scope-change; with a contract's test_first, draft_pr is also refused until a branch commit changing only that test comes before the first commit changing code.",
 			"Advancing to draft_pr, interface_review, thermonuclear, ready_gate, or live is refused until the stage before it has its output, passed as output keyed by that stage; `gh pr ready` is blocked until the ready gate's output is recorded. draft_pr reuses the branch's open PR when one exists.",
 			`A PR changing at most ${FAST_PATH.lines} lines in ${FAST_PATH.files} files, none a schema, public-interface, or \`${REVIEWS.thermonuclear.pathsFile}\` file, takes the fast path: neither review is needed, and advancing past them records each as an empty verdict list marked skipped.`,
 			"Pass posted after each Slack post or Linear link you make for a PR; every read lists them, and recording one again is a no-op.",
@@ -1197,11 +1230,11 @@ export default function ship(pi: ExtensionAPI) {
 			return { content: [{ type: "text" as const, text: "Stopped the /ship workflow in this session." }] };
 		}
 		if (contract) {
-			const refusal = await testEditRefusal(contract, ctx.cwd);
+			const refusal = contractSourceRefusal(contract, issue ?? state?.issue) ?? await testEditRefusal(contract, ctx.cwd);
 			if (refusal) return { content: [{ type: "text" as const, text: refusal }], isError: true };
 		}
 		if (stage === "implement" && !(contract ?? state?.contract)) {
-			return { content: [{ type: "text" as const, text: "Record the plan's contract before implementing: call ship_stage({stage: 'implement', contract: {goal, constraints, files_to_change, test_first, done_when}}), with done_when listing at least one check." }], isError: true };
+			return { content: [{ type: "text" as const, text: "Record the plan's contract before implementing: call ship_stage({stage: 'implement', contract: {goal, constraints, files_to_change, test_first, done_when, source}}), with done_when listing at least one check and source the run's issue, or null without one." }], isError: true };
 		}
 		let posts = state?.posts;
 		if (posted) {
@@ -1230,6 +1263,7 @@ export default function ship(pi: ExtensionAPI) {
 		const verified = VERIFIED_STAGES.find(claim => claim === stage);
 		if (verified) {
 			const refusal = verificationRefusal(verified, toolRuns(ctx.sessionManager.getBranch()), declaredChecks(checkoutReader(ctx.cwd)(".omp/land.json")))
+				?? (state?.contract ? await scopeCheck(verified, state.contract, ctx.cwd) : undefined)
 				?? (verified === "draft_pr" && state?.contract ? await testOrderRefusal(state.contract, ctx.cwd) : undefined);
 			if (refusal) return { content: [{ type: "text" as const, text: refusal }], isError: true };
 		}
@@ -1342,20 +1376,31 @@ export default function ship(pi: ExtensionAPI) {
 		return `The contract is not recorded: files_to_change holds ${existing.join(", ")}, which HEAD already has, and a test that exists guards behavior. Leave it out, or add a constraint \`test-change: <why the behavior changes on purpose>\`.`;
 	}
 
+	/** The commit where the checkout's branch left its default branch, abbreviated, or `undefined` when the checkout has no default branch. */
+	async function branchBase(cwd: string): Promise<string | undefined> {
+		for (const ref of ["origin/HEAD", "origin/main", "origin/master", "main", "master"]) {
+			const r = await pi.exec("git", ["merge-base", "HEAD", ref], { cwd });
+			if (r.code === 0 && r.stdout.trim()) return r.stdout.trim().slice(0, 12);
+		}
+		return undefined;
+	}
+
 	/** Why `contract`'s branch may not get its draft PR: with a `test_first`, a commit changing only that test must come before the code. */
 	async function testOrderRefusal(contract: Contract, cwd: string): Promise<string | undefined> {
 		if (!contract.test_first) return undefined;
-		let base: string | undefined;
-		for (const ref of ["origin/HEAD", "origin/main", "origin/master", "main", "master"]) {
-			const r = await pi.exec("git", ["merge-base", "HEAD", ref], { cwd });
-			if (r.code === 0 && r.stdout.trim()) {
-				base = r.stdout.trim().slice(0, 12);
-				break;
-			}
-		}
+		const base = await branchBase(cwd);
 		if (!base) return `draft_pr is not recorded: the contract's test_first is "${contract.test_first}", and this checkout has no main or master branch to read the branch's commits from. Fetch the default branch, then record draft_pr again.`;
 		const log = await pi.exec("git", ["log", "--reverse", "--no-merges", "--format=%x00%h", "--name-only", `${base}..HEAD`], { cwd });
 		if (log.code !== 0) return `draft_pr is not recorded: \`git log ${base}..HEAD\` failed, so the test-first order cannot be checked: ${log.stderr.trim()}`;
 		return testFirstRefusal(contract, parseBranchLog(log.stdout), base);
+	}
+
+	/** Why `stage` may not be recorded: the branch changes files outside `contract`'s files_to_change. */
+	async function scopeCheck(stage: Stage, contract: Contract, cwd: string): Promise<string | undefined> {
+		const base = await branchBase(cwd);
+		if (!base) return `${stage} is not recorded: this checkout has no main or master branch to diff the branch against, so its files cannot be checked against the contract's files_to_change. Fetch the default branch, then record ${stage} again.`;
+		const diff = await pi.exec("git", ["-c", "core.quotePath=false", "diff", "--name-only", base, "HEAD"], { cwd });
+		if (diff.code !== 0) return `${stage} is not recorded: \`git diff --name-only ${base} HEAD\` failed, so the branch's files cannot be checked against the contract's files_to_change: ${diff.stderr.trim()}`;
+		return scopeRefusal(stage, contract, diff.stdout.split("\n").filter(Boolean), base);
 	}
 }
