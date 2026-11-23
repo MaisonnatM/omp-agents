@@ -72,7 +72,7 @@ function SvgImage({ url, title }: RenderedProps) {
 function MarkdownText({ text }: RenderedProps) {
 	return (
 		<div className="size-full overflow-auto">
-			<article className="artifact-document mx-auto max-w-[40rem] px-10 py-9 @max-[30rem]/artifacts:px-5 @max-[30rem]/artifacts:py-6">
+			<article className="artifact-document mx-auto max-w-[48rem] px-10 py-9 @max-[30rem]/artifacts:px-5 @max-[30rem]/artifacts:py-6">
 				<MessageMarkdown text={text} preset={SESSION_AGENT_PRESET} />
 			</article>
 		</div>
