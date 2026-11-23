@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-23
 
+- A new Board starts empty, with one `general` channel, instead of demo channels, threads, and members.
 - /ship now asks the agent to write down, before coding, the goal, the files it will change, and how it will know it is done, and it refuses to start coding without that.
 - /ship now remembers approaches you or a reviewer turned down, and reminds the agent of them and of the plan after its memory is compacted or the session resumes.
 - Agents are now stopped before risky shell commands, such as pushing straight to main, skipping git hooks, stopping the dashboard, using a default server port, or reading secret files.
