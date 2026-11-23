@@ -1,6 +1,11 @@
 /** The Board: channels and threads where people, omp sessions, and remote agents post, with an inbox per member; a message for a session wakes it. */
-import { IconArrowUp, IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconPlusSmall, IconShieldCheck, IconSidebarSimpleRightWide } from "central-icons";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { IconBell, IconCalendar1, IconCheckmark1, IconChevronLeft, IconClock, IconPullRequest as IconGitPullRequest, IconHashtag, IconMagnifyingGlass, IconPlusSmall, IconRunShortcut, IconShieldCheck, IconSidebarSimpleRightWide, IconUser } from "central-icons";
+import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { InputMessage } from "@/components/ui/input-message";
+import type { MenuOption } from "../../mentions";
+import { CompletionPopup } from "../completion-popup";
+import type { PromptEditorHandle } from "../prompt-editor";
+import type { PromptToken, Tokenize } from "../../prompt-tokens";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
@@ -648,104 +653,106 @@ function StepDot({ state }: { state: "done" | "running" | "queued" | "failed" })
 
 /* ─────────────────────────── Composer ─────────────────────────── */
 
-type Suggestion = { kind: "member"; member: Member } | { kind: "command"; name: string; about: string };
+const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** A Board message's chips: `@` and a member's name, and a workflow command at the start. */
+function boardTokens(members: Member[]): Tokenize {
+	const names = members.map(member => member.name).sort((a, b) => b.length - a.length);
+	const mention = names.length ? new RegExp(`(?<=^|\\s)@(${names.map(escape).join("|")})(?=\\s|$)`, "gu") : null;
+	const command = new RegExp(`^/(${COMMANDS.map(item => item.name).join("|")})(?=\\s|$)`, "g");
+	return (text, { open = null, leading = true } = {}) => {
+		const found: PromptToken[] = [];
+		const scan = (re: RegExp, token: (match: RegExpExecArray) => Pick<PromptToken, "kind" | "label" | "target">) => {
+			for (const match of text.matchAll(re)) {
+				const end = match.index + match[0].length;
+				if (end !== open) found.push({ ...token(match), start: match.index, end });
+			}
+		};
+		if (leading) scan(command, match => ({ kind: "command", label: match[1]!, target: match[1]! }));
+		if (mention) scan(mention, match => ({ kind: "person", label: `@${match[1]}`, target: members.find(member => member.name === match[1])!.id }));
+		return found.sort((a, b) => a.start - b.start);
+	};
+}
 
 function Composer({ members, onPost, onCommand, channel }: { members: Member[]; onPost: (text: string) => void; onCommand: (command: string, arg: string) => void; channel: string }) {
 	const [text, setText] = useState("");
 	const [active, setActive] = useState(0);
-	const field = useRef<HTMLTextAreaElement>(null);
+	const [closed, setClosed] = useState(false);
+	const editorRef = useRef<PromptEditorHandle>(null);
+	const listId = useId();
 	const token = text.match(/(?:^|\s)([@/])([\p{L}'\- ]{0,20})$/u);
-	const suggestions: Suggestion[] = !token
-		? []
-		: token[1] === "@"
-			? members.filter(member => member.name.toLowerCase().startsWith(token[2]!.toLowerCase())).slice(0, 6).map(member => ({ kind: "member", member }))
-			: text.trimStart().startsWith("/") && !text.includes(" ")
-				? COMMANDS.filter(command => command.name.startsWith(token[2]!)).map(command => ({ kind: "command", ...command }))
-				: [];
+	const head = token ? text.slice(0, text.length - token[2]!.length - 1) : text;
+	const option = (icon: MenuOption["icon"], label: string, detail: string | null, inserted: string): MenuOption => ({ icon, label, detail, edit: { text: `${head}${inserted} `, cursor: head.length + inserted.length + 1 }, opens: false });
+	const tokenize = useMemo(() => boardTokens(members), [members]);
+	const options: MenuOption[] =
+		!token || closed
+			? []
+			: token[1] === "@"
+				? members
+						.filter(member => member.name.toLowerCase().startsWith(token[2]!.toLowerCase()))
+						.slice(0, 6)
+						.map(member => option(IconUser, member.name, member.presence === "asleep" ? "queues until it wakes" : member.kind === "human" ? "person" : (member.harness ?? null), `@${member.name}`))
+				: text.trimStart().startsWith("/") && !text.includes(" ")
+					? COMMANDS.filter(command => command.name.startsWith(token[2]!)).map(command => option(IconRunShortcut, `/${command.name}`, command.about, `/${command.name}`))
+					: [];
 
-	function pick(suggestion: Suggestion) {
-		const head = text.slice(0, text.length - token![2]!.length - 1);
-		setText(`${head}${suggestion.kind === "member" ? `@${suggestion.member.name}` : `/${suggestion.name}`} `);
+	function change(value: string) {
+		setText(value);
 		setActive(0);
-		field.current?.focus();
+		setClosed(false);
 	}
 
-	function send() {
-		const trimmed = text.trim();
+	function insert(edit: MenuOption["edit"]) {
+		change(edit.text);
+		requestAnimationFrame(() => editorRef.current?.select(edit.cursor));
+	}
+
+	function send(value: string) {
+		const trimmed = value.trim();
 		if (!trimmed) return;
 		const command = trimmed.match(/^\/([a-z]+)\s*(.*)$/s);
 		if (command && COMMANDS.some(item => item.name === command[1])) onCommand(command[1]!, command[2]!);
 		else onPost(trimmed);
-		setText("");
+		change("");
+	}
+
+	function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+		if (options.length === 0 || event.nativeEvent.isComposing) return;
+		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			event.preventDefault();
+			setActive(i => (i + (event.key === "ArrowDown" ? 1 : options.length - 1)) % options.length);
+		} else if ((event.key === "Tab" && !event.shiftKey) || event.key === "Enter") {
+			event.preventDefault();
+			insert(options[active]!.edit);
+		} else if (event.key === "Escape") {
+			event.preventDefault();
+			setClosed(true);
+		}
 	}
 
 	return (
 		<div className="shrink-0 pt-2 pb-[max(1.25rem,var(--toasts-clearance,0px))] transition-[padding] duration-200 max-phone:pb-5">
 			<div className="relative mx-auto max-w-3xl px-6">
-				{suggestions.length > 0 && (
-					<ul role="listbox" className="absolute right-6 bottom-full left-6 mb-2 overflow-hidden rounded-xl border border-border bg-popover p-1 shadow-lg">
-						{suggestions.map((suggestion, i) => (
-							<li key={suggestion.kind === "member" ? suggestion.member.id : suggestion.name} role="option" aria-selected={i === active}>
-								<button type="button" onMouseDown={event => event.preventDefault()} onClick={() => pick(suggestion)} className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm", i === active && "bg-accent")}>
-									{suggestion.kind === "member" ? (
-										<>
-											<Avatar member={suggestion.member} size="sm" />
-											<span className="font-medium">{suggestion.member.name}</span>
-											<span className="truncate text-xs text-muted-foreground">{suggestion.member.kind === "human" ? "person" : suggestion.member.harness}</span>
-											{suggestion.member.presence === "asleep" && <span className="ml-auto text-2xs text-amber-700 dark:text-amber-300">queues until it wakes</span>}
-										</>
-									) : (
-										<>
-											<span className="w-20 font-mono text-[0.85em] font-medium text-violet-700 dark:text-violet-300">/{suggestion.name}</span>
-											<span className="truncate text-xs text-muted-foreground">{suggestion.about}</span>
-										</>
-									)}
-								</button>
-							</li>
-						))}
-					</ul>
-				)}
-				<div className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-shadow focus-within:shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_25%,transparent)]">
-					<textarea
-						ref={field}
-						value={text}
-						rows={2}
-						onChange={event => {
-							setText(event.target.value);
-							setActive(0);
-						}}
-						onKeyDown={event => {
-							if (suggestions.length > 0 && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
-								event.preventDefault();
-								setActive(i => (i + (event.key === "ArrowDown" ? 1 : suggestions.length - 1)) % suggestions.length);
-							} else if (suggestions.length > 0 && (event.key === "Tab" || event.key === "Enter")) {
-								event.preventDefault();
-								pick(suggestions[active]!);
-							} else if (event.key === "Enter" && !event.shiftKey) {
-								event.preventDefault();
-								send();
-							}
-						}}
-						placeholder={`Reply in #${channel}. @ to ping a person or agent, / for a workflow`}
-						className="block w-full resize-none bg-transparent px-4 pt-3 text-sm outline-none placeholder:text-muted-foreground"
-					/>
-					<div className="flex items-center gap-1 px-2 pb-2">
-						{(["review", "implement", "schedule"] as const).map(name => (
-							<button key={name} type="button" onClick={() => setText(`/${name} `)} className="h-7 rounded-md px-2 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
-								/{name}
-							</button>
-						))}
-						<button
-							type="button"
-							onClick={send}
-							disabled={!text.trim()}
-							aria-label="Send"
-							className="ml-auto grid size-8 place-items-center rounded-full bg-foreground text-background transition-opacity disabled:opacity-30"
-						>
-							<IconArrowUp className="size-4" />
+				{options.length > 0 && <CompletionPopup id={listId} sections={[{ title: null, options }]} active={active} onPick={picked => insert(picked.edit)} error={null} />}
+				<InputMessage
+					editorRef={editorRef}
+					value={text}
+					onValueChange={change}
+					onSend={send}
+					tokenize={tokenize}
+					minRows={2}
+					placeholder={`Reply in #${channel}. @ to ping a person or agent, / for a workflow`}
+					editorProps={{
+						onKeyDown,
+						"aria-controls": options.length > 0 ? listId : undefined,
+						"aria-activedescendant": options.length > 0 ? `${listId}-${active}` : undefined,
+					}}
+					leftSlot={(["review", "implement", "schedule"] as const).map(name => (
+						<button key={name} type="button" onClick={() => insert({ text: `/${name} `, cursor: name.length + 2 })} className="h-7 rounded-md px-2 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
+							/{name}
 						</button>
-					</div>
-				</div>
+					))}
+				/>
 			</div>
 		</div>
 	);

@@ -76,6 +76,9 @@ const PATTERNS: readonly Pattern[] = [
 	},
 ];
 
+/** Finds the references a composer shows as chips, with `promptTokens`' `open` and `leading`. */
+export type Tokenize = (text: string, options?: { open?: number | null; leading?: boolean }) => PromptToken[];
+
 /**
  * The references in `text`, left to right and never overlapping. `open` is the caret while the user types: a reference
  * ending there may still be written, as `/mo` on the way to `/move`, so it stays text. `leading` says `text` starts the
