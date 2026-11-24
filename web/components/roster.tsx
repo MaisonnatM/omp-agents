@@ -331,17 +331,6 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, 
 					</SidebarMenu>
 				</SidebarGroup>
 			)}
-			{waitingHosts.length > 0 && (
-				<SidebarGroup collapsible open={!collapsed.has("waiting")} onOpenChange={() => toggleGroup("waiting")}>
-					<SidebarGroupLabel icon={IconCalendarClock}>
-						Waiting on CI or a scheduled check
-						<span className="tabular-nums text-muted-foreground/70">{waitingHosts.length}</span>
-					</SidebarGroupLabel>
-					<SidebarMenu aria-label="Sessions waiting on CI or a scheduled check" className="gap-px">
-						{waitingHosts.map(host => hostRow(host, false, showWorkspace))}
-					</SidebarMenu>
-				</SidebarGroup>
-			)}
 			{folders.shown.map(folder => {
 				const { cwd, cwdDisplay } = folder.group.workspace;
 				const key = `workspace:${cwd}`;
@@ -360,6 +349,17 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, 
 								{folders.more > 0 ? `${folders.more} more workspace${folders.more === 1 ? "" : "s"}` : "Fewer workspaces"}
 							</SidebarMenuButton>
 						</SidebarMenuItem>
+					</SidebarMenu>
+				</SidebarGroup>
+			)}
+			{waitingHosts.length > 0 && (
+				<SidebarGroup collapsible open={!collapsed.has("waiting")} onOpenChange={() => toggleGroup("waiting")}>
+					<SidebarGroupLabel icon={IconCalendarClock}>
+						Waiting
+						<span className="tabular-nums text-muted-foreground/70">{waitingHosts.length}</span>
+					</SidebarGroupLabel>
+					<SidebarMenu aria-label="Waiting omp sessions" className="gap-px">
+						{waitingHosts.map(host => hostRow(host, false, showWorkspace))}
 					</SidebarMenu>
 				</SidebarGroup>
 			)}

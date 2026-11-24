@@ -7,7 +7,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 - A step in a project's plan has a play button: it opens a new session in the project, already set to work on that step and its sub-steps, with the prompt written for you.
 - The prompt that Start session writes for the steps you picked now asks the session to tick each one it finishes.
-- Sessions waiting on a pull request's checks or a scheduled send now sit in one top-level Waiting on CI or a scheduled check section below the pinned sessions, each with a line per pull request showing whether its checks are running, failing, or passing; click a line to open the pull request.
+- Sessions waiting on a pull request's checks or a scheduled send now sit in one top-level Waiting section between the workspaces and Past, each with a line per pull request showing whether its checks are running, failing, or passing; click a line to open the pull request.
 - Once every pull request a session watches passes its checks, the session leaves Waiting on CI and shows the blue dot, so you see that CI went green without being pinged.
 - A session waiting on a scheduled send keeps the calendar clock.
 - The sidebar's **Scheduled** group is gone; scheduled messages still show above their session's composer with **Send now**, **Edit**, and **Cancel**.

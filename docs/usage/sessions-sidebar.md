@@ -30,7 +30,7 @@
   A session waiting on its subagents shows no dot either, even when its turn has ended, and its row's tooltip says **waiting on subagents**.
   A session whose turn ended to wait on a scheduled check, a `schedule_follow_up` send, a scheduled continue, or a pull request it watches, drops the blue dot, raises no notice, and the idle stop leaves it running; its tooltip says **waiting on a scheduled check**.
   One waiting on a send shows a calendar clock, and its tooltip says when the send goes out.
-  One waiting on the checks of the pull requests it watches lists, like one waiting on a scheduled send, in the root **Waiting on CI or a scheduled check** section after the pinned sessions instead of in its workspace, with one line per pull request under its row: its repository and number, an icon for its checks, and running, failing, passing, or no checks; a line opens the pull request on GitHub.
+  One waiting on the checks of the pull requests it watches lists, like one waiting on a scheduled send, in the root **Waiting** section between the workspaces and Past instead of in its workspace, with one line per pull request under its row: its repository and number, an icon for its checks, and running, failing, passing, or no checks; a line opens the pull request on GitHub.
   Once every one of those pull requests passes, or has no checks, the session leaves the group and shows the blue dot, since a passing check wakes no session; a failing one wakes it, so its row goes back to running.
 - Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
   With one workspace picked, the rows show no badge.
