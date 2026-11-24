@@ -9,7 +9,7 @@ import { type EndedTurn, endedTurn, type LiveSession, type LiveUpdate } from "..
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath, unreadFile } from "../paths";
 import { oneLine } from "../session-entries";
-import { type RosterHost, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
+import { type RosterHost, type ScheduledCheck, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 import { pullRequestTask, TaskClaims } from "../task-claims";
 import { portFromEnv } from "./address";
 import { TurnWaits } from "./turn-waits";
@@ -74,8 +74,12 @@ export class LiveSessions {
 	readonly #onUpdate: (instanceId: string, update: SessionUpdate) => void;
 	readonly #taskClaims: TaskClaims;
 
-	constructor(onUpdate: (instanceId: string, update: SessionUpdate) => void, taskClaims = new TaskClaims(), unreadPath = unreadFile) {
+	/** The scheduled check session `sessionId` waits on, which its row's `scheduledCheck` shows. */
+	readonly #scheduledCheck: (sessionId: string) => ScheduledCheck | null;
+
+	constructor(onUpdate: (instanceId: string, update: SessionUpdate) => void, taskClaims = new TaskClaims(), unreadPath = unreadFile, scheduledCheck: (sessionId: string) => ScheduledCheck | null = () => null) {
 		this.#onUpdate = onUpdate;
+		this.#scheduledCheck = scheduledCheck;
 		this.#taskClaims = taskClaims;
 		this.#unreadFile = new JsonFile(unreadPath, { parse: decoder(isSavedUnread), holds: "a list of unread turns", onInvalid: "ignore" });
 		const saved = this.#unreadFile.load();
@@ -282,13 +286,14 @@ export class LiveSessions {
 		this.#unreadFile.save({ turns: [...turns].map(([instanceId, turn]) => ({ instanceId, ...turn })), heardUntil });
 	}
 
-	/** Each session's roster row, with its `cwdDisplay`, its unread turn, whether its turn waits, and what the session files' index knows of it, asked with the directory it runs in now. */
+	/** Each session's roster row, with its `cwdDisplay`, its unread turn, whether its turn waits, the scheduled check it waits on, and what the session files' index knows of it, asked with the directory it runs in now. */
 	rows(factsOf: (sessionId: string, cwd: string) => SessionFacts): RosterHost[] {
 		return [...this.#sessions.values()].map(session => ({
 			...session.row(),
 			cwdDisplay: displayPath(session.cwd),
 			unread: this.#unread.get(session.instanceId) ?? null,
 			turnWaits: this.#turnWaits.waits(session.instanceId),
+			scheduledCheck: this.#scheduledCheck(session.sessionId),
 			...withSubject(factsOf(session.sessionId, session.cwd), this.#subjects.get(session.instanceId)),
 		}));
 	}

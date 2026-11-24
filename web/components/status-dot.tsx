@@ -2,8 +2,8 @@
 import type { AgentStatus, HostStatus } from "../../src/shared/sessions";
 import { cn } from "@/lib/utils";
 
-/** A session waiting on its subagents is a status only the sidebar's rows show, from `awaitsSubagents`. */
-export type RowStatus = HostStatus | "awaiting-subagents";
+/** A session waiting on its subagents or on a scheduled check is a status only the sidebar's rows and tabs show, from `awaitsSubagents` and `awaitsScheduled`. */
+export type RowStatus = HostStatus | "awaiting-subagents" | "awaiting-scheduled";
 type Status = RowStatus | AgentStatus;
 
 const DOTS: Record<Status, { label: string; className: string | null }> = {
@@ -11,6 +11,7 @@ const DOTS: Record<Status, { label: string; className: string | null }> = {
 	working: { label: "working", className: null },
 	running: { label: "running", className: null },
 	"awaiting-subagents": { label: "waiting on subagents", className: null },
+	"awaiting-scheduled": { label: "waiting on a scheduled check", className: null },
 	"needs-input": { label: "needs input", className: "bg-amber-500 shadow-[0_0_0_2px] shadow-amber-500/30" },
 	idle: { label: "idle", className: "bg-blue-500 shadow-[0_0_0_2px] shadow-blue-500/25" },
 	parked: { label: "parked", className: "border border-muted-foreground/60" },

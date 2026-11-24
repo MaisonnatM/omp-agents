@@ -1,7 +1,7 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { IconFlag1, IconFolderDelete, IconLayoutColumn, IconPause } from "central-icons";
+import { IconCalendarClock, IconFlag1, IconFolderDelete, IconLayoutColumn, IconPause } from "central-icons";
 import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
-import { awaitsSubagents, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
+import { awaitsScheduled, awaitsSubagents, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -257,9 +257,10 @@ export const PastRow = memo(function PastRow({ session, pinned, placement, showW
 
 function HostStatus({ host, status }: { host: RosterHost; status: RowStatus }) {
 	const ending = useDashboardStatus().ending.has(host.instanceId);
-	return ending
-		? <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><Spinner className="size-3" /></span>
-		: <StatusDot status={status} />;
+	if (ending) return <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><Spinner className="size-3" /></span>;
+	// A session waiting on a scheduled check is not done, so it shows the clock it waits on instead of the idle dot.
+	if (status === "awaiting-scheduled") return <IconCalendarClock aria-hidden={false} aria-label={statusLabel(status)} className="size-3 shrink-0 text-muted-foreground" />;
+	return <StatusDot status={status} />;
 }
 
 /** A running session's row, with its status dot, and End session where the server controls it. */
@@ -267,8 +268,9 @@ export const HostRow = memo(function HostRow({ session: host, pinned, placement,
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = hostLabel(host);
-	// A session waiting on its subagents needs nothing from you, so its row drops the idle dot that would say its work is done.
-	const status = awaitsSubagents(host) ? "awaiting-subagents" : host.status;
+	// A session waiting on its subagents or on a scheduled check needs nothing from you, so its row drops the idle dot that would say its work is done.
+	const status = awaitsSubagents(host) ? "awaiting-subagents" : awaitsScheduled(host) ? "awaiting-scheduled" : host.status;
+	const scheduledAt = status === "awaiting-scheduled" && host.scheduledCheck?.kind === "send" ? ` until ${new Date(host.scheduledCheck.at).toLocaleString()}` : "";
 	const isPrivate = isPrivateHost(host);
 	const workspace = showWorkspace && (host.sessionName !== null || workspaceCwd(host) !== host.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null;
 	return (
@@ -276,7 +278,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, placement,
 			<SessionButton
 				view={view}
 				label={label}
-				title={`${statusLabel(status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}${isPrivate ? `\n${PRIVATE_NOTE}` : ""}`}
+				title={`${statusLabel(status)}${scheduledAt}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}${isPrivate ? `\n${PRIVATE_NOTE}` : ""}`}
 				badge={
 					isPrivate ? (
 						<span className="flex items-center gap-1.5">

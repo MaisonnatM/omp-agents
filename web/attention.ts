@@ -1,6 +1,6 @@
 /** Which live sessions need you, and the alerts they raise, for the desktop app's Dock badge and the session notifications. */
 import type { SessionAlert } from "../src/shared/desktop-bridge";
-import { awaitsSubagents, hashForSession, type RosterHost, type Stop, stopOf, type UnreadTurn, type View } from "../src/shared/sessions";
+import { awaitsScheduled, awaitsSubagents, hashForSession, type RosterHost, type Stop, stopOf, type UnreadTurn, type View } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { hostLabel } from "./labels";
 
@@ -11,10 +11,10 @@ export function waitOf(host: RosterHost): Wait | null {
 	const stop = stopOf(host);
 	if (stop && stop.kind !== "turn-ended") return stop;
 	// An unread turn counts even while omp has not said it is idle, as for a terminal session that reports no busy state.
-	return host.unread && !awaitsSubagents(host) ? { kind: "turn", turn: host.unread } : null;
+	return host.unread && !awaitsSubagents(host) && !awaitsScheduled(host) ? { kind: "turn", turn: host.unread } : null;
 }
 
-/** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since and waits on no subagent. */
+/** Whether live session `host` needs you: it asks you something, or it ended a turn you have not looked at since and waits on no subagent or scheduled check. */
 export const needsYou = (host: RosterHost): boolean => waitOf(host) !== null;
 
 /** A session's {@link Wait} as an alert tells it. A question and a turn carry a key that names them across roster pushes; the bare wait has none. */

@@ -7,7 +7,7 @@ const host = (
 	instanceId: string,
 	status: HostStatus,
 	{ unread = null, requests = [], sessionName = `Session ${instanceId}`, agents = [] }: { unread?: UnreadTurn | null; requests?: UserRequest[]; sessionName?: string | null; agents?: AgentRow[] } = {},
-) => fromPartial<RosterHost>({ instanceId, sessionId: `s-${instanceId}`, sessionName, cwdDisplay: "~/code/webapp", status, unread, requests, agents, turnWaits: false });
+) => fromPartial<RosterHost>({ instanceId, sessionId: `s-${instanceId}`, sessionName, cwdDisplay: "~/code/webapp", status, unread, requests, agents, turnWaits: false, scheduledCheck: null });
 const subagent = (status: AgentRow["status"]) => fromPartial<AgentRow>({ status });
 const ask = (id: string, title: string): UserRequest => ({ id, title, deadline: null, kind: "select", options: [], checkboxes: 0, checked: [] });
 

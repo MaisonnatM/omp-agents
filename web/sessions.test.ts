@@ -1,10 +1,10 @@
 import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
-import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn, View } from "../src/shared/sessions";
+import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, ScheduledCheck, UnreadTurn, View } from "../src/shared/sessions";
 import type { Project } from "../src/shared/projects";
 import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, projectGroups, rosterFolders, rowPlacement, searchSessions, sidebarSessions, waitingCount, workspaceGroups, workspaceSession, workspaceSwitch } from "./sessions";
 
-const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
+const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false, scheduledCheck: null });
 const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(status => fromPartial<AgentRow>({ status }));
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
 const ids = (rows: { sessionId: string }[]) => rows.map(row => row.sessionId);
@@ -170,12 +170,16 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.idle)).toEqual(["h1"]);
 	});
 
-	test("a session whose subagents still run while its main agent's turn ended or only waits on them lists as waiting on subagents", () => {
-		const live = (sessionId: string, status: HostStatus, turnWaits: boolean, agents: AgentRow[]) => fromPartial<RosterHost>({ ...host(sessionId, "~/a"), status, turnWaits, agents });
+	test("a session whose subagents still run while its main agent's turn ended or only waits on them, or whose ended turn waits on a scheduled check, lists as waiting on work", () => {
+		const live = (sessionId: string, status: HostStatus, turnWaits: boolean, agents: AgentRow[], scheduledCheck: ScheduledCheck | null = null) =>
+			fromPartial<RosterHost>({ ...host(sessionId, "~/a"), status, turnWaits, agents, scheduledCheck });
 		const lists = sidebarSessions(
 			[
 				live("idle-delegating", "idle", false, subagents("running")),
 				live("waits-on-subagent", "working", true, subagents("idle", "running")),
+				live("waits-on-check", "idle", false, [], { kind: "send", at: 5_000 }),
+				live("waits-on-pull-request", "idle", false, [], { kind: "pull-request" }),
+				live("works-before-check", "working", false, [], { kind: "send", at: 5_000 }),
 				live("waits-on-bash-job", "working", true, []),
 				live("works-beside-subagent", "working", false, subagents("running")),
 				live("done", "idle", false, subagents("idle", "aborted")),
@@ -186,19 +190,20 @@ describe("sidebarSessions", () => {
 			null,
 			new Set(["pinned"]),
 		);
-		expect(ids(lists.awaitingSubagents)).toEqual(["idle-delegating", "waits-on-subagent"]);
-		expect(ids(lists.running)).toEqual(["waits-on-bash-job", "works-beside-subagent", "asks"]);
+		expect(ids(lists.awaitingWork)).toEqual(["idle-delegating", "waits-on-subagent", "waits-on-check", "waits-on-pull-request"]);
+		expect(ids(lists.running)).toEqual(["works-before-check", "waits-on-bash-job", "works-beside-subagent", "asks"]);
 		expect(ids(lists.idle)).toEqual(["done"]);
 		expect(ids(lists.pinned.hosts)).toEqual(["pinned"]);
 	});
 
-	test("the waiting count takes unread turns and open questions in the selected workspace, pinned ones included, and not a turn already read or one whose session waits on its subagents", () => {
+	test("the waiting count takes unread turns and open questions in the selected workspace, pinned ones included, and not a turn already read or one whose session waits on its subagents or a scheduled check", () => {
 		const turn = fromPartial<UnreadTurn>({ at: 1, reply: "Done." });
 		const rows = { h1: ["idle", turn], h2: ["needs-input", null], h3: ["working", null], h4: ["idle", turn], h5: ["unknown", null], h7: ["idle", null] } as const;
 		const live = [
 			...Object.entries(rows).map(([id, [status, unread]]) => ({ ...host(id, "~/a"), status, unread, requests: [] })),
 			{ ...host("h6", "~/b"), status: "idle" as const, unread: turn, requests: [] },
 			{ ...host("h8", "~/a"), status: "idle" as const, unread: turn, requests: [], agents: subagents("running") },
+			{ ...host("h9", "~/a"), status: "idle" as const, unread: turn, requests: [], scheduledCheck: { kind: "send" as const, at: 5_000 } },
 		];
 		expect(waitingCount(sidebarSessions(live, [], "~/a", new Set(["h4"])))).toBe(3);
 	});

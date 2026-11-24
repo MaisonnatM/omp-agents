@@ -1,6 +1,6 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
 import type { Project } from "../src/shared/projects";
-import { awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
+import { awaitsScheduled, awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import { inAppData, inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
 import { needsYou } from "./attention";
@@ -102,14 +102,14 @@ export interface SidebarSessions {
 	running: RosterHost[];
 	/** Live sessions that finished their turn: the blue dot. */
 	idle: RosterHost[];
-	/** Live sessions whose subagents still run while the main agent's turn has ended or only waits on them. */
-	awaitingSubagents: RosterHost[];
+	/** Live sessions that wait on work under way: subagents that still run while the main agent's turn has ended or only waits on them, or a scheduled check. */
+	awaitingWork: RosterHost[];
 	interrupted: PastSession[];
 	ended: PastSession[];
 }
 
 /** The sessions tab lists an unpinned live session can land in, in the order the sidebar shows them. */
-const LIVE_LISTS = ["idle", "running", "awaitingSubagents"] as const satisfies readonly (keyof SidebarSessions)[];
+const LIVE_LISTS = ["idle", "running", "awaitingWork"] as const satisfies readonly (keyof SidebarSessions)[];
 type LiveList = (typeof LIVE_LISTS)[number];
 
 /** Every live session `lists` holds outside pinned, in the sidebar's order. */
@@ -125,9 +125,9 @@ export function rowPlacement(panes: readonly View[], row: View): RowPlacement {
 	return panes.length > 1 ? "split" : "alone";
 }
 
-/** The list unpinned live session `host` lands in: `idle` and `running` hold the sessions that wait on no subagent, by its status. */
+/** The list unpinned live session `host` lands in: `idle` and `running` hold the sessions that wait on no subagent or scheduled check, by its status. */
 function liveList(host: RosterHost): LiveList {
-	if (awaitsSubagents(host)) return "awaitingSubagents";
+	if (awaitsSubagents(host) || awaitsScheduled(host)) return "awaitingWork";
 	return host.status === "idle" ? "idle" : "running";
 }
 
@@ -136,7 +136,7 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], worksp
 	const isPinned = (row: { sessionId: string }): boolean => pinned.has(row.sessionId);
 	const shownHosts = hosts.filter(listed);
 	const shownPast = past.filter(listed);
-	const live: Record<LiveList, RosterHost[]> = { running: [], idle: [], awaitingSubagents: [] };
+	const live: Record<LiveList, RosterHost[]> = { running: [], idle: [], awaitingWork: [] };
 	for (const host of shownHosts) if (!isPinned(host)) live[liveList(host)].push(host);
 	return {
 		pinned: {
@@ -160,7 +160,7 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 		pinned: { hosts: hosts(lists.pinned.hosts), past: past(lists.pinned.past) },
 		running: hosts(lists.running),
 		idle: hosts(lists.idle),
-		awaitingSubagents: hosts(lists.awaitingSubagents),
+		awaitingWork: hosts(lists.awaitingWork),
 		interrupted: past(lists.interrupted),
 		ended: past(lists.ended),
 	};
@@ -267,7 +267,7 @@ export function projectGroups(lists: SidebarSessions, projects: readonly Project
 			pinned: { hosts: take(lists.pinned.hosts, hosts), past: take(lists.pinned.past, past) },
 			idle: take(lists.idle, hosts),
 			running: take(lists.running, hosts),
-			awaitingSubagents: take(lists.awaitingSubagents, hosts),
+			awaitingWork: take(lists.awaitingWork, hosts),
 			interrupted: take(lists.interrupted, past),
 			ended: lists.ended,
 		},

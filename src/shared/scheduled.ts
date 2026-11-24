@@ -165,3 +165,13 @@ export function applyScheduled(sends: ScheduledSend[], change: Exclude<Scheduled
 
 /** Whether `send` waits and its time has come. */
 export const isDueSend = (send: ScheduledSend, now: number): boolean => send.state.phase === "waiting" && send.at <= now;
+
+/** When the soonest send to session `sessionId` that waits or is under way goes out, `null` when none does; a failed one waits on you instead. */
+export function nextSendTo(sends: readonly ScheduledSend[], sessionId: string): number | null {
+	let next: number | null = null;
+	for (const { target, state, at } of sends) {
+		if (target.kind === "start" || target.sessionId !== sessionId || state.phase === "failed") continue;
+		if (next === null || at < next) next = at;
+	}
+	return next;
+}

@@ -9,7 +9,7 @@ function host(instanceId: string, sessionId = `session-${instanceId}`, agents: A
 		instanceId, sessionId, agents, source: "dashboard", cwd: "/work", cwdDisplay: "/work", pid: 1,
 		sessionName: null, model: null, thinkingLevel: null, context: null, startedAt: 0, status: "idle",
 		control: { phase: "live", readOnly: false }, requests: [], queue: { steering: [], followUp: [] },
-		unread: null, turnWaits: false, thinkingLevels: [], switching: false, fast: null, pullRequests: [], ship: null, issues: [], arenas: [],
+		unread: null, turnWaits: false, scheduledCheck: null, thinkingLevels: [], switching: false, fast: null, pullRequests: [], ship: null, issues: [], arenas: [],
 		compaction: { auto: true, running: null, thresholdTokens: null }, advisor: null, goal: { kind: "none", continues: false },
 		worktree: null, branch: null, workspace: null, gone: false, private: false,
 	};
