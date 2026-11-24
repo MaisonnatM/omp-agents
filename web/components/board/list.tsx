@@ -49,11 +49,11 @@ export function listedThreads({ view, state, index, queue, query, open }: { view
 	}
 }
 
-/** A channel's threads, newest first; done ones show only while open or matched by a filter, so settled work leaves the list. */
+/** A channel's threads, newest first; done ones show only while unread, open, or matched by a filter, so settled work leaves the list once read. */
 function channelThreads(state: BoardState, index: BoardIndex, channel: string, query: string, open: string | null): Thread[] {
 	const at = (thread: Thread) => index.lastByThread.get(thread.id)?.at ?? 0;
 	return state.threads
-		.filter(thread => thread.channel === channel && thread.title.toLowerCase().includes(query.toLowerCase()) && (thread.task !== "done" || query !== "" || thread.id === open))
+		.filter(thread => thread.channel === channel && thread.title.toLowerCase().includes(query.toLowerCase()) && (thread.task !== "done" || index.unreadByThread.has(thread.id) || query !== "" || thread.id === open))
 		.toSorted((a, b) => at(b) - at(a));
 }
 
