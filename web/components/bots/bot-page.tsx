@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { BOT_KIND_START, botAsking, NEW_BOT_DRAFT, type NewBotDraft, type OpenBot, pickKind, pickTemplate, starterPrompts } from "../../bots-model";
 import { botDraftKey, useComposerDraft } from "../../composer-drafts";
-import { type Completions, useShowConversation } from "../../pane-store";
+import { type Completions, useNextSuggestions, useShowConversation } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
 import { hashForBotRoutine, hashForBots } from "../../routing";
 import { draftOf, newDraft, type RoutineDraft } from "../../routines-model";
@@ -182,7 +182,9 @@ export function BotPage({ open, bots, past, lastHosts, models, workspaces, conne
 		}),
 		[bot.name, names],
 	);
-	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : NO_STARTERS), [bot.sessionId, bot.job]);
+	// A stopped conversation offers what its last reply suggested; a new Bot offers its starters.
+	const lastSuggestions = useNextSuggestions(view, false);
+	const starters = useMemo(() => (bot.sessionId === null ? starterPrompts(bot.job) : lastSuggestions), [bot.sessionId, bot.job, lastSuggestions]);
 	useShowConversation(view);
 	switch (routine.kind) {
 		case "new":
