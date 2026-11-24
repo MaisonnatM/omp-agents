@@ -35,7 +35,7 @@ import {
 	TextNode,
 } from "lexical";
 import { type ComponentProps, type JSX, type Ref, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
-import { type ChipKind, type PromptToken, promptTokens, type Tokenize } from "../prompt-tokens";
+import { type ChipKind, type PromptToken, promptTokens } from "../prompt-tokens";
 import { isChipKind, PromptChip } from "./prompt-chip";
 
 type ChipData = Pick<PromptToken, "kind" | "label" | "target"> & { text: string };
@@ -153,10 +153,10 @@ export function $fill(text: string): void {
 const $text = (): string => $getRoot().getTextContent();
 
 /** Whether `chip` still reads as its reference beside the text around it: `/move` followed by `X` is `/moveX`. */
-function $whole(chip: ChipNode, before: string, after: string, tokenize: Tokenize): boolean {
+function $whole(chip: ChipNode, before: string, after: string): boolean {
 	const { text } = chip.__chip;
 	const leading = before === "" && chip.getPreviousSibling() === null;
-	return tokenize(before + text + after, { leading }).some(token => token.start === before.length && token.end === before.length + text.length);
+	return promptTokens(before + text + after, { leading }).some(token => token.start === before.length && token.end === before.length + text.length);
 }
 
 export interface PromptEditorHandle {
@@ -171,13 +171,11 @@ export interface PromptEditorHandle {
 }
 
 /** Turns each reference typed or inserted into a chip, and keeps the parent's `value` and the editor's text equal. */
-function Sync({ value, onChange, disabled, handle, tokenize }: { value: string; onChange: (text: string) => void; disabled: boolean; handle?: Ref<PromptEditorHandle>; tokenize: Tokenize }) {
+function Sync({ value, onChange, disabled, handle }: { value: string; onChange: (text: string) => void; disabled: boolean; handle?: Ref<PromptEditorHandle> }) {
 	const [editor] = useLexicalComposerContext();
 	const current = useRef(value);
 	const onChangeRef = useRef(onChange);
 	onChangeRef.current = onChange;
-	const tokenizeRef = useRef(tokenize);
-	tokenizeRef.current = tokenize;
 	/** Set while the parent's value replaces the text: none of it is being typed, so a reference at the caret is whole. */
 	const replacing = useRef(false);
 
@@ -226,7 +224,7 @@ function Sync({ value, onChange, disabled, handle, tokenize }: { value: string; 
 			const text = node.getTextContent();
 			// A chip the text now runs into turns back into text, which this transform then reads again as a whole.
 			const [previous, next] = [node.getPreviousSibling(), node.getNextSibling()];
-			const broken = previous instanceof ChipNode && !$whole(previous, "", text, tokenizeRef.current) ? previous : next instanceof ChipNode && !$whole(next, text, "", tokenizeRef.current) ? next : null;
+			const broken = previous instanceof ChipNode && !$whole(previous, "", text) ? previous : next instanceof ChipNode && !$whole(next, text, "") ? next : null;
 			if (broken) {
 				broken.replace($createTextNode(broken.__chip.text));
 				return;
@@ -237,7 +235,7 @@ function Sync({ value, onChange, disabled, handle, tokenize }: { value: string; 
 			// A folder the `@` menu inserted stays open, so its contents list next.
 			const open = replacing.current ? (text.endsWith("/") ? text.length : null) : caret;
 			const leading = node.getPreviousSibling() === null;
-			const [token] = tokenizeRef.current(text, { open, leading });
+			const [token] = promptTokens(text, { open, leading });
 			if (!token) return;
 			const parts = node.splitText(token.start, token.end);
 			const chip = new ChipNode({ kind: token.kind, label: token.label, target: token.target, text: text.slice(token.start, token.end) });
@@ -299,11 +297,9 @@ interface PromptEditorProps extends EditableProps {
 	onValueChange: (text: string) => void;
 	disabled?: boolean;
 	handle?: Ref<PromptEditorHandle>;
-	/** The references that show as chips; omp's prompt grammar by default. */
-	tokenize?: Tokenize;
 }
 
-export function PromptEditor({ value, onValueChange, disabled = false, handle, tokenize = promptTokens, ...editable }: PromptEditorProps) {
+export function PromptEditor({ value, onValueChange, disabled = false, handle, ...editable }: PromptEditorProps) {
 	// Built once: the editor keeps its own text from then on, and `Sync` follows `value`.
 	const [extension] = useState(() =>
 		defineExtension({
@@ -320,7 +316,7 @@ export function PromptEditor({ value, onValueChange, disabled = false, handle, t
 		// `null`: the editable renders as a child, since a new `contentEditable` element would build a new editor.
 		<LexicalExtensionComposer extension={extension} contentEditable={null}>
 			<ContentEditable {...editable} />
-			<Sync value={value} onChange={onValueChange} disabled={disabled} handle={handle} tokenize={tokenize} />
+			<Sync value={value} onChange={onValueChange} disabled={disabled} handle={handle} />
 		</LexicalExtensionComposer>
 	);
 }

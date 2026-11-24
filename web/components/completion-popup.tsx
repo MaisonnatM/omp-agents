@@ -90,7 +90,7 @@ interface Completion {
 
 /**
  * A composer's completion list, whatever it completes: suggestions follow the caret, and the open list owns Esc, the
- * arrows, Tab, and Enter. Sessions use it through `useCompletion`, and the Board with its members and commands.
+ * arrows, Tab, and Enter. Sessions use it through `useCompletion`.
  */
 export function useCompletionMenu<T>({ editorRef, draft, setDraft, open, list }: MenuSource<T>): Completion {
 	const [menu, setMenu] = useState<T | null>(null);

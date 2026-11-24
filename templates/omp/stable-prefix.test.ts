@@ -14,10 +14,7 @@ afterAll(() => {
 	setSystemTime();
 	rmSync(scratch, { recursive: true, force: true });
 });
-// The extensions read their config directory when they load, so it is set before they are imported below. Another
-// test file in the same run may have loaded the inbox client first, so the todos go wherever it settled.
-process.env.XDG_CONFIG_HOME = join(scratch, "config");
-const { CONFIG_DIR: config } = await import("./agent/extensions/inbox/client");
+const config = join(scratch, "config", "omp-agents");
 mkdirSync(config, { recursive: true });
 writeFileSync(
 	join(config, "todos.json"),
@@ -28,6 +25,8 @@ writeFileSync(
 		],
 	}),
 );
+// The extensions read their config directory when they load, so it is set before they are imported below.
+process.env.XDG_CONFIG_HOME = join(scratch, "config");
 
 type Result = { systemPrompt?: string[]; message?: { content: string } } | undefined;
 type Hook = (event: object, ctx: object) => Result | Promise<Result>;

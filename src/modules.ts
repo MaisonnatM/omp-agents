@@ -2,15 +2,13 @@
  * The modules the dashboard is built with, and what a module gives the server: a feature beside the core, such as Sport,
  * which the core reaches only through this list. The page's half is `web/modules.ts`; see docs/architecture/modules.md.
  */
-import { BOARD_MODULE } from "./board-module";
 import { MEMORY_MODULE } from "./memory-module";
 import type { InboxOptions, JsonInboxDir } from "./server/json-inbox";
 import type { RouteKit, Routes } from "./server/route-kit";
 import type { SessionJoin } from "./server/start";
 import { MODULES_OFF_KEY, parseModulesOff } from "./shared/modules-off";
 import type { PagePreferences } from "./shared/preferences";
-import type { Bot, BotId } from "./shared/bots";
-import type { RosterHost } from "./shared/sessions";
+import { PROJECTS_MODULE } from "./projects-module";
 import { SPORT_MODULE } from "./sport-module";
 
 /** A module's state as the server holds it, read from its file once; the server is the file's one writer. */
@@ -56,46 +54,13 @@ export interface ModuleCore {
 	workspaces(): string[];
 }
 
-/** What a running module reaches of the core. */
-export interface CoreEnv {
-	hosts(): readonly RosterHost[];
-	bots(): readonly Bot[];
-	/** Sends `text` to session `sessionId` as a follow-up, resuming it when it ended. */
-	wake(sessionId: string, text: string): Promise<void>;
-	/** Sends `text` into Bot `botId`'s conversation, resuming or starting it. */
-	wakeBot(botId: BotId, text: string): Promise<void>;
-	/** Starts a new session in `cwd` on `prompt`, in project `projectId` when it names one, and answers its session id. */
-	startSession(cwd: string, prompt: string, projectId: string | null): Promise<string>;
-	/** The workspaces the page shows, the first being where a session starts when nothing names another. */
-	workspaces(): string[];
-	/** Whether this server acts at all: only the one that owns the files does. */
-	active(): boolean;
-	now(): number;
-	/** Aborts as the dashboard stops. */
-	stopping: AbortSignal;
-}
-
-/** {@link CoreEnv} with a stored module's own state, and `apply`, which applies a change to it. */
-export type ModuleEnv<Value, Change> = CoreEnv & { state(): Value; apply(change: Change): void };
-
-/** What a running module does as the core changes. */
-export interface ModuleRun<Change> {
-	/** The module's state changed. */
-	changed?(): void;
-	/** The roster changed. */
-	rosterChanged?(): void;
-	/** The change an agent's tool left in the inbox, as the module applies it. */
-	fromAgent?(change: Change): Change;
-}
-
-/** A module that keeps state, with the types of its state and of a change to it; `run` starts what it does beside the core. */
+/** A module that keeps state, with the types of its state and of a change to it. */
 export type StoredModule<Id extends string, Value, Change> = Omit<ServerModule<Id>, "store"> & {
 	readonly store: ModuleStore<Value, Change>;
-	run?(env: ModuleEnv<Value, Change>): ModuleRun<Change>;
 };
 
 /** Every module, by id: adding one is adding its definition here and its page's to `WEB_MODULES` in `web/modules.ts`. */
-export const SERVER_MODULES = { sport: SPORT_MODULE, memory: MEMORY_MODULE, board: BOARD_MODULE };
+export const SERVER_MODULES = { sport: SPORT_MODULE, memory: MEMORY_MODULE, projects: PROJECTS_MODULE };
 SERVER_MODULES satisfies { readonly [I in ModuleId]: ServerModule<I> };
 
 type Modules = typeof SERVER_MODULES;
@@ -111,7 +76,7 @@ export type ModuleChanges = { [I in StoredModuleId]: StoreTypes<StoredModules[I]
 export type ModuleFiles = { [I in StoredModuleId]: ModuleFile<ModuleValues[I], ModuleChanges[I]> };
 
 /** The stored modules typed by id, so the store a lookup finds takes the change of the module the id names. */
-const STORED_MODULES: { readonly [I in StoredModuleId]: Pick<StoredModule<I, ModuleValues[I], ModuleChanges[I]>, "store" | "run"> } = SERVER_MODULES;
+const STORED_MODULES: { readonly [I in StoredModuleId]: Pick<StoredModule<I, ModuleValues[I], ModuleChanges[I]>, "store"> } = SERVER_MODULES;
 const STORED_IDS: readonly StoredModuleId[] = Object.values(SERVER_MODULES)
 	.filter((module): module is Modules[StoredModuleId] => "store" in module)
 	.map(module => module.id);
@@ -132,16 +97,6 @@ export function parseModuleChange<I extends StoredModuleId>(id: I, change: unkno
 export function moduleInboxes(files: ModuleFiles, apply: <I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => boolean, options: InboxOptions): JsonInboxDir<unknown>[] {
 	const inboxOf = <I extends StoredModuleId>(id: I): JsonInboxDir<unknown> | undefined => STORED_MODULES[id].store.inbox?.(() => files[id].value, change => apply(id, change), options);
 	return STORED_IDS.flatMap(id => inboxOf(id) ?? []);
-}
-
-/** The running stored modules, by id. */
-export type ModuleRuns = { [I in StoredModuleId]?: ModuleRun<ModuleChanges[I]> };
-
-/** Starts every stored module's `run`; `apply` applies a change to module `id`'s state. */
-export function runModules(files: ModuleFiles, apply: <I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => void, core: CoreEnv): ModuleRuns {
-	const runOf = <I extends StoredModuleId>(id: I): ModuleRun<ModuleChanges[I]> | undefined =>
-		STORED_MODULES[id].run?.({ ...core, state: () => files[id].value, apply: change => apply(id, change) });
-	return Object.fromEntries(STORED_IDS.map(id => [id, runOf(id)])) as ModuleRuns;
 }
 
 const isModuleId = (id: string): id is ModuleId => Object.hasOwn(SERVER_MODULES, id);

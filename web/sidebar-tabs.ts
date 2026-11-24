@@ -94,11 +94,8 @@ export function moveTab(layout: TabLayout, tab: SidebarTab, by: -1 | 1): TabLayo
 /** `layout` with `tab` hidden or shown. */
 export const hideTab = (layout: TabLayout, tab: SidebarTab, hidden: boolean): TabLayout => layout.map(entry => (entry.tab === tab ? { tab, hidden } : entry));
 
-/**
- * The tabs with no row in the page list or in Settings › Preferences: the sidebar's own Projects section, just below the list, already lists the projects
- * and starts a new one, and the sidebar's Sessions | Board switch opens the Board.
- */
-export const ROWLESS_TABS: ReadonlySet<SidebarTab> = new Set<SidebarTab>(["projects", "board"]);
+/** The tabs with no row in the page list or in Settings › Preferences: the sidebar's own Projects section, just below the list, already lists the projects and starts a new one. */
+export const ROWLESS_TABS: ReadonlySet<SidebarTab> = new Set<SidebarTab>(["projects"]);
 
 /** The tabs shown, in order: those the user did not hide, less the `absent` ones, whose module is turned off, and the {@link ROWLESS_TABS}. */
 export const shownTabs = (layout: TabLayout, absent: ReadonlySet<SidebarTab>): SidebarTab[] =>

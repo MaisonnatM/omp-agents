@@ -11,7 +11,7 @@ import { githubMediaPath, pullRequestOfUrl, type PullRequestDetail } from "../..
 import { hashForSession } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { linkedFile, remarkFilePaths } from "../file-paths";
-import { remarkChips, remarkPromptChips, type Tokenize } from "../prompt-tokens";
+import { remarkPromptChips } from "../prompt-tokens";
 import { useRead } from "../reads";
 import { parseBeforeAfter } from "../before-after";
 import { parseReviewPages } from "../review-pages";
@@ -357,9 +357,6 @@ const remarkLineBreaks = () => (root: BreakNode) => {
 
 /** A message one Bot sent another, shown in the receiving Bot's conversation: agent text whose line breaks stay. */
 export const BOT_MESSAGE_PRESET: MarkdownPreset = { ...SESSION_AGENT_PRESET, remark: [...AGENT_PRESET.remark, remarkLineBreaks] };
-
-/** A Board message: agent text whose line breaks stay, with the references `tokenize` finds, its members and workflows, as chips. */
-export const boardMessagePreset = (tokenize: Tokenize): MarkdownPreset => ({ ...PROMPT_PRESET, remark: [...PROMPT_PRESET.remark.map(plugin => (plugin === remarkPromptChips ? remarkChips(tokenize) : plugin)), remarkLineBreaks] });
 
 /**
  * Text written on GitHub, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which follows

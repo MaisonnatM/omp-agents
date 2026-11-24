@@ -2,7 +2,6 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { openBoardFile } from "./board-module";
 import { canonicalJson } from "./json";
 import { runChecked } from "./proc";
 import { isDue, type RoutineSpec } from "./routines";
@@ -11,6 +10,7 @@ import type { ListKind } from "./server/list-registry";
 import { PreferencesFile } from "./server/preferences-file";
 import { ProcessSettingsFile } from "./server/process-settings-file";
 import { RoutinesFile } from "./server/routines-file";
+import { ProjectsFile } from "./server/projects-file";
 import { UserTodosFile } from "./server/user-todos-file";
 import { WorkspacesFile } from "./server/workspaces-file";
 import { applyLocal, localPath, mergeFile, mergeJson, planSync, portablePath, portableText, readLocal, SettingsSync, type SyncStore, sourceControlStore, syncStores } from "./settings-sync";
@@ -239,7 +239,7 @@ function machine(root: string, remote: string) {
 		botsDir: join(root, "data", "bots"),
 		routines: new RoutinesFile(config("routines.json")),
 		machine: { id: `machine-${basename(root)}`, name: basename(root) },
-		board: openBoardFile(config("board.json")),
+		projects: new ProjectsFile(config("project-list.json")),
 	};
 	const changed = new Set<ListKind>();
 	const places = { omp, home, stores: syncStores(files, home, list => changed.add(list)) };
@@ -340,55 +340,48 @@ describe("SettingsSync", () => {
 		expect([a.bots.value[0]?.sessionId, b.bots.value[0]?.sessionId]).toEqual(["session-a", "session-b"]);
 	});
 
-	test("carries each project's goal, decisions, archive, and plan, without its sessions, leases, or messages, and merges both machines' changes", async () => {
+	test("carries each project's goal, decisions, archive, and plan, without its sessions or log, and merges both machines' changes", async () => {
 		const { a, b } = await pair();
-		const project = { goal: "Ship it.", decisions: ["Use Bun."], sessionIds: ["session-a"], createdAt: 1 };
-		const lease = { by: "session-a", until: 9e15 };
-		a.board.apply({
-			op: "all",
-			changes: [
-				{ op: "channel", channel: { id: "p1", name: "launch", about: "", project } },
-				{ op: "thread", thread: { id: "s1", channel: "p1", title: "Build", task: "claimed", lease, createdAt: 2 } },
-				{ op: "thread", thread: { id: "s2", channel: "p1", title: "Test", task: "open", lease: null, createdAt: 3, parent: "s1" } },
-				{ op: "post", message: { id: "m1", thread: "s1", author: "session-a", at: 4, text: "Started." } },
-			],
-		});
+		const at = "2026-01-01T00:00:00.000Z";
+		a.projects.apply({ op: "create", id: "p1", name: "Launch", goal: "Ship it.", at });
+		a.projects.apply({ op: "add-decision", projectId: "p1", text: "Use Bun." });
+		a.projects.apply({ op: "add-step", projectId: "p1", stepId: "s1", text: "Build" });
+		a.projects.apply({ op: "add-step", projectId: "p1", stepId: "s2", text: "Test", parentId: "s1" });
+		a.projects.apply({ op: "set-step", projectId: "p1", stepId: "s1", done: true });
+		a.projects.apply({ op: "join", projectId: "p1", sessionId: "session-a" });
+		a.projects.apply({ op: "log", projectId: "p1", at, sessionId: "session-a", text: "Started." });
 		await a.sync.sync();
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/projects.json"] });
-		expect(b.board.value.channels.find(channel => channel.id === "p1")).toEqual({ id: "p1", name: "launch", about: "", project: { ...project, sessionIds: [] } });
-		const plan = (side: typeof a) => side.board.value.threads.filter(thread => thread.channel === "p1").map(({ id, task, lease, parent }) => ({ id, task, lease, parent }));
-		expect(plan(b)).toEqual([
-			{ id: "s1", task: "claimed", lease: null, parent: undefined },
-			{ id: "s2", task: "open", lease: null, parent: "s1" },
+		expect(b.projects.value.projects).toEqual([
+			{
+				id: "p1",
+				name: "Launch",
+				goal: "Ship it.",
+				decisions: ["Use Bun."],
+				createdAt: at,
+				steps: [
+					{ id: "s1", text: "Build", done: true },
+					{ id: "s2", text: "Test", done: false, parentId: "s1" },
+				],
+				log: [],
+				sessionIds: [],
+			},
 		]);
-		expect(b.board.value.messages).toEqual([]);
-		expect(b.changed.has("board")).toBe(true);
+		expect(b.changed.has("projects")).toBe(true);
 
-		b.board.apply({ op: "decision", channel: "p1", text: "Ship Friday.", remove: false });
-		b.board.apply({ op: "remove-thread", thread: "s2" });
-		a.board.apply({ op: "thread", thread: { id: "s3", channel: "p1", title: "Docs", task: "open", lease: null, createdAt: 5 } });
-		a.board.apply({ op: "archive", channel: "p1", at: 6 });
+		b.projects.apply({ op: "add-decision", projectId: "p1", text: "Ship Friday." });
+		b.projects.apply({ op: "remove-step", projectId: "p1", stepId: "s2" });
+		a.projects.apply({ op: "add-step", projectId: "p1", stepId: "s3", text: "Docs" });
+		a.projects.apply({ op: "archive", projectId: "p1", at: "2026-01-02T00:00:00.000Z" });
 		await b.sync.sync();
 		await a.sync.sync();
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/projects.json"], sent: [] });
 		for (const side of [a, b]) {
-			expect(side.board.value.channels.find(channel => channel.id === "p1")?.project).toMatchObject({ decisions: ["Use Bun.", "Ship Friday."], archivedAt: 6 });
-			expect(plan(side).map(step => step.id)).toEqual(["s1", "s3"]);
+			expect(side.projects.value.projects[0]).toMatchObject({ decisions: ["Use Bun.", "Ship Friday."], archivedAt: "2026-01-02T00:00:00.000Z" });
+			expect(side.projects.value.projects[0]?.steps.map(step => step.id)).toEqual(["s1", "s3"]);
 		}
-		expect(a.board.value.channels.find(channel => channel.id === "p1")?.project?.sessionIds).toEqual(["session-a"]);
-		expect(plan(a)[0]?.lease).toEqual(lease);
-		expect(a.board.value.messages.map(message => message.id)).toEqual(["m1"]);
-	});
-
-	test("a project whose name another channel holds on this machine takes the next free name on both", async () => {
-		const { a, b } = await pair();
-		a.board.apply({ op: "channel", channel: { id: "p1", name: "launch", about: "", project: { goal: "", decisions: [], sessionIds: [], createdAt: 1 } } });
-		b.board.apply({ op: "channel", channel: { id: "c1", name: "launch", about: "" } });
-		await a.sync.sync();
-		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/projects.json"], sent: ["dashboard/projects.json"] });
-		await a.sync.sync();
-		for (const side of [a, b]) expect(side.board.value.channels.find(channel => channel.id === "p1")?.name).toBe("launch-2");
-		expect(b.board.value.channels.find(channel => channel.id === "c1")?.name).toBe("launch");
+		expect(a.projects.value.projects[0]?.sessionIds).toEqual(["session-a"]);
+		expect(a.projects.value.projects[0]?.log.map(entry => entry.text)).toEqual(["Started."]);
 	});
 
 	test("runs each routine on one computer: it arrives on the other without running there, and enabling it there moves it", async () => {

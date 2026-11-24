@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { ProjectChannel } from "../src/shared/board";
+import type { Project } from "../src/shared/projects";
 import { latestSession, listedViews, type ProjectGroup, projectGroups, searchSessions, type SidebarSessions, sidebarSessions, waitingCount, type WorkspaceGroup, workspaceGroups } from "./sessions";
 import type { PinChange } from "../src/shared/pins";
 import type { View } from "../src/shared/sessions";
@@ -36,7 +36,7 @@ export function useSessionLists(
 	{ visible, workspace, workspaces }: Pick<WorkspaceScope, "visible" | "workspace" | "workspaces">,
 	pins: string[],
 	changePins: (change: PinChange) => void,
-	openProjects: readonly ProjectChannel[],
+	openProjects: readonly Project[],
 ): SessionLists {
 	const pinned = useMemo<ReadonlySet<string>>(() => new Set(pins), [pins]);
 	const pinnedRef = useRef(pinned);

@@ -5,6 +5,10 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
+- The Board is gone: its page, channels, threads, and the board tool agents used to post there.
+- Projects keep working on their own: the Projects page, the brief each session in a project gets, and the project_list and project_update tools agents use.
+- Your existing projects move over by themselves the first time the dashboard starts, with their plan, decisions, and messages as log lines; the Board's leftover inbox folder is deleted.
+- Agents can add a whole project plan, with its sub-steps, in one project_update call.
 - The eval set's 11 tasks that failed the same way in every run now tell the agent the interface their checks expect, such as an exact error message, a dependency's name, or an output's shape, so a run is no longer failed for guessing a name differently.
 - The eval runner takes `--jobs N` to run N tasks at once; each run and its recorded result stay the same, only the wall time drops.
 - A done Board thread with messages you have not read now stays in its channel's list, and in the channel's unread badge, until you open it; before, the badge counted it while the list hid it.
@@ -55,7 +59,7 @@ The dashboard shows the same lines in Settings › What's new.
 - The Board's reply box is now the same composer as a session's, so its `@` and `/` lists look and work the same way, and a member you mention or a workflow you start shows as a chip.
 - Board messages now show Markdown, such as **bold**, *italic*, lists, and links.
 - A Board mention now counts when a comma or other punctuation follows it, such as `@Maxence,`, in any case, and `@Max` no longer wakes `@Maxence`; the composer's chips match exactly what wakes.
-- Behind the scenes: the Board composer and the session composers share one completion list core, `useCompletionMenu`, and the Board reads mentions and commands with one grammar in `src/shared/board.ts`.
+- Behind the scenes: the Board composer and the session composers share one completion list core, `useCompletionMenu`, and the Board reads mentions and commands with one grammar in its shared module.
 - A Board command such as `/schedule` or `/claim` now saves all its changes together or none of them, and a schedule keeps its member's name even after that member leaves.
 - Behind the scenes: the Board drops its unused pull request, finding, question, blocked, and label surfaces; its page is split into list, thread view, attachments, and composer files; and the dashboard server runs the Board through a module `run` hook instead of naming it.
 - The safety check now lets an agent keep the dashboard token in a shell variable when it only goes into a request header, and /ship now counts `astro check` and `playwright test` as test runs.

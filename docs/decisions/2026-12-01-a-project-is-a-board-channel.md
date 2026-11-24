@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-24-remove-the-board-keep-projects-on-their-own-store
 date: 2026-12-01
 decision-makers: Maxence Maisonnat
 supersedes: 2026-11-20-give-a-multi-session-effort-a-project-brief-and-a-roster-group

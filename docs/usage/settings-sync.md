@@ -24,7 +24,7 @@
   - your preferences: the theme, what transcripts hide, the sidebar tabs, the pinned skill, notifications, the merge method, the diff view, and the idle stop;
   - the workspaces Settings › Workspaces added and hid;
   - your Bots, each with its name, job, type, look, model, skill, workspace, pin, section, memory, and routines;
-  - your Board projects, each with its name, about line, goal, decisions, archive, and plan steps with their state.
+  - your projects, each with its name, goal, decisions, archive, and plan steps with their state, without its sessions or log.
   A Bot's conversation stays on the machine that had it, so a Bot from another machine starts a new one here; facts each machine's Bot remembered arrive on both, and a Bot one machine deleted goes on the other with its routines.
   Each routine runs on one machine only: one made or turned on here runs here, and on the other machines its row reads **Runs on** and this machine's name, with its switch off.
   Turning that switch on moves the routine there, its schedule counting from then, and it stops here at this machine's next sync; until then, both may run it.

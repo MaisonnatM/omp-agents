@@ -16,8 +16,8 @@ import { TurnWaits } from "./turn-waits";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 
-/** An unread turn with the instance id of the session that ended it, as the unread file holds it; its suggestions do not come back. */
-type SavedTurn = { instanceId: string } & Omit<UnreadTurn, "suggestions">;
+/** An unread turn with the instance id of the session that ended it, as the unread file holds it. */
+type SavedTurn = { instanceId: string } & UnreadTurn;
 
 /**
  * The turns no page read yet, and when the server that saved them last saved, until which it heard every turn of the
@@ -34,7 +34,7 @@ const isSavedUnread = fields<SavedUnread>({
 });
 
 /** An ended turn as a row shows it unread. */
-const unreadTurn = ({ at, reply, suggestions }: EndedTurn): UnreadTurn => ({ at, reply: firstLine(reply), ...(suggestions?.length ? { suggestions } : {}) });
+const unreadTurn = ({ at, reply }: EndedTurn): UnreadTurn => ({ at, reply: firstLine(reply) });
 
 /** `facts` with `subject` first among the session's links, unless its tool calls named it already. */
 export function withSubject(facts: SessionFacts, subject: WorkItem | undefined): SessionFacts {

@@ -4,7 +4,7 @@ import { keyedStore } from "./keyed-store";
 describe("keyed store", () => {
 	test("a nullish value other than the empty one reads back as itself", () => {
 		const store = keyedStore<string | null | undefined>(undefined);
-		store.set("view", "board");
+		store.set("view", "inbox");
 		store.set("view", null);
 		expect(store.get("view")).toBeNull();
 		store.set("view", undefined);

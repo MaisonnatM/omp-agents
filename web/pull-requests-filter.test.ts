@@ -89,7 +89,7 @@ describe("shown sections", () => {
 	test("the stored display round-trips, and a missing or unknown grouping falls back to grouping by repository", () => {
 		const picked = { grouping: "author", empty: true } as const;
 		expect(decodeDisplay(encodeDisplay(picked))).toEqual(picked);
-		for (const raw of [null, "{", '{"grouping":"board"}']) expect(decodeDisplay(raw)).toEqual(DEFAULT_DISPLAY);
+		for (const raw of [null, "{", '{"grouping":"kanban"}']) expect(decodeDisplay(raw)).toEqual(DEFAULT_DISPLAY);
 		expect(decodeDisplay('{"grouping":"section","empty":"yes"}')).toEqual({ grouping: "section", empty: false });
 	});
 });

@@ -1,8 +1,7 @@
 /** A project's Decisions and Recent activity cards: what was settled, and its log lines newest first. */
 import { useState } from "react";
-import { type BoardChange, type BoardState, type Message, type ProjectChannel, sessionMemberId } from "../../../src/shared/board";
+import type { Project } from "../../../src/shared/projects";
 import { hashForSession } from "../../../src/shared/sessions";
-import { hashForPage } from "../../routing";
 import { Button } from "@/components/ui/button";
 import { Age } from "../age";
 import { offerUndo } from "../toaster";
@@ -12,13 +11,11 @@ import { AddLine, Card, EmptyNote, type OnProjectChange, PROJECT_UNDO, RemoveBut
 /** Log lines Recent activity shows until **View all**. */
 const RECENT = 8;
 
-/** The title of the thread a project's own log lines go to. */
-const LOG_THREAD = "Log";
-
-export function Decisions({ channel: { id: channel, project }, readOnly, onChange }: { channel: ProjectChannel; readOnly: boolean; onChange: OnProjectChange }) {
+export function Decisions({ project, readOnly, onChange }: { project: Project; readOnly: boolean; onChange: OnProjectChange }) {
+	const projectId = project.id;
 	const remove = (text: string): void => {
-		onChange({ op: "decision", channel, text, remove: true });
-		offerUndo(PROJECT_UNDO, `Removed “${text}”`, () => onChange({ op: "decision", channel, text, remove: false }));
+		onChange({ op: "remove-decision", projectId, text });
+		offerUndo(PROJECT_UNDO, `Removed “${text}”`, () => onChange({ op: "add-decision", projectId, text }));
 	};
 	return (
 		<Card title="Decisions" meta={project.decisions.length > 0 ? String(project.decisions.length) : undefined}>
@@ -35,50 +32,24 @@ export function Decisions({ channel: { id: channel, project }, readOnly, onChang
 					))}
 				</ul>
 			)}
-			{!readOnly && <AddLine control="projects.decision.add" label="Add a decision" onAdd={text => onChange({ op: "decision", channel, text, remove: false })} />}
+			{!readOnly && <AddLine control="projects.decision.add" label="Add a decision" onAdd={text => onChange({ op: "add-decision", projectId, text })} />}
 		</Card>
 	);
 }
 
-/** Posts `text` to project `channel`'s Log thread, opening the thread first when it has none. */
-function logLine(board: BoardState, channel: string, text: string): BoardChange {
-	const at = Date.now();
-	const existing = board.threads.find(thread => thread.channel === channel && thread.task === null && thread.title === LOG_THREAD);
-	const thread = existing ?? { id: crypto.randomUUID(), channel, title: LOG_THREAD, task: null, lease: null, createdAt: at };
-	const post: BoardChange = { op: "post", message: { id: crypto.randomUUID(), thread: thread.id, author: board.me, at, text } };
-	return existing ? post : { op: "all", changes: [{ op: "thread", thread }, post] };
-}
-
-/** Who wrote `message`: a session's name, linking to it, You, or the member id. */
-function Author({ message, board, sessions }: { message: Message; board: BoardState; sessions: KnownSessions }) {
-	if (message.author === board.me) return <span className="font-medium">You</span>;
-	const sessionId = message.author.startsWith(sessionMemberId("")) ? message.author.slice(sessionMemberId("").length) : null;
-	if (sessionId === null) return <span className="font-medium">{board.extraMembers.find(member => member.id === message.author)?.name ?? message.author}</span>;
-	return (
-		<a href={hashForSession(sessionId)} className="font-medium hover:underline">
-			{sessionLabel(sessionId, sessions).name}
-		</a>
-	);
-}
-
-export function RecentActivity({ channel, board, log, sessions, readOnly, onChange }: { channel: ProjectChannel; board: BoardState; log: readonly Message[]; sessions: KnownSessions; readOnly: boolean; onChange: OnProjectChange }) {
+export function RecentActivity({ project, sessions, readOnly, onChange }: { project: Project; sessions: KnownSessions; readOnly: boolean; onChange: OnProjectChange }) {
 	const [all, setAll] = useState(false);
-	const newest = log.toReversed();
+	const newest = project.log.toReversed();
 	const shown = all ? newest : newest.slice(0, RECENT);
 	return (
 		<Card
 			title="Recent activity"
 			action={
-				<>
-					{newest.length > RECENT && (
-						<Button variant="ghost" size="xs" onClick={() => setAll(!all)}>
-							{all ? "Show fewer" : "View all"}
-						</Button>
-					)}
-					<Button variant="ghost" size="xs" render={<a href={hashForPage({ kind: "board", view: { kind: "channel", id: channel.id }, thread: null })} />}>
-						Open in Board
+				newest.length > RECENT && (
+					<Button variant="ghost" size="xs" onClick={() => setAll(!all)}>
+						{all ? "Show fewer" : "View all"}
 					</Button>
-				</>
+				)
 			}
 		>
 			{newest.length === 0 ? (
@@ -86,19 +57,25 @@ export function RecentActivity({ channel, board, log, sessions, readOnly, onChan
 			) : (
 				<ol className="flex flex-col px-4 py-1.5">
 					{shown.map(entry => (
-						<li key={entry.id} className="flex items-start gap-2.5 py-1.5 text-sm leading-snug">
+						<li key={`${entry.at}:${entry.sessionId ?? ""}:${entry.text}`} className="flex items-start gap-2.5 py-1.5 text-sm leading-snug">
 							<p className="min-w-0 flex-1 break-words">
-								<Author message={entry} board={board} sessions={sessions} />{" "}
+								{entry.sessionId ? (
+									<a href={hashForSession(entry.sessionId)} className="font-medium hover:underline">
+										{sessionLabel(entry.sessionId, sessions).name}
+									</a>
+								) : (
+									<span className="font-medium">You</span>
+								)}{" "}
 								<span className="text-muted-foreground">{entry.text}</span>
 							</p>
-							<time dateTime={new Date(entry.at).toISOString()} className="shrink-0 text-xs text-muted-foreground tabular-nums">
-								<Age at={entry.at} compact exact className="tabular-nums" /> ago
+							<time dateTime={entry.at} className="shrink-0 text-xs text-muted-foreground tabular-nums">
+								<Age at={Date.parse(entry.at)} compact exact className="tabular-nums" /> ago
 							</time>
 						</li>
 					))}
 				</ol>
 			)}
-			{!readOnly && <AddLine control="projects.log.add" label="Add a log line" onAdd={text => onChange(logLine(board, channel.id, text))} />}
+			{!readOnly && <AddLine control="projects.log.add" label="Add a log line" onAdd={text => onChange({ op: "log", projectId: project.id, at: new Date().toISOString(), text })} />}
 		</Card>
 	);
 }

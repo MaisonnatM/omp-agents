@@ -85,7 +85,7 @@ const PATTERNS: readonly Pattern[] = [
 export type Tokenize = (text: string, options?: { open?: number | null; leading?: boolean }) => PromptToken[];
 
 /** The `Tokenize` that reads `patterns`; where two overlap, the earlier and then the longer wins. */
-export function tokenizer(patterns: readonly Pattern[]): Tokenize {
+function tokenizer(patterns: readonly Pattern[]): Tokenize {
 	return (text, { open = null, leading = true } = {}) => {
 		const found: PromptToken[] = [];
 		for (const pattern of patterns) {
@@ -149,7 +149,7 @@ function chipTree(parent: MdNode, source: string, tokenize: Tokenize): void {
 }
 
 /** A remark plugin that makes each reference `tokenize` finds in sent text a chip, as the composer showed it. */
-export const remarkChips = (tokenize: Tokenize) => () => (tree: MdNode, file: { value: unknown }) => chipTree(tree, String(file.value), tokenize);
+const remarkChips = (tokenize: Tokenize) => () => (tree: MdNode, file: { value: unknown }) => chipTree(tree, String(file.value), tokenize);
 
 /** `remarkChips` for omp's prompt grammar. */
 export const remarkPromptChips = remarkChips(promptTokens);
