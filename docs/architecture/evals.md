@@ -67,6 +67,7 @@ Each run replays the task the way [Worker model replay](token-cost.md#worker-mod
 - A new repository holds the base's history and nothing after it, after the repository's `.omp/land.json` setup.
 - `omp -p` runs the prompt in it under macOS's `sandbox-exec`, which hides the real repository, its worktrees, and their session folders, with no way to a remote, so a run cannot copy the landed change.
 - The sandbox also hides `--out` and every `~/.cache/omp-evals*` folder except the run's own, so a run cannot copy another run's change or a dry run's landed one; the pilot's first try did exactly that.
+  The folders above the run's own stay visible as entries, though not listable: git and uv stat each of them, and without that the 2026-11-24 smoke run could not run git status, uv, or pytest in its clone.
 - The run's environment drops the `PI_*` and `OMPCODE` variables an omp session sets, so a set started from inside a session starts clean.
 - Unlike a model replay, a run keeps the full harness: every extension and skill the user's omp loads.
 - It turns off every MCP server in `~/.omp/agent/mcp.json` through `disabledExtensions`, so a run cannot post to Slack or Linear and does not wait 30 seconds each on their startup.

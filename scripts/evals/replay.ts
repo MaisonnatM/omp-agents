@@ -5,7 +5,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { sessionPaths } from "../../src/omp/modules";
 
 export interface Usage {
@@ -143,7 +143,11 @@ export function confined(
 		`(regex #"^${(existsSync(path) ? realpathSync(path) : path).replace(/[.*+?^$()|[\]{}\\"]/g, "\\$&")}($|[-/])")`;
 	const sessions = sessionPaths.sessionDirForCwd(repo, join(homedir(), ".omp", "agent", "sessions"));
 	const denied = [repo, sessions, ...hidden].map(startingWith).join(" ");
-	const profile = `(version 1)(allow default)(deny file-read* file-write* ${denied})(allow file-read* file-write* ${startingWith(dir)})`;
+	// `dir` usually sits inside a hidden folder; git and uv stat each folder above the clone, so those folders stay
+	// visible as entries while their listings and other contents stay hidden.
+	const above: string[] = [];
+	for (let path = dirname(realpathSync(dir)); path !== dirname(path); path = dirname(path)) above.push(`(literal "${path.replace(/["\\]/g, "\\$&")}")`);
+	const profile = `(version 1)(allow default)(deny file-read* file-write* ${denied})(allow file-read* file-write* ${startingWith(dir)})(allow file-read-metadata ${above.join(" ")})`;
 	const remotes = ["https://", "http://", "ssh://", "git://", "git@"];
 	const gh = join(dir, "gh");
 	mkdirSync(gh, { recursive: true });

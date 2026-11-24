@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildPrompt, type EvalTask, exportsName, namedImports, passedTests, testTerms } from "./candidates";
+import { confined } from "./replay";
 import { arms, DECAY_COMPONENTS, decayPlan, decayRows, deltaBand, type EvalRow, pastCost, summarize, verdict } from "./run";
 
 describe("hidden test imports", () => {
@@ -177,5 +180,23 @@ test("the committed eval set has 20 tasks, each with a hidden test and a check t
 		expect(task.check).toBe(`bun test ${task.hiddenTests.map(path => `./${path}`).join(" ")}`);
 		expect(task.base).toMatch(/^[0-9a-f]{40}$/);
 		expect(task.landed).toMatch(/^[0-9a-f]{40}$/);
+	}
+});
+
+test.if(process.platform === "darwin")("the sandbox lets git work in a run's clone inside a hidden folder, and still hides the run's siblings", () => {
+	const out = mkdtempSync(join(tmpdir(), "evals-sandbox-"));
+	try {
+		const dir = join(out, "full", "pr-1", "1");
+		const sibling = join(out, "full", "pr-2", "1");
+		mkdirSync(join(dir, "repo"), { recursive: true });
+		mkdirSync(sibling, { recursive: true });
+		const { sandboxArgs } = confined(join(out, "missing-repo"), dir, [], [out]);
+		const inside = (script: string) =>
+			spawnSync("sandbox-exec", [...sandboxArgs.slice(0, 2), "/bin/sh", "-c", script], { cwd: join(dir, "repo"), encoding: "utf8" });
+		expect(inside("git init -q . && git status --short").status).toBe(0);
+		expect(inside(`ls ${sibling}`).status).not.toBe(0);
+		expect(inside(`ls ${join(out, "full")}`).status).not.toBe(0);
+	} finally {
+		rmSync(out, { recursive: true, force: true });
 	}
 });
