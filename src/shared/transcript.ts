@@ -69,7 +69,7 @@ export const mediaExtension = (type: string): string | null => MEDIA_FILE_EXTENS
 /** The address of the image or video at absolute or `~/` path `path`, `GET /api/media`. */
 export const mediaUrl = (path: string): string => `/api/media?${new URLSearchParams({ path })}`;
 
-/** How a prompt the dashboard sent in the user's place starts, as an older version's project updates did; the agent read it, the user never sees it as theirs. */
+/** How a prompt the dashboard sent in the user's place starts, such as a pull request watch's wake; the agent reads it, the transcript hides it. */
 export const DASHBOARD_PROMPT_PREFIX = "[omp-agents]";
 
 /** Who sent a prompt: the user, the dashboard in the user's place, or a routine or another Bot, whose message a stamp tells. */
