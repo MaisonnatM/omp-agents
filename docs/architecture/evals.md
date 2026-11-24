@@ -14,6 +14,8 @@ Each task is a prompt, the base commit it started from, and a hidden check: the 
    When a hidden test imports a name the base does not export, the prompt lists that import, so a run is not failed for naming a new function differently.
    It also lists, word for word, every other name and quoted text a hidden test uses that the landing adds outside tests and docs and the base never has, such as a setting's key, a tool parameter, or an error message.
    Without that list, 2 of the pilot's first 5 runs failed on a setting key or a tool parameter the commit messages never named, as [the pilot](evals-pilot-2026-11-23.md) records.
+   Last come the task's hand-written notes from `scripts/evals/task-notes.json`, keyed by task id: what its tests pin that no name list catches, such as a dependency's method, a fixture's fields, an exact error message, or an output's order.
+   The 2026-11-24 run failed 11 of 20 tasks on the same tests in all 3 runs, each time on such a detail; the notes state the interface, never the implementation, the hidden tests' names, or their paths.
 5. `--verify` keeps a candidate only when its check fails at the base with the hidden tests in place and passes at the landed commit, in one temporary worktree, newest first, until 20 are kept.
 
 Rebuild the set with `bun scripts/evals/candidates.ts --verify > scripts/evals/tasks.json`; a new set changes every number, so compare runs only on the same set.
