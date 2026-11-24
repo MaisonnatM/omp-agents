@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
+- When a land stops because an existing test changed, its message now says exactly how to mark the change as intended, or to put new tests in a new file instead.
 - A new Friday routine receipt, off until you turn it on, lists what each routine did and cost this week and says which to keep, slow down, or retire.
 - Each routine now shows what its runs cost: the row adds up the Bot's turns over the kept runs, and an open run shows its own tokens and cost.
 - A Bot now ends a routine run that found nothing new quietly by default, with no notification and no unread dot, so only runs with news reach you.

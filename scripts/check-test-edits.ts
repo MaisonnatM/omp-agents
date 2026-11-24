@@ -34,7 +34,8 @@ if (import.meta.main) {
 	for (const { path, change } of edited) console.error(`ERROR: ${path} existed at ${base.slice(0, 12)} and was ${change}.`);
 	if (edited.length > 0) {
 		console.error("A test that already passed guards behavior; change it only when that behavior changed on purpose, never to make a failing check pass.");
-		console.error("If the change is intended, add a line `test-change: <reason>` to a commit message in this range.");
+		console.error("Fix, if the change is intended: add a line that starts with `test-change: <reason>` at column 0, not as a `- ` bullet, to a commit message in this range, such as with `git commit --amend`.");
+		console.error("Or leave the existing test alone and put new tests in a new *.test.ts file, which this check does not count.");
 		process.exit(1);
 	}
 }
