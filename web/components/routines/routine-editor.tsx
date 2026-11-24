@@ -178,6 +178,20 @@ export function RoutineEditor({ initial, isNew, botName, connected, saving, onSa
 								className={TEXT_AREA}
 							/>
 							<p className="text-xs text-muted-foreground">Each run sends this into {botName}'s conversation, as if you wrote it there.</p>
+							<label className="flex items-start gap-2 text-sm">
+								<input
+									type="checkbox"
+									checked={draft.freshConversation}
+									onChange={event => set("freshConversation", event.target.checked)}
+									className="mt-0.5 size-4 shrink-0 accent-current"
+								/>
+								<span className="space-y-0.5">
+									<span className="block">New conversation each run</span>
+									<span className="block text-xs text-muted-foreground">
+										Each run restarts {botName}'s conversation first, so the message opens a new one. While {botName} is busy, it joins the current conversation.
+									</span>
+								</span>
+							</label>
 						</Choice>
 						<Choice name={`${id}-task`} checked={draft.task === "command"} label="Run a command" onCheck={() => set("task", "command")}>
 							<textarea

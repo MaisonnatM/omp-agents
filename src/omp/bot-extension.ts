@@ -48,10 +48,10 @@ export type SaveRoutineParams = Partial<Omit<RoutineSpec, "botId">>;
 const TASK_PREVIEW_LENGTH = 80;
 
 /** `routine` as one short line: its fields as `save_routine` takes them, then its task's kind and the start of its prompt or command. */
-function routineLine({ id, name, enabled, schedules, triggers, task }: RoutineSpec): string {
+function routineLine({ id, name, enabled, schedules, triggers, task, freshConversation }: RoutineSpec): string {
 	const text = (task.kind === "prompt" ? task.prompt : task.command).replace(/\s+/g, " ").trim();
 	const preview = text.length > TASK_PREVIEW_LENGTH ? `${text.slice(0, TASK_PREVIEW_LENGTH)}…` : text;
-	return `${JSON.stringify({ id, name, enabled, schedules, triggers })} ${task.kind}: ${preview}`;
+	return `${JSON.stringify({ id, name, enabled, schedules, triggers, freshConversation })} ${task.kind}: ${preview}`;
 }
 
 const APPLIES = "The dashboard applies it, and while the dashboard is stopped the change waits for it.";
@@ -213,6 +213,11 @@ export default function botExtension(pi: ExtensionApi): void {
 			),
 			task: Type.Optional(task),
 			enabled: Type.Optional(Type.Boolean({ description: "Whether it runs; a new routine runs unless this is false." })),
+			freshConversation: Type.Optional(
+				Type.Boolean({
+					description: "For a prompt routine: whether each run first restarts this conversation, so its prompt opens a new one; a run while a turn is under way follows up instead. Off unless true.",
+				}),
+			),
 		}),
 		loadMode: "essential",
 		approval: "write",

@@ -24,8 +24,11 @@ export interface RoutineRunnerDeps {
 	fullyAwake(): Promise<boolean>;
 	/** The routines changed; every socket should hear them. */
 	onChange(): void;
-	/** Sends `text` into Bot `botId`'s conversation, as the user's message would; the session it went to. Rejects with why it could not. */
-	messageBot(botId: BotId, text: string): Promise<string>;
+	/**
+	 * Sends `text` into Bot `botId`'s conversation, as the user's message would; the session it went to. Rejects with why it could not.
+	 * With `fresh`, an idle conversation restarts first, so `text` opens a new one; a busy one takes it as a follow-up.
+	 */
+	messageBot(botId: BotId, text: string, fresh?: boolean): Promise<string>;
 }
 
 /** Why a run a stopped server left sending failed: its prompt may have reached the Bot or not. */
@@ -125,7 +128,7 @@ export class RoutineRunner {
 			switch (task.kind) {
 				case "prompt":
 					file.sending(routine.id, run.at);
-					await this.#message(routine, run.at, sentText(routine, run, { kind: "prompt", prompt: task.prompt }));
+					await this.#message(routine, run.at, sentText(routine, run, { kind: "prompt", prompt: task.prompt }), routine.freshConversation === true);
 					break;
 				case "command":
 					this.#launch(routine, run, task);
@@ -138,11 +141,14 @@ export class RoutineRunner {
 		}
 	}
 
-	/** Sends the prompt into the Bot's conversation, which the routine neither tracks nor ends: the Bot keeps it. */
-	async #message(routine: Routine, at: number, text: string): Promise<void> {
+	/**
+	 * Sends the prompt into the Bot's conversation, which the routine neither tracks nor ends: the Bot keeps it. With
+	 * `fresh`, the Bot restarts an idle conversation first, so the prompt opens a new one.
+	 */
+	async #message(routine: Routine, at: number, text: string, fresh: boolean): Promise<void> {
 		const { file } = this.#deps;
 		try {
-			file.sent(routine.id, at, await this.#deps.messageBot(routine.botId, text));
+			file.sent(routine.id, at, await this.#deps.messageBot(routine.botId, text, fresh));
 		} catch (error) {
 			file.failed(routine.id, at, `${routine.name}: ${errorText(error)}`);
 		}

@@ -85,6 +85,11 @@ export interface Routine {
 	triggers: Trigger[];
 	task: RoutineTask;
 	enabled: boolean;
+	/**
+	 * Whether a prompt run first restarts the Bot's conversation, as **Restart** does, so its prompt opens a new one;
+	 * only while that conversation is idle, else the prompt follows up in it. Left out when off; command runs ignore it.
+	 */
+	freshConversation?: boolean;
 	/** The other computer it runs on while enabled, as Settings sync carried it; `null` while it runs on this one or is off. */
 	machine: RoutineMachine | null;
 	createdAt: number;
@@ -187,6 +192,7 @@ export function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 		routine.botId === spec.botId &&
 		routine.name === spec.name &&
 		routine.enabled === spec.enabled &&
+		(routine.freshConversation ?? false) === (spec.freshConversation ?? false) &&
 		JSON.stringify([routine.schedules, routine.triggers, routine.task]) === JSON.stringify([spec.schedules, spec.triggers, spec.task])
 	);
 }
@@ -319,14 +325,16 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
  */
 export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	if (!isObject(value)) return null;
-	const { id, name, enabled } = value;
+	const { id, name, enabled, freshConversation } = value;
 	const botId = parseBotId(value.botId);
 	const schedules = parseSchedules(value.schedules);
 	const triggers = parseTriggers(value.triggers);
 	const task = parseRoutineTask(value.task);
 	if (!isNonEmpty(id) || !botId || !isNonEmpty(name) || typeof enabled !== "boolean" || !schedules || !triggers || !task) return null;
+	if (freshConversation !== undefined && typeof freshConversation !== "boolean") return null;
 	if (schedules.ok.length === 0 && triggers.ok.length === 0) return null;
-	return { ok: { id, botId, name, schedules: schedules.ok, triggers: triggers.ok, task: task.ok, enabled } };
+	const spec: RoutineSpec = { id, botId, name, schedules: schedules.ok, triggers: triggers.ok, task: task.ok, enabled };
+	return { ok: freshConversation ? { ...spec, freshConversation } : spec };
 }
 
 /**
