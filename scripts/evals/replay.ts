@@ -118,7 +118,40 @@ export function prepare(repo: string, base: string, dir: string): string {
 		const step = sh(command, clone);
 		if (!step.ok) throw new Error(`setup "${command}" failed in ${clone}:\n${step.output}`);
 	}
+	installNodeModules(clone);
 	return clone;
+}
+
+const NODE_MODULES_CACHE = join(homedir(), ".cache", "omp-evals-node-modules");
+
+/**
+ * Gives each npm package at the clone's root or one folder down, such as yampa's `front/`, its `node_modules`, so a run
+ * can run vitest. One `npm ci` per lockfile fills a cache outside every sandbox, and each clone gets an APFS copy-on-write
+ * copy of it, which costs no disk until written to.
+ */
+function installNodeModules(clone: string): void {
+	const locks = git(clone, "ls-files", "package-lock.json", "*/package-lock.json")
+		.split("\n")
+		.filter(lock => lock && lock.split("/").length <= 2);
+	for (const lock of locks) {
+		const folder = join(clone, dirname(lock));
+		if (existsSync(join(folder, "node_modules"))) continue;
+		const hash = new Bun.CryptoHasher("sha256").update(readFileSync(join(clone, lock))).digest("hex").slice(0, 16);
+		const cached = join(NODE_MODULES_CACHE, hash);
+		if (!existsSync(join(cached, "node_modules"))) {
+			rmSync(cached, { recursive: true, force: true });
+			mkdirSync(cached, { recursive: true });
+			for (const file of ["package.json", "package-lock.json", ".npmrc"])
+				if (existsSync(join(folder, file))) writeFileSync(join(cached, file), readFileSync(join(folder, file)));
+			const install = sh("npm ci --ignore-scripts --no-audit --no-fund", cached);
+			if (!install.ok) {
+				rmSync(cached, { recursive: true, force: true });
+				throw new Error(`npm ci for ${lock} failed:\n${install.output}`);
+			}
+		}
+		const copy = spawnSync("cp", ["-cR", join(cached, "node_modules"), join(folder, "node_modules")], { encoding: "utf8" });
+		if (copy.status !== 0) throw new Error(`copying node_modules into ${folder}: ${copy.stderr}`);
+	}
 }
 
 /**
