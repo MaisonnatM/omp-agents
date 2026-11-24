@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildPrompt, type EvalTask, exportsName, namedImports, testTerms } from "./candidates";
+import { buildPrompt, type EvalTask, exportsName, namedImports, passedTests, testTerms } from "./candidates";
+import { confined } from "./replay";
 import { arms, DECAY_COMPONENTS, decayPlan, decayRows, deltaBand, type EvalRow, pastCost, summarize, verdict } from "./run";
 
 describe("hidden test imports", () => {
@@ -70,6 +73,8 @@ describe("decay summary", () => {
 		answeredBy: { "anthropic/claude-opus-5-5": 1 },
 		filesChanged: 1,
 		linesChanged: 1,
+		testsPassed: null,
+		testsTotal: null,
 		...extra,
 	});
 
@@ -91,9 +96,32 @@ describe("decay summary", () => {
 			row("-extension:ship", false, 9, { answeredBy: { "openai/gpt-6": 3 } }),
 		];
 		expect(summarize(rows)).toEqual([
-			{ arm: "full", runs: 2, passRate: 1, costPerRun: 3, minutesPerRun: 1, passRateDelta: null, costDelta: null },
-			{ arm: "-extension:ship", runs: 2, passRate: 0.5, costPerRun: 1.5, minutesPerRun: 1, passRateDelta: -0.5, costDelta: -1.5 },
+			{ arm: "full", runs: 2, passRate: 1, costPerRun: 3, minutesPerRun: 1, testShare: null, passRateDelta: null, costDelta: null },
+			{ arm: "-extension:ship", runs: 2, passRate: 0.5, costPerRun: 1.5, minutesPerRun: 1, testShare: null, passRateDelta: -0.5, costDelta: -1.5 },
 		]);
+	});
+
+	test("the test share averages each run's passed share of its fail-to-pass tests, over the runs that have them", () => {
+		const rows = [
+			row("full", false, 1, { testsPassed: 64, testsTotal: 65 }),
+			row("full", false, 1, { testsPassed: 1, testsTotal: 2 }),
+			row("full", true, 1),
+			row("-skill:ship", true, 1),
+		];
+		const [full, ship] = summarize(rows);
+		expect(full?.testShare).toBeCloseTo((64 / 65 + 1 / 2) / 2);
+		expect(ship?.testShare).toBeNull();
+	});
+
+	test("reads the passed tests from pytest's summary lines, parameters included", () => {
+		const output = [
+			"PASSED tests/test_a.py::test_ok",
+			"PASSED tests/test_a.py::test_roles[viewer-403-refresh token]",
+			"FAILED tests/test_a.py::test_no - assert 200 == 403",
+			"ERROR tests/test_b.py",
+			"1 failed, 2 passed, 1 error in 3.87s",
+		].join("\n");
+		expect([...passedTests(output)]).toEqual(["tests/test_a.py::test_ok", "tests/test_a.py::test_roles[viewer-403-refresh token]"]);
 	});
 
 	test("the noise band widens with few runs and its verdict keeps a component only when dropping it hurts beyond the band", () => {
@@ -152,5 +180,23 @@ test("the committed eval set has 20 tasks, each with a hidden test and a check t
 		expect(task.check).toBe(`bun test ${task.hiddenTests.map(path => `./${path}`).join(" ")}`);
 		expect(task.base).toMatch(/^[0-9a-f]{40}$/);
 		expect(task.landed).toMatch(/^[0-9a-f]{40}$/);
+	}
+});
+
+test.if(process.platform === "darwin")("the sandbox lets git work in a run's clone inside a hidden folder, and still hides the run's siblings", () => {
+	const out = mkdtempSync(join(tmpdir(), "evals-sandbox-"));
+	try {
+		const dir = join(out, "full", "pr-1", "1");
+		const sibling = join(out, "full", "pr-2", "1");
+		mkdirSync(join(dir, "repo"), { recursive: true });
+		mkdirSync(sibling, { recursive: true });
+		const { sandboxArgs } = confined(join(out, "missing-repo"), dir, [], [out]);
+		const inside = (script: string) =>
+			spawnSync("sandbox-exec", [...sandboxArgs.slice(0, 2), "/bin/sh", "-c", script], { cwd: join(dir, "repo"), encoding: "utf8" });
+		expect(inside("git init -q . && git status --short").status).toBe(0);
+		expect(inside(`ls ${sibling}`).status).not.toBe(0);
+		expect(inside(`ls ${join(out, "full")}`).status).not.toBe(0);
+	} finally {
+		rmSync(out, { recursive: true, force: true });
 	}
 });

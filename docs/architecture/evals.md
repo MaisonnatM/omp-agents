@@ -27,17 +27,23 @@ Each task carries its `repo`, the checkout it comes from, so `run.ts` replays it
 2. A pull request is kept when it changes Python under `--package` (`yampa`) and a Python test under `tests/`, changes fewer than 400 lines outside `tests/`, and adds no migration.
    A ticket that more than one merged pull request names is left out, since its text asks for more than any one of them did.
 3. The base is the merge commit's first parent, which is `main` before the change for a squash merge and for a merge commit; a rebase merge, whose subject lacks `(#<number>)`, has no single base and is left out.
-4. The hidden tests are every file the pull request added or changed under `tests/`, `conftest.py` and factories included; `testIds` lists the pytest node ids its test modules hold, and the check runs those modules.
-5. The prompt is the Linear ticket's title and description, with Linear's mention tags cut to their labels, never the pull request's body, which describes the change and often holds its diff.
+4. The hidden tests are every file the pull request added or changed under `tests/`, `conftest.py` and factories included.
+5. The prompt is the Linear ticket's title and description, with Linear's mention tags cut to their labels, then the pull request's description under `## What the change did`.
    A script cannot reach Linear, so the calling session saves the tickets to a JSON file keyed by ticket id and passes it as `--tickets`; `--tickets-needed` prints the ids in pick order.
-   A ticket missing from the file falls back to the pull request's title and its body's first section without code, and the script says so.
-   A prompt that names a hidden test, a hidden file, the pull request's number, or holds a code block is dropped.
-6. Picks go newest first, at most 2 per folder under `yampa/` until that runs short, and `--verify` keeps a task only when its check fails at the base with the hidden tests in place and passes at the merge commit, in one temporary clone, until 20 are kept.
+   A ticket missing from the file falls back to the pull request's title, and the script says so.
+   The ticket alone under-specifies the change: the set built on 2026-11-23 ran whole landed test files against ticket-only prompts and scored 0%, with runs such as 64 of 65 and 82 of 88 tests passing, because the tests also checked behaviour only the pull request described, such as a second route's permission or a per-period row cap.
+   The description loses its code blocks, images, HTML comments, checkboxes, and the review bot's markup, keeps the bot's summary under its own heading, and drops every line that names a hidden test, a hidden file, or the pull request's number.
+   A prompt that still names one, or holds a code block, is dropped.
+6. Picks go newest first, at most 2 per folder under `yampa/` until that runs short.
+   `--verify` runs the hidden test modules at the base with the hidden tests in place and at the merge commit, in one temporary clone, and keeps as `testIds` only the pytest node ids that fail at the base and pass at the merge commit.
+   The check then runs only those ids, so a test that already passed at the base, or one the merge commit fails, never decides a run.
+   A pull request with no such test is dropped, and `--verify` stops once 20 are kept.
 
 yampa's tests need Postgres with pgvector.
 The default check starts the main checkout's `db` service with `docker compose -f ~/code/yampa/compose.yml up -d db`, which leaves a running container alone; a clone's own `compose.yml` at an old base could differ and recreate it.
-It then creates the empty `envs/local.env` and `envs/shared-secrets.env` that yampa's CI creates, and runs `uv run --group dev pytest` on the hidden test modules with `DB_HOST=localhost` and `TEST_GROUP=evals`, so the tests' `postgres_test_db` fixture creates and drops its own `test_db_evals` database beside a developer's.
-`--check` replaces that command for another repository; `{files}` becomes the hidden test modules.
+It then creates the empty `envs/local.env` and `envs/shared-secrets.env` that yampa's CI creates, and runs `uv run --group dev pytest -rfEp --continue-on-collection-errors` on the hidden tests with `DB_HOST=localhost` and `TEST_GROUP=evals`, so the tests' `postgres_test_db` fixture creates and drops its own `test_db_evals` database beside a developer's.
+`-rfEp` prints each test's outcome by node id, which `--verify` and a run's test share read; `--continue-on-collection-errors` keeps a module that fails to import at the base from stopping the others.
+`--check` replaces that command for another repository; `{tests}` becomes the hidden test modules, then the fail-to-pass node ids, and the command must print pytest's `-rp` lines.
 The first check in a clone builds its virtual environment from uv's cache, about two minutes, so a check may run 15 minutes before it times out.
 The sandbox does not block docker, but the check runs after omp exits and outside the sandbox anyway, and needs no model.
 
@@ -49,8 +55,9 @@ bun scripts/evals/pull-candidates.ts --tickets ~/.cache/omp-evalset/yampa-ticket
 bun scripts/evals/run.ts --tasks ~/.cache/omp-evalset/yampa-20.json --runs 3 --out ~/.cache/omp-evals/yampa
 ```
 
-The set built on 2026-11-23 holds 18 of its 20 tasks: the disk filled up during `--verify` after the 18th was kept.
-The next candidates, `pr-7317` (ENG-2811) and `pr-7271` (ENG-2838), are not verified yet; rerun the `--verify` command above to fill the set to 20.
+The set built on 2026-11-24 replaced the 2026-11-23 one, whose prompts held only the ticket and whose checks ran whole test files.
+It holds 20 tasks with 1 to 121 fail-to-pass tests each; `--verify` dropped `pr-7419`, whose tests all passed at the base, and the leak guard dropped `pr-7387`, whose ticket names a hidden test file.
+Its newest task, `pr-7564` (ENG-3113), is not in the tickets file, so its prompt is the pull request's title and description.
 
 ## A run
 
@@ -60,6 +67,7 @@ Each run replays the task the way [Worker model replay](token-cost.md#worker-mod
 - A new repository holds the base's history and nothing after it, after the repository's `.omp/land.json` setup.
 - `omp -p` runs the prompt in it under macOS's `sandbox-exec`, which hides the real repository, its worktrees, and their session folders, with no way to a remote, so a run cannot copy the landed change.
 - The sandbox also hides `--out` and every `~/.cache/omp-evals*` folder except the run's own, so a run cannot copy another run's change or a dry run's landed one; the pilot's first try did exactly that.
+  The folders above the run's own stay visible as entries, though not listable: git and uv stat each of them, and without that the 2026-11-24 smoke run could not run git status, uv, or pytest in its clone.
 - The run's environment drops the `PI_*` and `OMPCODE` variables an omp session sets, so a set started from inside a session starts clean.
 - Unlike a model replay, a run keeps the full harness: every extension and skill the user's omp loads.
 - It turns off every MCP server in `~/.omp/agent/mcp.json` through `disabledExtensions`, so a run cannot post to Slack or Linear and does not wait 30 seconds each on their startup.
@@ -68,7 +76,7 @@ Each run replays the task the way [Worker model replay](token-cost.md#worker-mod
 - After the run, the hidden tests are written from the landed commit over whatever the agent wrote, and the check runs outside the sandbox.
 - The run's folder keeps its prompt, omp's output and session files, `change.diff`, and `check.log`; the clone is removed once checked.
 
-Each run appends one line to `<out>/results.jsonl`, `~/.cache/omp-evals` by default: the task, arm, run number, model, `passed`, the failing test names, cost, requests, output tokens, which models answered, minutes, and the size of the change.
+Each run appends one line to `<out>/results.jsonl`, `~/.cache/omp-evals` by default: the task, arm, run number, model, `passed`, the failing test names, `testsPassed` of `testsTotal` (how many of the task's `testIds` passed), cost, requests, output tokens, which models answered, minutes, and the size of the change.
 A run already recorded is skipped, so a stopped run resumes.
 A run whose model could not answer, such as on a usage limit, is recorded with its `error`, left out of the summary, and retried next time; a run another model answered part of is left out of the summary too.
 `--max-cost` (5 dollars) and `--max-time` (30 minutes) bound each run; the full set at 3 runs is 60 runs.
@@ -94,7 +102,8 @@ The thermonuclear and interface reviews have no arm of their own.
 Only `/ship` spawns `thermonuclear-reviewer` and `interface-reviewer`, after it opens a pull request, and a run has no remote to open one on; none of the 29 eval runs recorded by 2026-11-23 spawned a subagent or called `ship_stage`.
 omp's `disabledExtensions` has no id for an agent either, so the `-extension:ship` arm, which drops the whole ship flow that asks for the reviews, is as close as a run gets.
 
-The summary prints, per arm, pass@1, pass@k for k = `--runs`, the change in pass@1 points against the full harness with its 95% band, the cost per task run and its change, minutes per task run, and a verdict.
+The summary prints, per arm, pass@1, pass@k for k = `--runs`, the mean share of each run's `testIds` that passed, the change in pass@1 points against the full harness with its 95% band, the cost per task run and its change, minutes per task run, and a verdict.
+The test share tells a run that missed one test from one that missed them all; pass@1 counts both as failures.
 pass@k is the unbiased estimate 1 - C(n-c, k) / C(n, k) for a task with n scored runs of which c passed, averaged over the tasks with at least k runs; with 3 runs, pass@3 is the share of tasks that passed at least once.
 The band is the Agresti-Caffo interval on the difference of two pass rates: add one pass and one failure to each arm, then take the smoothed difference ± 1.96 standard errors, so an arm at 0% or 100% still gets a band.
 The verdict reads the band:

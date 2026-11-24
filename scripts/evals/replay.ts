@@ -5,7 +5,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { sessionPaths } from "../../src/omp/modules";
 
 export interface Usage {
@@ -118,7 +118,40 @@ export function prepare(repo: string, base: string, dir: string): string {
 		const step = sh(command, clone);
 		if (!step.ok) throw new Error(`setup "${command}" failed in ${clone}:\n${step.output}`);
 	}
+	installNodeModules(clone);
 	return clone;
+}
+
+const NODE_MODULES_CACHE = join(homedir(), ".cache", "omp-evals-node-modules");
+
+/**
+ * Gives each npm package at the clone's root or one folder down, such as yampa's `front/`, its `node_modules`, so a run
+ * can run vitest. One `npm ci` per lockfile fills a cache outside every sandbox, and each clone gets an APFS copy-on-write
+ * copy of it, which costs no disk until written to.
+ */
+function installNodeModules(clone: string): void {
+	const locks = git(clone, "ls-files", "package-lock.json", "*/package-lock.json")
+		.split("\n")
+		.filter(lock => lock && lock.split("/").length <= 2);
+	for (const lock of locks) {
+		const folder = join(clone, dirname(lock));
+		if (existsSync(join(folder, "node_modules"))) continue;
+		const hash = new Bun.CryptoHasher("sha256").update(readFileSync(join(clone, lock))).digest("hex").slice(0, 16);
+		const cached = join(NODE_MODULES_CACHE, hash);
+		if (!existsSync(join(cached, "node_modules"))) {
+			rmSync(cached, { recursive: true, force: true });
+			mkdirSync(cached, { recursive: true });
+			for (const file of ["package.json", "package-lock.json", ".npmrc"])
+				if (existsSync(join(folder, file))) writeFileSync(join(cached, file), readFileSync(join(folder, file)));
+			const install = sh("npm ci --ignore-scripts --no-audit --no-fund", cached);
+			if (!install.ok) {
+				rmSync(cached, { recursive: true, force: true });
+				throw new Error(`npm ci for ${lock} failed:\n${install.output}`);
+			}
+		}
+		const copy = spawnSync("cp", ["-cR", join(cached, "node_modules"), join(folder, "node_modules")], { encoding: "utf8" });
+		if (copy.status !== 0) throw new Error(`copying node_modules into ${folder}: ${copy.stderr}`);
+	}
 }
 
 /**
@@ -143,7 +176,11 @@ export function confined(
 		`(regex #"^${(existsSync(path) ? realpathSync(path) : path).replace(/[.*+?^$()|[\]{}\\"]/g, "\\$&")}($|[-/])")`;
 	const sessions = sessionPaths.sessionDirForCwd(repo, join(homedir(), ".omp", "agent", "sessions"));
 	const denied = [repo, sessions, ...hidden].map(startingWith).join(" ");
-	const profile = `(version 1)(allow default)(deny file-read* file-write* ${denied})(allow file-read* file-write* ${startingWith(dir)})`;
+	// `dir` usually sits inside a hidden folder; git and uv stat each folder above the clone, so those folders stay
+	// visible as entries while their listings and other contents stay hidden.
+	const above: string[] = [];
+	for (let path = dirname(realpathSync(dir)); path !== dirname(path); path = dirname(path)) above.push(`(literal "${path.replace(/["\\]/g, "\\$&")}")`);
+	const profile = `(version 1)(allow default)(deny file-read* file-write* ${denied})(allow file-read* file-write* ${startingWith(dir)})(allow file-read-metadata ${above.join(" ")})`;
 	const remotes = ["https://", "http://", "ssh://", "git://", "git@"];
 	const gh = join(dir, "gh");
 	mkdirSync(gh, { recursive: true });
