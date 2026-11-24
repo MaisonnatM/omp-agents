@@ -258,11 +258,16 @@ export class Bots {
 	/**
 	 * Sends `text` into Bot `id`'s conversation: queued as a follow-up in its live session, else after resuming it, else
 	 * as the first message of a new one in the Bot's workspace. Resolves to the conversation's session id once omp took it.
+	 * With `fresh`, a conversation that is idle, or not running, is restarted first, as {@link restart} does, so `text`
+	 * opens a new one; a conversation with a turn under way takes `text` as a follow-up instead.
 	 */
-	message(id: BotId, text: string): Promise<string> {
+	message(id: BotId, text: string, fresh = false): Promise<string> {
 		const sent = (this.#sending.get(id) ?? Promise.resolve())
 			.catch(() => {})
-			.then(() => this.#send(id, text))
+			.then(async () => {
+				if (fresh && this.#idle(id)) await this.#restart(id);
+				return this.#send(id, text);
+			})
 			.finally(() => {
 				if (this.#sending.get(id) === sent) this.#sending.delete(id);
 			});
@@ -298,6 +303,14 @@ export class Bots {
 			});
 		this.#sending.set(id, restarted);
 		return restarted;
+	}
+
+	/** Whether Bot `id` has a conversation and no turn runs in it: its session is idle, or not running. */
+	#idle(id: BotId): boolean {
+		const sessionId = this.list.find(candidate => candidate.id === id)?.sessionId ?? null;
+		if (sessionId === null) return false;
+		const live = this.#deps.live(sessionId);
+		return !live || live.row().status === "idle";
 	}
 
 	async #restart(id: BotId): Promise<void> {

@@ -182,6 +182,38 @@ describe("Bots", () => {
 		expect(requests).toHaveLength(0);
 	});
 
+	test("a fresh message restarts an idle conversation first, so it opens a new one; without fresh it follows up", async () => {
+		const { bots, file, sessions, requests, dir } = harness();
+		await bots.message(scout.id, "Hello.");
+		expect(await bots.message(scout.id, "Appended.")).toBe("s1");
+		writeFileSync(join(dir, "s1.jsonl"), "{}\n");
+		expect(await bots.message(scout.id, "Routine run.", true)).toBe("s2");
+		expect(sessions[0]?.ended).toBe(true);
+		expect(sessions[0]?.heard).toEqual(["steer Hello.", "followUp Appended."]);
+		expect(existsSync(join(dir, "session-archive", "s1.jsonl"))).toBe(true);
+		expect(requests[1]).toMatchObject({ kind: "new", prompt: "Routine run.", bot: scout.id });
+		expect(file.value[0]?.sessionId).toBe("s2");
+	});
+
+	test("a fresh message to a conversation whose session ended still restarts it", async () => {
+		const { bots, sessions, requests, end } = harness();
+		await bots.message(scout.id, "Hello.");
+		end(sessions[0]!);
+		expect(await bots.message(scout.id, "Routine run.", true)).toBe("s2");
+		expect(requests[1]).toMatchObject({ kind: "new", prompt: "Routine run." });
+	});
+
+	test("a fresh message to a busy conversation does not restart it and follows up instead", async () => {
+		const { bots, file, sessions, requests } = harness();
+		await bots.message(scout.id, "Hello.");
+		sessions[0]!.working = true;
+		expect(await bots.message(scout.id, "Routine run.", true)).toBe("s1");
+		expect(sessions[0]?.ended).toBe(false);
+		expect(sessions[0]?.heard).toEqual(["steer Hello.", "followUp Routine run."]);
+		expect(requests).toHaveLength(1);
+		expect(file.value[0]?.sessionId).toBe("s1");
+	});
+
 	test("two messages at once start one conversation, in the order they were sent", async () => {
 		const { bots, sessions, requests } = harness();
 		await Promise.all([bots.message(scout.id, "One."), bots.message(scout.id, "Two.")]);

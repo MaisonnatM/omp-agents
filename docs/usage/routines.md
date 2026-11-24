@@ -27,6 +27,7 @@
   A triggered run leaves the schedules alone: an hourly routine still runs on the hour.
 - A message reaches the Bot the way your own does: it follows the Bot's running session, resumes its saved one, or starts its first.
   A routine starts no session of its own, so the Bot keeps one conversation, and its answers show there.
+  With **New conversation each run** checked on a message routine, each run first restarts the Bot's conversation, as **Restart conversation** does, so its message opens a new conversation; while the Bot is busy with a turn, the message joins the current conversation instead.
 - In the conversation, each routine message has a folded card with the routine's name, a message or command icon, the logos of what triggered it, its time, and a status icon and label.
   A message reads **Sending…** until recorded, then **Sent**; a command report shows how the command ended and how long it took.
   Click the card to show its **Prompt** or **Command**, any output, and **Started by** with links to the events when available.

@@ -59,6 +59,14 @@ describe("parseRoutineSpec", () => {
 		expect(parseRoutineSpec({ ...spec, task: { ...quiet, post: true } })).toBeNull();
 	});
 
+	test("keeps freshConversation when true, leaves it out when false or missing, and refuses another type", () => {
+		expect(parseRoutineSpec({ ...spec, freshConversation: true })?.ok.freshConversation).toBe(true);
+		expect(parseRoutineSpec(parseRoutineSpec({ ...spec, freshConversation: true })?.ok)?.ok.freshConversation).toBe(true);
+		expect(parseRoutineSpec({ ...spec, freshConversation: false })?.ok).not.toHaveProperty("freshConversation");
+		expect(parseRoutineSpec(spec)?.ok).not.toHaveProperty("freshConversation");
+		expect(parseRoutineSpec({ ...spec, freshConversation: "yes" })).toBeNull();
+	});
+
 	test("takes triggers in place of schedules, drops a kind routines no longer watch, and refuses neither, a trigger that is not one, and a kind twice", () => {
 		expect(parseRoutineSpec({ ...spec, schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] })?.ok).toMatchObject({ schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] });
 		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "event" }, { kind: "slack" }] })?.ok.triggers).toEqual([{ kind: "slack" }]);

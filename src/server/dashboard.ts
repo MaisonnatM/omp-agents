@@ -473,7 +473,7 @@ export class Dashboard {
 			},
 			fullyAwake,
 			onChange: () => broadcasts.pushList("routines"),
-			messageBot: (botId, text) => this.#bots.message(botId, text),
+			messageBot: (botId, text, fresh) => this.#bots.message(botId, text, fresh),
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,

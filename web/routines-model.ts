@@ -289,13 +289,27 @@ export interface RoutineDraft {
 	command: string;
 	/** Whether the command posts its output to the Bot only when it fails. */
 	failuresOnly: boolean;
+	/** Whether a message run restarts the Bot's idle conversation first. */
+	freshConversation: boolean;
 	schedules: ScheduleDraft[];
 	triggers: TriggerKind[];
 }
 
 /** A new routine's form for Bot `botId`: a prompt on weekdays at 9:00. */
 export function newDraft(id: string, botId: BotId): RoutineDraft {
-	return { id, botId, name: "", enabled: true, task: "prompt", prompt: "", command: "", failuresOnly: false, schedules: [blankSchedule()], triggers: [] };
+	return {
+		id,
+		botId,
+		name: "",
+		enabled: true,
+		task: "prompt",
+		prompt: "",
+		command: "",
+		failuresOnly: false,
+		freshConversation: false,
+		schedules: [blankSchedule()],
+		triggers: [],
+	};
 }
 
 /** One saved schedule as the editor shows it, with the other kind's fields at their defaults. */
@@ -321,6 +335,7 @@ export function draftOf(routine: Routine): RoutineDraft {
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
 		command: task.kind === "command" ? task.command : draft.command,
 		failuresOnly: task.kind === "command" && task.post === "failures",
+		freshConversation: routine.freshConversation === true,
 		schedules: routine.schedules.map(scheduleDraft),
 		triggers: routine.triggers.map(({ kind }) => kind),
 	};
@@ -356,7 +371,8 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	}
 	if (schedules.length === 0 && draft.triggers.length === 0) return { fix: "Add a schedule or a trigger." };
 	const triggers = TRIGGER_KINDS.filter(kind => draft.triggers.includes(kind)).map(kind => ({ kind }));
-	return { ok: { id: draft.id, botId: draft.botId, name, enabled: draft.enabled, task, schedules, triggers } };
+	const spec: RoutineSpec = { id: draft.id, botId: draft.botId, name, enabled: draft.enabled, task, schedules, triggers };
+	return { ok: task.kind === "prompt" && draft.freshConversation ? { ...spec, freshConversation: true } : spec };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */
@@ -416,7 +432,8 @@ export function cadenceOf(schedules: readonly Schedule[]): CompactSchedule | nul
 /** `current` switched to `cadence`, at the defaults when the routine was custom. */
 export const withCadence = (current: CompactSchedule | null, cadence: Cadence): CompactSchedule => ({ ...(current ?? DEFAULT_COMPACT), cadence });
 
-/** `routine` to save with `schedule` in place of all its schedules, keeping its triggers. */
-export function specWithSchedule({ id, botId, name, enabled, task, triggers }: Routine, schedule: Schedule): RoutineSpec {
-	return { id, botId, name, enabled, task, schedules: [schedule], triggers };
+/** `routine` to save with `schedule` in place of all its schedules, keeping its triggers and whether each run starts a new conversation. */
+export function specWithSchedule({ id, botId, name, enabled, task, triggers, freshConversation }: Routine, schedule: Schedule): RoutineSpec {
+	const spec: RoutineSpec = { id, botId, name, enabled, task, schedules: [schedule], triggers };
+	return freshConversation ? { ...spec, freshConversation } : spec;
 }

@@ -60,6 +60,8 @@ function harness(file: RoutinesFile) {
 		execs: [] as FakeExec[],
 		/** Each message a Bot was sent, as `<bot>: <text>`. */
 		messages: [] as string[],
+		/** Whether each message, in the same order, asked for a fresh conversation. */
+		fresh: [] as boolean[],
 		/** Each Bot's workspace and conversation; a Bot not named here is gone. */
 		bots: new Map<string, { cwd: string; sessionId: string }>([[SCOUT, { cwd: "/work/webapp", sessionId: "s-scout" }]]),
 	};
@@ -74,10 +76,11 @@ function harness(file: RoutinesFile) {
 		},
 		fullyAwake: async () => fake.awake,
 		onChange: () => {},
-		async messageBot(botId: BotId, text: string): Promise<string> {
+		async messageBot(botId: BotId, text: string, fresh = false): Promise<string> {
 			const bot = fake.bots.get(botId);
 			if (!bot) throw new Error("This Bot is gone.");
 			fake.messages.push(`${botId}: ${text}`);
+			fake.fresh.push(fresh);
 			return bot.sessionId;
 		},
 	});
@@ -98,6 +101,15 @@ describe("RoutineRunner", () => {
 		await runner.tick();
 		expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], summary)]);
 		expect(file.value[0]?.runs).toEqual([{ at: T0 + HOUR, outcome: { kind: "sent", sessionId: "s-scout" }, errors: [], triggeredBy: [] }]);
+	});
+
+	test("a prompt routine with freshConversation asks the Bot for a new conversation, and one without it appends", async () => {
+		const file = fileWith(routinesPath());
+		file.apply({ op: "save", routine: { id: "r2", botId: SCOUT, name: "Fresh", schedules: [everyHour], triggers: [], task: summary, enabled: true, freshConversation: true } }, T0);
+		const { runner, fake } = harness(file);
+		await runner.tick();
+		expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], summary), sentBy("r2", "Fresh", T0 + HOUR, [], summary)]);
+		expect(fake.fresh).toEqual([false, true]);
 	});
 
 	test("every due routine runs at once, whatever their number, since none starts a session of its own", async () => {
