@@ -1,8 +1,8 @@
 /**
  * A project's plan: its steps and their sub-steps to tick, under **To do**, **Done**, and **All** tabs, with a field to add
- * a step at its end. **Select** turns the boxes into a selection, whose steps **Start session** hands to a new session in the project.
+ * a step at its end. A step's play button, or **Select** and **Start session** for several, hands steps to a new session in the project.
  */
-import { IconCheckmark1, IconPlusSmall } from "central-icons";
+import { IconCheckmark1, IconPlay, IconPlusSmall } from "central-icons";
 import { useState } from "react";
 import { collapseSpaces } from "../../../src/shared/collapse-spaces";
 import { type Project, type ProjectStep, stepNumbers } from "../../../src/shared/projects";
@@ -58,11 +58,15 @@ export function Plan({ project, readOnly, onChange }: { project: Project; readOn
 			for (const id of [step.id, ...subStepsOf(step).map(each => each.id)]) on ? next.add(id) : next.delete(id);
 			return next;
 		});
-	const startSession = (): void => {
-		const picked = project.steps.filter(step => selection?.has(step.id));
+	// The new session's draft names the steps, sub-steps indented under theirs, so it starts on the right part of the plan.
+	const startSession = (picked: ProjectStep[]): void => {
 		if (picked.length === 0) return;
-		const lines = picked.map(step => `${step.parentId === undefined ? "" : "   "}- ${numbers.get(step.id)}. ${step.text}${step.done ? " (done)" : ""}`);
-		appendToComposer(newDraftKey(null), [`Work on ${picked.length === 1 ? "this step" : "these steps"} of the plan of the project "${project.name}":`, ...lines].join("\n"));
+		// A sub-step indents only under its own step; picked alone, it stands as a step of its own.
+		const nested = picked.map(step => picked.some(each => each.id === step.parentId));
+		const lines = picked.map((step, index) => `${nested[index] ? "   " : ""}- ${numbers.get(step.id)}. ${step.text}${step.done ? " (done)" : ""}`);
+		const heads = nested.filter(under => !under).length;
+		const intro = `Work on ${heads === 1 ? "this step" : "these steps"} of the plan of the project "${project.name}":`;
+		appendToComposer(newDraftKey(null), [intro, ...lines, "", "Tick each step with project_update as you finish it."].join("\n"));
 		setSelection(null);
 		location.hash = hashForNewSession({ projectId });
 	};
@@ -114,6 +118,7 @@ export function Plan({ project, readOnly, onChange }: { project: Project; readOn
 										onChange={onChange}
 										onRemove={() => remove(step)}
 										onAddSubStep={step.parentId === undefined ? () => setAddingUnder(step.id) : null}
+										onStart={() => startSession([step, ...subStepsOf(step)])}
 									/>
 								);
 								if (index !== lastOfAdding || addingUnder === null || selecting) return [row];
@@ -125,7 +130,14 @@ export function Plan({ project, readOnly, onChange }: { project: Project; readOn
 				{selecting ? (
 					<div className="flex items-center gap-2 border-t border-border px-4 py-1.5">
 						<span className="text-xs text-muted-foreground tabular-nums">{selection.size === 0 ? "Pick the steps a new session works on" : `${selection.size} selected`}</span>
-						<Button {...activityControl("projects.step.start")} size="compact" leadingIcon={IconPlusSmall} className="ml-auto" disabled={selection.size === 0} onClick={startSession}>
+						<Button
+							{...activityControl("projects.step.start")}
+							size="compact"
+							leadingIcon={IconPlusSmall}
+							className="ml-auto"
+							disabled={selection.size === 0}
+							onClick={() => startSession(project.steps.filter(step => selection.has(step.id)))}
+						>
 							Start session
 						</Button>
 					</div>
@@ -149,10 +161,12 @@ interface PlanRowProps {
 	onRemove: () => void;
 	/** Opens the field that adds a sub-step under it; `null` for a sub-step, which holds none. */
 	onAddSubStep: (() => void) | null;
+	/** Starts a session in the project on this step and its sub-steps. */
+	onStart: () => void;
 }
 
 /** A step of the plan: a box that ticks it, or picks it while the plan is selecting, its text, which a click edits, and its number in the plan. */
-function PlanRow({ projectId, step, number, readOnly, picked, onPick, onChange, onRemove, onAddSubStep }: PlanRowProps) {
+function PlanRow({ projectId, step, number, readOnly, picked, onPick, onChange, onRemove, onAddSubStep, onStart }: PlanRowProps) {
 	const [editing, setEditing] = useState(false);
 	const selecting = picked !== null;
 	const save = (text: string): void => {
@@ -220,6 +234,20 @@ function PlanRow({ projectId, step, number, readOnly, picked, onPick, onChange, 
 			)}
 			{!readOnly && !editing && !selecting && (
 				<>
+					{!step.done && (
+						<Tooltip content="Start a session on this step">
+							<Button
+								{...activityControl("projects.step.start")}
+								variant="ghost"
+								size="icon-xs"
+								aria-label={`Start a session on “${step.text}”`}
+								className="size-6 shrink-0 text-muted-foreground opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+								onClick={onStart}
+							>
+								<IconPlay />
+							</Button>
+						</Tooltip>
+					)}
 					{onAddSubStep && (
 						<Tooltip content="Add a sub-step">
 							<Button
