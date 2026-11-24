@@ -270,6 +270,23 @@ describe("RoutineRunner", () => {
 			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + 2 * HOUR, [], { kind: "command", command: "git worktree prune", run })]);
 		});
 
+		test("posting changes, a command that exits 0 posts only when its output differs from the last run's, and a failure always posts", async () => {
+			const file = fileWith(routinesPath(), { ...command, post: "changes" });
+			const { runner, fake } = harness(file);
+			const runOnce = async (exitCode: number, output: string): Promise<void> => {
+				await runner.tick();
+				fake.execs.at(-1)!.end({ exitCode, output });
+				await settled();
+				fake.now += HOUR;
+			};
+			await runOnce(0, "3 open\n");
+			await runOnce(0, "3 open\n");
+			await runOnce(0, "4 open\n");
+			await runOnce(1, "4 open\n");
+			expect(fake.messages).toHaveLength(3);
+			expect(file.value[0]?.runs).toHaveLength(4);
+		});
+
 		test("with freshConversation, a posted report asks for a new conversation, a run that posts nothing asks for none, and without it a report appends", async () => {
 			const file = fileWith(routinesPath(), command);
 			file.apply({ op: "save", routine: { id: "r2", botId: SCOUT, name: "Fresh", schedules: [everyHour], triggers: [], task: { ...command, post: "failures" }, enabled: true, freshConversation: true } }, T0);

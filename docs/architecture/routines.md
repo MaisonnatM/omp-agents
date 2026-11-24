@@ -94,6 +94,7 @@ Each tick at a full wake does three things, in order:
    When the command ends, the runner writes its exit code, output, times, and `slept` to the run; a non-zero exit, a stop, or a failed spawn also goes to the run's errors.
    It then posts the command's completed `RoutineMessage` through `routineMessageText` and `Bots.message`, with the routine's name, command, result, how long the Mac slept, and output fenced as data.
    A command task with `post: "failures"` skips that post, and holds nothing for a full wake, when it exited with code 0; see [Command routines can post only their failures](../decisions/2026-11-04-command-routines-can-post-only-failures.md).
+   With `post: "changes"` it skips it only when it exited 0 with the same output as the routine's newest earlier run that exited, so a command acts as a cheap gate before the Bot's model turn.
    That post waits for a full wake, since the Bot's turn it starts would stall in a dark wake; it waits in memory, so a server that stops first never posts it, though the run keeps the output.
    The run keeps the output whether or not the post goes through, and a post the Bot refused adds why to the run's errors.
    The runner keeps the routines whose command runs in memory, since a run holds one outcome and later `run-now` claims can push a running command's run out of the saved 10; a command routine whose last command still runs records an error instead of running a second one.

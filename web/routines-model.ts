@@ -5,6 +5,7 @@ import {
 	nextDueAt,
 	runsHere,
 	TRIGGER_KINDS,
+	type CommandPost,
 	type CommandRun,
 	type Routine,
 	type RoutineRun,
@@ -275,6 +276,9 @@ export function blankSchedule(): ScheduleDraft {
 	return { kind: "weekly", amount: "1", unit: "days", days: [...WEEKDAYS], time: "09:00" };
 }
 
+/** When a command posts its output, as the editor picks it: `every` run, or a {@link CommandPost}. */
+export type CommandPostChoice = "every" | CommandPost;
+
 /**
  * The editor's form. It keeps both tasks' fields, so switching kind and back keeps what you typed.
  */
@@ -287,8 +291,8 @@ export interface RoutineDraft {
 	task: RoutineTask["kind"];
 	prompt: string;
 	command: string;
-	/** Whether the command posts its output to the Bot only when it fails. */
-	failuresOnly: boolean;
+	/** When the command posts its output to the Bot: every run, only failures, or failures and changed output. */
+	post: CommandPostChoice;
 	/** Whether a message run restarts the Bot's idle conversation first. */
 	freshConversation: boolean;
 	schedules: ScheduleDraft[];
@@ -305,7 +309,7 @@ export function newDraft(id: string, botId: BotId): RoutineDraft {
 		task: "prompt",
 		prompt: "",
 		command: "",
-		failuresOnly: false,
+		post: "every",
 		freshConversation: false,
 		schedules: [blankSchedule()],
 		triggers: [],
@@ -334,7 +338,7 @@ export function draftOf(routine: Routine): RoutineDraft {
 		task: task.kind,
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
 		command: task.kind === "command" ? task.command : draft.command,
-		failuresOnly: task.kind === "command" && task.post === "failures",
+		post: task.kind === "command" ? (task.post ?? "every") : "every",
 		freshConversation: routine.freshConversation === true,
 		schedules: routine.schedules.map(scheduleDraft),
 		triggers: routine.triggers.map(({ kind }) => kind),
@@ -355,7 +359,7 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 			const command = draft.command.trim();
 			if (!command) return { fix: "Write the command to run." };
 			if (command.length > MAX_COMMAND_LENGTH) return { fix: `Shorten the command to ${MAX_COMMAND_LENGTH.toLocaleString("en-US")} characters or fewer.` };
-			task = draft.failuresOnly ? { kind: "command", command, post: "failures" } : { kind: "command", command };
+			task = draft.post === "every" ? { kind: "command", command } : { kind: "command", command, post: draft.post };
 			break;
 		}
 		default: {
