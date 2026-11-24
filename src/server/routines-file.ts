@@ -12,6 +12,7 @@ import {
 	MAX_ROUTINE_RUNS,
 	MAX_TRIGGER_EVENTS,
 	isRoutineMachine,
+	isRunUsage,
 	parseCommandRun,
 	parseKeptRoutineSpec,
 	parseTriggeredBy,
@@ -20,6 +21,7 @@ import {
 	type RoutineChange,
 	type RoutineOutcome,
 	type RoutineRun,
+	type RunUsage,
 	type TriggerEvent,
 } from "../routines";
 import { type BotId, type BotSpec, defaultLook } from "../shared/bots";
@@ -72,7 +74,9 @@ function parseRun(value: unknown): RoutineRun | null {
 			const run = parseCommandRun(outcome.run);
 			if (run) parsed = { kind: "command", run };
 		}
-		return parsed ? { at: value.at, outcome: parsed, errors, triggeredBy } : null;
+		if (!parsed) return null;
+		const run: RoutineRun = { at: value.at, outcome: parsed, errors, triggeredBy };
+		return isRunUsage(value.usage) ? { ...run, usage: { tokens: value.usage.tokens, cost: value.usage.cost } } : run;
 	}
 	const queued = "queued" in value ? value.queued : isTexts(value.queue) && value.queue.length > 0;
 	const started = parseAll(value.started, parseStarted);
@@ -245,6 +249,11 @@ export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<Routin
 	/** Records the Bot conversation the run at `at` sent its prompt into. */
 	sent(id: string, at: number, sessionId: string): void {
 		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "sent", sessionId } }));
+	}
+
+	/** Records what the Bot's turn that answered the run at `at` spent. */
+	usage(id: string, at: number, usage: RunUsage): void {
+		this.#updateRun(id, at, run => ({ ...run, usage }));
 	}
 
 	/** Records the command of the run at `at` as it launches and again as it ends. */

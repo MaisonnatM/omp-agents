@@ -53,6 +53,8 @@ It judges the runs claimed in the day before the last half hour (`HEALTH_WINDOW_
 
 `routineTurn` in `src/live-session.ts` finds a message run's turn in its Bot's session file: the messages between the prompt whose routine stamp names the routine and the run's key, and the next prompt, read as `turnUpdate` reads an `agent_end`'s.
 A run whose session file or prompt is not found has no turn, so it is judged on its outcome alone.
+It also sums the turn's `usage`: every assistant message's input, output, and cache tokens, and its `usage.cost.total`.
+When a session's turn ends, the `Dashboard` records that sum as `usage` on each prompt run sent into that session that has none yet, in `routines.json`, so the page shows each run's tokens and cost and a routine's total over its kept runs.
 The `Dashboard` checks `HEALTH_KINDS` on the owner at startup and on the daily tick, and the bell shows one `routine-health` notice for what it found; see [Notifications](notifications.md).
 
 ## Built-in routines
