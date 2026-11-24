@@ -94,6 +94,7 @@ export class ShepherdInbox extends JsonInboxDir<ShepherdRequest> {
 							newSessionRequest(cwd, action ? action.prompt(pr) : landPrompt(pr), {
 								branch: branch ? { kind: "work", name: branch } : null,
 								subject: { kind: "pull-request", pr: { owner: pr.owner, repo: pr.repo, number: pr.number } },
+								reachOwner: action?.reachesOwner ?? false,
 							}),
 						);
 						if (!result.ok) return await refuse(result.error);

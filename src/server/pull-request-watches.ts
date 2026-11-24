@@ -207,6 +207,12 @@ export class PullRequestWatches {
 		return this.#deps.file.value.length > 0;
 	}
 
+	/** The session that watches `pr`, as another server may have saved, `null` when none does. */
+	watcherOf(pr: PullRequest): string | null {
+		this.#deps.file.reload();
+		return this.#deps.file.value.find(watch => samePullRequest(watch.pr, pr))?.sessionId ?? null;
+	}
+
 	/** How `request` joins the server as session `instanceId`: with its own watch tool, unless it starts a Bot's conversation. */
 	join(request: StartRequest, instanceId: string): SessionJoin {
 		return { rpc: this.#deps.isBot(request) ? PLAIN_LAUNCH : { ...PLAIN_LAUNCH, tools: [this.#toolFor(instanceId)] }, attach() {} };

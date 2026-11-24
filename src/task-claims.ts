@@ -117,6 +117,11 @@ export class TaskClaims {
 		return claims.find(claim => claim.sessionId === sessionId)?.identity ?? saved[sessionId] ?? null;
 	}
 
+	/** The ended sessions that kept `identity` for their resume. */
+	sessionsOf(identity: string): string[] {
+		return Object.entries(this.#read().saved).flatMap(([sessionId, saved]) => (saved === identity ? [sessionId] : []));
+	}
+
 	/** A reattached session's subject must not override its explicit independent or review identity. */
 	identityForInstance(instanceId: string): string | null {
 		return this.#read().claims.find(claim => claim.instanceId === instanceId)?.identity ?? null;

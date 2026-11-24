@@ -36,6 +36,11 @@ The identity comes from `taskId`, a pull-request `subject`, `todoId`, a pull req
 `LiveSessions.reserveTask` also matches a running session that predates claims through the pull requests its transcript names, with the same `pullRequestTask` identity.
 Another start for that identity fails with the owning session link, dashboard port, and directory rather than spawning or steering it.
 The failed `StartResult` also carries that session as `owner` (`TaskOwner`: its `~`-shortened directory, plus its instance id and name when this dashboard runs it, `here`, else the port of the dashboard that does), which a quick action's note on the page turns into **Open session** and **End it and start again** for a session here; bots, routines, and scheduled sends read only `error`.
+A start with `reachOwner`, which `parseNewSessionRequest` takes only with a pull request `subject`, goes to the session here that owns that pull request instead.
+The starter's `ownersOf` lists the running session that `LiveSessions.taskOwner` finds for its identity, else the session that watches the pull request (`PullRequestWatches.watcherOf`) and the ended sessions whose `saved` identity is that pull request's, newest file first.
+The dashboard's `startSession` sends the prompt to the first one through `reach`, resumed when it ended, as the starter's `followUp`, before the worktree checkout chain, which a resume's restored worktree waits on.
+A resume failure is the start's error; a new session starts only when no session owns the pull request.
+The page's **Fix CI and conflicts**, **Fix CI**, **Resolve conflicts**, and **Address comments**, whose `reachesOwner` is set in `src/pull-request-actions.ts`, and a PR shepherd's fixes start with it; a session another dashboard runs still fails the start with `owner`.
 Set a distinct nonblank `taskId` only for intentional independent work; unrelated task identities remain concurrent.
 Ownership is shared across dashboards, survives a dashboard restart while its keeper lives, and releases when the session ends or its launch fails.
 PR review drafts use a separate review identity, so read-only review and implementation can coexist without admitting duplicate launches within either role.

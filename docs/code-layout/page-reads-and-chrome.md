@@ -10,7 +10,7 @@
   `terminal-socket.ts` sends its commands and retains a kill requested while the socket connects, sending it when the socket opens.
 - `web/quick-actions.ts`: the quick actions of the Pull requests page and the open todo, which pull requests and todos each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   Todos take the **Work on it** and **Plan it** labels and descriptions from `WORK_ACTIONS`, with their own rules for which todos an action applies to and the prompt it sends.
-  `startTarget` turns what a quick start works on into the `subject` or `todoId` its `start` message carries, and `reviewDraft`, true for **Review** alone, and `quickOn` picks the quick start that works on an item, whose failure that item's details show.
+  `startTarget` turns what a quick start works on into the `subject` or `todoId` its `start` message carries, `reviewDraft`, true for **Review** alone, and `reachOwner`, true for the fixes whose `reachesOwner` sends them to the session that owns the pull request, and `quickOn` picks the quick start that works on an item, whose failure that item's details show.
   `web/components/quick-actions.tsx` holds a row's menu, the buttons on a pull request's or a todo's details, and the note that says why a start failed, or names the session that already works on its task with **Open session** and **End it and start again**.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
   `web/components/status-dot.tsx` draws that dot for each session status.
