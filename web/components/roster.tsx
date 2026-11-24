@@ -1,7 +1,7 @@
 /** The left sidebar's roster: the projects, then the Workspaces section, whose label picks the workspace, and its search, then the pinned sessions, each workspace's sessions, and the past ones. */
-import { IconArrowLoopDownLeft, IconDotGrid1x3Horizontal, IconFlag1, IconFolder1, IconFolderOpen, IconLoader, IconMagnifyingGlass, IconPin, IconPlusSmall } from "central-icons";
+import { IconArrowLoopDownLeft, IconCalendarClock, IconDotGrid1x3Horizontal, IconFlag1, IconFolder1, IconFolderOpen, IconLoader, IconMagnifyingGlass, IconPin, IconPlusSmall } from "central-icons";
 import { type ReactNode, useContext, useState } from "react";
-import { awaitsCi, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
+import { awaitsScheduled, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -86,21 +86,6 @@ interface WorkspaceFolderProps {
 	onNewSession: () => void;
 	/** The folder's session rows, in order. */
 	children: ReactNode;
-}
-
-/** A workspace's sessions waiting on their pull requests' checks, last in its folder under their own label; nothing when none waits. */
-function WaitingOnCi({ hosts, hostRow }: { hosts: RosterHost[]; hostRow: (host: RosterHost) => ReactNode }) {
-	if (hosts.length === 0) return null;
-	return (
-		<>
-			<li className="flex h-6 items-center gap-1.5 px-2 pt-1 text-[11px] font-medium text-muted-foreground">
-				<span aria-hidden className="size-1.5 shrink-0 rounded-full border-[1.5px] border-amber-500 motion-safe:animate-pulse" />
-				Waiting on CI
-				<span className="tabular-nums text-muted-foreground/70">{hosts.length}</span>
-			</li>
-			{hosts.map(hostRow)}
-		</>
-	);
 }
 
 /** A workspace in the roster: a folder of its session rows, or with none its name alone; hovering it offers a new session there. */
@@ -264,6 +249,7 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, 
 				},
 	);
 	const { pinned, interrupted, ended } = lists;
+	const waitingHosts = groups.flatMap(group => group.hosts.filter(awaitsScheduled));
 	const resumingAll = resumeAll?.phase === "starting";
 	/** The search field narrows the lists, so a workspace left empty hides rather than showing no sessions. */
 	const filtering = query.trim() !== "";
@@ -345,14 +331,24 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, 
 					</SidebarMenu>
 				</SidebarGroup>
 			)}
+			{waitingHosts.length > 0 && (
+				<SidebarGroup collapsible open={!collapsed.has("waiting")} onOpenChange={() => toggleGroup("waiting")}>
+					<SidebarGroupLabel icon={IconCalendarClock}>
+						Waiting on CI or a scheduled check
+						<span className="tabular-nums text-muted-foreground/70">{waitingHosts.length}</span>
+					</SidebarGroupLabel>
+					<SidebarMenu aria-label="Sessions waiting on CI or a scheduled check" className="gap-px">
+						{waitingHosts.map(host => hostRow(host, false, showWorkspace))}
+					</SidebarMenu>
+				</SidebarGroup>
+			)}
 			{folders.shown.map(folder => {
 				const { cwd, cwdDisplay } = folder.group.workspace;
 				const key = `workspace:${cwd}`;
 				return (
 					<WorkspaceFolder key={cwd} folder={folder} name={folderName(cwdDisplay) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
-						{folder.group.hosts.filter(host => !awaitsCi(host)).map(host => hostRow(host, false, false))}
+						{folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false))}
 						{folder.group.interrupted.map(session => pastRow(session, false, false))}
-						<WaitingOnCi hosts={folder.group.hosts.filter(awaitsCi)} hostRow={host => hostRow(host, false, false)} />
 					</WorkspaceFolder>
 				);
 			})}
