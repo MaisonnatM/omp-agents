@@ -19,7 +19,6 @@ import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Roster } from "./roster";
-import { ScheduledSends } from "./scheduled";
 import { type NavCount, SidebarNav } from "./sidebar-nav";
 
 const NO_VIEWS: View[] = [];
@@ -65,7 +64,6 @@ export const AppSidebar = memo(function AppSidebar({
 }: AppSidebarProps) {
 	const { openNewSession } = useDashboardActions();
 	const { connected, pullRequestsScope } = useDashboardStatus();
-	const scheduled = useContext(ScheduledSends);
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
 	const [hiddenRepos] = useHiddenRepos();
 	const counts = useMemo(
@@ -116,8 +114,6 @@ export const AppSidebar = memo(function AppSidebar({
 					onQuery={setQuery}
 					onTogglePin={togglePin}
 					open={page ? NO_VIEWS : panes}
-					scheduled={scheduled}
-					scheduledOpen={page?.kind === "scheduled" ? page.id : null}
 					projectOpen={page?.kind === "projects" ? page.open : null}
 					onPickWorkspace={onPickWorkspace}
 				/>
