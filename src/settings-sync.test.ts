@@ -2,6 +2,7 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { openBoardFile } from "./board-module";
 import { canonicalJson } from "./json";
 import { runChecked } from "./proc";
 import { isDue, type RoutineSpec } from "./routines";
@@ -42,7 +43,7 @@ const text = (value: string) => ({ text: value, executable: false });
 /** Stores that read `values`, `{}` for the rest, and take whatever sync writes. */
 const fixedStores = (values: Partial<Record<SyncStoreId, unknown>> = {}): Record<SyncStoreId, SyncStore> => {
 	const store = (id: SyncStoreId): SyncStore => ({ read: () => values[id] ?? {}, parse: value => ({ ok: value }), write: () => {} });
-	return { "source-control": store("source-control"), todos: store("todos"), preferences: store("preferences"), workspaces: store("workspaces"), bots: store("bots") };
+	return { "source-control": store("source-control"), todos: store("todos"), preferences: store("preferences"), workspaces: store("workspaces"), bots: store("bots"), projects: store("projects") };
 };
 
 describe("what syncs", () => {
@@ -84,6 +85,7 @@ describe("what syncs", () => {
 			"dashboard/preferences.json": text("{}\n"),
 			"dashboard/workspaces.json": text("{}\n"),
 			"dashboard/bots.json": text("{}\n"),
+			"dashboard/projects.json": text("{}\n"),
 		});
 		expect(skipped.sort((a, b) => a.path.localeCompare(b.path))).toEqual([
 			{ path: "dashboard/todos.json", reason: "credential" },
@@ -237,6 +239,7 @@ function machine(root: string, remote: string) {
 		botsDir: join(root, "data", "bots"),
 		routines: new RoutinesFile(config("routines.json")),
 		machine: { id: `machine-${basename(root)}`, name: basename(root) },
+		board: openBoardFile(config("board.json")),
 	};
 	const changed = new Set<ListKind>();
 	const places = { omp, home, stores: syncStores(files, home, list => changed.add(list)) };
@@ -275,7 +278,7 @@ describe("SettingsSync", () => {
 		put(agentsMd(a), `Notes live in ${a.home}/notes.\n`);
 		put(join(a.omp, "skills", "alpha", "SKILL.md"), "# Alpha\n");
 		a.sourceControl.apply({ op: "repo", repo: join(a.home, "code", "app"), on: true });
-		const sent = ["bots", "preferences", "source-control", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
+		const sent = ["bots", "preferences", "projects", "source-control", "todos", "workspaces"].map(name => `dashboard/${name}.json`);
 		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [...sent, "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"] });
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/source-control.json", "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"], sent: [] });
 		expect(readFileSync(agentsMd(b), "utf8")).toBe("Notes live in ~/notes.\n");
@@ -335,6 +338,57 @@ describe("SettingsSync", () => {
 		await a.sync.sync();
 		for (const side of [a, b]) expect(readFileSync(memory(side), "utf8")).toBe("- 2026-01-01 likes tea\n- 2026-01-02 from B\n- 2026-01-02 from A\n");
 		expect([a.bots.value[0]?.sessionId, b.bots.value[0]?.sessionId]).toEqual(["session-a", "session-b"]);
+	});
+
+	test("carries each project's goal, decisions, archive, and plan, without its sessions, leases, or messages, and merges both machines' changes", async () => {
+		const { a, b } = await pair();
+		const project = { goal: "Ship it.", decisions: ["Use Bun."], sessionIds: ["session-a"], createdAt: 1 };
+		const lease = { by: "session-a", until: 9e15 };
+		a.board.apply({
+			op: "all",
+			changes: [
+				{ op: "channel", channel: { id: "p1", name: "launch", about: "", project } },
+				{ op: "thread", thread: { id: "s1", channel: "p1", title: "Build", task: "claimed", lease, createdAt: 2 } },
+				{ op: "thread", thread: { id: "s2", channel: "p1", title: "Test", task: "open", lease: null, createdAt: 3, parent: "s1" } },
+				{ op: "post", message: { id: "m1", thread: "s1", author: "session-a", at: 4, text: "Started." } },
+			],
+		});
+		await a.sync.sync();
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/projects.json"] });
+		expect(b.board.value.channels.find(channel => channel.id === "p1")).toEqual({ id: "p1", name: "launch", about: "", project: { ...project, sessionIds: [] } });
+		const plan = (side: typeof a) => side.board.value.threads.filter(thread => thread.channel === "p1").map(({ id, task, lease, parent }) => ({ id, task, lease, parent }));
+		expect(plan(b)).toEqual([
+			{ id: "s1", task: "claimed", lease: null, parent: undefined },
+			{ id: "s2", task: "open", lease: null, parent: "s1" },
+		]);
+		expect(b.board.value.messages).toEqual([]);
+		expect(b.changed.has("board")).toBe(true);
+
+		b.board.apply({ op: "decision", channel: "p1", text: "Ship Friday.", remove: false });
+		b.board.apply({ op: "remove-thread", thread: "s2" });
+		a.board.apply({ op: "thread", thread: { id: "s3", channel: "p1", title: "Docs", task: "open", lease: null, createdAt: 5 } });
+		a.board.apply({ op: "archive", channel: "p1", at: 6 });
+		await b.sync.sync();
+		await a.sync.sync();
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/projects.json"], sent: [] });
+		for (const side of [a, b]) {
+			expect(side.board.value.channels.find(channel => channel.id === "p1")?.project).toMatchObject({ decisions: ["Use Bun.", "Ship Friday."], archivedAt: 6 });
+			expect(plan(side).map(step => step.id)).toEqual(["s1", "s3"]);
+		}
+		expect(a.board.value.channels.find(channel => channel.id === "p1")?.project?.sessionIds).toEqual(["session-a"]);
+		expect(plan(a)[0]?.lease).toEqual(lease);
+		expect(a.board.value.messages.map(message => message.id)).toEqual(["m1"]);
+	});
+
+	test("a project whose name another channel holds on this machine takes the next free name on both", async () => {
+		const { a, b } = await pair();
+		a.board.apply({ op: "channel", channel: { id: "p1", name: "launch", about: "", project: { goal: "", decisions: [], sessionIds: [], createdAt: 1 } } });
+		b.board.apply({ op: "channel", channel: { id: "c1", name: "launch", about: "" } });
+		await a.sync.sync();
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/projects.json"], sent: ["dashboard/projects.json"] });
+		await a.sync.sync();
+		for (const side of [a, b]) expect(side.board.value.channels.find(channel => channel.id === "p1")?.name).toBe("launch-2");
+		expect(b.board.value.channels.find(channel => channel.id === "c1")?.name).toBe("launch");
 	});
 
 	test("runs each routine on one computer: it arrives on the other without running there, and enabling it there moves it", async () => {

@@ -18,6 +18,8 @@ export interface ModuleFile<Value, Change> {
 	readonly value: Value;
 	/** Applies `change` and saves; `false` when it changed nothing, and a throw when the state refuses it. */
 	apply(change: Change): boolean;
+	/** Replaces the whole state and saves, as settings sync does; `false` when it changed nothing. */
+	replace(value: Value): boolean;
 	/** Whether what `apply` saved reached the disk. */
 	flush(): boolean;
 }

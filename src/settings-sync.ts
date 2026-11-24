@@ -14,6 +14,9 @@ import { canonicalJson, errorText, isNonEmpty, isObject, isSafeInteger, isTexts,
 import { isRoutineMachine, parseKeptRoutineSpec, type Routine, type RoutineMachine } from "./routines";
 import { SerialLane } from "./serial-lane";
 import type { ListKind } from "./server/list-registry";
+import type { ModuleFile } from "./modules";
+import { type CarriedProject, parseProjects, portableProjects, withProjects } from "./project-sync";
+import type { BoardChange, BoardState } from "./shared/board";
 import type { Bot } from "./shared/bots";
 import type { PagePreferences } from "./shared/preferences";
 import type { ProcessSettings } from "./shared/processes";
@@ -426,6 +429,26 @@ function botsStore(files: SyncedFiles, home: string, changed: (list: ListKind) =
 	};
 }
 
+/** The Board's projects, carried as `portableProjects` gives them; a write keeps this machine's sessions, leases, and messages. */
+function projectsStore(board: SyncedFiles["board"], changed: () => void): SyncStore {
+	const parse = (value: unknown): CarriedProject[] => {
+		const projects = parseProjects(value);
+		if (!projects) throw new Error("Sync cannot write projects the Board does not keep");
+		return projects;
+	};
+	return {
+		read: () => portableProjects(board.value),
+		parse: value => {
+			const projects = parseProjects(value);
+			return projects && { ok: portableProjects(withProjects(board.value, projects)) };
+		},
+		write: value => {
+			const projects = parse(value);
+			if (board.replace(withProjects(board.value, projects))) changed();
+		},
+	};
+}
+
 /** The files sync carries beside omp's. */
 export interface SyncedFiles {
 	sourceControl: SourceControl;
@@ -440,6 +463,8 @@ export interface SyncedFiles {
 	routines: Pick<ReducerFile<Routine[], never>, "value" | "replace">;
 	/** This computer, as the routines it runs name it to the others. */
 	machine: RoutineMachine;
+	/** The Board, whose project channels and their plans travel. */
+	board: Pick<ModuleFile<BoardState, BoardChange>, "value" | "replace">;
 }
 
 /** This computer as Settings sync names it to the others: an id kept in `path`, made on first use since a Mac's name can change, and its name now. */
@@ -461,6 +486,7 @@ export function syncStores(files: SyncedFiles, home: string, changed: (list: Lis
 		preferences: partsStore({ page: fileStore(files.preferences, () => changed("preferences"), PAGE_VALUES), processes: fileStore(files.processes) }),
 		workspaces: fileStore(files.workspaces, () => changed("workspaces"), homePaths(home)),
 		bots: botsStore(files, home, changed),
+		projects: projectsStore(files.board, () => changed("board")),
 	};
 }
 

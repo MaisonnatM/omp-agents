@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-24
+
+- Settings › Sync can now carry your Board projects between machines: each project's name, goal, decisions, archive, and plan steps with their state arrive on every machine, while its sessions and messages stay where they happened.
+
 ## 2026-11-23
 
 - Behind the scenes: a ship run on a Linear ticket now records which ticket its plan came from, and refuses a plan that names a different ticket or none.
