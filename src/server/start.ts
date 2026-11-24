@@ -1,14 +1,16 @@
 /** Starting a dashboard session: a new one, a fork of a transcript, or a past session resumed. All three spawn omp the same way. */
+import { statSync } from "node:fs";
 import { withPinnedSkill } from "../commands";
 import { DashboardSession, type DashboardUpdate, recordedCwd } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
-import { endedTurn, skipRefused } from "../live-session";
+import { endedTurn, type LiveSession, skipRefused } from "../live-session";
 import { type AdmittedLaunch, keptSessions, type RpcLaunch } from "../omp/rpc";
 import { continuationOf } from "../omp/sessions";
 import { directoryOf, displayPath } from "../paths";
 import { formatOf } from "../session-formats";
-import { type PromptImage, type SessionFacts, type StartFailure, type StartRequest, type StartResult, type TaskOwner, type View } from "../shared/sessions";
+import type { PullRequest } from "../shared/github";
+import { type NewSessionRequest, type PromptImage, type SessionFacts, type StartFailure, type StartRequest, type StartResult, type TaskOwner, type View } from "../shared/sessions";
 import { pullRequestTask, taskConflict, taskIdentity } from "../task-claims";
 import { portFromEnv } from "./address";
 import type { LiveSessions } from "./live-sessions";
@@ -60,6 +62,8 @@ export interface StartEnv {
 	/** Lets omp spawn in `cwd`, or throws {@link UntrustedProjectError} while its project's agent code is not trusted as it is now. */
 	admit(cwd: string): Promise<void>;
 	privateSessions: Pick<PrivateSessions, "launch" | "holds">;
+	/** The session that watches pull request `pr`, `null` when none does. */
+	watcherOf(pr: PullRequest): string | null;
 }
 
 export type Starter = (request: StartRequest) => Promise<StartResult>;
@@ -204,7 +208,57 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
-	return async request => {
+	/** Sends `request`'s prompt to `session` as a follow-up, through its pinned skill, answered as a start of that session. */
+	async function followUp(session: LiveSession, request: NewSessionRequest): Promise<StartResult> {
+		let text: string;
+		try {
+			text = await withPinnedSkill(session.cwd, request.skill, request.prompt);
+		} catch (err) {
+			return { ok: false, error: `Cannot read the skills in ${session.cwd}: ${errorText(err)}` };
+		}
+		try {
+			await session.prompt(null, text, request.images, "followUp");
+		} catch (err) {
+			return { ok: false, error: `Cannot send to the session that owns the task: ${errorText(err)}` };
+		}
+		return { ok: true, instanceId: session.instanceId, workspace: await env.workspaceOf(session.cwd), prompt: null };
+	}
+
+	/** When `sessionId`'s file was last written, `0` while it is not listed. */
+	const writtenAt = (sessionId: string): number => {
+		const path = env.savedFile(sessionId);
+		return path === null ? 0 : (statSync(path, { throwIfNoEntry: false })?.mtimeMs ?? 0);
+	};
+
+	/**
+	 * Sends `request`'s prompt to the session here that owns its pull request: the one running on it, else the one that
+	 * watches it, else the ended session that kept its task last, resumed. `null` when none does or none resumes.
+	 */
+	async function reachOwner(request: NewSessionRequest): Promise<StartResult | null> {
+		const identity = taskIdentity(request);
+		const pr = request.subject?.pr;
+		const dir = await directoryOf(request.cwd);
+		if (!identity || !pr || !dir) return null;
+		const running = await sessions.taskOwner(identity, dir, env.factsFor);
+		if (running) return followUp(running, request);
+		const kept = sessions.savedOwners(identity).sort((a, b) => writtenAt(b) - writtenAt(a));
+		const watcher = env.watcherOf(pr);
+		for (const sessionId of new Set(watcher === null ? kept : [watcher, ...kept])) {
+			const live = sessions.bySessionId(sessionId);
+			if (live && !live.finished(Date.now())) return followUp(live, request);
+			if (env.savedFile(sessionId) === null) continue;
+			const resumed = await start({ kind: "resume", sessionId });
+			const session = resumed.ok ? sessions.get(resumed.instanceId) : undefined;
+			if (session) return followUp(session, request);
+		}
+		return null;
+	}
+
+	const start: Starter = async request => {
+		if (request.kind === "new" && request.reachOwner) {
+			const reached = await reachOwner(request);
+			if (reached) return reached;
+		}
 		const outcome = await spawnFor(request);
 		if ("error" in outcome) return { ok: false, ...outcome };
 		const { session, prompt, first } = outcome.started;
@@ -232,6 +286,7 @@ export function createStarter(env: StartEnv): Starter {
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, workspace, prompt };
 	};
+	return start;
 }
 
 /** A session attached to but not listed yet, which holds back what it reports until it is. */

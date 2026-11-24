@@ -16,6 +16,8 @@ export interface QuickAction<Subject> {
 	prompt: (subject: Subject) => string;
 	/** The branch its session starts on, in that branch's worktree, `null` to start in the workspace as it is. */
 	branch: (subject: Subject) => string | null;
+	/** The prompt goes to the session that already owns the pull request, resuming it if it ended, and starts a new one only when none does. */
+	reachesOwner: boolean;
 }
 
 /** What every pull request prompt opens with: which pull request, and its branch. */
@@ -32,8 +34,8 @@ const baseOf = (pr: PullRequestSummary): string => (pr.stackedOn ? `\`${pr.stack
 /** The commands that list the failing checks of `pr` and print their logs. */
 const checkLogs = (pr: PullRequestSummary): string => `(\`gh pr checks ${pr.number} -R ${pr.owner}/${pr.repo}\`, \`gh run view <run> --log-failed\`)`;
 
-/** Where every prompt of an action that changes the PR's branch says the session runs: the dashboard starts it there. */
-const ON_BRANCH = "This session runs in a git worktree on the PR's branch, which the dashboard checked out for it; work there.";
+/** Where every prompt of an action that changes the PR's branch says the session works: a new one starts in the worktree the dashboard checked out, an owner reached keeps its own. */
+const ON_BRANCH = "Work in a git worktree on the PR's branch: a new session runs in the one the dashboard checked out for it, and a session that already worked on this PR keeps its own.";
 
 /**
  * How a session works through a rebase that stops at conflicts, commit after commit. A repository's post-checkout hook
@@ -61,6 +63,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		prompt: pr =>
 			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}) and the checks on its latest commit fail. ${ON_BRANCH} ${shipWork(pr, "rebase", "fix_ci")} First rebase it onto the latest base and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Then find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause of each failure that still applies after the rebase, and rerun a failure that is flaky or unrelated to this pull request instead of changing code, saying so. Run the project's checks, then push the branch with \`--force-with-lease\`. ${END_WHEN_DONE}`,
 		branch: pr => pr.head,
+		reachesOwner: true,
 	},
 	"fix-ci": {
 		label: "Fix CI",
@@ -69,6 +72,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		prompt: pr =>
 			`${pullRequestContext(pr)} The checks on its latest commit fail. ${ON_BRANCH} ${shipWork(pr, "fix_ci")} Find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause, run the failing checks locally when you can, then commit and push to the PR's branch. If a failure is flaky or unrelated to this pull request, rerun it instead of changing code, and say so. ${END_WHEN_DONE}`,
 		branch: pr => pr.head,
+		reachesOwner: true,
 	},
 	"resolve-conflicts": {
 		label: "Resolve conflicts",
@@ -77,6 +81,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		prompt: pr =>
 			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}). ${ON_BRANCH} ${shipWork(pr, "rebase")} Rebase it onto the latest base and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Run the project's checks, and push the branch with \`--force-with-lease\`. ${END_WHEN_DONE}`,
 		branch: pr => pr.head,
+		reachesOwner: true,
 	},
 	"address-comments": {
 		label: "Address comments",
@@ -89,6 +94,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 			return `${pullRequestContext(pr)} It has ${has}. ${ON_BRANCH} ${shipWork(pr, "fix_comments")} Read the threads and reviews, fix what is right, commit and push, then reply to each thread with what you changed or why you did not change it, and resolve the threads you fixed. ${END_WHEN_DONE}`;
 		},
 		branch: pr => pr.head,
+		reachesOwner: true,
 	},
 	review: {
 		label: "Review",
@@ -97,6 +103,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 		prompt: pr =>
 			`${pullRequestContext(pr)} ${pr.author.login} asked you to review it. Read the description and the diff, and check it for correctness, regressions, and missing tests. Note the head commit you reviewed with \`gh pr view ${pr.number} -R ${pr.owner}/${pr.repo} --json headRefOid\`. Then save your review with the \`${REVIEW_DRAFT_TOOL}\` tool: a verdict, a summary, and one finding per issue, each with its file and the line at that commit. The user reads the draft in the dashboard, accepts or dismisses each finding, and posts it. Do not post anything on GitHub yourself.`,
 		branch: () => null,
+		reachesOwner: false,
 	},
 	"thermonuclear-review": {
 		label: "Thermonuclear review",
@@ -107,6 +114,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 				? `${pullRequestContext(pr)} ${ON_BRANCH} ${thermonuclear(pr)} Apply the valid findings, run the project's checks, then commit and push to the PR's branch. Only once the fixes are pushed, read the PR's description with \`pr_description({repo:"${pr.owner}/${pr.repo}",pr:${pr.number},change:{kind:"read"}})\`. Unless the line \`- [x] Thermo-nuclear code quality review\` is already there, append it with the same tool and \`change:{kind:"append",text:"- [x] Thermo-nuclear code quality review"}\`. The tool preserves the original and refuses failed reads or concurrent changes; never use an unchecked body overwrite. Report each finding and what you did with it.`
 				: `${pullRequestContext(pr)} ${pr.author.login} asked you to review it. ${thermonuclear(pr)} Report its findings here with file and line references. Do not change the PR's branch or post anything on GitHub.`,
 		branch: pr => (pr.role === "author" ? pr.head : null),
+		reachesOwner: false,
 	},
 };
 

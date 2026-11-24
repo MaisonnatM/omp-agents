@@ -109,6 +109,7 @@ describe("in a separate worktree", () => {
 				reviewDraft: false,
 				bot: null,
 				private: false,
+				reachOwner: false,
 			},
 		]);
 	});

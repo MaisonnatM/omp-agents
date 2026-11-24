@@ -389,6 +389,7 @@ export class Dashboard {
 			admit: this.#admit,
 			restoreWorktree: sessionIds => this.#worktrees.checkout(() => restoreEndedWorktree(this.#endedWorktrees.of(sessionIds))),
 			privateSessions: this.#privateSessions,
+			watcherOf: pr => this.#prWatches.watcherOf(pr),
 		});
 		const occupants = new WorktreeOccupants();
 		const worktrees = (this.#worktrees = new Worktrees({

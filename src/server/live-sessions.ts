@@ -134,11 +134,18 @@ export class LiveSessions {
 	 */
 	async reserveTask(identity: string, instanceId: string, cwd: string, factsOf: (sessionId: string) => SessionFacts) {
 		const repository = await repositoryAt(cwd) ?? cwd;
-		return await this.#runningTask(repository, identity, factsOf) ?? this.#taskClaims.claim(repository, identity, instanceId, cwd);
+		const running = await this.#runningTask(repository, identity, factsOf);
+		if (running) return { identity, instanceId: running.instanceId, sessionId: running.sessionId, cwd: running.cwd, port: portFromEnv() };
+		return this.#taskClaims.claim(repository, identity, instanceId, cwd);
+	}
+
+	/** The running session here that works on task `identity` in `cwd`'s repository, `null` when none does. */
+	async taskOwner(identity: string, cwd: string, factsOf: (sessionId: string) => SessionFacts): Promise<LiveSession | null> {
+		return this.#runningTask(await repositoryAt(cwd) ?? cwd, identity, factsOf);
 	}
 
 	/** Includes terminal and pre-claim dashboard sessions already known by the running-session registry. */
-	async #runningTask(repository: string, identity: string, factsOf: (sessionId: string) => SessionFacts) {
+	async #runningTask(repository: string, identity: string, factsOf: (sessionId: string) => SessionFacts): Promise<LiveSession | null> {
 		for (const session of this.#sessions.values()) {
 			if (session.finished(Date.now())) continue;
 			const savedIdentity = this.#taskClaims.identityForInstance(session.instanceId);
@@ -147,11 +154,14 @@ export class LiveSessions {
 				const facts = withSubject(factsOf(session.sessionId), this.#subjects.get(session.instanceId));
 				matches = facts.pullRequests.some(pr => identity === pullRequestTask(pr));
 			}
-			if (matches && (await repositoryAt(session.cwd) ?? session.cwd) === repository) {
-				return { identity, instanceId: session.instanceId, sessionId: session.sessionId, cwd: session.cwd, port: portFromEnv() };
-			}
+			if (matches && (await repositoryAt(session.cwd) ?? session.cwd) === repository) return session;
 		}
 		return null;
+	}
+
+	/** The ended sessions that kept task `identity` for their resume. */
+	savedOwners(identity: string): string[] {
+		return this.#taskClaims.sessionsOf(identity);
 	}
 
 	/** The explicit startup identity retained by a saved session, before its inferred links. */
