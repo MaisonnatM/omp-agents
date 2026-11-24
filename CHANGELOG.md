@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
+- The extension tests now run against a temporary omp config, so a killed test run can no longer leave a broken test marketplace in your `~/.omp` that makes `omp plugin marketplace update` fail.
 - The Board is gone: its page, channels, threads, and the board tool agents used to post there.
 - Projects keep working on their own: the Projects page, the brief each session in a project gets, and the project_list and project_update tools agents use.
 - Your existing projects move over by themselves the first time the dashboard starts, with their plan, decisions, and messages as log lines; the Board's leftover inbox folder is deleted.
