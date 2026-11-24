@@ -28,6 +28,7 @@
 - The dot before each session shows when it waits on you.
   A running turn shows no dot, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
   A session waiting on its subagents shows no dot either, even when its turn has ended, and its row's tooltip says **waiting on subagents**.
+  A session whose turn ended to wait on a scheduled check, a `schedule_follow_up` send, a scheduled continue, or a pull request it watches, shows a calendar clock instead of the blue dot, lists with the sessions waiting on subagents, raises no notice, and the idle stop leaves it running; its tooltip says **waiting on a scheduled check** and, for a send, when it goes out.
 - Under **All workspaces**, a session row with a title shows a badge that names its workspace, the last segment of the workspace's directory, on the right before its age.
   With one workspace picked, the rows show no badge.
   A row without a title shows its directory's name as its label, and the badge only when it runs in a linked worktree, whose name is not its workspace's.

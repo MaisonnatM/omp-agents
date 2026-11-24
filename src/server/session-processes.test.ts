@@ -22,8 +22,8 @@ const SCOPE = { kind: "project", dir: "/repo" } as const;
 const BROWSER_UNIT: UnitSnapshot = { id: "u1", kind: "proc", scope: SCOPE, key: "browser", generation: "g1", state: "running", pids: [300], startedAt: T0, supervised: true };
 const API_UNIT: UnitSnapshot = { id: "u2", kind: "proc", scope: SCOPE, key: "api", generation: "g2", state: "running", pids: [], startedAt: T0, owner: "sa", command: "bun api.ts", supervised: true };
 
-const A: WatchedSession = { instanceId: "a", sessionId: "sa", pid: 100, cwd: "/repo", status: "idle", awaitsSubagents: false, stopsWhenIdle: true };
-const B: WatchedSession = { instanceId: "b", sessionId: "sb", pid: 200, cwd: "/repo/wt", status: "working", awaitsSubagents: false, stopsWhenIdle: true };
+const A: WatchedSession = { instanceId: "a", sessionId: "sa", pid: 100, cwd: "/repo", status: "idle", waitsOnWork: false, stopsWhenIdle: true };
+const B: WatchedSession = { instanceId: "b", sessionId: "sb", pid: 200, cwd: "/repo/wt", status: "working", waitsOnWork: false, stopsWhenIdle: true };
 
 /** A watch over a computer whose processes, services, sessions, and clock the test sets; a stop takes what it stopped off the computer. */
 function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
@@ -183,7 +183,7 @@ describe("SessionProcessWatch", () => {
 		state.sessions = [{ ...A, status: "working" }, B];
 		await tickAt(0);
 		await tickAt(60);
-		state.sessions = [{ ...A, awaitsSubagents: true }, B];
+		state.sessions = [{ ...A, waitsOnWork: true }, B];
 		await tickAt(120);
 		state.sessions = [A, B];
 		await tickAt(121);
@@ -199,7 +199,7 @@ describe("SessionProcessWatch", () => {
 	test("a session that works, asks a question, or waits on a subagent never ends", async () => {
 		const { state, stopped, tickAt } = computer([]);
 		state.minutes = null;
-		state.sessions = [{ ...A, status: "needs-input" }, B, { ...B, instanceId: "c", sessionId: "sc", status: "idle", awaitsSubagents: true }];
+		state.sessions = [{ ...A, status: "needs-input" }, B, { ...B, instanceId: "c", sessionId: "sc", status: "idle", waitsOnWork: true }];
 		await tickAt(0);
 		await tickAt(48 * 60);
 		expect(stopped).toEqual([]);

@@ -28,8 +28,8 @@ export interface WatchedSession {
 	pid: number;
 	cwd: string;
 	status: HostStatus;
-	/** Its main agent only waits on a subagent that still runs, which the idle session stop counts as busy. */
-	awaitsSubagents: boolean;
+	/** Its main agent only waits on a subagent that still runs or on a scheduled check, which the idle session stop counts as busy. */
+	waitsOnWork: boolean;
 	/** The idle session stop may end it: a session this server started that is neither private nor a Bot's conversation. */
 	stopsWhenIdle: boolean;
 }
@@ -158,10 +158,10 @@ export class SessionProcessWatch {
 		const { stopIdleAfterMinutes: timeout, stopIdleSessionsAfterHours: sessionTimeout } = this.#deps.settings();
 		const live = new Set(sessions.map(session => session.instanceId));
 		for (const clock of [this.#idleSince, this.#settledSince]) for (const id of clock.keys()) if (!live.has(id)) clock.delete(id);
-		for (const { instanceId, status, awaitsSubagents } of sessions) {
+		for (const { instanceId, status, waitsOnWork } of sessions) {
 			this.#idleSince.set(instanceId, status === "idle" ? (this.#idleSince.get(instanceId) ?? now) : now);
 			// A server that restarted first sees a long-idle session settled since its file was last written, not since now.
-			const settled = status === "idle" && !awaitsSubagents;
+			const settled = status === "idle" && !waitsOnWork;
 			this.#settledSince.set(instanceId, settled ? (this.#settledSince.get(instanceId) ?? Math.min(now, this.#deps.lastWrittenAt(instanceId) ?? now)) : now);
 		}
 

@@ -41,7 +41,8 @@ import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchedKinds } from "../routine
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { agentOn } from "../shared/moves";
-import { awaitsSubagents, type StartRequest, type StartResult, type View } from "../shared/sessions";
+import { awaitsScheduled, awaitsSubagents, type ScheduledCheck, type StartRequest, type StartResult, type View } from "../shared/sessions";
+import { nextSendTo } from "../shared/scheduled";
 import { inAppData } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
@@ -241,7 +242,13 @@ export class Dashboard {
 		const pins = this.#pins;
 		const interrupted = this.#interrupted;
 		const ownerLock = (this.#ownerLock = new OwnerLock(serverLockFile, port));
-		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
+		const prWatchesFile = new PullRequestWatchesFile(pullRequestWatchesFile);
+		const scheduledCheck = (sessionId: string): ScheduledCheck | null => {
+			const at = nextSendTo(scheduled.value, sessionId);
+			if (at !== null) return { kind: "send", at };
+			return prWatchesFile.value.some(watch => watch.sessionId === sessionId) ? { kind: "pull-request" } : null;
+		};
+		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update), undefined, undefined, scheduledCheck));
 		const { placement } = files.facts;
 		const { factsOf } = files;
 		const pathFor = (view: View): string | null =>
@@ -404,7 +411,7 @@ export class Dashboard {
 					pid: row.pid,
 					cwd: row.cwd,
 					status: row.status,
-					awaitsSubagents: awaitsSubagents(row),
+					waitsOnWork: awaitsSubagents(row) || awaitsScheduled(row),
 					// A Bot ends its own idle conversation, and a private session's end deletes it.
 					stopsWhenIdle: row.source === "dashboard" && !row.private && !botConversations.has(row.sessionId),
 				}));
@@ -475,7 +482,7 @@ export class Dashboard {
 			onChange: () => broadcasts.pushList("scheduled"),
 		}));
 		this.#prWatches = new PullRequestWatches({
-			file: new PullRequestWatchesFile(pullRequestWatchesFile),
+			file: prWatchesFile,
 			hosts: () => sessions.rows(factsOf),
 			isBot: request => this.#bots.botOf(request) !== null,
 			wake: async (sessionId, text) => (await reach(sessionId)).prompt(null, text, [], "followUp"),

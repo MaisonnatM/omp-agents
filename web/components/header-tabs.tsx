@@ -2,7 +2,7 @@
 import { IconBubbleText, IconCalendarClock, IconChainLink1, IconCrossMedium, IconEditBig, IconHome, IconPin, IconPlusSmall, IconSparklesTwo, IconSquareBehindSquare2, IconUnpin } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useEffect, useRef } from "react";
-import { awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
+import { awaitsScheduled, awaitsSubagents, type PastSession, type RosterHost } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuSeparator, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -74,9 +74,9 @@ function faceOf(target: HeaderTabTarget, hosts: readonly RosterHost[], past: rea
 	const host = hosts.find(each => each.instanceId === view.instanceId) ?? null;
 	const label = viewTitle(view, host, null) ?? "Session";
 	if (!host) return { label, lead: <IconBubbleText className={ICON} /> };
-	const status = awaitsSubagents(host) ? "awaiting-subagents" : host.status;
+	const status = awaitsSubagents(host) ? "awaiting-subagents" : awaitsScheduled(host) ? "awaiting-scheduled" : host.status;
 	// A working session draws no mark, as its sidebar row's dot does not: the icon, and the status only for screen readers.
-	if (status === "working" || status === "awaiting-subagents") return { label, lead: <><IconBubbleText className={ICON} /><StatusDot status={status} /></> };
+	if (status === "working" || status === "awaiting-subagents" || status === "awaiting-scheduled") return { label, lead: <><IconBubbleText className={ICON} /><StatusDot status={status} /></> };
 	return { label, lead: <span className="flex w-3.5 justify-center"><StatusDot status={status} /></span> };
 }
 

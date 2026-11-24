@@ -100,9 +100,9 @@ export class Broadcasts {
 		return usage;
 	}
 
-	/** Publish a registered whole list only when its message changed. */
+	/** Publish a registered whole list only when its message changed; a changed scheduled list also pushes the roster, whose rows show the sends their sessions wait on. */
 	pushList(kind: ListKind): void {
-		this.#publishChanged(kind, this.#deps.lists.message(kind));
+		if (this.#publishChanged(kind, this.#deps.lists.message(kind)) && kind === "scheduled") this.pushRoster();
 	}
 
 	/** Also stands in for a pending debounced push: a burst of roster updates costs one sync and one push. */
@@ -137,11 +137,13 @@ export class Broadcasts {
 		return sessions;
 	}
 
-	#publishChanged(kind: ListKind | "usage", msg: Broadcast): void {
+	/** Whether the message changed, and so was published. */
+	#publishChanged(kind: ListKind | "usage", msg: Broadcast): boolean {
 		const json = JSON.stringify(msg);
-		if (json === this.#last.get(kind)) return;
+		if (json === this.#last.get(kind)) return false;
 		this.#last.set(kind, json);
 		this.#deps.publish(TOPIC, json);
+		return true;
 	}
 }
 

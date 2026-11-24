@@ -153,7 +153,12 @@ interface RosterHostBase extends SessionFacts {
 	 * or `task` calls, or, between calls, its last ones were; `false` once it starts any other tool or its turn ends.
 	 */
 	turnWaits: boolean;
+	/** The scheduled check the session waits on, such as a send it scheduled for itself or a pull request it watches; `null` while none waits. */
+	scheduledCheck: ScheduledCheck | null;
 }
+
+/** A check that wakes a session later: a scheduled send to it, the soonest one when several wait, else a pull request it watches. */
+export type ScheduledCheck = { kind: "send"; at: number } | { kind: "pull-request" };
 
 /** The tool a session calls in a turn that found nothing for the user, such as a Bot's routine run; that turn ends without marking the session unread. */
 export const STAY_QUIET_TOOL = "stay_quiet";
@@ -175,18 +180,21 @@ export type RosterHost = RosterHostBase &
 export const awaitsSubagents = (host: Pick<RosterHost, "status" | "turnWaits" | "agents">): boolean =>
 	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running");
 
+/** Whether `host`'s turn ended to wait on a scheduled check, so it needs nothing from you until the check wakes it. */
+export const awaitsScheduled = (host: Pick<RosterHost, "status" | "scheduledCheck">): boolean => host.status === "idle" && host.scheduledCheck !== null;
+
 /**
  * Why `host` stopped for the user, `null` while it has not: its oldest open question, else a wait with no question relayed
  * (a terminal session's own dialog, or the placeholder a terminal session shows until its host replays the question),
- * else its ended turn once no subagent it waits on still runs.
+ * else its ended turn once no subagent it waits on still runs and no scheduled check waits.
  */
 export type Stop = { kind: "ask"; request: UserRequest } | { kind: "input" } | { kind: "turn-ended" };
 
-export function stopOf(host: Pick<RosterHost, "requests" | "status" | "turnWaits" | "agents">): Stop | null {
+export function stopOf(host: Pick<RosterHost, "requests" | "status" | "turnWaits" | "agents" | "scheduledCheck">): Stop | null {
 	const [request] = host.requests;
 	if (request) return { kind: "ask", request };
 	if (host.status === "needs-input") return { kind: "input" };
-	if (host.status === "idle" && !awaitsSubagents(host)) return { kind: "turn-ended" };
+	if (host.status === "idle" && !awaitsSubagents(host) && !awaitsScheduled(host)) return { kind: "turn-ended" };
 	return null;
 }
 

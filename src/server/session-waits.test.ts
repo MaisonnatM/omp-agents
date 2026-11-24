@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 const host = (instanceId: string, status: HostStatus, { sessionName = `Session ${instanceId}`, requests = [], agents = [] }: { sessionName?: string | null; requests?: UserRequest[]; agents?: AgentRow[] } = {}) =>
-	fromPartial<RosterHost>({ instanceId, sessionId: `s-${instanceId}`, sessionName, status, requests, agents, turnWaits: false });
+	fromPartial<RosterHost>({ instanceId, sessionId: `s-${instanceId}`, sessionName, status, requests, agents, turnWaits: false, scheduledCheck: null });
 const subagent = (status: AgentRow["status"]) => fromPartial<AgentRow>({ status });
 
 /** Whether `promise` has settled yet: its value, its error's message, or `"pending"`. */
