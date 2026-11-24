@@ -3,7 +3,7 @@ import { COMMAND_TIME_LIMIT, type RoutineSpec, TRIGGER_KINDS, type TriggerKind, 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type ScheduleDraft, specOf, TRIGGER_WORDS, WEEK, WEEKDAYS } from "../../routines-model";
+import { blankSchedule, type CommandPostChoice, dayName, type EveryUnit, type RoutineDraft, type ScheduleDraft, specOf, TRIGGER_WORDS, WEEK, WEEKDAYS } from "../../routines-model";
 import { PageFrame } from "../list-page";
 import { Field, FIELD, TEXT_AREA } from "../form-field";
 
@@ -14,6 +14,13 @@ const TRIGGER_HINTS: Record<TriggerKind, string> = {
 	slack: "A mention or direct message you have not answered. Needs Slack signed in under Settings › Integrations.",
 	"pull-request": "One of yours, or one waiting on your review, comes to need you: a review, failing checks, a conflict, comments to address, or ready to merge.",
 };
+
+/** The editor's choices of when a command posts its output, with what each means. */
+const COMMAND_POST_CHOICES: { value: CommandPostChoice; label: string; hint: string }[] = [
+	{ value: "every", label: "Every run", hint: "Each run starts a turn." },
+	{ value: "failures", label: "Only when it fails", hint: "A run that exits 0 keeps its output in the run list and starts no turn." },
+	{ value: "changes", label: "When it fails or its output changes", hint: "A run that exits 0 with the same output as the last run starts no turn, so a check wakes the Bot only on news." },
+];
 
 /** One choice of a radio group, with the controls it enables under it. */
 function Choice({ name, checked, label, onCheck, children }: { name: string; checked: boolean; label: string; onCheck: () => void; children: ReactNode }) {
@@ -194,13 +201,18 @@ export function RoutineEditor({ initial, isNew, botName, connected, saving, onSa
 							<p className="text-xs text-muted-foreground">
 								Runs with sh in {botName}'s workspace, without an omp session, and stops after {COMMAND_TIME_LIMIT}. Its output goes into {botName}'s conversation.
 							</p>
-							<label className="flex items-start gap-2 text-sm">
-								<input type="checkbox" checked={draft.failuresOnly} onChange={event => set("failuresOnly", event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-current" />
-								<span className="space-y-0.5">
-									<span className="block">Post the output to {botName} only when it fails</span>
-									<span className="block text-xs text-muted-foreground">A run that exits 0 keeps its output in the run list and starts no turn.</span>
-								</span>
-							</label>
+							<fieldset className="space-y-1.5 text-sm">
+								<legend className="mb-1">Post the output to {botName}</legend>
+								{COMMAND_POST_CHOICES.map(({ value, label, hint }) => (
+									<label key={value} className="flex items-start gap-2">
+										<input type="radio" name={`${draft.id}-post`} checked={draft.post === value} onChange={() => set("post", value)} className="mt-0.5 size-4 shrink-0 accent-current" />
+										<span className="space-y-0.5">
+											<span className="block">{label}</span>
+											<span className="block text-xs text-muted-foreground">{hint}</span>
+										</span>
+									</label>
+								))}
+							</fieldset>
 						</Choice>
 						<label className="flex items-start gap-2 text-sm">
 							<input

@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
+- A routine that runs a command can now post its output to the Bot only when the command fails or prints something different from last time: pick When it fails or its output changes in the routine's editor. A cheap check can then run often and wake the Bot only on news.
 - Wake-up messages the dashboard sends a session no longer show in its conversation: a watched pull request's change, a Board mention, and a follow-up the agent scheduled for itself. The agent still reads and acts on each one. Messages you schedule yourself still show.
 - New conversation each run now works for routines that run a command too: when the command's output is posted to the Bot, it opens a new conversation. A run that posts nothing leaves the conversation alone.
 - A routine that sends a message can now start a new conversation on each run: check New conversation each run in the routine's editor. When the Bot is busy, the run's message joins the current conversation as before.

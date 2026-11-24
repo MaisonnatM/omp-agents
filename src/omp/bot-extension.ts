@@ -8,7 +8,7 @@
 import { randomUUID } from "node:crypto";
 import { inbox } from "../../templates/omp/agent/extensions/inbox/client";
 import { isObject, parseJson } from "../json";
-import { type BotRoutineRequest, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
+import { type BotRoutineRequest, COMMAND_POSTS, MAX_COMMAND_LENGTH, parseRoutineSpec, type RoutineSpec, TRIGGER_KINDS } from "../routines";
 import { BOT_MESSAGE_STAMP } from "../shared/bot-message";
 import {
 	type Bot,
@@ -190,6 +190,12 @@ export default function botExtension(pi: ExtensionApi): void {
 			Type.Object({
 				kind: Type.Literal("command"),
 				command: Type.String({ minLength: 1, maxLength: MAX_COMMAND_LENGTH, description: "The shell command each run runs in this Bot's workspace; its output is posted here." }),
+				post: Type.Optional(
+					Type.Union(COMMAND_POSTS.map(post => Type.Literal(post)), {
+						description:
+							"When the output is posted here: failures, only when the command does not exit 0; changes, also when it exits 0 with output other than the last run's, so a cheap check wakes you only on news. Every run when left out.",
+					}),
+				),
 			}),
 		],
 		{ description: "What each run does; a new routine needs one." },

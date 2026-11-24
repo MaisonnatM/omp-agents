@@ -37,10 +37,16 @@ export const MAX_TRIGGER_DETAIL = 2_000;
 export type RoutineTask =
 	/** `prompt` sent into the Bot's conversation, as if you wrote it there. */
 	| { kind: "prompt"; prompt: string }
-	/** `command` through `sh -c` in the Bot's workspace, with no omp session; what it printed is then posted into the Bot's conversation,
-	 * or with `post: "failures"` only when it did not exit 0. No `post` posts every run.
+	/** `command` through `sh -c` in the Bot's workspace, with no omp session; what it printed is then posted into the Bot's conversation:
+	 * with `post: "failures"` only when it did not exit 0, and with `post: "changes"` also when it exited 0 with output other than the
+	 * last run's, so a check wakes the Bot only on news. No `post` posts every run.
 	 */
-	| { kind: "command"; command: string; post?: "failures" };
+	| { kind: "command"; command: string; post?: CommandPost };
+
+/** When a command run posts its output to the Bot, beside every run. */
+export const COMMAND_POSTS = ["failures", "changes"] as const;
+export type CommandPost = (typeof COMMAND_POSTS)[number];
+const isCommandPost = oneOf(COMMAND_POSTS);
 
 /**
  * A run's command: `running` from its launch, saved before it can end, then how it ended. `slept` is how long the Mac
@@ -313,7 +319,7 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 		case "command":
 			if (!isNonEmpty(value.command) || value.command.length > MAX_COMMAND_LENGTH) return null;
 			if (value.post === undefined) return { ok: { kind: "command", command: value.command } };
-			return value.post === "failures" ? { ok: { kind: "command", command: value.command, post: "failures" } } : null;
+			return isCommandPost(value.post) ? { ok: { kind: "command", command: value.command, post: value.post } } : null;
 		default:
 			return null;
 	}

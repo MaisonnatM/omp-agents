@@ -7,7 +7,7 @@
  */
 import { errorText } from "../json";
 import type { ShellResult } from "../proc";
-import { COMMAND_TIME_LIMIT, isDue, isTriggeredBy, MAX_TRIGGER_EVENTS, triggersOn, type CommandRun, type Routine, type RoutineRun, type TriggerEvent } from "../routines";
+import { COMMAND_TIME_LIMIT, type CommandPost, isDue, isTriggeredBy, MAX_TRIGGER_EVENTS, triggersOn, type CommandRun, type Routine, type RoutineRun, type TriggerEvent } from "../routines";
 import { SerialLane } from "../serial-lane";
 import type { BotId } from "../shared/bots";
 import { type RoutineMessage, routineMessageText } from "../shared/routine-message";
@@ -174,7 +174,7 @@ export class RoutineRunner {
 			file.command(routine.id, at, run);
 			if (error !== null) file.failed(routine.id, at, error);
 			this.#deps.onChange();
-			if (post === "failures" && run.phase === "exited" && run.code === 0) return;
+			if (!posts(post, run, previousOutput(file.value, routine.id, at))) return;
 			void this.#post(routine, at, sentText(routine, { at, triggeredBy }, { kind: "command", command, run }));
 		};
 		void this.#deps.exec(command, cwd, { ROUTINE_TRIGGERS: JSON.stringify(triggeredBy) }).then(
@@ -221,6 +221,20 @@ interface HeldReport {
 /** What a run of `routine` sends into its Bot's conversation. */
 const sentText = (routine: Routine, { at, triggeredBy }: Pick<RoutineRun, "at" | "triggeredBy">, sent: RoutineMessage["sent"]): string =>
 	routineMessageText({ botId: routine.botId, routine: { id: routine.id, name: routine.name }, at, triggeredBy, sent });
+
+/** The output of routine `id`'s newest command run before the run at `at` that exited, or `null` for none. */
+function previousOutput(routines: Routine[], id: string, at: number): string | null {
+	for (const { at: runAt, outcome } of routines.find(routine => routine.id === id)?.runs ?? []) {
+		if (runAt < at && outcome.kind === "command" && outcome.run.phase === "exited") return outcome.run.output;
+	}
+	return null;
+}
+
+/** Whether a command run that ended as `run` posts its report, given its routine's `post` and the last run's output. */
+function posts(post: CommandPost | undefined, run: Exclude<CommandRun, { phase: "running" }>, previous: string | null): boolean {
+	if (post === undefined || run.phase !== "exited" || run.code !== 0) return true;
+	return post === "changes" && run.output !== previous;
+}
 
 /** The oldest queued run. */
 function oldestQueued(routines: Routine[]): { routine: Routine; run: RoutineRun } | null {

@@ -55,6 +55,7 @@ describe("parseRoutineSpec", () => {
 		const quiet = { kind: "command", command: "./clean.sh", post: "failures" } as const;
 		expect(parseRoutineSpec({ ...spec, task: quiet })?.ok.task).toEqual(quiet);
 		expect(parseRoutineSpec(parseRoutineSpec({ ...spec, task: quiet })?.ok)?.ok.task).toEqual(quiet);
+		expect(parseRoutineSpec({ ...spec, task: { ...quiet, post: "changes" } })?.ok.task).toEqual({ ...quiet, post: "changes" });
 		expect(parseRoutineSpec({ ...spec, task: { ...quiet, post: "always" } })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, task: { ...quiet, post: true } })).toBeNull();
 	});

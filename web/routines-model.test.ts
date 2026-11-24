@@ -335,8 +335,11 @@ describe("editor form", () => {
 		expect(specOf({ ...draft, task: "prompt" })).toMatchObject({ ok: { task: { kind: "prompt", prompt: "Hi" } } });
 		const saved = routine({ task: { kind: "command", command: "git worktree prune" } });
 		expect(specOf(draftOf(saved))).toMatchObject({ ok: { task: { kind: "command", command: "git worktree prune" } } });
-		const quiet = routine({ task: { kind: "command", command: "./clean.sh", post: "failures" } });
-		expect(draftOf(quiet).failuresOnly).toBe(true);
-		expect(specOf(draftOf(quiet))).toMatchObject({ ok: { task: { kind: "command", command: "./clean.sh", post: "failures" } } });
+		for (const post of ["failures", "changes"] as const) {
+			const quiet = routine({ task: { kind: "command", command: "./clean.sh", post } });
+			expect(draftOf(quiet).post).toBe(post);
+			expect(specOf(draftOf(quiet))).toMatchObject({ ok: { task: { kind: "command", command: "./clean.sh", post } } });
+		}
+		expect(specOf(draftOf(saved))).not.toHaveProperty("ok.task.post");
 	});
 });
