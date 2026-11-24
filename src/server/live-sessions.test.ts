@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { writeEvalRun } from "../eval-runs";
 import { flushJsonFiles } from "../fs";
 import type { LiveSession } from "../live-session";
 import * as collab from "../omp/collab";
@@ -318,5 +319,37 @@ describe("LiveSessions", () => {
 		next.markUnread("i-both", { at: 2_000, reply: "New." });
 		next.restoreUnread(new Set(["i-kept", "i-both"]));
 		expect(unreadOf(next)).toEqual([["i-kept", { at: 1_000, reply: "Fixed the test." }], ["i-both", { at: 2_000, reply: "New." }]]);
+	});
+});
+
+describe("eval runs", () => {
+	test("a session lists the eval runs its main agent and subagents started after its subagents, and each opens the transcript its run's omp writes", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "omp-agents-eval-session-"));
+		dirs.push(dir);
+		const file = join(dir, "session.jsonl");
+		const runSessions = join(dir, "run", "sessions");
+		mkdirSync(runSessions, { recursive: true });
+		writeFileSync(join(runSessions, "2026-11-24_run.jsonl"), "");
+		const evalRun = { task: "tab-history", arm: "full", model: "m", title: "Reopen tabs", pid: process.pid, sessions: runSessions, startedAt: 1, ended: null };
+		writeEvalRun(file, { ...evalRun, id: "tab-history.1", run: 1 });
+		writeEvalRun(join(dir, "Scout.jsonl"), { ...evalRun, id: "tab-history.2", run: 2 });
+		const subagent = { id: "Scout", kind: "scout" };
+		const session = {
+			...liveSession("i-1"),
+			row: () => ({ instanceId: "i-1", agents: [subagent] }),
+			transcriptPath: (agentId: string | null) => (agentId === null ? file : `${dir}/${agentId}.jsonl`),
+		} as unknown as LiveSession;
+		const sessions = new LiveSessions(() => {}, undefined, unreadIn());
+		sessions.add(session, null);
+		expect(sessions.rows(() => facts)[0]!.agents).toEqual([subagent] as never);
+		await sessions.refreshEvalRuns(() => null);
+		expect(sessions.rows(() => facts)[0]!.agents.map(agent => [agent.id, agent.parentId, agent.status, agent.evalRun ?? false])).toEqual([
+			["Scout", undefined, undefined, false],
+			["tab-history.1", null, "running", true],
+			["tab-history.2", "Scout", "running", true],
+		] as never);
+		expect(sessions.transcriptPath("i-1", "tab-history.1", () => null)).toBe(join(runSessions, "2026-11-24_run.jsonl"));
+		expect(sessions.transcriptPath("i-1", "Scout", () => null)).toBe(`${dir}/Scout.jsonl`);
+		expect(sessions.transcriptPath("i-1", null, () => null)).toBe(file);
 	});
 });

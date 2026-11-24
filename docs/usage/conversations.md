@@ -69,6 +69,7 @@
   A subagent that another subagent started sits indented under it.
   Each row shows a robot icon with the subagent's status dot on its corner (none while running, blue idle, hollow parked, red aborted), then its id and what it is doing now.
   A second line names its model after the logo of the org that makes it, labeled as the composer labels models, then its type and how long it has run, such as `Haiku 5.5 · task · 5m`; the time counts up while the subagent runs and stops when it does.
+  An eval run that the session or one of its subagents started with `scripts/evals/run.ts` sits under it with the type `eval run`: while it runs it shows the task's first line, then how it ended, such as `passed, $0.09, 0.4 min`; it is red when its model could not answer or its runner stopped before it finished, has no stop button, and opens the run's own conversation.
   A subagent the dashboard did not see start, or saw stopped without seeing when, shows no time; hover a row for its full activity.
   The section's title counts the subagents, and how many are running.
   Click a row to open the subagent's conversation in a sidebar tab named after it, beside the session's own in the pane, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split beside the conversation, or middle-click to open it in the app window in place of what it shows.

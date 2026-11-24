@@ -3,13 +3,14 @@ import { forgetSession } from "../commands";
 import { DashboardSession, type DashboardUpdate, newInstanceId } from "../dashboard-session";
 import { JsonFile } from "../fs";
 import { SessionGuest } from "../guest";
+import { type EvalRun, evalRunRow, evalRunTranscript, readEvalRuns } from "../eval-runs";
 import { repositoryAt } from "../git";
 import { arrayOf, decoder, fields, isNumber, isString, nullable, optional } from "../json";
 import { type EndedTurn, endedTurn, type LiveSession, type LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath, unreadFile } from "../paths";
 import { oneLine } from "../session-entries";
-import { type RosterHost, type ScheduledCheck, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
+import { type AgentRow, type RosterHost, type ScheduledCheck, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 import { pullRequestTask, TaskClaims } from "../task-claims";
 import { portFromEnv } from "./address";
 import { TurnWaits } from "./turn-waits";
@@ -60,6 +61,11 @@ export class LiveSessions {
 	/** Whether each session's main agent waits on work it started, which its row's `turnWaits` shows. */
 	readonly #turnWaits = new TurnWaits();
 	/**
+	 * The eval runs each session's main agent and subagents started, by instance id, each with its row, as {@link refreshEvalRuns} last read them;
+	 * a row's status comes from the same read as its record, so a run that ended since does not show as stopped.
+	 */
+	#evalRuns = new Map<string, { run: EvalRun; row: AgentRow }[]>();
+	/**
 	 * The turns the previous server saved unread, with its `heardUntil`: `unrestored` until {@link restoreUnread} takes back
 	 * those of the sessions this server attached to, then `listing` until the first registry listing after it, which
 	 * {@link restoreListedUnread} restores the terminal sessions' at, then `restored`. Every save until then keeps the turns
@@ -100,6 +106,30 @@ export class LiveSessions {
 	/** The live main agent's file, private sessions included, then the saved file. */
 	fileOf(sessionId: string, savedFile: (sessionId: string) => string | null): string | null {
 		return this.#bySessionId.get(sessionId)?.transcriptPath(null, savedFile) ?? savedFile(sessionId);
+	}
+
+	/** The file the main agent (`agentId` null), a subagent, or an eval run of session `instanceId` writes, or `null` while it is not known. */
+	transcriptPath(instanceId: string, agentId: string | null, savedFile: (sessionId: string) => string | null): string | null {
+		const started = agentId === null ? undefined : this.#evalRuns.get(instanceId)?.find(({ run }) => run.id === agentId);
+		if (started) return evalRunTranscript(started.run);
+		return this.#sessions.get(instanceId)?.transcriptPath(agentId, savedFile) ?? null;
+	}
+
+	/** Read again the eval runs each session's main agent and subagents started from their files, which `savedFile` resolves for a terminal session's main agent. */
+	async refreshEvalRuns(savedFile: (sessionId: string) => string | null): Promise<void> {
+		const read = await Promise.all(
+			[...this.#sessions.values()].map(async session => {
+				const starters = [null, ...session.row().agents.map(agent => agent.id)];
+				const runs = await Promise.all(
+					starters.map(async parentId => {
+						const file = session.transcriptPath(parentId, savedFile);
+						return file ? (await readEvalRuns(file)).map(run => ({ run, row: { ...evalRunRow(run), parentId } })) : [];
+					}),
+				);
+				return [session.instanceId, runs.flat()] as const;
+			}),
+		);
+		this.#evalRuns = new Map(read.filter(([, runs]) => runs.length > 0));
 	}
 
 	/** The last reply in session `sessionId`'s file, of its running or last turn, `null` when it has none; `savedFile` finds the file of one that no longer runs. */
@@ -286,16 +316,21 @@ export class LiveSessions {
 		this.#unreadFile.save({ turns: [...turns].map(([instanceId, turn]) => ({ instanceId, ...turn })), heardUntil });
 	}
 
-	/** Each session's roster row, with its `cwdDisplay`, its unread turn, whether its turn waits, the scheduled check it waits on, and what the session files' index knows of it, asked with the directory it runs in now. */
+	/** Each session's roster row, with its `cwdDisplay`, its unread turn, whether its turn waits, the scheduled check it waits on, the eval runs it started after its subagents, and what the session files' index knows of it, asked with the directory it runs in now. */
 	rows(factsOf: (sessionId: string, cwd: string) => SessionFacts): RosterHost[] {
-		return [...this.#sessions.values()].map(session => ({
-			...session.row(),
-			cwdDisplay: displayPath(session.cwd),
-			unread: this.#unread.get(session.instanceId) ?? null,
-			turnWaits: this.#turnWaits.waits(session.instanceId),
-			scheduledCheck: this.#scheduledCheck(session.sessionId),
-			...withSubject(factsOf(session.sessionId, session.cwd), this.#subjects.get(session.instanceId)),
-		}));
+		return [...this.#sessions.values()].map(session => {
+			const row = session.row();
+			const runs = this.#evalRuns.get(session.instanceId) ?? [];
+			return {
+				...row,
+				agents: runs.length > 0 ? [...row.agents, ...runs.map(started => started.row)] : row.agents,
+				cwdDisplay: displayPath(session.cwd),
+				unread: this.#unread.get(session.instanceId) ?? null,
+				turnWaits: this.#turnWaits.waits(session.instanceId),
+				scheduledCheck: this.#scheduledCheck(session.sessionId),
+				...withSubject(factsOf(session.sessionId, session.cwd), this.#subjects.get(session.instanceId)),
+			};
+		});
 	}
 
 	/** The ids of the sessions that run now, which are not past sessions. */

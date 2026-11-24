@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-24
 
 - A step in a project's plan has a play button: it opens a new session in the project, already set to work on that step and its sub-steps, with the prompt written for you.
+- An eval run that a session starts with the eval runner now shows in that session's Subagents list, with the task it works on while it runs, then whether it passed, its cost, and its minutes; click it to read the run's conversation.
 - The prompt that Start session writes for the steps you picked now asks the session to tick each one it finishes.
 - Sessions waiting on a pull request's checks or a scheduled send now sit in one top-level Waiting section between the workspaces and Past, each with a line per pull request showing whether its checks are running, failing, or passing; click a line to open the pull request.
 - Once every pull request a session watches passes its checks, the session leaves Waiting on CI and shows the blue dot, so you see that CI went green without being pinged.
