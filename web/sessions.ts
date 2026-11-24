@@ -275,7 +275,7 @@ export function projectGroups(lists: SidebarSessions, projects: readonly Project
 	};
 }
 
-/** Every row of the sessions tab in its order, which the previous and next session keys walk: each project's, pinned, then the root Waiting section's, then each workspace's, then the ended ones. */
+/** Every row of the sessions tab in its order, which the previous and next session keys walk: each project's, pinned, then each workspace's, then the root Waiting section's, then the ended ones. */
 export function listedViews(lists: SidebarSessions, projects: readonly ProjectGroup[], groups: readonly WorkspaceGroup[]): View[] {
 	const { pinned, ended } = lists;
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
@@ -284,8 +284,8 @@ export function listedViews(lists: SidebarSessions, projects: readonly ProjectGr
 		...projects.flatMap(group => [...live(group.hosts), ...saved(group.past)]),
 		...live(pinned.hosts),
 		...saved(pinned.past),
-		...groups.flatMap(group => live(group.hosts.filter(awaitsScheduled))),
 		...groups.flatMap(group => [...live(group.hosts.filter(host => !awaitsScheduled(host))), ...saved(group.interrupted)]),
+		...groups.flatMap(group => live(group.hosts.filter(awaitsScheduled))),
 		...saved(ended),
 	];
 }
