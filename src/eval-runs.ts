@@ -3,9 +3,11 @@
  * The harness runs each one as its own headless omp outside the session, so omp records no link to it; the harness writes
  * one record per run into the session's artifacts directory instead, and the server reads them back.
  */
-import { mkdirSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { isRunning } from "../templates/omp/agent/extensions/github/owner-lock";
+import { atomicWriteTextSync } from "./fs";
 import { isObject } from "./json";
 import { type AgentRow, EMPTY_QUEUE } from "./shared/sessions";
 import { artifactsDir } from "./subagents";
@@ -14,7 +16,7 @@ import { artifactsDir } from "./subagents";
 const EVAL_RUNS = "eval-runs";
 
 export interface EvalRun {
-	/** Its id among the session's subagents: the task and run number, after the arm when that is not the full harness. */
+	/** Its id among the runs its starter recorded: the task and run number, after the arm when that is not the full harness. */
 	id: string;
 	task: string;
 	arm: string;
@@ -37,9 +39,7 @@ export interface EvalRun {
 export function writeEvalRun(sessionFile: string, run: EvalRun): void {
 	const dir = join(artifactsDir(sessionFile), EVAL_RUNS);
 	mkdirSync(dir, { recursive: true });
-	const path = join(dir, `${run.id}.json`);
-	writeFileSync(`${path}.tmp`, JSON.stringify(run));
-	renameSync(`${path}.tmp`, path);
+	atomicWriteTextSync(join(dir, `${run.id}.json`), JSON.stringify(run));
 }
 
 function parseEvalRun(value: unknown): EvalRun | null {
@@ -62,23 +62,16 @@ export async function readEvalRuns(sessionFile: string): Promise<EvalRun[]> {
 	return runs.filter(run => run !== null).sort((a, b) => a.startedAt - b.startedAt);
 }
 
-function running(pid: number): boolean {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch (err) {
-		// EPERM: the process runs under another user.
-		return isObject(err) && err.code === "EPERM";
-	}
-}
-
-/** `run` as a subagent row: running while its harness process runs it, idle once scored, aborted when it could not answer or was stopped. */
-export function evalRunRow(run: EvalRun, alive: (pid: number) => boolean = running): AgentRow {
+/**
+ * `run` as a row under the subagent `parentId` that started it, or the main agent: running while its harness process runs it, idle once scored, aborted
+ * when it could not answer or was stopped. Its id is unique among the session's subagents, since two subagents can run the same task.
+ */
+export function evalRunRow(run: EvalRun, parentId: string | null, alive: (pid: number) => boolean = isRunning): AgentRow {
 	const stopped = run.ended === null && !alive(run.pid);
 	return {
-		id: run.id,
+		id: parentId === null ? run.id : `${parentId}/${run.id}`,
 		kind: "eval run",
-		parentId: null,
+		parentId,
 		status: run.ended ? (run.ended.error ? "aborted" : "idle") : stopped ? "aborted" : "running",
 		activity: run.ended?.outcome ?? (stopped ? "Stopped before it finished" : run.title || null),
 		model: run.model,
@@ -90,14 +83,14 @@ export function evalRunRow(run: EvalRun, alive: (pid: number) => boolean = runni
 	};
 }
 
-/** The transcript `run`'s omp writes, the newest session file in its session directory; `null` before omp wrote one. */
-export function evalRunTranscript(run: EvalRun): string | null {
+/** The transcript a run's omp writes, the newest session file in its session directory `sessions`; `null` before omp wrote one. */
+export function evalRunTranscript(sessions: string): string | null {
 	let names: string[];
 	try {
-		names = readdirSync(run.sessions);
+		names = readdirSync(sessions);
 	} catch {
 		return null;
 	}
 	const newest = names.filter(name => name.endsWith(".jsonl") && !name.startsWith(".")).sort().at(-1);
-	return newest ? join(run.sessions, newest) : null;
+	return newest ? join(sessions, newest) : null;
 }

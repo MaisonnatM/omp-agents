@@ -1039,10 +1039,10 @@ export class Dashboard {
 		}
 		this.#registry = "fresh";
 		const joinedOrLeft = this.#sessions.follow(hosts);
-		// Every listing reads the eval runs again, so their rows follow the harness that records them.
-		await this.#sessions.refreshEvalRuns(this.#files.pathOf);
 		// Only a listing that worked knows which terminal sessions still run.
 		if (this.#rosterError === null) this.#sessions.restoreListedUnread(hosts, this.#files.pathOf);
+		// Every listing reads the eval runs again, so their rows follow the harness that records them.
+		await this.#sessions.refreshEvalRuns(this.#files.pathOf);
 		// A terminal session that asked to end before the registry listed it.
 		void this.#endInbox.drain();
 		// Every listing can change a host's row or the registry error; only a session that joins or leaves changes the past list.

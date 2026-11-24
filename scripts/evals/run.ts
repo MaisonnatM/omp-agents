@@ -26,9 +26,9 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { type EvalRun, writeEvalRun } from "../../src/eval-runs";
 import { type EvalTask, passedTests, writeHiddenTests } from "./candidates";
 import { bare, changeSize, confined, endedOnError, git, pinnedConfig, prepare, price, sh, type Usage } from "./replay";
-import { type EvalRun, writeEvalRun } from "../../src/eval-runs";
 
 /** One harness configuration: the full harness, or the full harness with one component turned off. */
 export interface Arm {

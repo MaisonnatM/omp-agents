@@ -54,7 +54,7 @@ describe("eval run records", () => {
 
 describe("evalRunRow", () => {
 	test("a run its harness still runs is a running subagent showing its task's title", () => {
-		expect(evalRunRow(evalRun(), () => true)).toMatchObject({
+		expect(evalRunRow(evalRun(), null, () => true)).toMatchObject({
 			id: "tab-history.2",
 			kind: "eval run",
 			parentId: null,
@@ -68,15 +68,19 @@ describe("evalRunRow", () => {
 		});
 	});
 
+	test("a run a subagent started sits under it, with an id that tells it from the same run another starter recorded", () => {
+		expect(evalRunRow(evalRun(), "Scout", () => true)).toMatchObject({ id: "Scout/tab-history.2", parentId: "Scout" });
+	});
+
 	test("a scored run is idle with its outcome, and one whose model could not answer is aborted", () => {
-		const scored = evalRunRow(evalRun({ ended: { at: 5_000, outcome: "failed 3 tests, $1.01, 1.9 min", error: false } }), () => false);
+		const scored = evalRunRow(evalRun({ ended: { at: 5_000, outcome: "failed 3 tests, $1.01, 1.9 min", error: false } }), null, () => false);
 		expect([scored.status, scored.activity, scored.endedAt]).toEqual(["idle", "failed 3 tests, $1.01, 1.9 min", 5_000]);
-		const unanswered = evalRunRow(evalRun({ ended: { at: 5_000, outcome: "could not answer: usage limit", error: true } }), () => true);
+		const unanswered = evalRunRow(evalRun({ ended: { at: 5_000, outcome: "could not answer: usage limit", error: true } }), null, () => true);
 		expect([unanswered.status, unanswered.activity]).toEqual(["aborted", "could not answer: usage limit"]);
 	});
 
 	test("an unfinished run whose harness is gone was stopped", () => {
-		const row = evalRunRow(evalRun(), () => false);
+		const row = evalRunRow(evalRun(), null, () => false);
 		expect([row.status, row.activity, row.endedAt]).toEqual(["aborted", "Stopped before it finished", null]);
 	});
 });
@@ -84,14 +88,14 @@ describe("evalRunRow", () => {
 describe("evalRunTranscript", () => {
 	test("is the newest session file omp wrote in the run's session directory, not its lock", () => {
 		const sessions = tempDir();
-		expect(evalRunTranscript(evalRun({ sessions }))).toBeNull();
+		expect(evalRunTranscript(sessions)).toBeNull();
 		writeFileSync(join(sessions, "2026-11-24T10-15-03-020Z_a.jsonl"), "");
 		writeFileSync(join(sessions, ".2026-11-24T10-22-20-305Z_b.jsonl.lock.os"), "");
 		writeFileSync(join(sessions, "2026-11-24T10-22-20-305Z_b.jsonl"), "");
-		expect(evalRunTranscript(evalRun({ sessions }))).toBe(join(sessions, "2026-11-24T10-22-20-305Z_b.jsonl"));
+		expect(evalRunTranscript(sessions)).toBe(join(sessions, "2026-11-24T10-22-20-305Z_b.jsonl"));
 	});
 
 	test("is null while the run's session directory does not exist", () => {
-		expect(evalRunTranscript(evalRun({ sessions: join(tempDir(), "missing") }))).toBeNull();
+		expect(evalRunTranscript(join(tempDir(), "missing"))).toBeNull();
 	});
 });

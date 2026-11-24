@@ -332,7 +332,7 @@ describe("eval runs", () => {
 		writeFileSync(join(runSessions, "2026-11-24_run.jsonl"), "");
 		const evalRun = { task: "tab-history", arm: "full", model: "m", title: "Reopen tabs", pid: process.pid, sessions: runSessions, startedAt: 1, ended: null };
 		writeEvalRun(file, { ...evalRun, id: "tab-history.1", run: 1 });
-		writeEvalRun(join(dir, "Scout.jsonl"), { ...evalRun, id: "tab-history.2", run: 2 });
+		writeEvalRun(join(dir, "Scout.jsonl"), { ...evalRun, id: "tab-history.1", run: 1 });
 		const subagent = { id: "Scout", kind: "scout" };
 		const session = {
 			...liveSession("i-1"),
@@ -346,9 +346,10 @@ describe("eval runs", () => {
 		expect(sessions.rows(() => facts)[0]!.agents.map(agent => [agent.id, agent.parentId, agent.status, agent.evalRun ?? false])).toEqual([
 			["Scout", undefined, undefined, false],
 			["tab-history.1", null, "running", true],
-			["tab-history.2", "Scout", "running", true],
+			["Scout/tab-history.1", "Scout", "running", true],
 		] as never);
 		expect(sessions.transcriptPath("i-1", "tab-history.1", () => null)).toBe(join(runSessions, "2026-11-24_run.jsonl"));
+		expect(sessions.transcriptPath("i-1", "Scout/tab-history.1", () => null)).toBe(join(runSessions, "2026-11-24_run.jsonl"));
 		expect(sessions.transcriptPath("i-1", "Scout", () => null)).toBe(`${dir}/Scout.jsonl`);
 		expect(sessions.transcriptPath("i-1", null, () => null)).toBe(file);
 	});
