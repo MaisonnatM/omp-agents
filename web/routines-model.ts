@@ -310,7 +310,7 @@ export function newDraft(id: string, botId: BotId): RoutineDraft {
 		prompt: "",
 		command: "",
 		post: "every",
-		freshConversation: false,
+		freshConversation: true,
 		schedules: [blankSchedule()],
 		triggers: [],
 	};

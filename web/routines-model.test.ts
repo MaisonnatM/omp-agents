@@ -309,7 +309,7 @@ describe("editor form", () => {
 		const base = newDraft("r2", scout);
 		const draft: RoutineDraft = { ...base, name: " Standup ", prompt: "Hi", schedules: [{ ...base.schedules[0]!, days: [3, 1], time: "18:30" }] };
 		expect(specOf(draft)).toEqual({
-			ok: { id: "r2", botId: scout, name: "Standup", enabled: true, task: { kind: "prompt", prompt: "Hi" }, schedules: [{ kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } }], triggers: [] },
+			ok: { id: "r2", botId: scout, name: "Standup", enabled: true, task: { kind: "prompt", prompt: "Hi" }, schedules: [{ kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } }], triggers: [], freshConversation: true },
 		});
 		expect(specOf({ ...draft, name: "" })).toEqual({ fix: "Name the routine." });
 		expect(specOf({ ...draft, schedules: [{ ...draft.schedules[0]!, days: [] }] })).toEqual({ fix: "Pick at least one day." });
@@ -329,7 +329,7 @@ describe("editor form", () => {
 	test("a command form saves its command, trimmed, and keeps the prompt typed for the other task", () => {
 		const draft = { ...newDraft("r3", scout), name: "Prune", task: "command" as const, prompt: "Hi", command: "  git worktree prune\n" };
 		expect(specOf(draft)).toEqual({
-			ok: { id: "r3", botId: scout, name: "Prune", enabled: true, task: { kind: "command", command: "git worktree prune" }, schedules: [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } }], triggers: [] },
+			ok: { id: "r3", botId: scout, name: "Prune", enabled: true, task: { kind: "command", command: "git worktree prune" }, schedules: [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } }], triggers: [], freshConversation: true },
 		});
 		expect(specOf({ ...draft, command: " " })).toEqual({ fix: "Write the command to run." });
 		expect(specOf({ ...draft, task: "prompt" })).toMatchObject({ ok: { task: { kind: "prompt", prompt: "Hi" } } });
