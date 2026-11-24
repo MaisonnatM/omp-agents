@@ -273,6 +273,7 @@ export function useDashboard(): Dashboard {
 					case "project-trust":
 					case "notices":
 					case "merges":
+					case "jobs":
 					case "review-drafts":
 						dispatch(msg);
 						return;

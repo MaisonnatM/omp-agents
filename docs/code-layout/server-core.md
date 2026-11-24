@@ -64,6 +64,7 @@
   `fileOf` resolves the live main agent's file before the saved index, private sessions included, and `lastReply` reads through it.
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
+- `src/server/session-jobs.ts`: `SessionJobs`, each live session's background jobs from its main agent's `bash` events, which `LiveSessions` keeps and the `jobs` message carries; `src/shared/jobs.ts` holds `BackgroundJob` and the progress parser `jobProgress`; see [Background jobs](../architecture/background-jobs.md).
 - `src/server/turn-waits.ts`: `TurnWaits`, the main agent's tool calls in flight per live session, from its `tool_execution_start` and `tool_execution_end` events, cleared at each `agent_start` and `agent_end`, since a cut-off call never ends.
   `waits` tells whether the turn sits only in `wait` or `task` calls, `WAITING_TOOLS`, or did at its last call; `LiveSessions.heard` feeds it from `Dashboard#onLiveUpdate`, and a roster row carries it as `turnWaits`; see [Session notifications](../architecture/notifications.md#session-notifications).
 - `src/task-claims.ts`: atomic ownership for one explicit task per repository before checkout/spawn, shared across dashboards through private `task-claims.json` beside the access token.

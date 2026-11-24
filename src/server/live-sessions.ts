@@ -10,9 +10,11 @@ import { type EndedTurn, endedTurn, type LiveSession, type LiveUpdate } from "..
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath, unreadFile } from "../paths";
 import { oneLine } from "../session-entries";
+import type { BackgroundJob } from "../shared/jobs";
 import { type AgentRow, type RosterHost, type ScheduledCheck, type SessionFacts, type UnreadTurn, type WorkItem, worksOn } from "../shared/sessions";
 import { pullRequestTask, TaskClaims } from "../task-claims";
 import { portFromEnv } from "./address";
+import { SessionJobs } from "./session-jobs";
 import { TurnWaits } from "./turn-waits";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
@@ -60,6 +62,8 @@ export class LiveSessions {
 	readonly #readByTurn = new Map<string, UnreadTurn>();
 	/** Whether each session's main agent waits on work it started, which its row's `turnWaits` shows. */
 	readonly #turnWaits = new TurnWaits();
+	/** Each session's background jobs, which the Overview tab's Jobs section and the sidebar's rows show. */
+	readonly #jobs = new SessionJobs();
 	/**
 	 * The eval runs each session's main agent and subagents started, by instance id, each as its row and its session directory, as {@link refreshEvalRuns} last read them;
 	 * a row's status comes from the same read as its record, so a run that ended since does not show as stopped.
@@ -232,6 +236,16 @@ export class LiveSessions {
 		return this.#turnWaits.heard(instanceId, event);
 	}
 
+	/** Session `instanceId`'s main agent reported `event`; whether that changed its background jobs. */
+	heardJob(instanceId: string, event: unknown): boolean {
+		return this.#jobs.heard(instanceId, event);
+	}
+
+	/** Every live session's background jobs, by instance id. */
+	jobs(): Record<string, BackgroundJob[]> {
+		return this.#jobs.all();
+	}
+
 	/** Session `instanceId` started a turn, which reads its unread turn unless the turn ends quietly; whether it had one. */
 	turnStarted(instanceId: string): boolean {
 		const turn = this.#unread.get(instanceId);
@@ -310,6 +324,7 @@ export class LiveSessions {
 		this.#subjects.delete(instanceId);
 		this.#readByTurn.delete(instanceId);
 		this.#turnWaits.forget(instanceId);
+		this.#jobs.forget(instanceId);
 		if (this.#unread.delete(instanceId)) this.#saveUnread();
 		this.#reindex();
 		forgetSession(instanceId);

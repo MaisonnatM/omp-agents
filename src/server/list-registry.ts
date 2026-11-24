@@ -24,8 +24,8 @@ interface ListChanges {
 	bots: Exclude<BotChange, { op: "message" | "restart" }>;
 }
 
-/** The lists only the server changes, through actions of their own: the bell's notices and the queued merges. */
-type ReadOnlyKind = "notices" | "merges";
+/** The lists only the server changes, through actions of their own: the bell's notices, the queued merges, and the live sessions' background jobs. */
+type ReadOnlyKind = "notices" | "merges" | "jobs";
 /** A core list, or a stored module's state under the module's id. */
 export type ListKind = keyof ListChanges | ReadOnlyKind | StoredModuleId;
 export type ListMessage<T extends ListKind = ListKind> = T extends StoredModuleId ? ModuleMsg<T> : Extract<ServerMsg, { t: T }>;

@@ -1,6 +1,7 @@
 /** What the page holds of the dashboard, and how the server's messages and the page's own actions change it. */
 import { applyBot, type Bot, type BotChange, type BotId, type BotLast } from "../src/shared/bots";
 import type { PlanUsage } from "../src/shared/models";
+import type { BackgroundJob } from "../src/shared/jobs";
 import type { QueuedMerge } from "../src/shared/merge-queue";
 import type { Notice } from "../src/shared/notices";
 import type { TrustedProject } from "../src/shared/project-trust";
@@ -69,6 +70,8 @@ export interface DashboardState extends PaneNavigation {
 	notices: Notice[];
 	/** The merges the server waits to make until GitHub allows them, empty until the server first sends them. */
 	merges: QueuedMerge[];
+	/** Each live session's background jobs by instance id, empty until the server first sends them. */
+	jobs: Record<string, BackgroundJob[]>;
 	/** The review drafts the server keeps, posted ones too, empty until the server first sends them. */
 	reviewDrafts: ReviewDraft[];
 	/** The live sessions this page asked the server to end, by instance id, with the session each ran then, until the server answers. */
@@ -76,7 +79,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "module" | "routines" | "bots" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "module" | "routines" | "bots" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "jobs" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -245,6 +248,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, notices: action.list };
 		case "merges":
 			return { ...state, merges: action.list };
+		case "jobs":
+			return { ...state, jobs: action.jobs };
 		case "review-drafts":
 			return { ...state, reviewDrafts: action.list };
 		case "user-todo":
@@ -294,6 +299,7 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		pins: [],
 		notices: [],
 		merges: [],
+		jobs: {},
 		reviewDrafts: [],
 		ending: new Map(),
 	};

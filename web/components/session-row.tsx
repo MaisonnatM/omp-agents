@@ -14,6 +14,7 @@ import { folderName, hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, 
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
 import { isPrivateHost, type RowPlacement, workspaceCwd, workspaceOf } from "../sessions";
+import { JobsContext } from "../jobs-context";
 import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
 import { OpenProjectsContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
@@ -257,6 +258,21 @@ export const PastRow = memo(function PastRow({ session, pinned, placement, showW
 	);
 });
 
+/** How many background jobs the session runs, so a running job shows while its agent is idle; nothing while none runs. */
+function RunningJobs({ instanceId }: { instanceId: string }) {
+	const running = (useContext(JobsContext)[instanceId] ?? []).filter(job => job.state === "running").length;
+	if (running === 0) return null;
+	const label = `${running} background ${running === 1 ? "job" : "jobs"} running`;
+	return (
+		<Tooltip content={label}>
+			<span role="img" aria-label={label} className="flex h-4 items-center gap-[3px] rounded-full bg-foreground/10 pr-[5px] pl-1 text-2xs font-medium tabular-nums text-foreground">
+				<span aria-hidden className="size-2 rounded-full border-[1.5px] border-foreground/25 border-t-foreground motion-safe:animate-spin" />
+				{running}
+			</span>
+		</Tooltip>
+	);
+}
+
 function HostStatus({ host, status }: { host: RosterHost; status: RowStatus }) {
 	const ending = useDashboardStatus().ending.has(host.instanceId);
 	if (ending) return <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><Spinner className="size-3" /></span>;
@@ -301,14 +317,11 @@ export const HostRow = memo(function HostRow({ session: host, pinned, placement,
 					label={label}
 					title={`${statusLabel(status)}${scheduledAt}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}${isPrivate ? `\n${PRIVATE_NOTE}` : ""}`}
 					badge={
-						isPrivate ? (
-							<span className="flex items-center gap-1.5">
-								<PrivateChip />
-								{workspace}
-							</span>
-						) : (
-							workspace
-						)
+						<span className="flex items-center gap-1.5">
+							<RunningJobs instanceId={host.instanceId} />
+							{isPrivate && <PrivateChip />}
+							{workspace}
+						</span>
 					}
 					facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline"])}
 					when={host.startedAt}

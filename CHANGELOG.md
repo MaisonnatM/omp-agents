@@ -5,6 +5,10 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
+- The session details sidebar's Overview tab has a Jobs section that lists the commands the agent runs in the background, live, with how long each has run and its last line of output.
+- When a job's output counts its progress, such as 23/60, its row shows a progress bar, the pass and fail counts, and about how long is left.
+- Click a job to read its last 15 lines as they come in; a job that fails opens by itself and shows in red.
+- A session's row in the left sidebar shows a small spinner and a count while it runs background jobs, even when its agent is idle.
 - Each Your move row shows the session its fix goes to, or "no session", the badge's tooltip says where the fix goes, and the heading buttons ask, for example, "Confirm 4? · 3 to sessions, 1 new".
 - Fix CI, Address comments, and Resolve conflicts on a pull request now go to the session that already worked on it, resuming that session if it ended, instead of starting a new session each click.
 - Reply and Fix CI at the top of Your move do the same for each pull request, and start a new session only for a pull request no session worked on.

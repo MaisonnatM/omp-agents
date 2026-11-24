@@ -115,6 +115,8 @@ type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
 
 /** How often the merge queue looks at the pull requests it waits on: checks take minutes, and a click shows its first step at once. */
 const MERGE_QUEUE_TICK_MS = 15_000;
+/** Coalesce a burst of background job output into one push of the jobs list. */
+const JOBS_PUSH_MS = 250;
 
 /** Everything the server serves, built once at startup; {@link Dashboard.start} sets it going and {@link Dashboard.stop} stops it. */
 export class Dashboard {
@@ -141,6 +143,7 @@ export class Dashboard {
 	readonly #bots: Bots;
 	readonly #projectTrust = new ProjectTrustFile(projectTrustFile);
 	readonly #admit = (dir: string): Promise<void> => this.#projectTrust.admit(dir);
+	#jobsPush: NodeJS.Timeout | undefined;
 	readonly #moves = new SessionMoves({
 		session: instanceId => this.#sessions.started(instanceId),
 		staysPut: request => this.#bots.botOf(request) !== null,
@@ -329,6 +332,7 @@ export class Dashboard {
 			preferences: { msg: () => ({ t: "preferences", values: this.#preferences.value }), apply: change => this.#preferences.apply(change) },
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
+			jobs: { msg: () => ({ t: "jobs", jobs: this.#sessions.jobs() }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
 			bots: {
 				msg: () => this.#bots.msg(),
@@ -825,6 +829,11 @@ export class Dashboard {
 		return [...new Set([...this.knownWorkspaces(), ...added])].filter(cwd => !hidden.includes(cwd));
 	}
 
+	#pushJobs(): void {
+		this.#jobsPush = undefined;
+		this.#broadcasts.pushList("jobs");
+	}
+
 	/** Where every live session's update goes: the views, the broadcasts, the Bots, and the loops. */
 	#onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 		switch (update.kind) {
@@ -835,6 +844,7 @@ export class Dashboard {
 				this.#views.applyEvent(instanceId, update.event);
 				this.#moves.heard(update.event);
 				if (this.#sessions.heard(instanceId, update.event)) this.#broadcasts.rosterChanged();
+				if (this.#sessions.heardJob(instanceId, update.event)) this.#jobsPush ??= setTimeout(() => this.#pushJobs(), JOBS_PUSH_MS);
 				return;
 			case "starting":
 				this.#views.starting(instanceId);

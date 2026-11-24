@@ -136,6 +136,7 @@
   A sign-in that exists only in Chrome stays a name, because that browser's cookies are encrypted.
   A window omp meters in dollars, such as Cursor's `Other Models`, adds the dollars spent to its hover.
   The server runs `omp usage --json` every minute while a page is open, and once when a page opens after a minute with none.
+- A live session's row shows a small spinner with a count while its agent runs background jobs, so a running job shows while the agent is idle; the session details sidebar's **Jobs** section lists them.
 - The idle stop ends a job once its session has been idle, waiting on you or done with its turn, for the time **Stop idle processes** in [Settings](settings.md) names, 30 minutes by default, counted from when the session was last busy or from the job's start if that is later.
   A shared service stops once every live session of its project has been idle that long.
   Only the server that runs unattended work, the first one started, stops processes.

@@ -4,6 +4,7 @@ import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ActivityEvent } from "./activity-event";
 import type { Bot, BotChange, BotId, BotLast } from "./bots";
 import type { DictationEvent } from "./dictation";
+import type { BackgroundJob } from "./jobs";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { QueuedMerge } from "./merge-queue";
 import type { Notice, NoticeOp } from "./notices";
@@ -70,6 +71,8 @@ export type ServerMsg =
 	| { t: "notices"; list: Notice[] }
 	/** Every merge the server waits to make until GitHub allows it, whole, sent when a socket opens and after every change. */
 	| { t: "merges"; list: QueuedMerge[] }
+	/** Every live session's background jobs, by instance id, whole on each change. */
+	| { t: "jobs"; jobs: Record<string, BackgroundJob[]> }
 	/** Every review draft, posted ones too, whole, sent when a socket opens and after every change. */
 	| { t: "review-drafts"; list: ReviewDraft[] }
 	/** One step of this page's `dictation-start` with `captureId`, until its `end`. */

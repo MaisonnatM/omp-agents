@@ -14,9 +14,15 @@
   ⇧⌘L opens **Browser**, and opens the sidebar too when it is closed; the **+** menu lists both keys.
   The sidebar remembers the tabs you opened and the one you chose, for every view; a tab the view cannot show, such as **Browser** for a past session, stays open but hidden until it can.
   **Review visuals** opens and shows the **Browser** tab, and saving an artifact the **Artifacts** tab; a reply that lists new screen changes opens the **Review** tab behind the one on screen.
-- **Overview** lists the view's **Subagents**, then the **Files**, **Images**, and **Sources** of [Changed files and images](changed-files-and-images.md), each under a filled header with its count that folds on a click; see [Conversations](conversations.md) for the **Subagents** section.
+- **Overview** lists the session's background **Jobs**, then the view's **Subagents**, then the **Files**, **Images**, and **Sources** of [Changed files and images](changed-files-and-images.md), each under a filled header with its count that folds on a click; see [Conversations](conversations.md) for the **Subagents** section.
   A section shows once it has something to list, and the tab says **Nothing yet** once the session's lists have loaded and none has.
   A past session's view shows its files, images, and sources but no subagents.
+- **Jobs** lists the commands the session's agent runs in the background, such as a long test run, as `bg_3`, and keeps the finished ones for as long as the session runs; a subagent's view leaves them out.
+  Its header counts them and says how many run, and how many failed, in red.
+  Each row shows a terminal icon with a spinner while the job runs, a green dot once it exited with 0, or a red one once it failed or was stopped, then the command, cut short with the whole of it on hover, the time it has run, and its last line of output.
+  When its latest output counts its progress, as `23/60` or `task 23 of 60`, a thin bar and the count show under the command, with the pass and fail counts when it prints them, such as `21 pass` and `2 fail`, and an estimate of the time left at its pace so far.
+  Click a row to unfold its last 15 lines, wrapped, which follow new output unless you scroll up; a failed job unfolds by itself.
+  An eval run that the eval runner starts shows among the **Subagents** instead.
 - Clicking a subagent in **Overview** opens its conversation in a tab named after it, after **Overview**, while the session's own conversation stays in the pane.
   The tab streams the subagent's transcript and has its composer, which steers or messages the subagent as its own view's does; picking another subagent shows it in the same tab.
   Cmd-click (Ctrl-click on Linux and Windows) still opens the subagent in a split, and middle-click in the app window.
