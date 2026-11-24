@@ -8,6 +8,7 @@ import type { RpcHostTool } from "../omp/module-types/rpc";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { MAX_SCHEDULED_TEXT, type ScheduledChange } from "../shared/scheduled";
 import type { RosterHost, StartRequest } from "../shared/sessions";
+import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
 import type { SessionJoin } from "./start";
 
 export const SCHEDULE_FOLLOW_UP_TOOL = "schedule_follow_up";
@@ -60,13 +61,14 @@ export class SessionFollowUps {
 			loadMode: "essential",
 			execute: async ({ message, in_minutes }) => {
 				if (typeof message !== "string" || !message.trim()) throw new Error("message must be a non-empty text.");
-				if (message.length > MAX_SCHEDULED_TEXT) throw new Error(`message must be at most ${MAX_SCHEDULED_TEXT} characters.`);
+				const text = `${DASHBOARD_PROMPT_PREFIX} ${message}`;
+				if (text.length > MAX_SCHEDULED_TEXT) throw new Error(`message must be at most ${MAX_SCHEDULED_TEXT - DASHBOARD_PROMPT_PREFIX.length - 1} characters.`);
 				if (typeof in_minutes !== "number" || !(in_minutes >= 1 && in_minutes <= MAX_MINUTES)) throw new Error(`in_minutes must be from 1 to ${MAX_MINUTES}.`);
 				const host = this.#deps.hosts().find(row => row.instanceId === caller);
 				if (!host) throw new Error("This session is not listed yet; try again in a moment.");
 				const at = this.#deps.now() + Math.round(in_minutes * 60_000);
 				const id = randomUUID();
-				if (!this.#deps.schedule({ op: "add", send: { id, at, reset: null, target: { kind: "message", sessionId: host.sessionId, text: message } } })) {
+				if (!this.#deps.schedule({ op: "add", send: { id, at, reset: null, target: { kind: "message", sessionId: host.sessionId, text } } })) {
 					throw new Error("The dashboard did not save the follow-up.");
 				}
 				return `Scheduled for ${new Date(at).toISOString()} (id ${id}). End your turn now; the message arrives as your next prompt.`;
