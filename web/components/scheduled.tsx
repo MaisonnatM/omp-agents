@@ -1,20 +1,14 @@
-/** Scheduled sends: the sidebar group listing them, their edit menu, and the context that holds and adds them. */
-import { IconClockAlert, IconCrossMedium, IconDotGrid1x3Horizontal, IconPencil, IconSend } from "central-icons";
+/** Scheduled sends: their schedule menu, the composer's list of a session's scheduled messages, and the context that holds and adds them. */
+import { IconClockAlert, IconCrossMedium, IconPencil, IconSend } from "central-icons";
 import { createContext, useContext, useState } from "react";
 import { promptLabel } from "../../src/shared/prompt-files";
 import { CONTINUE_PROMPT, type ScheduledChange, type ScheduledSend, type ScheduledTarget } from "../../src/shared/scheduled";
-import { hashForSession } from "../../src/shared/sessions";
 import { DASHBOARD_PROMPT_PREFIX } from "../../src/shared/transcript";
-import { hashForScheduled } from "../routing";
 import { opensWithShortcut } from "./composer";
-import { ROW_END, RowLine, WorkspaceBadge } from "./session-row";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { folderName } from "../labels";
 import { whenWords } from "../routines-model";
 import { dateTimeInputValue, resetChoices, type ScheduleWhen, tomorrowMorning } from "../scheduled-model";
 import { type Action, useAction } from "../use-action";
@@ -236,93 +230,5 @@ export function ScheduledMessages({ sessionId, onEdit }: { sessionId: string | n
 				<ScheduledRow key={send.id} send={send} text={text} now={now} editing={edit.pending} onEdit={() => edit.run(send.id, text)} />
 			))}
 		</ul>
-	);
-}
-
-/** Where a send's row and its menu's **Edit** lead: a message or a continue to its session, whose composer edits it, and a start to its own page. */
-const hashOf = (send: ScheduledSend): string => (send.target.kind === "start" ? hashForScheduled(send.id) : hashForSession(send.target.sessionId));
-
-/** What the sidebar says a send is, after its text. */
-function whatOf(target: ScheduledTarget): string {
-	switch (target.kind) {
-		case "message":
-			return "Message";
-		case "continue":
-			return target.cause === "transient" ? `Retry after the ${target.provider} connection error` : `Continue after the ${target.provider} usage limit`;
-		case "start":
-			return `New session in ${folderName(target.request.cwd) ?? target.request.cwd}`;
-		default: {
-			const unhandled: never = target;
-			return unhandled;
-		}
-	}
-}
-
-function ScheduledMenu({ send, label }: { send: ScheduledSend; label: string }) {
-	const [open, setOpen] = useState(false);
-	const change = useScheduledChange("Could not change the scheduled send");
-	const failed = send.state.phase === "failed";
-	return (
-		<DropdownMenu open={open} onOpenChange={setOpen}>
-			<Tooltip content="More actions" forceOpen={open ? false : undefined}>
-				<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${label}`} disabled={send.state.phase === "sending" || change.pending} />}>
-					<IconDotGrid1x3Horizontal />
-				</DropdownMenuTrigger>
-			</Tooltip>
-			<DropdownMenuContent align="end">
-				<MenuItem onClick={() => change.run({ op: "send-now", id: send.id })}>
-					<IconSend />
-					{failed ? "Try again" : "Send now"}
-				</MenuItem>
-				<MenuItem onClick={() => (location.hash = hashOf(send))}>
-					<IconPencil />
-					Edit
-				</MenuItem>
-				<MenuItem variant="destructive" onClick={() => change.run({ op: "remove", id: send.id })}>
-					<IconCrossMedium />
-					{failed ? "Dismiss" : "Cancel"}
-				</MenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
-
-/**
- * The sidebar's list of the scheduled sends `sends`, new sessions' starts too, in the session rows' look; hidden while there is none.
- * `openId` is the start whose page is open; `showWorkspace` badges a start with its workspace, as all workspaces badge a session.
- */
-export function ScheduledGroup({ sends, openId, showWorkspace, open, onOpenChange }: { sends: readonly ScheduledSend[]; openId: string | null; showWorkspace: boolean; open: boolean; onOpenChange: () => void }) {
-	const now = useMinute();
-	if (sends.length === 0) return null;
-	return (
-		<SidebarGroup collapsible open={open} onOpenChange={onOpenChange}>
-			<SidebarGroupLabel icon={IconClockAlert}>{`${sends.length} scheduled`}</SidebarGroupLabel>
-			<SidebarMenu aria-label="Scheduled messages and sessions">
-				{sends.map(send => {
-					const { target } = send;
-					const label = promptLabel(sentText(target));
-					const state = stateLabel(send);
-					const where = whatOf(target);
-					const active = send.id === openId;
-					return (
-						<SidebarMenuItem key={send.id}>
-							<Tooltip content={`${label}. ${where} · ${state ?? whenLabel(send, now)}`} side="right">
-								<SidebarMenuButton asChild isActive={active}>
-									<a href={hashOf(send)} aria-current={active ? "page" : undefined}>
-										<RowLine
-											badge={showWorkspace && target.kind === "start" ? <WorkspaceBadge cwdDisplay={target.request.cwd} /> : null}
-											label={label}
-											facts={send.state.phase === "failed" ? { text: "Not sent", alert: true } : send.state.phase === "sending" ? { text: "Sending…" } : null}
-											end={<span className={ROW_END}>{whenWords(send.at, now)}</span>}
-										/>
-									</a>
-								</SidebarMenuButton>
-							</Tooltip>
-							<ScheduledMenu send={send} label={label} />
-						</SidebarMenuItem>
-					);
-				})}
-			</SidebarMenu>
-		</SidebarGroup>
 	);
 }

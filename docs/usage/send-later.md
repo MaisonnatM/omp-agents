@@ -13,10 +13,7 @@
   A session that is no longer live resumes first, as **Resume** would.
 - A scheduled new session starts as the draft's **Start session** would: in the same directory, on the same branch choice, model, thinking level, and skill, and linked to the draft's todo.
   It opens in no pane; it shows in the sidebar once it starts.
-- The sidebar's **Scheduled** group, such as **2 scheduled**, sits at the top of the list and lists the scheduled sends, new sessions too, in the session rows' look: the message and its time on the right; under all workspaces a new session's row also shows its workspace badge. It hides while nothing is scheduled.
-  Each sessions-sidebar group title starts with its own icon: an alarm clock for scheduled, then pinned, idle, running, an hourglass for waiting on subagents, then interrupted, and past.
-  A message's row opens its session, and each row's menu has **Send now**, **Edit**, and **Cancel**.
-- A scheduled new session's row, or its **Edit**, opens it as the new-session draft it was scheduled from, at `#scheduled/<id>`: its message, directory, branch, model, thinking level, and skill.
+- A scheduled new session opens at `#scheduled/<id>` as the new-session draft it was scheduled from: its message, directory, branch, model, thinking level, and skill.
   The header shows its time, with **Start now** and **Cancel**. Sending the message saves the edits and keeps the time, and the clock button moves it to another time.
   **Start now** saves the edits, then starts it at once. A send that is already sending refuses edits.
 - A send that fails, such as a session that cannot resume, stays listed in red with the error, and **Try again** or **Dismiss** in place of **Send now** and **Cancel**.
@@ -25,7 +22,7 @@
 - Sends go on the dashboard's minute tick, so a send can go up to a minute after its time.
   A send whose time passed while the dashboard was closed goes at the first tick after it starts.
 - An agent can schedule a message to its own session, such as a check on CI in five minutes after it pushed a pull request.
-  It shows in the **Scheduled** group and above the composer like one you scheduled, with **Send now**, **Edit**, and **Cancel**, and arrives as your message would.
+  It shows above the composer like one you scheduled, with **Send now**, **Edit**, and **Cancel**, and arrives as your message would.
 
 ## Continue after a usage limit or a connection error
 
@@ -38,7 +35,7 @@
   After five retries in a row that each ended the same way, the dashboard schedules nothing and leaves the session idle; a fault after that starts over at one minute.
   A turn that ends any other way, an edited prompt, and **Archive session** start the count over, and so does a dashboard restart.
   A usage limit wins over a fault, so a `429` that names a used-up plan waits for the reset instead.
-- The row has **Send now**, **Edit**, and **Cancel**, as a scheduled message does, and the sidebar's **Scheduled** group lists it as a continue after the provider's usage limit or a retry after the provider's connection error.
+- The row has **Send now**, **Edit**, and **Cancel**, as a scheduled message does.
 - A session waits on one continue at most: a later limit moves it to the new reset, and a later fault to its next retry.
   Any new turn of that session cancels it, whoever sends the prompt: you or a scheduled message; so do an edited prompt and **Archive session**.
 - Until the continue goes, fails, or you cancel it, the session stays on its task: **After a merge** does not end it.

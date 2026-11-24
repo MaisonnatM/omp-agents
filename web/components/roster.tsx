@@ -1,7 +1,6 @@
-/** The left sidebar's roster: the projects, then the Workspaces section, whose label picks the workspace, and its search, then the scheduled sends, the pinned sessions, each workspace's sessions, and the past ones. */
+/** The left sidebar's roster: the projects, then the Workspaces section, whose label picks the workspace, and its search, then the pinned sessions, each workspace's sessions, and the past ones. */
 import { IconArrowLoopDownLeft, IconDotGrid1x3Horizontal, IconFlag1, IconFolder1, IconFolderOpen, IconLoader, IconMagnifyingGlass, IconPin, IconPlusSmall } from "central-icons";
 import { type ReactNode, useContext, useState } from "react";
-import type { ScheduledSend } from "../../src/shared/scheduled";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -15,7 +14,6 @@ import { useStoredKeys, useStoredState } from "../stored-state";
 import { CommandPicker } from "./command-picker";
 import { CountPill } from "./count-pill";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { ScheduledGroup } from "./scheduled";
 import { HostRow, PastRow } from "./session-row";
 import { activityControl } from "../activity";
 import { useModulesOff } from "../modules-off";
@@ -217,10 +215,6 @@ interface RosterProps {
 	onTogglePin: (sessionId: string) => void;
 	/** Views on screen; their sessions' rows are highlighted, and marked while they share the screen with another pane. */
 	open: View[];
-	/** The scheduled sends. */
-	scheduled: readonly ScheduledSend[];
-	/** The scheduled send whose page is open, highlighted in its group; `null` for none. */
-	scheduledOpen: string | null;
 	/** The project whose page is open, highlighted in Projects; `null` for none. */
 	projectOpen: string | null;
 	onPickWorkspace: (cwd: string | null) => void;
@@ -230,7 +224,7 @@ interface RosterProps {
  * The roster: each workspace holds its live and interrupted sessions, the busy ones first, and Past lists the ended ones,
  * even one on screen that Past does not show.
  */
-export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, onQuery, onTogglePin, open, scheduled, scheduledOpen, projectOpen, onPickWorkspace }: RosterProps) {
+export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, onQuery, onTogglePin, open, projectOpen, onPickWorkspace }: RosterProps) {
 	const [modulesOff] = useModulesOff();
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll }, scope: { workspace } } = useDashboardStatus();
@@ -327,7 +321,6 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, 
 				)}
 			</SidebarGroup>
 			{filtering && nothing && <p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>}
-			{!filtering && <ScheduledGroup sends={scheduled} openId={scheduledOpen} showWorkspace={showWorkspace} open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
 			{pinned.hosts.length + pinned.past.length > 0 && (
 				<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
 					<SidebarGroupLabel icon={IconPin}>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
