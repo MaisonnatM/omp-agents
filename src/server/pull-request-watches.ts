@@ -23,6 +23,7 @@ import {
 	samePullRequest,
 } from "../shared/github";
 import type { RosterHost, StartRequest } from "../shared/sessions";
+import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
 import type { SessionJoin } from "./start";
 
 export const WATCH_PULL_REQUEST_TOOL = "watch_pull_request";
@@ -261,7 +262,7 @@ export class PullRequestWatches {
 		}
 		this.#held = held;
 		for (const [sessionId, text] of wakes) {
-			this.#deps.wake(sessionId, text).catch((err: unknown) => console.error(`omp-agents: a pull request watch could not wake session ${sessionId}: ${errorText(err)}`));
+			this.#deps.wake(sessionId, `${DASHBOARD_PROMPT_PREFIX} ${text}`).catch((err: unknown) => console.error(`omp-agents: a pull request watch could not wake session ${sessionId}: ${errorText(err)}`));
 		}
 	}
 

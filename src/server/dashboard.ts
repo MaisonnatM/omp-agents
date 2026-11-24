@@ -30,6 +30,7 @@ import { activityDb, botInboxDir, botsDir, botsFile, builtInRoutinesFile, direct
 import { isStoredModuleId, type ModuleChanges, type ModuleRuns, moduleInboxes, moduleJoins, openModules, runModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
+import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
 import { checkOutPullRequest } from "../pull-request-checkout";
 import { rebasePullRequest } from "../pull-request-rebase";
 import { worktreeAt } from "../git";
@@ -485,7 +486,7 @@ export class Dashboard {
 		this.#moduleRuns = runModules(modules, (id, change) => void lists.applyModule(id, change), {
 			hosts: () => sessions.rows(factsOf),
 			bots: () => this.#botsFile.value,
-			wake: async (sessionId, text) => (await reach(sessionId)).prompt(null, text, [], "followUp"),
+			wake: async (sessionId, text) => (await reach(sessionId)).prompt(null, `${DASHBOARD_PROMPT_PREFIX} ${text}`, [], "followUp"),
 			wakeBot: async (botId, text) => void (await this.#bots.message(botId, text)),
 			async startSession(cwd, prompt, projectId) {
 				const result = await startSession(newSessionRequest(cwd, prompt, { projectId }));

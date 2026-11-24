@@ -4,6 +4,7 @@ import { createContext, useContext, useState } from "react";
 import { promptLabel } from "../../src/shared/prompt-files";
 import { CONTINUE_PROMPT, type ScheduledChange, type ScheduledSend, type ScheduledTarget } from "../../src/shared/scheduled";
 import { hashForSession } from "../../src/shared/sessions";
+import { DASHBOARD_PROMPT_PREFIX } from "../../src/shared/transcript";
 import { hashForScheduled } from "../routing";
 import { opensWithShortcut } from "./composer";
 import { ROW_END, RowLine, WorkspaceBadge } from "./session-row";
@@ -161,7 +162,7 @@ export function whenLabel(send: ScheduledSend, now: number): string {
 function sentText(target: ScheduledTarget): string {
 	switch (target.kind) {
 		case "message":
-			return target.text;
+			return target.text.startsWith(DASHBOARD_PROMPT_PREFIX) ? target.text.slice(DASHBOARD_PROMPT_PREFIX.length).trimStart() : target.text;
 		case "continue":
 			return CONTINUE_PROMPT;
 		case "start":

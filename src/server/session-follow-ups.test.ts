@@ -37,7 +37,7 @@ describe("the schedule_follow_up tool", () => {
 		const { scheduled, call } = setup();
 		const answer = await call({ message: "Check CI on #12", in_minutes: 5 });
 		expect(scheduled).toEqual([
-			{ op: "add", send: { id: expect.any(String), at: NOW + 5 * 60_000, reset: null, target: { kind: "message", sessionId: "s-i1", text: "Check CI on #12" } } },
+			{ op: "add", send: { id: expect.any(String), at: NOW + 5 * 60_000, reset: null, target: { kind: "message", sessionId: "s-i1", text: "[omp-agents] Check CI on #12" } } },
 		]);
 		expect(answer).toContain(new Date(NOW + 5 * 60_000).toISOString());
 	});
