@@ -10,6 +10,28 @@ import { withDiscovery } from "./omp/scoped-discovery";
 import { loadOmpSettings, saveOmpFile } from "./settings";
 import type { ExtensionOperation, ExtensionTarget } from "./shared/extensions";
 
+/**
+ * These cases add marketplaces, install packages, and change registry settings through omp's user config, which omp
+ * resolves from HOME once per process. The file reruns itself in a child with a temporary HOME, so a killed run leaves
+ * its marketplace in that directory instead of the user's ~/.omp.
+ */
+const ISOLATED_HOME = "OMP_AGENTS_EXTENSIONS_TEST_HOME";
+const isolated = process.env[ISOLATED_HOME] !== undefined && process.env[ISOLATED_HOME] === process.env.HOME;
+const run = isolated ? test : test.skip;
+
+test.if(!isolated)("extension cases pass against a temporary omp config", async () => {
+	const home = await mkdtemp(join(tmpdir(), "oa-extensions-home-"));
+	try {
+		const env: Record<string, string | undefined> = { ...process.env, HOME: home, [ISOLATED_HOME]: home, PI_CODING_AGENT_DIR: join(home, ".omp", "agent") };
+		for (const key of ["PI_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"]) delete env[key];
+		const child = Bun.spawn([process.execPath, "test", import.meta.path], { env, stdout: "pipe", stderr: "pipe" });
+		const [stdout, stderr, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+		if (exit !== 0) throw new Error(`${stdout}\n${stderr}`);
+	} finally {
+		await rm(home, { recursive: true, force: true });
+	}
+}, 120_000);
+
 const hooks = { confirmScripts: async () => false, warn: () => {} };
 async function settled(id: string): Promise<ExtensionOperation> {
 	for (let attempt = 0; attempt < 100; attempt++) {
@@ -20,7 +42,7 @@ async function settled(id: string): Promise<ExtensionOperation> {
 	throw new Error("Operation did not settle");
 }
 
-test("extension changes reject arbitrary operations, scope confusion, and credential-bearing registry URLs", () => {
+run("extension changes reject arbitrary operations, scope confusion, and credential-bearing registry URLs", () => {
 	for (const raw of [
 		null,
 		{ kind: "install", packageKind: "unknown", spec: "x", source: "", scope: "user" },
@@ -51,7 +73,7 @@ test("extension changes reject arbitrary operations, scope confusion, and creden
 	);
 });
 
-test("script approval is bound to a workspace and exact request token, and does not run until answered", async () => {
+run("script approval is bound to a workspace and exact request token, and does not run until answered", async () => {
 	let approved: boolean | undefined;
 	const operation = startExtensionChange(null, { kind: "source-add", source: "test" }, async (_cwd, _change, nativeHooks) => {
 		approved = await nativeHooks.confirmScripts({ id: "@test/review", version: "1.2.3", files: [{ path: "scripts/run.sh", executable: true }] });
@@ -69,7 +91,7 @@ test("script approval is bound to a workspace and exact request token, and does 
 	expect(() => answerExtensionApproval(null, { id: operation.id, token: waiting.approval.token, approved: true })).toThrow();
 });
 
-test("registry mutations queue behind script approval and keep native warnings and failures", async () => {
+run("registry mutations queue behind script approval and keep native warnings and failures", async () => {
 	const order: string[] = [];
 	const first = startExtensionChange(null, { kind: "source-add", source: "one" }, async (_cwd, _change, nativeHooks) => {
 		order.push("first");
@@ -88,7 +110,7 @@ test("registry mutations queue behind script approval and keep native warnings a
 	expect(order).toEqual(["first", "second"]);
 });
 
-test("malformed native registries are not treated as an empty writable source", async () => {
+run("malformed native registries are not treated as an empty writable source", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "oa-extension-registry-"));
 	try {
 		const path = join(dir, "registry.json");
@@ -105,7 +127,7 @@ test("malformed native registries are not treated as an empty writable source", 
 	}
 });
 
-test("native local marketplace lifecycle preserves scope, contributions, workflow read-only boundaries, and disabled state on update", async () => {
+run("native local marketplace lifecycle preserves scope, contributions, workflow read-only boundaries, and disabled state on update", async () => {
 	const root = await mkdtemp(join(tmpdir(), "oa-extension-market-"));
 	const source = join(root, "market");
 	const cwd = join(root, "project");
@@ -162,7 +184,7 @@ test("native local marketplace lifecycle preserves scope, contributions, workflo
 	}
 }, 30_000);
 
-test("registry skills retain locked range, missing-store state, and a named disable rather than a package flag", async () => {
+run("registry skills retain locked range, missing-store state, and a named disable rather than a package flag", async () => {
 	const cwd = await mkdtemp(join(tmpdir(), "oa-extension-skills-"));
 	const name = `review-${crypto.randomUUID().slice(0, 8)}`;
 	const id = `@exttest/${name}`;
@@ -195,7 +217,7 @@ test("registry skills retain locked range, missing-store state, and a named disa
 	}
 }, 30_000);
 
-test("discovery keeps each workspace binding until its read finishes and recovers after a refusal", async () => {
+run("discovery keeps each workspace binding until its read finishes and recovers after a refusal", async () => {
 	const root = await mkdtemp(join(tmpdir(), "oa-extension-binding-"));
 	const a = join(root, "a");
 	const b = join(root, "b");
@@ -241,7 +263,7 @@ test("discovery keeps each workspace binding until its read finishes and recover
 	}
 });
 
-test("extension config changes wait on the shared settings writer", async () => {
+run("extension config changes wait on the shared settings writer", async () => {
 	const previous = (await loadExtensions(null)).registry.global;
 	const entered = Promise.withResolvers<void>();
 	const resume = Promise.withResolvers<void>();
