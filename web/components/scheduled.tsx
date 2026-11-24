@@ -1,20 +1,14 @@
-/** Scheduled sends: the sidebar group listing them, their edit menu, and the context that holds and adds them. */
-import { IconClockAlert, IconCrossMedium, IconDotGrid1x3Horizontal, IconPencil, IconSend } from "central-icons";
+/** Scheduled sends: their schedule menu, the composer's list of a session's scheduled messages, and the context that holds and adds them. */
+import { IconClockAlert, IconCrossMedium, IconPencil, IconSend } from "central-icons";
 import { createContext, useContext, useState } from "react";
 import { promptLabel } from "../../src/shared/prompt-files";
 import { CONTINUE_PROMPT, type ScheduledChange, type ScheduledSend, type ScheduledTarget } from "../../src/shared/scheduled";
-import { hashForSession } from "../../src/shared/sessions";
 import { DASHBOARD_PROMPT_PREFIX } from "../../src/shared/transcript";
-import { hashForScheduled } from "../routing";
 import { opensWithShortcut } from "./composer";
-import { ROW_END, RowLine, WorkspaceBadge } from "./session-row";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { folderName } from "../labels";
 import { whenWords } from "../routines-model";
 import { dateTimeInputValue, resetChoices, type ScheduleWhen, tomorrowMorning } from "../scheduled-model";
 import { type Action, useAction } from "../use-action";

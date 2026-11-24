@@ -1,5 +1,5 @@
 import { IconMagnifyingGlass } from "central-icons";
-import { memo, type ReactNode, useContext, useMemo } from "react";
+import { memo, type ReactNode, useMemo } from "react";
 import type { View } from "../../src/shared/sessions";
 import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";

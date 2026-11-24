@@ -1,4 +1,4 @@
-/** The left sidebar's roster: the projects, then the Workspaces section, whose label picks the workspace, and its search, then the scheduled sends, the pinned sessions, each workspace's sessions, and the past ones. */
+/** The left sidebar's roster: the projects, then the Workspaces section, whose label picks the workspace, and its search, then the pinned sessions, each workspace's sessions, and the past ones. */
 import { IconArrowLoopDownLeft, IconDotGrid1x3Horizontal, IconFlag1, IconFolder1, IconFolderOpen, IconLoader, IconMagnifyingGlass, IconPin, IconPlusSmall } from "central-icons";
 import { type ReactNode, useContext, useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
