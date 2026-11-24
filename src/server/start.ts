@@ -13,6 +13,7 @@ import { pullRequestTask, taskConflict, taskIdentity } from "../task-claims";
 import { portFromEnv } from "./address";
 import type { LiveSessions } from "./live-sessions";
 import type { PrivateSessions } from "./private-sessions";
+import { sendToOwner } from "./owner-delivery";
 import { UntrustedProjectError } from "./project-trust-file";
 
 /** How a start joins the server: what omp launches with, and what links the session once it is in the registry, before its first prompt. */
@@ -204,7 +205,16 @@ export function createStarter(env: StartEnv): Starter {
 		}
 	}
 
-	return async request => {
+	const start: Starter = async request => {
+		// A pull request fix goes to the session that owns the pull request, and a new session takes it only when that one cannot.
+		if (request.kind === "new" && request.owner !== null) {
+			const owned = await sendToOwner(
+				{ live: sessionId => sessions.bySessionId(sessionId), resume: sessionId => start({ kind: "resume", sessionId }), get: instanceId => sessions.get(instanceId), workspaceOf: env.workspaceOf },
+				request.owner,
+				request.prompt,
+			);
+			if (owned) return owned;
+		}
 		const outcome = await spawnFor(request);
 		if ("error" in outcome) return { ok: false, ...outcome };
 		const { session, prompt, first } = outcome.started;
@@ -232,6 +242,7 @@ export function createStarter(env: StartEnv): Starter {
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, workspace, prompt };
 	};
+	return start;
 }
 
 /** A session attached to but not listed yet, which holds back what it reports until it is. */

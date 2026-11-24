@@ -398,6 +398,11 @@ export type StartRequest =
 			bot: BotId | null;
 			/** The session is deleted, with everything it wrote, when it ends, and omp remembers nothing of it; it works on no todo, task, or review draft. */
 			private: boolean;
+			/**
+			 * The session that owns the pull request this start fixes, which gets `prompt` instead of a new session: resumed first
+			 * when it ended, queued after its turn when it runs one. A new session starts as asked when it cannot take it; `null` for none.
+			 */
+			owner: string | null;
 	  }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
@@ -419,6 +424,7 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	taskId: null,
 	reviewDraft: false,
 	bot: null,
+	owner: null,
 	private: false,
 	...options,
 });
@@ -482,7 +488,7 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
  */
 export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest> {
 	if (!isObject(value) || value.kind !== "new") return null;
-	const { cwd, prompt, todoId = null, projectId = null, taskId = null, reviewDraft = false, private: isPrivate = false } = value;
+	const { cwd, prompt, todoId = null, projectId = null, taskId = null, reviewDraft = false, private: isPrivate = false, owner = null } = value;
 	const images = parseImages(value.images);
 	const branch = parseBranchChoice(value.branch);
 	// `null` starts on omp's default model.
@@ -494,12 +500,13 @@ export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest
 	if (todoId !== null && !isTodoId(todoId)) return null;
 	if (projectId !== null && !isNonEmpty(projectId)) return null;
 	if (taskId !== null && !isNonEmpty(taskId)) return null;
+	if (owner !== null && !isNonEmpty(owner)) return null;
 	// Only a pull request has a review draft.
 	if (typeof reviewDraft !== "boolean" || (reviewDraft && subject.ok?.kind !== "pull-request")) return null;
 	// A private session leaves nothing behind, so nothing may link to it.
-	if (typeof isPrivate !== "boolean" || (isPrivate && (todoId !== null || projectId !== null || taskId !== null || reviewDraft))) return null;
+	if (typeof isPrivate !== "boolean" || (isPrivate && (todoId !== null || projectId !== null || taskId !== null || reviewDraft || owner !== null))) return null;
 	return prompt.trim() || images.ok.length > 0
-		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, projectId, taskId, reviewDraft, private: isPrivate }) }
+		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, projectId, taskId, reviewDraft, private: isPrivate, owner }) }
 		: null;
 }
 

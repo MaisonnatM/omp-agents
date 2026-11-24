@@ -29,6 +29,8 @@ export type QuickOp = {
 	prompt: string;
 	subject: QuickSubject;
 	skill: string | null;
+	/** The session that owns the pull request, which gets the prompt instead of a new session; `null` for none. */
+	owner: string | null;
 };
 
 /** What the server links the session that `subject` starts to: a pull request as its subject, or a todo; a Review start saves a review draft of its pull request. */
@@ -106,14 +108,18 @@ export const todoActions = (todo: UserTodo): WorkActionId[] => WORK_IDS.filter(i
 /** The branch choice of a quick start that works on `branch`, `null` to start in the workspace as it is. */
 const workBranch = (branch: string | null): QuickOp["branch"] => (branch ? { kind: "work", name: branch } : null);
 
-/** The start of `action` on `pr`, from `cwd` and in the PR branch's worktree when the action changes it, through the pinned `skill` when one is pinned. */
-export const pullRequestStart = (pr: PullRequestSummary, action: PullRequestActionId, cwd: string, skill: string | null): QuickOp => ({
+/**
+ * The start of `action` on `pr`, from `cwd` and in the PR branch's worktree when the action changes it, through the pinned
+ * `skill` when one is pinned; with an `owner`, the server sends the prompt to that session instead, as {@link fixOwner} picks it.
+ */
+export const pullRequestStart = (pr: PullRequestSummary, action: PullRequestActionId, cwd: string, skill: string | null, owner: string | null = null): QuickOp => ({
 	kind: "quick",
 	cwd,
 	branch: workBranch(PULL_REQUEST_ACTIONS[action].branch(pr)),
 	prompt: PULL_REQUEST_ACTIONS[action].prompt(pr),
 	subject: { kind: "pull-request", pr: { owner: pr.owner, repo: pr.repo, number: pr.number }, action },
 	skill,
+	owner,
 });
 
 /** The start of `action` on `todo`, in its Workspace or else `cwd`, through the pinned `skill` when one is pinned. */
@@ -124,4 +130,5 @@ export const todoStart = (todo: UserTodo, action: WorkActionId, cwd: string, ski
 	prompt: TODO_RULES[action].prompt(todo),
 	subject: { kind: "todo", id: todo.id, text: todo.text, action },
 	skill,
+	owner: null,
 });

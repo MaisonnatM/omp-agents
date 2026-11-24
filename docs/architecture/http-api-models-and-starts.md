@@ -31,6 +31,11 @@ A `start` of kind `new` carries a `subject`, `null` for none: a quick action sen
 `LiveSessions` keeps it by instance id, and `rows()` puts it first among the session's `pullRequests` until the session's tool calls name it, so the roster links the session to its subject from the start, before omp writes the session file.
 The link goes when the session ends.
 
+A `start` of kind `new` carries an `owner`, a session id or `null`: a fix from the Pull requests list names the session that owns the pull request, the first of the row's sessions as `fixOwner` in `web/pull-requests-model.ts` picks it, a running one before an ended one and the one that opened it before one that only worked on it.
+`sendToOwner` in `src/server/owner-delivery.ts` then sends the prompt to that session instead of starting one: a running owner gets it with `followUp` delivery, which runs at once while it is idle and waits in its queue while a turn runs, and an ended owner is resumed as **Resume** does, then gets it.
+An owner that cannot resume, such as one whose worktree is gone, or that refuses the prompt, leaves the start to go on as a new session, with the pull request's task claim as usual; the answer names the owner's instance id on success.
+A private start never names an owner.
+
 An explicit task reserves one owner per canonical repository before checkout creation or omp spawn.
 The identity comes from `taskId`, a pull-request `subject`, `todoId`, a pull request URL leading the prompt, or the argument of a leading `/ship`, `/review`, or `/fix-pr` (`taskIdentity` in `src/task-claims.ts`); a word elsewhere in the prompt, such as `#12` in prose, does not identify a task.
 `LiveSessions.reserveTask` also matches a running session that predates claims through the pull requests its transcript names, with the same `pullRequestTask` identity.

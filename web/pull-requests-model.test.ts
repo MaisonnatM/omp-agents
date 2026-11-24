@@ -7,6 +7,8 @@ import type { ReviewDraft } from "../src/shared/review-drafts";
 import {
 	bulkMoves,
 	commentCount,
+	confirmLabel,
+	fixOwner,
 	DEFAULT_ORDER,
 	decodeOrder,
 	lineCommentsBlocked,
@@ -67,6 +69,24 @@ function shownOf(repos: readonly RepoPullRequests[], order: PullRequestOrder, is
 	const listed = filteredList(orderedRepos(repos, order), NO_FILTER, "", order, noAgent, false, 0);
 	return shownPullRequests("repository", groupedList("repository", listed, order), isFolded).map(({ repo, number }) => `${repo}#${number}`);
 }
+
+describe("the session a pull request fix goes to", () => {
+	test("a fix goes to the first session its row lists, and no session means a new one", () => {
+		expect(fixOwner(["running", "ended"], "fix-ci")).toBe("running");
+		expect(fixOwner(["ended"], "address-comments")).toBe("ended");
+		expect(fixOwner([], "resolve-conflicts")).toBeNull();
+	});
+
+	test("a review is no fix, so it always starts a new session", () => {
+		expect(fixOwner(["running"], "review")).toBeNull();
+	});
+
+	test("an armed heading button counts the fixes going to sessions and the new ones", () => {
+		expect(confirmLabel(4, 3)).toBe("Confirm 4? · 3 to sessions, 1 new");
+		expect(confirmLabel(2, 0)).toBe("Confirm 2? · 2 new");
+		expect(confirmLabel(1, 1)).toBe("Confirm 1? · 1 to session");
+	});
+});
 
 describe("next move", () => {
 	test("each pull request waits on the first move that applies", () => {

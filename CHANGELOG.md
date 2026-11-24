@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
+- On the Pull requests page, Fix CI, Reply, and Rebase now go to the session that already works on the pull request instead of starting a new one: a busy session gets it after its current turn, and an ended one is resumed first; only a pull request with no session, or one whose session cannot be resumed, gets a new session.
+- Each Your move row shows its session, or "no session", and the badge's tooltip says where the fix goes; the heading buttons ask, for example, "Confirm 4? · 3 to sessions, 1 new".
 - A step in a project's plan has a play button: it opens a new session in the project, already set to work on that step and its sub-steps, with the prompt written for you.
 - The prompt that Start session writes for the steps you picked now asks the session to tick each one it finishes.
 - Sessions waiting on a pull request's checks or a scheduled send now sit in one top-level Waiting section between the workspaces and Past, each with a line per pull request showing whether its checks are running, failing, or passing; click a line to open the pull request.

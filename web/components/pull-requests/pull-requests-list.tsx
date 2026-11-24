@@ -14,6 +14,7 @@ import {
 	type PullRequestOrder,
 	type SectionRow,
 	type PullRequestSort,
+	fixOwner,
 	listedPullRequest,
 	moveAction,
 	movesSummary,
@@ -65,8 +66,7 @@ function foldsOf(grouping: PullRequestGrouping, groups: readonly ListGroup[], pr
  * action that makes the move of the focused row's pull request, or the one the main area shows, the one its row's menu
  * would, even in a repository you hid. A key that has nothing to act on keeps its usual meaning.
  */
-export function usePullRequestKeys({ poll, groups, display, agent, route, onActionsOpenChange }: PullRequests, isFolded: (key: string) => boolean): void {
-	const { start } = useDashboardActions();
+export function usePullRequestKeys({ poll, groups, display, agent, route, onActionsOpenChange, onQuickAction }: PullRequests, isFolded: (key: string) => boolean): void {
 	const { target } = route;
 	const shown = useMemo(() => shownPullRequests(display.grouping, groups, isFolded), [display.grouping, groups, isFolded]);
 	const current = (): number =>
@@ -87,7 +87,7 @@ export function usePullRequestKeys({ poll, groups, display, agent, route, onActi
 		const listed = read && listedPullRequest(read, pr);
 		const action = listed && moveAction(listed.pr, moveOf(listed.pr, agent(listed.pr)));
 		if (!listed || !action) return false;
-		start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()));
+		onQuickAction(listed.pr, listed.cwd, action);
 		return true;
 	};
 	useShortcuts({
@@ -307,7 +307,13 @@ export function usePullRequests({ hosts, past, route, query = "" }: PullRequests
 	const sessions = useSessionsByPullRequest(hosts, past);
 	/** The row, by {@link rowId}, whose `⋯` menu is open. */
 	const [actionsOpen, setActionsOpen] = useState<string | null>(null);
-	const onQuickAction = useCallback((pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill())), [start]);
+	// Read through a ref, so the function stays the same for every row while the roster changes.
+	const sessionsNow = useRef(sessions);
+	sessionsNow.current = sessions;
+	const onQuickAction = useCallback(
+		(pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill(), fixOwner(sessionsNow.current.get(prKey(pr)) ?? NO_SESSIONS, action)?.sessionId ?? null)),
+		[start],
+	);
 	const refresh = useCallback(() => void pullRequestsStore.refresh(scope, { fresh: true }), [scope]);
 	const rebaseHooks = useMemo((): RebaseHooks => ({ resolve: ({ pr, cwd }) => onQuickAction(pr, cwd, "resolve-conflicts"), refresh }), [onQuickAction, refresh]);
 	const onRebase = useCallback((pr: PullRequestSummary, cwd: string) => rebasePullRequest({ pr, cwd }, rebaseHooks), [rebaseHooks]);

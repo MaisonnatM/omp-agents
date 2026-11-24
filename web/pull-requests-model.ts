@@ -133,6 +133,26 @@ export function bulkMoves<R extends { row: SectionRow; pending: unknown }>(rows:
 	});
 }
 
+/** The quick actions that fix your own pull request, which go to the session that owns it rather than to a new one. */
+const FIXES: readonly PullRequestActionId[] = ["fix-ci-and-conflicts", "fix-ci", "resolve-conflicts", "address-comments"];
+
+/**
+ * The session that `action` on a pull request goes to, from the pull request's sessions in the order its row's chips
+ * show them: the first, a running one before an ended one and the one that opened it before one that only worked on it.
+ * `null` when no session is linked to it, or for an action that is no fix, such as **Review**, which always starts a new session.
+ */
+export const fixOwner = <S>(sessions: readonly S[], action: PullRequestActionId): S | null => (isFix(action) ? (sessions[0] ?? null) : null);
+
+/** Whether `action` fixes your own pull request, so it goes to the session that owns it when one does. */
+export const isFix = (action: PullRequestActionId): boolean => FIXES.includes(action);
+
+/** What a heading button that hands a move to `count` pull requests reads once armed, `owned` of them going to their sessions: `Confirm 4? · 3 to sessions, 1 new`. */
+export function confirmLabel(count: number, owned: number): string {
+	const fresh = count - owned;
+	const parts = [owned > 0 && `${owned} to ${owned === 1 ? "session" : "sessions"}`, fresh > 0 && `${fresh} new`].filter(Boolean);
+	return `Confirm ${count}? · ${parts.join(", ")}`;
+}
+
 /** Where a pull request sits in a stack of two or more that the list holds: `position` 1 is the bottom, which merges first. */
 export interface StackPlace {
 	position: number;

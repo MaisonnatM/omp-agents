@@ -92,6 +92,8 @@
   The list reads GitHub again once the rebases end.
   A state change, a review request, or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
+  A fix from the list, every quick action but a review, goes to the session that owns the pull request, the first session its row lists, and the badge's tooltip ends with **Send to** and that session's name; a **Your move** row with no session reads **no session**, and its badge's tooltip ends with **New session**.
+  A running session gets the fix as a follow-up, which waits for its turn to end rather than interrupting it; an ended one resumes first; one that cannot resume, such as one whose worktree is gone, leaves the fix to a new session.
   While a quick action's session starts on a pull request, from its badge or its `⋯` menu, or while its rebase is queued or runs, the badge reads **Starting**, **Queued**, or **Rebasing** beside a spinner, and its tooltip says what, such as **Starting Fix CI**.
   Click a **Merge** badge for a popover that reads the pull request from GitHub and confirms the merge; a **CI running** badge on your own pull request that is ready but for its checks opens it too, and queues the merge until they pass.
   Click a repository or a section heading to fold it; the app keeps your choice across reloads.
@@ -118,7 +120,7 @@
   A conflict or a failure also toasts on its own as it happens.
   The button reads **Rebasing…** beside a spinner and waits while any rebase is queued or running.
 - A **Your move** table's heading ends with one button per fix its pull requests wait on, such as **Reply 3**, **Fix CI 2**, and **Rebase 1**, counting those with no session starting.
-  The first click arms **Confirm N?**, and a second within three seconds starts the move's quick action on each of them, one session per pull request, as clicking each row's move badge does: **Address comments**, **Fix CI**, and **Fix CI and conflicts** or **Resolve conflicts**.
+  The first click arms **Confirm N?** followed by how many fixes go to their sessions and how many start new ones, such as **Confirm 4? · 3 to sessions, 1 new**, and a second within three seconds hands the move's quick action to each of them, as clicking each row's move badge does: **Address comments**, **Fix CI**, and **Fix CI and conflicts** or **Resolve conflicts**.
 - Tabs above the list show part of it: **Open** every section but **Recently merged**, **Your move**, **Approved**, and **Merged** that one section, and **All**, the default, every section.
   A tab reads as picked only while the sections shown are exactly its own, so sections you switch one by one leave no tab picked.
 - **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section** lists the sections, **Repository** and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.
@@ -162,7 +164,7 @@
   Beside the table, the page unfolds its row's repository and section, scrolls the row into view, and highlights it.
   When the list does not include that pull request, a note says why, and the details still show.
   `#pull-requests/<owner>/<repo>/<number>/files` opens the details on the **Code** tab at the first file, and `#pull-requests/<owner>/<repo>/<number>/files/<path>` at the file at that path, encoded; choosing **Code** puts that address in the location bar, and another tab takes it out.
-- The quick actions in a row's `⋯` menu on the Pull requests page, and buttons in the pull request's details, start a new dashboard session in the background, from the repository's most recently used workspace, with a prompt that names the pull request and its branch.
+- The quick actions in a row's `⋯` menu on the Pull requests page, and buttons in the pull request's details, start a new dashboard session in the background, from the repository's most recently used workspace, with a prompt that names the pull request and its branch; a fix from the list goes to the session that owns the pull request instead, when one does.
   An action that changes the branch, every one but **Review** and a **Thermonuclear review** of someone else's pull request, starts the session in a git worktree on the branch: the worktree that has it checked out, else a new one beside the main worktree on the local branch, else on origin's branch, fetched.
   When origin cannot be reached, or the branch is in a fork the workspace's origin lacks, the start fails and the note says why.
   The page stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
