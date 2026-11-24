@@ -3,7 +3,8 @@
  * `board.json` becomes a project, its task threads the steps of its plan, and its messages its log. The Board is gone,
  * so `board.json` is renamed `board.json.removed` once the projects are saved, and the move runs at most once.
  */
-import { existsSync, readFileSync, renameSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { ReducerFile } from "../fs";
 import { arrayOf, decoder, fields, type Guard, isNonEmpty, isNumber, isString, nullable, oneOf, optional, parseJson } from "../json";
 import type { Project, ProjectChange, ProjectList, ProjectStep } from "../shared/projects";
@@ -91,8 +92,9 @@ export function foldBoardProjects(list: ProjectList, board: OldBoard): ProjectLi
 	return added.length === 0 ? list : { projects: [...list.projects, ...added] };
 }
 
-/** Folds the projects of `boardPath`, an older `board.json`, into `projects`, then renames that file `<boardPath>.removed`; a file that holds no board stays where it is. */
+/** Folds the projects of `boardPath`, an older `board.json`, into `projects`, then renames that file `<boardPath>.removed`; a file that holds no board stays where it is. Deletes the unused `board-inbox/` beside it. */
 export function migrateBoardProjects(projects: ReducerFile<ProjectList, [ProjectChange]>, boardPath: string): void {
+	rmSync(join(dirname(boardPath), "board-inbox"), { recursive: true, force: true });
 	if (!existsSync(boardPath)) return;
 	const board = parseOldBoard(parseJson(readFileSync(boardPath, "utf8")));
 	if (!board) {

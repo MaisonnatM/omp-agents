@@ -14,7 +14,7 @@ The name is not `projects.json`, which an older version kept the workspaces in.
 
 When the store opens at startup, `migrateBoardProjects` in `src/server/project-migration.ts` moves the projects of a `board.json` that an older version left into the list, once.
 Each channel carrying a project becomes a project with the channel's id and name, its goal, decisions, session ids, and dates; its task threads become steps in plan order, done when their task was, a sub-step's parent thread its `parentId`; and its messages, oldest first, become log lines, signed with the session that wrote them.
-A project the list already holds is left as it is, and once the list is saved the file is renamed `board.json.removed`, so nothing reads it again; the Board's other channels, threads, members, and schedules are dropped.
+A project the list already holds is left as it is, and once the list is saved the file is renamed `board.json.removed`, so nothing reads it again; the Board's other channels, threads, members, and schedules are dropped, and the unused `board-inbox/` beside it is deleted.
 
 `applyProjectChange` is the reducer the server applies and the page applies before the server answers.
 A change that changes nothing returns the same list, so a repeated change, such as a second tick or a second join, writes nothing.

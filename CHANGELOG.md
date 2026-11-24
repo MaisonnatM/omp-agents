@@ -7,7 +7,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 - The Board is gone: its page, channels, threads, and the board tool agents used to post there.
 - Projects keep working on their own: the Projects page, the brief each session in a project gets, and the project_list and project_update tools agents use.
-- Your existing projects move over by themselves the first time the dashboard starts, with their plan, decisions, and messages as log lines.
+- Your existing projects move over by themselves the first time the dashboard starts, with their plan, decisions, and messages as log lines; the Board's leftover inbox folder is deleted.
 - Agents can add a whole project plan, with its sub-steps, in one project_update call.
 - The eval set's 11 tasks that failed the same way in every run now tell the agent the interface their checks expect, such as an exact error message, a dependency's name, or an output's shape, so a run is no longer failed for guessing a name differently.
 - The eval runner takes `--jobs N` to run N tasks at once; each run and its recorded result stay the same, only the wall time drops.
