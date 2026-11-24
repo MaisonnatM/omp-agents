@@ -16,6 +16,7 @@ import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } fro
 import { offerUndo } from "../toaster";
 import { TodoInput } from "../todo/input";
 import { AddLine, Card, EmptyNote, type OnProjectChange, PROJECT_UNDO, RemoveButton } from "./parts";
+import { stepsPrompt } from "./steps-prompt";
 
 type PlanTab = "todo" | "done" | "all";
 
@@ -58,15 +59,9 @@ export function Plan({ project, readOnly, onChange }: { project: Project; readOn
 			for (const id of [step.id, ...subStepsOf(step).map(each => each.id)]) on ? next.add(id) : next.delete(id);
 			return next;
 		});
-	// The new session's draft names the steps, sub-steps indented under theirs, so it starts on the right part of the plan.
 	const startSession = (picked: ProjectStep[]): void => {
 		if (picked.length === 0) return;
-		// A sub-step indents only under its own step; picked alone, it stands as a step of its own.
-		const nested = picked.map(step => picked.some(each => each.id === step.parentId));
-		const lines = picked.map((step, index) => `${nested[index] ? "   " : ""}- ${numbers.get(step.id)}. ${step.text}${step.done ? " (done)" : ""}`);
-		const heads = nested.filter(under => !under).length;
-		const intro = `Work on ${heads === 1 ? "this step" : "these steps"} of the plan of the project "${project.name}":`;
-		appendToComposer(newDraftKey(null), [intro, ...lines, "", "Tick each step with project_update as you finish it."].join("\n"));
+		appendToComposer(newDraftKey(null), stepsPrompt(project, picked));
 		setSelection(null);
 		location.hash = hashForNewSession({ projectId });
 	};
