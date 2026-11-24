@@ -10,7 +10,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger, DropdownMenu, Drop
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { type ListChange, type SectionRow, MOVES, moveAction, reason, type StackPlace, threadStarters, withReviewer } from "../../pull-requests-model";
+import { fixOwner, type ListChange, type SectionRow, MOVES, moveAction, reason, type StackPlace, threadStarters, withReviewer } from "../../pull-requests-model";
+import { PULL_REQUEST_ACTIONS } from "../../../src/pull-request-actions";
 import { hashForPullRequests, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
@@ -188,15 +189,18 @@ function RowBusyBadge({ busy }: { busy: Busy }) {
 /**
  * A row's move badge: while the pull request rebases or a session starts on it, what it is busy with; for **Merge**, and
  * **Checks running** on a pull request ready but for them, a button that merges; else a button that starts the quick
- * action handing the move to an agent, when one applies; else the plain badge.
+ * action handing the move to an agent, when one applies, whose label says whether a fix goes to the session that owns
+ * the pull request or to a new one; else the plain badge.
  */
-function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+function RowMoveBadge({ pr, move, sessions, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId } & Pick<RowProps, "sessions" | "pending" | "cwd" | "onQuickAction">) {
 	const busy = useBusy(pr, pending);
 	if (busy) return <RowBusyBadge busy={busy} />;
 	if (move === "merge" || (move === "checks-running" && readyOnceChecksPass(pr))) return <MergeBadge pr={pr} move={move} />;
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
-	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
+	const owner = fixOwner(sessions, action);
+	const goesTo = owner ? ` · Send to ${owner.label}` : PULL_REQUEST_ACTIONS[action].reachesOwner ? " · New session" : "";
+	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}${goesTo}`;
 	return (
 		<Tooltip content={`${label}. ${QUICK_ACTIONS[action].description}`}>
 			<button
@@ -208,6 +212,21 @@ function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: PullReque
 			>
 				<BadgeFace move={move} />
 			</button>
+		</Tooltip>
+	);
+}
+
+/** Whether `move` on `pr` waits on a fix, which goes to the session that owns the pull request. */
+const fixes = (pr: PullRequestSummary, move: MoveId): boolean => {
+	const action = moveAction(pr, move);
+	return action !== null && PULL_REQUEST_ACTIONS[action].reachesOwner;
+};
+
+/** The sessions cell of a row whose fix no session owns, so the fix starts a new one. */
+function NoSession() {
+	return (
+		<Tooltip content="No session opened or worked on this pull request, so its fix starts a new one">
+			<span className="italic text-muted-foreground">no session</span>
 		</Tooltip>
 	);
 }
@@ -550,7 +569,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 				/>
 			}
 		>
-			<RowMoveBadge pr={pr} move={move} {...actions} />
+			<RowMoveBadge pr={pr} move={move} sessions={sessions} {...actions} />
 			<div className="min-w-0 max-phone:order-first max-phone:col-span-full">
 				<TitleLink pr={pr} targeted={targeted} className="block truncate" />
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground max-phone:flex-wrap max-phone:gap-x-2 max-phone:gap-y-0.5">
@@ -571,7 +590,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 				</p>
 			</div>
 			<span className={cn(WIDE, "min-w-0 text-xs")}>
-				<SessionChips sessions={sessions} onOpen={onOpen} />
+				{sessions.length === 0 && fixes(pr, move) ? <NoSession /> : <SessionChips sessions={sessions} onOpen={onOpen} />}
 			</span>
 			<span className={cn(WIDE, "min-w-0 text-xs text-muted-foreground")}>
 				<StackInfo stack={stack} base={pr.stackedOn} />

@@ -92,6 +92,7 @@
   The list reads GitHub again once the rebases end.
   A state change, a review request, or a merge from a row shows in the list as soon as GitHub takes it, and the list then reads GitHub again; a closed pull request leaves the list, and when GitHub refuses a change, a toast says why.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
+  A fix's badge tooltip ends with **Send to** and the name of the session its row lists first, the one the fix most likely goes to, as the quick actions paragraph below says; a **Your move** row whose fix no session worked on reads **no session**, and its badge's tooltip ends with **New session**.
   While a quick action's session starts on a pull request, from its badge or its `⋯` menu, or while its rebase is queued or runs, the badge reads **Starting**, **Queued**, or **Rebasing** beside a spinner, and its tooltip says what, such as **Starting Fix CI**.
   Click a **Merge** badge for a popover that reads the pull request from GitHub and confirms the merge; a **CI running** badge on your own pull request that is ready but for its checks opens it too, and queues the merge until they pass.
   Click a repository or a section heading to fold it; the app keeps your choice across reloads.
@@ -118,7 +119,7 @@
   A conflict or a failure also toasts on its own as it happens.
   The button reads **Rebasing…** beside a spinner and waits while any rebase is queued or running.
 - A **Your move** table's heading ends with one button per fix its pull requests wait on, such as **Reply 3**, **Fix CI 2**, and **Rebase 1**, counting those with no session starting.
-  The first click arms **Confirm N?**, and a second within three seconds runs the move's quick action on each of them, as clicking each row's move badge does: **Address comments**, **Fix CI**, and **Fix CI and conflicts** or **Resolve conflicts**, each sent to the session that owns its pull request, else in a new session per pull request.
+  The first click arms **Confirm N?** followed by how many pull requests list a session and how many list none, such as **Confirm 4? · 3 to sessions, 1 new**, and a second within three seconds runs the move's quick action on each of them, as clicking each row's move badge does: **Address comments**, **Fix CI**, and **Fix CI and conflicts** or **Resolve conflicts**, each sent to the session that owns its pull request, else in a new session per pull request.
 - Tabs above the list show part of it: **Open** every section but **Recently merged**, **Your move**, **Approved**, and **Merged** that one section, and **All**, the default, every section.
   A tab reads as picked only while the sections shown are exactly its own, so sections you switch one by one leave no tab picked.
 - **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section** lists the sections, **Repository** and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.

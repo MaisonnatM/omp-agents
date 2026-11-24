@@ -11,7 +11,7 @@ import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { filters, NO_FILTER, type PullRequestFilter } from "../../pull-requests-filter";
-import { bulkMoves, MOVES } from "../../pull-requests-model";
+import { bulkMoves, confirmLabel, fixOwner, MOVES } from "../../pull-requests-model";
 import { QUICK_ACTIONS } from "../../quick-actions";
 import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsDisplay, usePullRequestsFilter, usePullRequestsFolds } from "../../pull-requests-state";
 import { activityControl } from "../../activity";
@@ -63,7 +63,8 @@ function TableCount({ length, yours, summary }: { length: number; yours: boolean
 
 /**
  * A **Your move** table's buttons that each hand one move to agents on every pull request waiting on it, such as
- * **Reply 3**: the first click arms **Confirm 3?**, and a second within three seconds starts one session per pull request.
+ * **Reply 3**: the first click arms **Confirm 3? · 2 to sessions, 1 new**, and a second within three seconds sends each
+ * fix to the session that owns its pull request, or starts a new session for one no session owns.
  */
 function BulkMoveButtons({ scope, rows }: { scope: string; rows: RowProps[] }) {
 	const confirm = useInlineConfirm(scope);
@@ -75,13 +76,16 @@ function BulkMoveButtons({ scope, rows }: { scope: string; rows: RowProps[] }) {
 				const action = items[0]!.action;
 				const armed = confirm.isArmed(move);
 				const count = items.length;
-				const label = armed ? `Confirm ${count}?` : `${MOVES[move].label} ${count}`;
+				const owned = items.filter(({ row, action }) => fixOwner(row.sessions, action) !== null).length;
+				const label = armed ? confirmLabel(count, owned) : `${MOVES[move].label} ${count}`;
 				const start = () => {
 					for (const { row, action } of items) row.onQuickAction(row.row.pr, row.cwd, action);
 				};
+				const fresh = count - owned;
+				const where = [owned > 0 && `${owned} to the session${owned === 1 ? " that owns it" : "s that own them"}`, fresh > 0 && `${fresh} in a new session${fresh === 1 ? "" : " each"}`].filter(Boolean).join(", ");
 				return (
-					<Tooltip key={move} content={`${QUICK_ACTIONS[action].label} on ${count} pull request${count === 1 ? "" : "s"}, one agent session each`} forceOpen={armed ? false : undefined}>
-						<Button size="compact" variant="ghost" leadingIcon={QUICK_ACTION_ICON[action]} aria-label={armed ? `Confirm ${QUICK_ACTIONS[action].label} on ${count}?` : `${MOVES[move].label} all ${count}`} {...confirm.props(move, start)}>
+					<Tooltip key={move} content={`${QUICK_ACTIONS[action].label} on ${count} pull request${count === 1 ? "" : "s"}: ${where}`} forceOpen={armed ? false : undefined}>
+						<Button size="compact" variant="ghost" leadingIcon={QUICK_ACTION_ICON[action]} aria-label={armed ? `Confirm ${QUICK_ACTIONS[action].label} on ${count}? ${where}` : `${MOVES[move].label} all ${count}`} {...confirm.props(move, start)}>
 							{label}
 						</Button>
 					</Tooltip>
