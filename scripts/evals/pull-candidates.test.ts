@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { baseOf, domainOf, leaks, type Pull, type PullFile, rejection, spread, testNodeIds, ticketFromBody, ticketOf, ticketPrompt } from "./pull-candidates";
+import { baseOf, changeSummary, domainOf, leaks, type Pull, type PullFile, rejection, spread, testNodeIds, ticketOf, ticketPrompt } from "./pull-candidates";
 import { type EvalRow, passAtK, passAtKRate } from "./run";
 
 const pull = (extra: Partial<Pull> = {}): Pull => ({
@@ -105,27 +105,48 @@ describe("hidden tests", () => {
 });
 
 describe("prompt", () => {
-	test("a ticket's Linear mentions become their labels", () => {
-		const prompt = ticketPrompt("ENG-2827", 'Count attachments\n\nDepends on <issue id="d1" label="ENG-2818" href="https://linear.app/x" />.');
+	test("a ticket's Linear mentions become their labels, and what the change did follows it", () => {
+		const prompt = ticketPrompt("ENG-2827", 'Count attachments\n\nDepends on <issue id="d1" label="ENG-2818" href="https://linear.app/x" />.', "Each image adds 1,600 tokens.");
 		expect(prompt).toContain("Do Linear ticket ENG-2827 in the repository");
-		expect(prompt).toContain("Depends on ENG-2818.");
+		expect(prompt).toContain("Depends on ENG-2818.\n\n## What the change did\n\nEach image adds 1,600 tokens.\n");
 		expect(prompt).not.toContain("<issue");
+		expect(ticketPrompt("ENG-1", "Fix it", "")).not.toContain("What the change did");
 	});
 
-	test("a pull request's body keeps only its first section, without code, images, or the bot summary", () => {
+	test("the change summary keeps the body's prose and the bot summary, without code, images, checkboxes, or lines naming hidden tests or the pull request", () => {
+		const hidden = { files: ["tests/test_auth.py"], testIds: ["tests/test_auth.py::test_viewer_gets_403"] };
 		const body = [
-			"## Why",
-			"People could not log out. See ![shot](https://x/y.png)",
+			"## Summary",
+			"Both routes now require `connector:manage`. See ![shot](https://x/y.png)",
+			'<img width="10" src="https://x/z.png" />',
 			"```diff",
-			"+ fixed()",
+			"+ has_permission(MANAGE)",
 			"```",
-			"## What",
-			"Moved the avatar inside the trigger.",
+			"## Evidence",
+			"- `test_viewer_gets_403` failed on main.",
+			"- `uv run pytest tests/test_auth.py`: 65 passed.",
+			"- Follow-up to #7495.",
+			"## Checks",
+			"- [x] Browser proof",
 			"<!-- CURSOR_SUMMARY -->",
-			"Adds a test_lobby test.",
+			"---",
+			"> [!NOTE]",
+			"> **Overview**",
+			"> A Viewer now gets 403 on both routes.",
+			"> <sup>Reviewed by Bugbot.</sup>",
 			"<!-- /CURSOR_SUMMARY -->",
 		].join("\n");
-		expect(ticketFromBody("fix(front): show the avatar (ENG-3108)", body)).toBe("fix(front): show the avatar\n\nPeople could not log out. See");
+		expect(changeSummary(body, hidden, 7495)).toBe(
+			[
+				"### Summary",
+				"Both routes now require `connector:manage`. See",
+				"",
+				"### Review bot summary",
+				"",
+				"**Overview**",
+				"A Viewer now gets 403 on both routes.",
+			].join("\n"),
+		);
 	});
 
 	test("flags a prompt that names a hidden test, a hidden file, the pull request, or a diff", () => {
@@ -170,6 +191,8 @@ describe("pass@k", () => {
 		answeredBy: { "anthropic/claude-opus-5-5": 1 },
 		filesChanged: 1,
 		linesChanged: 1,
+		testsPassed: null,
+		testsTotal: null,
 		...extra,
 	});
 

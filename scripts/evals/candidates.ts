@@ -30,10 +30,18 @@ export interface EvalTask {
 	prompt: string;
 	/** Test files, relative to the repository, that the runner writes from `landed` after the run. */
 	hiddenTests: string[];
-	/** The test ids the hidden tests hold, such as pytest node ids, for reading a run's failures against. */
+	/**
+	 * The test ids the check runs, such as pytest node ids: for a set built with `--verify` from pull requests, only the
+	 * tests that fail at the base and pass at the landed commit. A run's share is how many of them pass.
+	 */
 	testIds?: string[];
 	/** The command that must exit 0 once the hidden tests are in place. */
 	check: string;
+}
+
+/** The tests a pytest run with `-rp` reports as passed, by node id. */
+export function passedTests(output: string): Set<string> {
+	return new Set([...output.matchAll(/^PASSED (.+)$/gm)].map(match => match[1]!.trimEnd()));
 }
 
 const MAX_SOURCE_LINES = 300;

@@ -1,6 +1,7 @@
 /**
  * Runs the eval set: each task's prompt through `omp -p` with the full harness, in a confined clone at the task's base,
- * then writes the task's hidden tests from its landed commit and records whether its check passes, with cost and minutes,
+ * then writes the task's hidden tests from its landed commit and records whether its check passes, how many of the task's
+ * `testIds` pass, with cost and minutes,
  * as one line per run in a JSONL results file.
  *
  * - `--disable-extensions a,b` and `--disable-skills c,d` add a decay check: besides the full harness, the set runs once
@@ -25,7 +26,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { type EvalTask, writeHiddenTests } from "./candidates";
+import { type EvalTask, passedTests, writeHiddenTests } from "./candidates";
 import { bare, changeSize, confined, endedOnError, git, pinnedConfig, prepare, price, sh, type Usage } from "./replay";
 
 /** One harness configuration: the full harness, or the full harness with one component turned off. */
@@ -50,6 +51,9 @@ export interface EvalRow extends Usage {
 	minutes: number;
 	filesChanged: number;
 	linesChanged: number;
+	/** How many of the task's `testIds` passed, of how many; null for a task without them or an unchecked run. */
+	testsPassed: number | null;
+	testsTotal: number | null;
 }
 
 export interface ArmSummary {
@@ -58,6 +62,8 @@ export interface ArmSummary {
 	passRate: number;
 	costPerRun: number;
 	minutesPerRun: number;
+	/** The mean share of each run's `testIds` that passed, over the runs that have them; null when none has. */
+	testShare: number | null;
 	/** Against the full harness; null for the full harness itself or when it has no scored runs. */
 	passRateDelta: number | null;
 	costDelta: number | null;
@@ -90,7 +96,13 @@ export function arms(extensions: string[], skills: string[]): Arm[] {
 /** A row counts when the model answered and only the pinned model did. */
 const scored = (row: EvalRow) => !row.error && Object.keys(row.answeredBy).every(model => model === bare(row.model));
 
-/** Pass rate, cost, and minutes per arm over its scored runs, with each arm's delta against the full harness. */
+/** The mean share of each run's `testIds` that passed, over the runs that have them; null when none has. */
+function meanShare(rows: EvalRow[]): number | null {
+	const shares = rows.filter(row => row.testsTotal).map(row => row.testsPassed! / row.testsTotal!);
+	return shares.length > 0 ? shares.reduce((sum, share) => sum + share, 0) / shares.length : null;
+}
+
+/** Pass rate, cost, minutes, and test share per arm over its scored runs, with each arm's delta against the full harness. */
 export function summarize(rows: EvalRow[]): ArmSummary[] {
 	const byArm = Map.groupBy(rows.filter(scored), row => row.arm);
 	const plain = [...byArm].map(([arm, runs]) => ({
@@ -99,6 +111,7 @@ export function summarize(rows: EvalRow[]): ArmSummary[] {
 		passRate: runs.filter(row => row.passed).length / runs.length,
 		costPerRun: runs.reduce((sum, row) => sum + row.cost, 0) / runs.length,
 		minutesPerRun: runs.reduce((sum, row) => sum + row.minutes, 0) / runs.length,
+		testShare: meanShare(runs),
 	}));
 	const full = plain.find(summary => summary.arm === FULL);
 	return plain
@@ -209,6 +222,7 @@ function printSummary(rows: EvalRow[], k: number): void {
 			runs: s.runs,
 			"pass@1 %": (s.passRate * 100).toFixed(0),
 			[`pass@${k} %`]: s.passAtK === null ? "" : (s.passAtK * 100).toFixed(0),
+			"tests passed %": s.testShare === null ? "" : (s.testShare * 100).toFixed(0),
 			"Δ pass pts": signed(s.passRateDelta, 0, 100),
 			"95% band pts": s.band ? `${signed(s.band.low, 0, 100)} to ${signed(s.band.high, 0, 100)}` : "",
 			"$ per task": s.costPerRun.toFixed(2),
@@ -227,14 +241,18 @@ const readRows = (file: string): EvalRow[] =>
 				.map(line => JSON.parse(line) as EvalRow)
 		: [];
 
+type CheckResult = Pick<EvalRow, "passed" | "failures" | "testsPassed" | "testsTotal">;
+
 /** Writes the hidden tests into the clone and runs the task's check there, outside the sandbox. */
-function hiddenCheck(repo: string, task: EvalTask, clone: string, dir: string): { passed: boolean; failures: string[] } {
+function hiddenCheck(repo: string, task: EvalTask, clone: string, dir: string): CheckResult {
 	writeHiddenTests(repo, task, clone);
 	const run = sh(task.check, clone, {}, CHECK_TIMEOUT_MS);
 	writeFileSync(join(dir, "check.log"), `$ ${task.check}\n${run.output}\n${run.ok ? "passed" : "FAILED"}\n`);
 	// bun test prints `(fail) name`; pytest prints `FAILED path::test - why` and `ERROR path::test`.
 	const failures = [...run.output.matchAll(/^\(fail\) (.+?)(?: \[[\d.]+m?s\])?$|^(?:FAILED|ERROR) (\S+)/gm)].map(match => (match[1] ?? match[2])!);
-	return { passed: run.ok, failures: [...new Set(failures)] };
+	const passedIds = passedTests(run.output);
+	const testsPassed = task.testIds ? task.testIds.filter(id => run.ok || passedIds.has(id)).length : null;
+	return { passed: run.ok, failures: [...new Set(failures)], testsPassed, testsTotal: task.testIds?.length ?? null };
 }
 
 interface Options {
@@ -278,7 +296,7 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 	// Each clone holds its own node_modules or .venv; hundreds of decay runs fill a disk, so it goes even when scoring throws.
 	let filesChanged = 0;
 	let linesChanged = 0;
-	let check: { passed: boolean; failures: string[] } = { passed: false, failures: [] };
+	let check: CheckResult = { passed: false, failures: [], testsPassed: null, testsTotal: null };
 	try {
 		const change = changeSize(clone, task.base);
 		writeFileSync(join(dir, "change.diff"), change.diff);
@@ -287,7 +305,7 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 	} finally {
 		rmSync(clone, { recursive: true, force: true });
 	}
-	const { passed, failures } = check;
+	const { passed, failures, testsPassed, testsTotal } = check;
 	return {
 		at: new Date().toISOString(),
 		task: task.id,
@@ -298,6 +316,8 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 		error,
 		passed,
 		failures,
+		testsPassed,
+		testsTotal,
 		exitCode,
 		minutes: Number(minutes.toFixed(1)),
 		...price(sessions),
@@ -367,7 +387,8 @@ if (import.meta.main) {
 				if (!values["dry-run"] && done.has(`${arm.name}\t${task.id}\t${run}\t${values.model}`)) continue;
 				console.error(`${arm.name} ${task.id} run ${run}`);
 				const row = runOnce(task, arm, run, options, values["dry-run"]);
-				console.error(`  ${row.error ? `could not answer: ${row.error}` : row.passed ? "passed" : `failed ${row.failures.length} tests`}, $${row.cost.toFixed(2)}, ${row.minutes} min`);
+				const tests = row.testsTotal ? `, ${row.testsPassed}/${row.testsTotal} tests passed` : "";
+				console.error(`  ${row.error ? `could not answer: ${row.error}` : row.passed ? "passed" : `failed ${row.failures.length} tests`}${tests}, $${row.cost.toFixed(2)}, ${row.minutes} min`);
 				if (values["dry-run"]) dryRows.push(row);
 				else appendFileSync(resultsFile, `${JSON.stringify(row)}\n`);
 			}

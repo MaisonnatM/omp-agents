@@ -7,12 +7,14 @@
  *   under `tests/`, changes fewer than `--max-lines` lines outside `tests/`, and adds no migration.
  *   Picks run newest first, at most `--per-folder` per folder of the package until that runs short.
  * - The prompt is the ticket's title and description from `--tickets`, a JSON object keyed by ticket id that the
- *   calling session fills from Linear, since a script cannot reach it; a ticket missing there falls back to the pull
- *   request's title and its body's first section without code. A prompt that names a hidden test, a hidden file,
- *   or the pull request is dropped.
+ *   calling session fills from Linear, since a script cannot reach it, or the pull request's title for a ticket missing
+ *   there; then, under `## What the change did`, the pull request's description, so the prompt specifies what the
+ *   hidden tests check. The description loses its code blocks, images, checkboxes, and every line that names a hidden
+ *   test, a hidden file, or the pull request. A prompt that still names one is dropped.
  * - `--tickets-needed` prints the ticket ids of every kept pull request in pick order, to fill `--tickets` from.
- * - `--verify` keeps a task only when its check fails at the base with the hidden tests in place and passes at the
- *   merge commit, in one temporary clone, and stops at `--limit` verified tasks.
+ * - `--verify` runs the hidden test modules at the base with the hidden tests in place and at the merge commit, in one
+ *   temporary clone, and keeps as `testIds` only the tests that fail at the base and pass at the merge commit; the
+ *   check then runs only those. A task with none is dropped, and the run stops at `--limit` verified tasks.
  *
  * Usage:
  *   bun scripts/evals/pull-candidates.ts --repo ~/code/yampa --github yampa-ai/yampa [--tickets t.json] [--verify] > ~/.cache/omp-evalset/yampa-20.json
@@ -21,7 +23,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { type EvalTask, writeHiddenTests } from "./candidates";
+import { type EvalTask, passedTests, writeHiddenTests } from "./candidates";
 import { git, sh } from "./replay";
 
 export interface PullFile {
@@ -112,24 +114,38 @@ export function testNodeIds(path: string, source: string): string[] {
 	return ids;
 }
 
+type Hidden = { files: string[]; testIds: string[] };
+
 /**
- * A pull request's body cut to what a ticket would say: its first section, without code blocks, images,
- * HTML comments, or the review bot's summary, which describe the change rather than the need.
+ * What a merged pull request's description says the change did: its body without code blocks, images, HTML comments,
+ * checkboxes, or the review bot's markup, without any line that names a hidden test, a hidden file, or the pull
+ * request, and without the sections that leaves empty; headings go one level down to sit under the prompt's own.
  */
-export function ticketFromBody(title: string, body: string): string {
-	const text = body
-		.replace(/<!-- CURSOR_SUMMARY -->[\s\S]*?<!-- \/CURSOR_SUMMARY -->/g, "")
-		.replace(/<!--[\s\S]*?-->/g, "")
+export function changeSummary(body: string, hidden: Hidden, pr: number): string {
+	const lines = body
 		.replace(/```[\s\S]*?```/g, "")
-		.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
-	const first = text.split(/^#{1,6} .*$/m).map(part => part.trim()).find(Boolean) ?? "";
-	return `${title.replace(/\s*\(ENG-\d+\)\s*/i, " ").trim()}\n\n${first}`.trim();
+		.replace("<!-- CURSOR_SUMMARY -->", "## Review bot summary\n")
+		.replace(/<!--[\s\S]*?-->/g, "")
+		.replace(/<sup>[\s\S]*?<\/sup>/g, "")
+		.replace(/<img\b[^>]*>|!\[[^\]]*\]\([^)]*\)/g, "")
+		.split("\n")
+		.map(line => line.replace(/^>\s?/, "").trimEnd())
+		.filter(line => !/^\s*[-*] \[[ xX]\]|^\[!\w+\]$|^-{3,}$/.test(line) && leaks(line, hidden, pr).length === 0);
+	return lines
+		.join("\n")
+		.split(/^(?=#{1,6} )/m)
+		.filter(section => section.replace(/^#{1,6} .*/, "").trim())
+		.join("")
+		.replace(/^(#{1,5}) /gm, "#$1 ")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
 }
 
-/** The prompt a run gets: the ticket, with Linear's mention tags cut to their labels, and what to do with it. */
-export function ticketPrompt(ticket: string, text: string): string {
+/** The prompt a run gets: what to do, the ticket with Linear's mention tags cut to their labels, then what the change did. */
+export function ticketPrompt(ticket: string, text: string, change: string): string {
 	const body = text.replace(/<[\w-]+\b[^>]*\blabel="([^"]*)"[^>]*\/>/g, "$1").trim();
-	return `Do Linear ticket ${ticket} in the repository in the current directory: change the code and add or update its tests. You cannot reach Linear or GitHub.\n\n${body}\n`;
+	const done = change ? `\n\n## What the change did\n\n${change}` : "";
+	return `Do Linear ticket ${ticket} in the repository in the current directory: change the code and add or update its tests. You cannot reach Linear or GitHub.\n\n${body}${done}\n`;
 }
 
 /** What in a prompt gives away the solution: a hidden test's name, a hidden file's path, the pull request, or a diff. */
@@ -173,20 +189,23 @@ function spawnText(command: string[], cwd: string): string {
 
 const VERIFY_TIMEOUT_MS = 900_000;
 
-/** Whether the check fails at the base with the hidden tests in place and passes at the merge commit. */
-function verify(repo: string, task: EvalTask, clone: string): { ok: boolean; why: string } {
-	const at = (rev: string) => {
+const quote = (arg: string) => `'${arg.replaceAll("'", `'\\''`)}'`;
+
+/** The hidden tests that fail at the base with the hidden tests in place and pass at the merge commit, by pytest node id. */
+function failToPass(repo: string, task: EvalTask, clone: string): string[] {
+	const passedAt = (rev: string) => {
 		git(clone, "fetch", "--quiet", "--no-tags", repo, rev);
 		git(clone, "checkout", "--force", "--quiet", "--detach", rev);
 		// The virtual environment stays, so each check only syncs what changed.
 		git(clone, "clean", "-fdxq", "-e", ".venv");
+		if (rev === task.base) writeHiddenTests(repo, task, clone);
+		const { output } = sh(task.check, clone, {}, VERIFY_TIMEOUT_MS);
+		// A run that never reached pytest's last line, such as on a failed sync, would count every test as failing.
+		if (!/\b(passed|failed|errors?|no tests ran)\b.* in [\d.]+s/.test(output)) throw new Error(`${task.id}: pytest did not finish at ${rev}: ${output.slice(-400)}`);
+		return passedTests(output);
 	};
-	at(task.base);
-	writeHiddenTests(repo, task, clone);
-	if (sh(task.check, clone, {}, VERIFY_TIMEOUT_MS).ok) return { ok: false, why: "check already passes at the base" };
-	at(task.landed);
-	const landed = sh(task.check, clone, {}, VERIFY_TIMEOUT_MS);
-	return landed.ok ? { ok: true, why: "" } : { ok: false, why: `check fails at the merge commit: ${landed.output.slice(-400)}` };
+	const atBase = passedAt(task.base);
+	return [...passedAt(task.landed)].filter(id => !atBase.has(id));
 }
 
 if (import.meta.main) {
@@ -209,9 +228,11 @@ if (import.meta.main) {
 	const repo = resolve(values.repo);
 	// The main checkout's compose file starts its database container or leaves it running; a clone's own compose
 	// file can differ at an old base and recreate the container. TEST_GROUP gives the run its own test database.
+	// `-rfEp` lists each test's outcome by node id, which `--verify` and a run's share read; a module that fails to
+	// import at the base must not stop the others.
 	const check =
 		values.check ??
-		`docker compose -f ${join(repo, "compose.yml")} up -d db >/dev/null && touch envs/local.env envs/shared-secrets.env && TEST_GROUP=evals DB_HOST=localhost uv run --quiet --group dev pytest -p no:cacheprovider -q {files}`;
+		`docker compose -f ${join(repo, "compose.yml")} up -d db >/dev/null && touch envs/local.env envs/shared-secrets.env && TEST_GROUP=evals DB_HOST=localhost uv run --quiet --group dev pytest -p no:cacheprovider -q -rfEp --continue-on-collection-errors {tests}`;
 	const tickets: Record<string, { title: string; description: string }> = values.tickets ? JSON.parse(readFileSync(values.tickets, "utf8")) : {};
 
 	type Raw = { number: number; title: string; body: string | null; head: { ref: string }; merged_at: string | null; merge_commit_sha: string };
@@ -254,15 +275,17 @@ if (import.meta.main) {
 			const hiddenTests = changed.filter(file => isTest(file.filename) && file.status !== "removed").map(file => file.filename);
 			const testIds = hiddenTests.flatMap(file => testNodeIds(file, spawnText(["git", "show", `${pull.mergeCommit}:${file}`], repo)));
 			const testFiles = hiddenTests.filter(file => testIds.some(id => id.startsWith(`${file}::`)));
+			const hidden = { files: hiddenTests, testIds };
 			const known = tickets[ticket];
-			const prompt = ticketPrompt(ticket, known ? `${known.title}\n\n${known.description}` : ticketFromBody(pull.title, pull.body));
-			const leaked = leaks(prompt, { files: hiddenTests, testIds }, pull.number);
+			const text = known ? `${known.title}\n\n${known.description}` : pull.title.replace(/\s*\(ENG-\d+\)\s*/i, " ").trim();
+			const prompt = ticketPrompt(ticket, text, changeSummary(pull.body, hidden, pull.number));
+			const leaked = leaks(prompt, hidden, pull.number);
 			const id = `pr-${pull.number}`;
 			if (testFiles.length === 0 || leaked.length > 0) {
 				console.error(`drop ${id}: ${testFiles.length === 0 ? "its test changes hold no test" : `the prompt names ${leaked.join(", ")}`}`);
 				continue;
 			}
-			if (!known) console.error(`${id}: ${ticket} is not in --tickets, so the prompt comes from the pull request's body`);
+			if (!known) console.error(`${id}: ${ticket} is not in --tickets, so the prompt holds only the pull request's title and description`);
 			const task: EvalTask = {
 				id,
 				repo,
@@ -272,14 +295,15 @@ if (import.meta.main) {
 				prompt,
 				hiddenTests,
 				testIds,
-				check: check.replace("{files}", testFiles.join(" ")),
+				check: check.replace("{tests}", testFiles.join(" ")),
 			};
-			if (values.verify) {
-				const { ok, why } = verify(repo, task, clone);
-				console.error(`${ok ? "keep" : "drop"} ${id}${why ? `: ${why}` : ""}`);
-				if (!ok) continue;
+			if (!values.verify) {
+				picked.push(task);
+				continue;
 			}
-			picked.push(task);
+			const ids = failToPass(repo, task, clone);
+			console.error(`${ids.length > 0 ? "keep" : "drop"} ${id}: ${ids.length} tests fail at the base and pass at the merge commit`);
+			if (ids.length > 0) picked.push({ ...task, testIds: ids, check: check.replace("{tests}", ids.map(quote).join(" ")) });
 		}
 	} finally {
 		rmSync(join(clone, ".."), { recursive: true, force: true });
