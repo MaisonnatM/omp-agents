@@ -57,6 +57,11 @@ export interface AgentRow {
 	/** Whether the dashboard can message it: a writable terminal room and an agent that is not aborted, or a running subagent of a session this dashboard started. */
 	canMessage: boolean;
 	queue: MessageQueue;
+	/**
+	 * An eval run that `scripts/evals/run.ts` started from the session as its own omp, which the dashboard lists and opens
+	 * but cannot stop or message, and which the session does not wait on.
+	 */
+	evalRun?: true;
 }
 
 export const SHIP_STAGES = ["ticket", "plan", "implement", "draft_pr", "interface_review", "thermonuclear", "ready_gate", "live", "merged"] as const;
@@ -185,9 +190,9 @@ export type RosterHost = RosterHostBase &
 		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null; compaction: CompactionState; advisor: AdvisorState | null; goal: GoalSlot; private: boolean }
 	);
 
-/** Whether `host`'s main agent only waits on a subagent that still runs: its turn ended, or sits only in `wait` or `task` calls. */
+/** Whether `host`'s main agent only waits on a subagent that still runs: its turn ended, or sits only in `wait` or `task` calls. An eval run is never waited on. */
 export const awaitsSubagents = (host: Pick<RosterHost, "status" | "turnWaits" | "agents">): boolean =>
-	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running");
+	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running" && !agent.evalRun);
 
 /**
  * Whether `host`'s turn ended to wait on a scheduled check, so it needs nothing from you until the check wakes it; once

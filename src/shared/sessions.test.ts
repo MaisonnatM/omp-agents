@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test";
-import { parseNewSessionRequest } from "./sessions";
+import { type AgentRow, awaitsSubagents, EMPTY_QUEUE, parseNewSessionRequest } from "./sessions";
+
+test("an idle session waits on a running subagent, but never on a running eval run", () => {
+	const agent: AgentRow = { id: "Scout", kind: "scout", parentId: null, status: "running", activity: null, model: null, startedAt: 1, endedAt: null, canMessage: true, queue: EMPTY_QUEUE };
+	const evalRun: AgentRow = { ...agent, id: "tab-history.1", kind: "eval run", canMessage: false, evalRun: true };
+	expect(awaitsSubagents({ status: "idle", turnWaits: false, agents: [agent, evalRun] })).toBe(true);
+	expect(awaitsSubagents({ status: "idle", turnWaits: false, agents: [evalRun] })).toBe(false);
+});
 
 test("a private start parses alone and is refused with a todo, a project, a task, or a review draft, which would outlive it", () => {
 	const start = { kind: "new", cwd: "/work", prompt: "Plan dinner" };

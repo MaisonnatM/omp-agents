@@ -122,3 +122,12 @@ The band treats runs as independent and ignores that both arms ran the same task
 The estimate is (1 + extensions + skills) × tasks × `--runs` runs, less those already recorded, times the mean cost of a scored run of `--model`.
 That mean comes from the set's own past runs when it has any, else from every past run of the model in `~/.cache/omp-evals*/results.jsonl` and one folder below, and the plan says which.
 The ceiling is the same run count times `--max-cost`, each run's cost cap.
+
+## Runs in the dashboard
+
+A run started from an omp session, which sets `PI_SESSION_FILE` in the runner's environment, records itself as `<artifacts>/eval-runs/<id>.json` beside that session's transcript (`writeEvalRun` in `src/eval-runs.ts`), before the confined omp starts and again once the run is scored.
+The record holds the task, arm, run, model, the task prompt's first line, the runner's pid, the run's `--session-dir`, its start, and once scored its end, its outcome line, and whether its model could not answer.
+The id is `<task>.<run>`, after `<arm>.` for an arm other than the full harness, so a `--jobs` child process records its runs beside its parent's.
+The dashboard reads the records of each live session's main agent and subagents on every registry listing, after its synchronous bookkeeping and dropping a read that a later one overtook, and lists each run as a subagent of the one that started it, as `<subagent>/<id>` under a subagent, so two starters' runs of one task stay apart: running while the runner's pid lives at the read, idle once scored, aborted when its model could not answer or the runner exited before scoring it.
+Opening the run opens the newest session file in its `--session-dir`; it cannot be messaged or stopped from the dashboard, and the session never waits on it.
+`--dry-run` records nothing, and a run started outside omp records nothing.

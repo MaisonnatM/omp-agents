@@ -129,7 +129,7 @@ function SubagentRow({ agent, depth, links, lead }: { agent: AgentRow; depth: nu
 					</span>
 				</a>
 			</Tooltip>
-			{links.onCancel && <CancelAgentButton view={view} onCancel={links.onCancel} running={agent.status === "running"} />}
+			{links.onCancel && !agent.evalRun && <CancelAgentButton view={view} onCancel={links.onCancel} running={agent.status === "running"} />}
 		</li>
 	);
 }

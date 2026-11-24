@@ -253,7 +253,7 @@ export class Dashboard {
 		const { placement } = files.facts;
 		const { factsOf } = files;
 		const pathFor = (view: View): string | null =>
-			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
+			view.kind === "past" ? files.pathOf(view.sessionId) : sessions.transcriptPath(view.instanceId, view.agentId, files.pathOf);
 		const views = (this.#views = new Views(
 			pathFor,
 			(topic, msg) => void this.#publisher?.publish(topic, JSON.stringify(msg)),
@@ -397,7 +397,7 @@ export class Dashboard {
 			activity: () => files.activity(),
 			serverCwd: process.cwd(),
 			mergedPullRequests,
-			live: () => occupants.snapshot(sessions.rows(factsOf), (host, agentId) => sessions.get(host.instanceId)?.transcriptPath(agentId, files.pathOf) ?? null),
+			live: () => occupants.snapshot(sessions.rows(factsOf), (host, agentId) => sessions.transcriptPath(host.instanceId, agentId, files.pathOf)),
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
 		this.#processWatch = new SessionProcessWatch({
@@ -1054,6 +1054,8 @@ export class Dashboard {
 		const joinedOrLeft = this.#sessions.follow(hosts);
 		// Only a listing that worked knows which terminal sessions still run.
 		if (this.#rosterError === null) this.#sessions.restoreListedUnread(hosts, this.#files.pathOf);
+		// Every listing reads the eval runs again, so their rows follow the harness that records them.
+		await this.#sessions.refreshEvalRuns(this.#files.pathOf);
 		// A terminal session that asked to end before the registry listed it.
 		void this.#endInbox.drain();
 		// Every listing can change a host's row or the registry error; only a session that joins or leaves changes the past list.
