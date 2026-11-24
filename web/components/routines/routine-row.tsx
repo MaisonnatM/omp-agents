@@ -19,6 +19,7 @@ import {
 	runWords,
 	scheduledRunAt,
 	schedulesWords,
+	spentWords,
 	taskWords,
 } from "../../routines-model";
 import { useAction } from "../../use-action";
@@ -148,6 +149,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 	const here = runsHere(routine);
 	const latest = runs[0];
 	const picked = runs.find(({ at }) => at === pickedAt) ?? latest;
+	const spent = spentWords(runs);
 	const health = latest && runHealth(latest);
 	// A run the server holds queued, sending, or running takes no second Run now: it would claim another run beside it.
 	const running = runNow.pending || health === "running" || health === "waiting";
@@ -239,6 +241,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 						<TaskIcon task={task} className="size-3.5 shrink-0" />
 						<span className="min-w-0 truncate">{taskWords(task)}</span>
 					</p>
+					{spent && <span className="shrink-0 tabular-nums">{spent}</span>}
 					<RunStrip
 						runs={runs}
 						picked={open ? (picked ?? null) : null}

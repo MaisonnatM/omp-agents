@@ -11,6 +11,7 @@ import {
 	type RoutineRun,
 	type RoutineSpec,
 	type RoutineTask,
+	type RunUsage,
 	type Schedule,
 	type TriggerKind,
 	type Weekday,
@@ -247,6 +248,21 @@ export function runSlots(runs: readonly RoutineRun[]): (RoutineRun | null)[] {
 export function runDuration({ outcome }: RoutineRun): number | null {
 	if (outcome.kind !== "command" || outcome.run.phase === "running") return null;
 	return outcome.run.endedAt - outcome.run.startedAt;
+}
+
+/** Dollars as the page shows a cost: cents under $10, whole dollars above, and `<$0.01` for a cost under a cent. */
+const dollars = (cost: number): string => (cost > 0 && cost < 0.005 ? "<$0.01" : `$${cost.toFixed(cost < 10 ? 2 : 0)}`);
+
+/** What a run's Bot turn spent, such as `12.3k tokens · $0.04`. */
+export const usageWords = ({ tokens, cost }: RunUsage): string =>
+	`${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(tokens).toLowerCase()} tokens · ${dollars(cost)}`;
+
+/** What the kept runs with a known usage spent together, such as `$0.31 over 8 runs`, or `null` when none has one. */
+export function spentWords(runs: readonly RoutineRun[]): string | null {
+	const priced = runs.filter(run => run.usage !== undefined);
+	if (priced.length === 0) return null;
+	const cost = priced.reduce((sum, run) => sum + (run.usage?.cost ?? 0), 0);
+	return `${dollars(cost)} over ${priced.length === 1 ? "1 run" : `${priced.length} runs`}`;
 }
 
 export type EveryUnit = "minutes" | "hours" | "days";

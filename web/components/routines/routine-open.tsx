@@ -26,6 +26,7 @@ import {
 	TRIGGER_WORDS,
 	WEEK,
 	withCadence,
+	usageWords,
 } from "../../routines-model";
 import { useDashboardActions } from "../dashboard-context";
 import { FIELD } from "../form-field";
@@ -112,6 +113,7 @@ function RunReport({ run, latest, routine, botName, now }: { run: RoutineRun | u
 				)}
 				<span className="text-muted-foreground tabular-nums">{pastRunWords(run.at, now)}</span>
 				{duration !== null && <span className="text-muted-foreground tabular-nums">took {durationWords(duration)}</span>}
+				{run.usage && <span className="text-muted-foreground tabular-nums">{usageWords(run.usage)}</span>}
 			</p>
 			{run.triggeredBy.length > 0 && <TriggeredBy events={run.triggeredBy} />}
 			{output.trim() !== "" && <CommandOutput output={output} />}

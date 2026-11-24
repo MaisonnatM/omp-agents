@@ -42,7 +42,7 @@ const sent = (hoursAgo: number): RoutineRun => ({ at: NOW - hoursAgo * HOUR, out
 const usual = (): RoutineRun[] => [2, 3, 4, 5, 6].map(hoursAgo => command(hoursAgo));
 
 const noTurn: TurnOf = () => null;
-const turn = (fields: Partial<RunTurn> = {}): TurnOf => () => ({ replied: true, quiet: false, failed: false, ms: 5 * MINUTE, ...fields });
+const turn = (fields: Partial<RunTurn> = {}): TurnOf => () => ({ replied: true, quiet: false, failed: false, ms: 5 * MINUTE, usage: { tokens: 0, cost: 0 }, ...fields });
 
 describe("earlyRuns", () => {
 	test("routines whose runs exited 0, on time, and as long as usual find nothing", () => {
@@ -121,17 +121,17 @@ describe("routineTurn", () => {
 	test("reads the reply, quiet, and failure of the turn after the run's prompt, up to the next prompt", () => {
 		const path = write([
 			line("user", prompt("r1"), "2026-05-02T09:00:00.000Z"),
-			line("assistant", [{ type: "text", text: "Three new emails." }], "2026-05-02T09:04:00.000Z"),
+			JSON.stringify({ type: "message", timestamp: "2026-05-02T09:04:00.000Z", message: { role: "assistant", content: [{ type: "text", text: "Three new emails." }], usage: { input: 1000, output: 200, cacheRead: 3000, cacheWrite: 0, cost: { total: 0.012 } } } }),
 			line("user", "Thanks, archive them.", "2026-05-02T09:10:00.000Z"),
 			line("assistant", [{ type: "toolCall", name: "bash", arguments: {} }], "2026-05-02T09:11:00.000Z"),
 		]);
-		expect(routineTurn(path, "r1", at)).toEqual({ replied: true, quiet: false, failed: false, ms: 4 * MINUTE });
+		expect(routineTurn(path, "r1", at)).toEqual({ replied: true, quiet: false, failed: false, ms: 4 * MINUTE, usage: { tokens: 4200, cost: 0.012 } });
 		expect(routineTurn(path, "r2", at)).toBeNull();
 	});
 
 	test("a turn that ended on tool calls alone has no reply", () => {
 		const path = write([line("user", prompt("r1"), "2026-05-02T09:00:00.000Z"), line("assistant", [{ type: "toolCall", name: "bash", arguments: {} }], "2026-05-02T09:00:30.000Z")]);
-		expect(routineTurn(path, "r1", at)).toEqual({ replied: false, quiet: false, failed: false, ms: 30_000 });
+		expect(routineTurn(path, "r1", at)).toEqual({ replied: false, quiet: false, failed: false, ms: 30_000, usage: { tokens: 0, cost: 0 } });
 		expect(routineTurn(join(tmpdir(), "omp-agents-health-missing.jsonl"), "r1", at)).toBeNull();
 	});
 });

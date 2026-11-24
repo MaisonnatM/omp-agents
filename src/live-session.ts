@@ -1,5 +1,6 @@
 /** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
-import { isObject } from "./json";
+import { isObject, num } from "./json";
+import type { RunUsage } from "./routines";
 import type { HostSnapshot } from "./omp/collab";
 import { type TurnFailure, turnFailureOf } from "./omp/turn-failure";
 import type { RunTurn } from "./routine-health";
@@ -51,6 +52,19 @@ const offered = (reply: { suggestions: string[] } | null): { suggestions?: strin
 const stayedQuiet = (messages: unknown): boolean =>
 	Array.isArray(messages) &&
 	messages.some(message => isObject(message) && message.role === "assistant" && Array.isArray(message.content) && message.content.some(block => isObject(block) && block.type === "toolCall" && block.name === STAY_QUIET_TOOL));
+
+/** What the assistant messages among `messages` spent, from each one's `usage`. */
+function usageOf(messages: unknown[]): RunUsage {
+	let tokens = 0;
+	let cost = 0;
+	for (const message of messages) {
+		if (!isObject(message) || message.role !== "assistant" || !isObject(message.usage)) continue;
+		const { usage } = message;
+		for (const key of ["input", "output", "cacheRead", "cacheWrite"]) tokens += num(usage[key]) ?? 0;
+		cost += (isObject(usage.cost) ? num(usage.cost.total) : undefined) ?? 0;
+	}
+	return { tokens, cost };
+}
 
 /**
  * What a main-agent live event does to its turn, which both transports report: `agent_start` starts one, and an
@@ -127,7 +141,7 @@ export function routineTurn(sessionFile: string, routineId: string, at: number):
 			const promptedAt = entryTime(entry);
 			if (sent?.routine.id === routineId && sent.at === at && promptedAt !== null) {
 				const messages = newestFirst.toReversed();
-				return { replied: lastReply(messages) !== null, quiet: stayedQuiet(messages), failed: turnFailureOf(messages) !== null, ms: (lastAt ?? promptedAt) - promptedAt };
+				return { replied: lastReply(messages) !== null, quiet: stayedQuiet(messages), failed: turnFailureOf(messages) !== null, ms: (lastAt ?? promptedAt) - promptedAt, usage: usageOf(messages) };
 			}
 			newestFirst.length = 0;
 			lastAt = null;

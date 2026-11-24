@@ -2,7 +2,7 @@
  * The routines' daily heartbeat: which recent runs exited early. A run errored, its Bot's turn ended with no reply, it
  * ended far shorter than the routine's usual run, or it missed its schedule.
  */
-import { nextDueAt, type Routine, type RoutineRun, runsHere } from "./routines";
+import { nextDueAt, type Routine, type RoutineRun, type RunUsage, runsHere } from "./routines";
 import type { BotId } from "./shared/bots";
 import { DAY_MS } from "./shared/days";
 
@@ -39,6 +39,8 @@ export interface RunTurn {
 	quiet: boolean;
 	failed: boolean;
 	ms: number;
+	/** What the turn spent. */
+	usage: RunUsage;
 }
 
 /** The turn of routine `routineId`'s run at `at` in conversation `sessionId`, or `null` when it is not found. */

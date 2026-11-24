@@ -1,5 +1,5 @@
 /** The rules of routines: when one is due, how a change edits the list, and which routine the page and `routines.json` may hold. */
-import { fields, isNonEmpty, isObject, isSafeInteger, isString, nullable, oneOf, parseAll, type Parsed } from "./json";
+import { fields, isNonEmpty, isNumber, isObject, isSafeInteger, isString, nullable, oneOf, parseAll, type Parsed } from "./json";
 import { type BotId, parseBotId } from "./shared/bots";
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -78,7 +78,17 @@ export interface RoutineRun {
 	errors: string[];
 	/** What the routine's triggers saw that started this run; empty for a run a schedule or **Run now** started. */
 	triggeredBy: TriggerEvent[];
+	/** What the Bot's turn that answered a prompt run spent, once that turn ended; left out before then and for a command run. */
+	usage?: RunUsage;
 }
+
+/** What a Bot's turn spent: its tokens, input, output, and cache together, and its cost in dollars as the provider priced it. */
+export interface RunUsage {
+	tokens: number;
+	cost: number;
+}
+
+export const isRunUsage = fields<RunUsage>({ tokens: isNumber, cost: isNumber });
 
 /** A Bot's routine: on its schedules, or when its triggers see something happen, a run sends a prompt into the Bot's conversation or runs a command in its workspace. */
 export interface Routine {

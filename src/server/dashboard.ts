@@ -894,6 +894,8 @@ export class Dashboard {
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
 				this.#broadcasts.rosterChanged();
 				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
+				const turnSessionId = this.#sessions.get(instanceId)?.sessionId;
+				if (turnSessionId) this.#recordRunUsage(turnSessionId);
 				return;
 			}
 			default: {
@@ -901,6 +903,23 @@ export class Dashboard {
 				return unhandled;
 			}
 		}
+	}
+
+	/** Records what the Bot's turn spent on each prompt run sent into conversation `sessionId` whose usage is not recorded yet, once that turn ended. */
+	#recordRunUsage(sessionId: string): void {
+		const path = this.#files.pathOf(sessionId);
+		if (path === null) return;
+		let changed = false;
+		for (const routine of this.#routines.value) {
+			for (const run of routine.runs) {
+				if (run.usage || run.outcome.kind !== "sent" || run.outcome.sessionId !== sessionId) continue;
+				const turn = routineTurn(path, routine.id, run.at);
+				if (!turn) continue;
+				this.#routines.usage(routine.id, run.at, turn.usage);
+				changed = true;
+			}
+		}
+		if (changed) this.#broadcasts.pushList("routines");
 	}
 
 	/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
