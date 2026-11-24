@@ -72,7 +72,10 @@
 - Once a day, and as it starts, the dashboard that runs the routines checks the runs of the last day and raises one notification, under **Routines** in [Notifications](notifications.md), for the runs that exited early.
   A run exited early when it errored, its Bot's turn ended with no reply and without staying quiet, it took less than a quarter of the routine's usual time, or it started an hour or more after its schedule said.
   A routine whose next run is an hour or more overdue counts as missing its schedule too.
-- The dashboard adds one routine of its own, **Weekly harness review**, once, with a Bot named **Harness review** that works in the omp-agents checkout.
+- The dashboard adds two routines of its own, each once, each paused until you turn it on, and each with a Bot that works in the omp-agents checkout.
+- **Friday routine receipt**, with a Bot named **Routine receipt**, runs on Fridays at 17:00 once on.
+  It reads the week's runs and their cost from `routines.json` and replies with one table: each routine's runs, useful runs (not quiet, skipped, or failed), tokens, cost, and a verdict to keep it, slow it down, or retire it. It changes no routine.
+- **Weekly harness review**, with a Bot named **Harness review**.
   It is paused; turn it on to run it on Mondays at 9:00.
   Each run first says whether last week's proposed change fixed the failures it named, from the replay of them you ran once that change landed, or says in one line that the replay was never run.
   It then reads the last week of `ship-trace.jsonl` beside the access token, for every repository, `LEARNINGS.md`, the failed merges, and the failed routine runs.
