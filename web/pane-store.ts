@@ -220,8 +220,8 @@ export const useShownConversations = (): View[] => useSyncExternalStore(shownCon
 /** What the server answered `view`'s composer: its last `complete` and its last `dequeue`. */
 export const useComposerData = (view: View): ComposerData => usePaneSelect(view, composerOf, sameComposer);
 
-/** What the last turn of `view`'s transcript suggests sending next, as {@link nextSuggestions} reads it. */
-export function useNextSuggestions(view: View, working: boolean): string[] {
+/** What the last turn of `view`'s transcript suggests sending next, as {@link nextSuggestions} reads it; none without a view. */
+export function useNextSuggestions(view: View | null, working: boolean): string[] {
 	const select = useMemo(() => (pane: PaneData) => nextSuggestions(pane.items, working), [working]);
 	return usePaneSelect(view, select, sameElements);
 }

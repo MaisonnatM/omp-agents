@@ -17,7 +17,8 @@ It is a page of its own, not a list of sessions: the **Sessions** sidebar still 
   - "finished" and the first line of its reply, when it ends a turn you did not see.
 - A turn you watched end, or one that found nothing for you, posts nothing; neither does a Bot's conversation, whose routine runs would bury the rest.
 - To answer, open the session from the sessions list; a reply in its thread reaches it too, as the next section says.
-- When a thread's last message is an agent's that ends on suggested prompts, such as a session's "finished" post, the reply box lists them under it, as a session's composer does: click one, or press its number, to send it in the thread.
+- When a thread's last message is an agent's that ends on suggested prompts, such as a session's "finished" post or a Bot's answer, the reply box lists them under it, as a session's composer does: click one, or press its number, to send it in the thread.
+  A session or Bot woken by a Board message is asked to end its answer that way whenever it leaves you a next step.
 
 ## Threads and tasks
 

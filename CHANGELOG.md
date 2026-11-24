@@ -6,6 +6,8 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-24
 
 - A routine that sends a message can now start a new conversation on each run: check New conversation each run in the routine's editor. When the Bot is busy, the run's message joins the current conversation as before.
+- A Bot or session that answers you in a Board thread now ends its post on suggested prompts when it leaves you a next step, so the reply box offers them as it does under a session's "finished" post.
+- A Bot whose conversation stopped still offers the prompts its last reply suggested under its composer.
 - Settings › Sync can now carry your Board projects between machines: each project's name, goal, decisions, archive, and plan steps with their state arrive on every machine, while its sessions and messages stay where they happened.
 
 ## 2026-11-23
