@@ -246,7 +246,8 @@ export class Dashboard {
 		const scheduledCheck = (sessionId: string): ScheduledCheck | null => {
 			const at = nextSendTo(scheduled.value, sessionId);
 			if (at !== null) return { kind: "send", at };
-			return prWatchesFile.value.some(watch => watch.sessionId === sessionId) ? { kind: "pull-request" } : null;
+			const prs = prWatchesFile.value.filter(watch => watch.sessionId === sessionId).map(watch => ({ pr: watch.pr, checks: watch.seen?.checks ?? null }));
+			return prs.length > 0 ? { kind: "pull-request", prs } : null;
 		};
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update), undefined, undefined, scheduledCheck));
 		const { placement } = files.facts;
@@ -273,6 +274,8 @@ export class Dashboard {
 					const agent = agentOn(sessions.rows(factsOf));
 					this.#triggerWatch.learn(pullRequestSightings(list, agent));
 					this.#prWatches.learn(list);
+					// A row shows its watched pull requests' checks, which this list may have changed.
+					this.#broadcasts.pushRoster();
 					return { list, agent };
 				},
 				slack: async () => {

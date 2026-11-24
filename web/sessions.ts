@@ -1,6 +1,6 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
 import type { Project } from "../src/shared/projects";
-import { awaitsScheduled, awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
+import { awaitsCi, awaitsScheduled, awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import { inAppData, inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
 import { needsYou } from "./attention";
@@ -102,7 +102,7 @@ export interface SidebarSessions {
 	running: RosterHost[];
 	/** Live sessions that finished their turn: the blue dot. */
 	idle: RosterHost[];
-	/** Live sessions that wait on work under way: subagents that still run while the main agent's turn has ended or only waits on them, or a scheduled check. */
+	/** Live sessions that wait on work under way: subagents that still run while the main agent's turn has ended or only waits on them, or a scheduled check; those waiting on CI come last. */
 	awaitingWork: RosterHost[];
 	interrupted: PastSession[];
 	ended: PastSession[];
@@ -144,6 +144,7 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], worksp
 			past: shownPast.filter(isPinned).toSorted((a, b) => Number(b.interrupted) - Number(a.interrupted)),
 		},
 		...live,
+		awaitingWork: live.awaitingWork.toSorted((a, b) => Number(awaitsCi(a)) - Number(awaitsCi(b))),
 		interrupted: shownPast.filter(session => session.interrupted && !isPinned(session)),
 		ended: shownPast.filter(session => !session.interrupted && !isPinned(session)),
 	};
@@ -274,7 +275,7 @@ export function projectGroups(lists: SidebarSessions, projects: readonly Project
 	};
 }
 
-/** Every row of the sessions tab in its order, which the previous and next session keys walk: each project's, pinned, then each workspace's, then the ended ones. */
+/** Every row of the sessions tab in its order, which the previous and next session keys walk: each project's, pinned, then each workspace's, its Waiting on CI group last, then the ended ones. */
 export function listedViews(lists: SidebarSessions, projects: readonly ProjectGroup[], groups: readonly WorkspaceGroup[]): View[] {
 	const { pinned, ended } = lists;
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
@@ -283,7 +284,7 @@ export function listedViews(lists: SidebarSessions, projects: readonly ProjectGr
 		...projects.flatMap(group => [...live(group.hosts), ...saved(group.past)]),
 		...live(pinned.hosts),
 		...saved(pinned.past),
-		...groups.flatMap(group => [...live(group.hosts), ...saved(group.interrupted)]),
+		...groups.flatMap(group => [...live(group.hosts.filter(host => !awaitsCi(host))), ...saved(group.interrupted), ...live(group.hosts.filter(awaitsCi))]),
 		...saved(ended),
 	];
 }

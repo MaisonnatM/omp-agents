@@ -1,7 +1,8 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { IconCalendarClock, IconFlag1, IconFolderDelete, IconLayoutColumn, IconPause } from "central-icons";
+import { IconCalendarClock, IconClock, IconFlag1, IconFolderDelete, IconLayoutColumn, IconPause } from "central-icons";
 import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
-import { awaitsScheduled, awaitsSubagents, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
+import { pullRequestUrl } from "../../src/shared/github";
+import { awaitsCi, awaitsScheduled, awaitsSubagents, type PastSession, type RosterHost, type View, type WatchedChecks } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -17,6 +18,7 @@ import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
 import { OpenProjectsContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Spinner } from "./spinner";
+import { ChecksIcon } from "./pull-requests/pr-row";
 import { type RowStatus, StatusDot, statusLabel } from "./status-dot";
 
 /** The muted facts after a session's name: the parts that apply. */
@@ -258,9 +260,27 @@ export const PastRow = memo(function PastRow({ session, pinned, placement, showW
 function HostStatus({ host, status }: { host: RosterHost; status: RowStatus }) {
 	const ending = useDashboardStatus().ending.has(host.instanceId);
 	if (ending) return <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><Spinner className="size-3" /></span>;
-	// A session waiting on a scheduled check is not done, so it shows the clock it waits on instead of the idle dot.
-	if (status === "awaiting-scheduled") return <IconCalendarClock aria-hidden={false} aria-label={statusLabel(status)} className="size-3 shrink-0 text-muted-foreground" />;
+	// A session waiting on a scheduled send is not done, so it shows the clock it waits on instead of the idle dot; one waiting on CI shows its pull requests under its row instead.
+	if (status === "awaiting-scheduled" && host.scheduledCheck?.kind === "send") return <IconCalendarClock aria-hidden={false} aria-label={statusLabel(status)} className="size-3 shrink-0 text-muted-foreground" />;
 	return <StatusDot status={status} />;
+}
+
+const CHECKS_WORDS: Record<NonNullable<WatchedChecks["checks"]>, string> = { pending: "running", failing: "failing", passing: "passing", none: "no checks" };
+
+/** A pull request a session in Waiting on CI watches, under its row: how its checks stand, and a link to it on GitHub. */
+function WatchedPullRequest({ pr, checks }: WatchedChecks) {
+	return (
+		<a
+			href={pullRequestUrl(pr)}
+			target="_blank"
+			rel="noreferrer"
+			className="flex h-5 items-center gap-1.5 rounded-md pr-2 pl-5 text-xs tabular-nums text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+		>
+			{checks === null ? <IconClock aria-hidden={false} aria-label="Not listed yet" className="size-3 shrink-0" /> : <ChecksIcon checks={checks} />}
+			<span className="truncate">{`${pr.repo} #${pr.number}`}</span>
+			<span className="ml-auto shrink-0">{checks === null ? "waiting" : CHECKS_WORDS[checks]}</span>
+		</a>
+	);
 }
 
 /** A running session's row, with its status dot, and End session where the server controls it. */
@@ -275,26 +295,29 @@ export const HostRow = memo(function HostRow({ session: host, pinned, placement,
 	const workspace = showWorkspace && (host.sessionName !== null || workspaceCwd(host) !== host.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null;
 	return (
 		<RowMenu entry={{ kind: "live", host }} onScreen={placement !== "hidden"} pinned={pinned} onTogglePin={onTogglePin}>
-			<SessionButton
-				view={view}
-				label={label}
-				title={`${statusLabel(status)}${scheduledAt}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}${isPrivate ? `\n${PRIVATE_NOTE}` : ""}`}
-				badge={
-					isPrivate ? (
-						<span className="flex items-center gap-1.5">
-							<PrivateChip />
-							{workspace}
-						</span>
-					) : (
-						workspace
-					)
-				}
-				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline"])}
-				when={host.startedAt}
-				dot={<HostStatus host={host} status={status} />}
-				placement={placement}
-				onOpen={onOpen}
-			/>
+			<>
+				<SessionButton
+					view={view}
+					label={label}
+					title={`${statusLabel(status)}${scheduledAt}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}${isPrivate ? `\n${PRIVATE_NOTE}` : ""}`}
+					badge={
+						isPrivate ? (
+							<span className="flex items-center gap-1.5">
+								<PrivateChip />
+								{workspace}
+							</span>
+						) : (
+							workspace
+						)
+					}
+					facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline"])}
+					when={host.startedAt}
+					dot={<HostStatus host={host} status={status} />}
+					placement={placement}
+					onOpen={onOpen}
+				/>
+				{awaitsCi(host) && host.scheduledCheck?.kind === "pull-request" && host.scheduledCheck.prs.map(watched => <WatchedPullRequest key={`${watched.pr.owner}/${watched.pr.repo}#${watched.pr.number}`} {...watched} />)}
+			</>
 		</RowMenu>
 	);
 });

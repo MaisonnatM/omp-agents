@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
+- Sessions waiting on a pull request's checks now sit in their own Waiting on CI group at the bottom of their workspace, each with a line per pull request showing whether its checks are running, failing, or passing; click a line to open the pull request.
+- Once every pull request a session watches passes its checks, the session leaves Waiting on CI and shows the blue dot, so you see that CI went green without being pinged.
+- A session waiting on a scheduled send keeps the calendar clock.
 - The sidebar's **Scheduled** group is gone; scheduled messages still show above their session's composer with **Send now**, **Edit**, and **Cancel**.
 - A session that ended its turn to wait on a scheduled check, such as a follow-up it scheduled or a pull request it watches, no longer shows the blue idle dot: its row shows a calendar clock, it lists with the sessions waiting on work, it adds nothing to the waiting count, and the idle stop no longer ends it.
 - The extension tests now run against a temporary omp config, so a killed test run can no longer leave a broken test marketplace in your `~/.omp` that makes `omp plugin marketplace update` fail.
