@@ -372,7 +372,7 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	if (schedules.length === 0 && draft.triggers.length === 0) return { fix: "Add a schedule or a trigger." };
 	const triggers = TRIGGER_KINDS.filter(kind => draft.triggers.includes(kind)).map(kind => ({ kind }));
 	const spec: RoutineSpec = { id: draft.id, botId: draft.botId, name, enabled: draft.enabled, task, schedules, triggers };
-	return { ok: task.kind === "prompt" && draft.freshConversation ? { ...spec, freshConversation: true } : spec };
+	return { ok: draft.freshConversation ? { ...spec, freshConversation: true } : spec };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */

@@ -215,7 +215,7 @@ export default function botExtension(pi: ExtensionApi): void {
 			enabled: Type.Optional(Type.Boolean({ description: "Whether it runs; a new routine runs unless this is false." })),
 			freshConversation: Type.Optional(
 				Type.Boolean({
-					description: "For a prompt routine: whether each run first restarts this conversation, so its prompt opens a new one; a run while a turn is under way follows up instead. Off unless true.",
+					description: "Whether each run that posts here first restarts this conversation, so its prompt or command output opens a new one; a command run that posts nothing restarts nothing, and a run while a turn is under way follows up instead. Off unless true.",
 				}),
 			),
 		}),
