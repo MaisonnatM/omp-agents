@@ -39,7 +39,8 @@ function Rail({ state, members, index, view, onView, now }: { state: BoardState;
 	// Named agents and Bots, then the omp sessions on the board, which carry a session id.
 	const agents = members.filter(member => member.kind !== "human" && (!member.sessionId || member.botId));
 	const sessions = members.filter(member => member.kind !== "human" && member.sessionId && !member.botId);
-	const unreadIn = (channel: string) => state.threads.filter(thread => thread.channel === channel).reduce((sum, thread) => sum + (index.unreadByThread.get(thread.id) ?? 0), 0);
+	// Done threads leave the channel's list, so their unread messages leave its badge too.
+	const unreadIn = (channel: string) => state.threads.filter(thread => thread.channel === channel && thread.task !== "done").reduce((sum, thread) => sum + (index.unreadByThread.get(thread.id) ?? 0), 0);
 	const memberRow = (member: Member) => (
 		<RailRow
 			key={member.id}
