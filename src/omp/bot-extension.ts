@@ -221,7 +221,7 @@ export default function botExtension(pi: ExtensionApi): void {
 			enabled: Type.Optional(Type.Boolean({ description: "Whether it runs; a new routine runs unless this is false." })),
 			freshConversation: Type.Optional(
 				Type.Boolean({
-					description: "Whether each run that posts here first restarts this conversation, so its prompt or command output opens a new one; a command run that posts nothing restarts nothing, and a run while a turn is under way follows up instead. Off unless true.",
+					description: "Whether each run that posts here first restarts this conversation, so its prompt or command output opens a new one instead of re-reading this one; a command run that posts nothing restarts nothing, and a run while a turn is under way follows up instead. A new routine has it on unless false; a changed one keeps its value.",
 				}),
 			),
 		}),
@@ -232,7 +232,7 @@ export default function botExtension(pi: ExtensionApi): void {
 			if (!bot?.routineInbox) throw new Error(NO_ROUTINES);
 			const stored = id === undefined ? undefined : ownRoutines(bot).find(routine => routine.id === id);
 			if (id !== undefined && !stored) throw new Error(`None of your routines has id ${id}; omit id to create a routine.`);
-			const spec = parseRoutineSpec({ schedules: [], triggers: [], enabled: true, ...stored, ...fields, id: id ?? randomUUID(), botId: bot.botId });
+			const spec = parseRoutineSpec({ schedules: [], triggers: [], enabled: true, freshConversation: stored === undefined, ...stored, ...fields, id: id ?? randomUUID(), botId: bot.botId });
 			if (!spec) {
 				throw new Error(
 					`The routine is not valid: a new routine needs a name and a task, and every routine needs at least one schedule or trigger, schedules in range, each trigger kind at most once, and a prompt or a command that is not empty, a command at most ${MAX_COMMAND_LENGTH} characters.`,

@@ -176,11 +176,11 @@ test("save_routine leaves the dashboard one request per call: a new routine of t
 	const [request] = bot.requests();
 	expect(request).toEqual({
 		botId: "scout",
-		change: { op: "save", routine: { id: expect.any(String), botId: "scout", name: "Review digest", schedules: [], triggers: [{ kind: "pull-request" }, { kind: "slack" }], task: { kind: "command", command: "./digest.sh" }, enabled: true } },
+		change: { op: "save", routine: { id: expect.any(String), botId: "scout", name: "Review digest", schedules: [], triggers: [{ kind: "pull-request" }, { kind: "slack" }], task: { kind: "command", command: "./digest.sh" }, enabled: true, freshConversation: true } },
 	});
 	const newId: string = request.change.routine.id;
 	expect(created.content[0]?.text).toBe(
-		`Created routine "Review digest". The dashboard applies it, and while the dashboard is stopped the change waits for it.\n{"id":"${newId}","name":"Review digest","enabled":true,"schedules":[],"triggers":[{"kind":"pull-request"},{"kind":"slack"}]} command: ./digest.sh`,
+		`Created routine "Review digest". The dashboard applies it, and while the dashboard is stopped the change waits for it.\n{"id":"${newId}","name":"Review digest","enabled":true,"schedules":[],"triggers":[{"kind":"pull-request"},{"kind":"slack"}],"freshConversation":true} command: ./digest.sh`,
 	);
 
 	setSystemTime(new Date("2026-05-03T10:01:00.000Z"));

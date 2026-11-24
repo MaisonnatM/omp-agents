@@ -28,6 +28,7 @@
 - A message reaches the Bot the way your own does: it follows the Bot's running session, resumes its saved one, or starts its first.
   A routine starts no session of its own, so the Bot keeps one conversation, and its answers show there.
   With **New conversation each run** checked, each run that posts to the Bot first restarts its conversation, as **Restart conversation** does, so its message or command output opens a new conversation; a command run that posts nothing, such as one that exits 0 while posting only failures, restarts nothing; while the Bot is busy with a turn, the post joins the current conversation instead.
+  A new routine has it checked, whether you or the Bot create it, so a run does not re-read the whole earlier conversation; uncheck it for a routine that builds on the conversation you have with the Bot.
 - In the conversation, each routine message has a folded card with the routine's name, a message or command icon, the logos of what triggered it, its time, and a status icon and label.
   A message reads **Sending…** until recorded, then **Sent**; a command report shows how the command ended and how long it took.
   Click the card to show its **Prompt** or **Command**, any output, and **Started by** with links to the events when available.
