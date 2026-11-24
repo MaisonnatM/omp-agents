@@ -192,15 +192,15 @@ export class RoutineRunner {
 
 	/** Sends how the command ended into the Bot's conversation, or holds it for the next tick at a full wake. */
 	async #post(routine: Routine, at: number, report: string): Promise<void> {
-		const held = { botId: routine.botId, id: routine.id, at, report };
+		const held = { botId: routine.botId, id: routine.id, at, report, fresh: routine.freshConversation === true };
 		if (await this.#deps.fullyAwake()) await this.#send(held);
 		else this.#reports.push(held);
 	}
 
 	/** Sends a command report; the run keeps the output either way, and records why the Bot could not take it. */
-	async #send({ botId, id, at, report }: HeldReport): Promise<void> {
+	async #send({ botId, id, at, report, fresh }: HeldReport): Promise<void> {
 		try {
-			await this.#deps.messageBot(botId, report);
+			await this.#deps.messageBot(botId, report, fresh);
 		} catch (error) {
 			this.#deps.file.failed(id, at, `The output could not be posted to the Bot: ${errorText(error)}`);
 			this.#deps.onChange();
@@ -214,6 +214,8 @@ interface HeldReport {
 	id: string;
 	at: number;
 	report: string;
+	/** Whether the Bot restarts an idle conversation before the report. */
+	fresh: boolean;
 }
 
 /** What a run of `routine` sends into its Bot's conversation. */
