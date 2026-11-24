@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
+- A step in a project's plan has a play button: it opens a new session in the project, already set to work on that step and its sub-steps, with the prompt written for you.
+- The prompt that Start session writes for the steps you picked now asks the session to tick each one it finishes.
 - The sidebar's **Scheduled** group is gone; scheduled messages still show above their session's composer with **Send now**, **Edit**, and **Cancel**.
 - A session that ended its turn to wait on a scheduled check, such as a follow-up it scheduled or a pull request it watches, no longer shows the blue idle dot: its row shows a calendar clock, it lists with the sessions waiting on work, it adds nothing to the waiting count, and the idle stop no longer ends it.
 - The extension tests now run against a temporary omp config, so a killed test run can no longer leave a broken test marketplace in your `~/.omp` that makes `omp plugin marketplace update` fail.

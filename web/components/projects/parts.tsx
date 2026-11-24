@@ -1,6 +1,6 @@
-/** The pieces a project's cards share: the card, its empty note, the add field at its foot, a line's Remove button, and a status badge. */
+/** The pieces a project's cards share: the card, its empty note, the add field at its foot, a line's hover actions, and a status badge. */
 import { IconTrashCan } from "central-icons";
-import { type ReactNode, useState } from "react";
+import { type ComponentType, type ReactNode, useState } from "react";
 import { collapseSpaces } from "../../../src/shared/collapse-spaces";
 import type { ProjectChange } from "../../../src/shared/projects";
 import { Badge } from "@/components/ui/badge";
@@ -41,9 +41,10 @@ export function StatusBadge({ on, children }: { on: boolean; children: ReactNode
 	);
 }
 
-export function RemoveButton({ control, label, onClick }: { control: "projects.step.remove" | "projects.decision.remove"; label: string; onClick: () => void }) {
+/** A line's icon button that shows while the line is hovered or focused, and always on touch. */
+export function RowAction({ control, tooltip, label, icon: Icon, onClick }: { control: Parameters<typeof activityControl>[0]; tooltip: string; label: string; icon: ComponentType; onClick: () => void }) {
 	return (
-		<Tooltip content="Remove">
+		<Tooltip content={tooltip}>
 			<Button
 				{...activityControl(control)}
 				variant="ghost"
@@ -52,10 +53,14 @@ export function RemoveButton({ control, label, onClick }: { control: "projects.s
 				className="size-6 shrink-0 text-muted-foreground opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
 				onClick={onClick}
 			>
-				<IconTrashCan />
+				<Icon />
 			</Button>
 		</Tooltip>
 	);
+}
+
+export function RemoveButton({ control, label, onClick }: { control: "projects.step.remove" | "projects.decision.remove"; label: string; onClick: () => void }) {
+	return <RowAction control={control} tooltip="Remove" label={label} icon={IconTrashCan} onClick={onClick} />;
 }
 
 /** A card's foot: a field that adds a line on Enter and empties for the next one; its text lines up with the card's title. */

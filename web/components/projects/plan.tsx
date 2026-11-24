@@ -1,13 +1,12 @@
 /**
  * A project's plan: its steps and their sub-steps to tick, under **To do**, **Done**, and **All** tabs, with a field to add
- * a step at its end. **Select** turns the boxes into a selection, whose steps **Start session** hands to a new session in the project.
+ * a step at its end. A step's play button, or **Select** and **Start session** for several, hands steps to a new session in the project.
  */
-import { IconCheckmark1, IconPlusSmall } from "central-icons";
+import { IconCheckmark1, IconPlay, IconPlusSmall } from "central-icons";
 import { useState } from "react";
 import { collapseSpaces } from "../../../src/shared/collapse-spaces";
 import { type Project, type ProjectStep, stepNumbers } from "../../../src/shared/projects";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { appendToComposer, newDraftKey } from "../../composer-drafts";
@@ -15,7 +14,8 @@ import { hashForNewSession } from "../../routing";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
 import { offerUndo } from "../toaster";
 import { TodoInput } from "../todo/input";
-import { AddLine, Card, EmptyNote, type OnProjectChange, PROJECT_UNDO, RemoveButton } from "./parts";
+import { AddLine, Card, EmptyNote, type OnProjectChange, PROJECT_UNDO, RemoveButton, RowAction } from "./parts";
+import { stepsPrompt } from "./steps-prompt";
 
 type PlanTab = "todo" | "done" | "all";
 
@@ -50,19 +50,19 @@ export function Plan({ project, readOnly, onChange }: { project: Project; readOn
 			}
 		});
 	};
+	const withSubSteps = (step: ProjectStep): string[] => [step.id, ...subStepsOf(step).map(each => each.id)];
 	// Picking a step picks its sub-steps with it, so a session handed a step gets the whole of it.
 	const toggle = (step: ProjectStep): void =>
 		setSelection(current => {
 			const next = new Set(current);
 			const on = !next.has(step.id);
-			for (const id of [step.id, ...subStepsOf(step).map(each => each.id)]) on ? next.add(id) : next.delete(id);
+			for (const id of withSubSteps(step)) on ? next.add(id) : next.delete(id);
 			return next;
 		});
-	const startSession = (): void => {
-		const picked = project.steps.filter(step => selection?.has(step.id));
-		if (picked.length === 0) return;
-		const lines = picked.map(step => `${step.parentId === undefined ? "" : "   "}- ${numbers.get(step.id)}. ${step.text}${step.done ? " (done)" : ""}`);
-		appendToComposer(newDraftKey(null), [`Work on ${picked.length === 1 ? "this step" : "these steps"} of the plan of the project "${project.name}":`, ...lines].join("\n"));
+	const startSession = (stepIds: ReadonlySet<string>): void => {
+		const prompt = stepsPrompt(project, stepIds);
+		if (prompt === null) return;
+		appendToComposer(newDraftKey(null), prompt);
 		setSelection(null);
 		location.hash = hashForNewSession({ projectId });
 	};
@@ -114,6 +114,7 @@ export function Plan({ project, readOnly, onChange }: { project: Project; readOn
 										onChange={onChange}
 										onRemove={() => remove(step)}
 										onAddSubStep={step.parentId === undefined ? () => setAddingUnder(step.id) : null}
+										onStart={() => startSession(new Set(withSubSteps(step)))}
 									/>
 								);
 								if (index !== lastOfAdding || addingUnder === null || selecting) return [row];
@@ -125,7 +126,14 @@ export function Plan({ project, readOnly, onChange }: { project: Project; readOn
 				{selecting ? (
 					<div className="flex items-center gap-2 border-t border-border px-4 py-1.5">
 						<span className="text-xs text-muted-foreground tabular-nums">{selection.size === 0 ? "Pick the steps a new session works on" : `${selection.size} selected`}</span>
-						<Button {...activityControl("projects.step.start")} size="compact" leadingIcon={IconPlusSmall} className="ml-auto" disabled={selection.size === 0} onClick={startSession}>
+						<Button
+							{...activityControl("projects.step.start")}
+							size="compact"
+							leadingIcon={IconPlay}
+							className="ml-auto"
+							disabled={selection.size === 0}
+							onClick={() => startSession(selection)}
+						>
 							Start session
 						</Button>
 					</div>
@@ -149,10 +157,12 @@ interface PlanRowProps {
 	onRemove: () => void;
 	/** Opens the field that adds a sub-step under it; `null` for a sub-step, which holds none. */
 	onAddSubStep: (() => void) | null;
+	/** Starts a session in the project on this step and its sub-steps. */
+	onStart: () => void;
 }
 
 /** A step of the plan: a box that ticks it, or picks it while the plan is selecting, its text, which a click edits, and its number in the plan. */
-function PlanRow({ projectId, step, number, readOnly, picked, onPick, onChange, onRemove, onAddSubStep }: PlanRowProps) {
+function PlanRow({ projectId, step, number, readOnly, picked, onPick, onChange, onRemove, onAddSubStep, onStart }: PlanRowProps) {
 	const [editing, setEditing] = useState(false);
 	const selecting = picked !== null;
 	const save = (text: string): void => {
@@ -220,20 +230,8 @@ function PlanRow({ projectId, step, number, readOnly, picked, onPick, onChange, 
 			)}
 			{!readOnly && !editing && !selecting && (
 				<>
-					{onAddSubStep && (
-						<Tooltip content="Add a sub-step">
-							<Button
-								{...activityControl("projects.step.add-sub")}
-								variant="ghost"
-								size="icon-xs"
-								aria-label={`Add a sub-step under “${step.text}”`}
-								className="size-6 shrink-0 text-muted-foreground opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
-								onClick={onAddSubStep}
-							>
-								<IconPlusSmall />
-							</Button>
-						</Tooltip>
-					)}
+					{!step.done && <RowAction control="projects.step.start" tooltip="Start a session on this step" label={`Start a session on “${step.text}”`} icon={IconPlay} onClick={onStart} />}
+					{onAddSubStep && <RowAction control="projects.step.add-sub" tooltip="Add a sub-step" label={`Add a sub-step under “${step.text}”`} icon={IconPlusSmall} onClick={onAddSubStep} />}
 					<RemoveButton control="projects.step.remove" label={`Remove the step “${step.text}”${onAddSubStep ? " and its sub-steps" : ""}`} onClick={onRemove} />
 				</>
 			)}
