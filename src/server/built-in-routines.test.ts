@@ -33,13 +33,14 @@ test("the weekly harness review joins the routines list once, disabled, with its
 	flushJsonFiles();
 	expect(routines.value.map(({ id, botId, name, enabled, schedules }) => ({ id, botId, name, enabled, schedules }))).toEqual([
 		{ id: "harness-review-weekly", botId: BUILT_IN_ROUTINES[0]!.bot.id, name: "Weekly harness review", enabled: false, schedules: [{ kind: "weekly", days: [1], time: { hour: 9, minute: 0 } }] },
+		{ id: "routine-receipt-weekly", botId: BUILT_IN_ROUTINES[1]!.bot.id, name: "Friday routine receipt", enabled: false, schedules: [{ kind: "weekly", days: [5], time: { hour: 17, minute: 0 } }] },
 	]);
-	expect(bots.map(({ id, kind }) => ({ id, kind }))).toEqual([{ id: BUILT_IN_ROUTINES[0]!.bot.id, kind: "routines" }]);
+	expect(bots.map(({ id, kind }) => ({ id, kind }))).toEqual(BUILT_IN_ROUTINES.map(({ bot }) => ({ id: bot.id, kind: "routines" })));
 
 	routines.apply({ op: "remove", id: "harness-review-weekly" }, 2_000);
 	addBuiltInRoutines(added, saves);
-	expect(routines.value).toEqual([]);
-	expect(bots).toHaveLength(1);
+	expect(routines.value.map(({ id }) => id)).toEqual(["routine-receipt-weekly"]);
+	expect(bots).toHaveLength(2);
 });
 
 test("a built-in routine still holding a past prompt gets the current one, keeping its runs and settings, and an edited prompt stays", () => {

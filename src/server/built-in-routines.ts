@@ -81,6 +81,22 @@ export const HARNESS_REVIEW_PROMPT = [
 	"If the week holds no failures, say so in one line, after last week's verdict.",
 ].join("\n");
 
+const RECEIPT_BOT_ID = "routine-receipt" as BotId;
+
+/** What the Friday receipt reads from `routines.json` and the verdict it gives each routine. It changes nothing. */
+export const ROUTINE_RECEIPT_PROMPT = [
+	"Write this week's receipt for my routines. Read only: do not edit, enable, disable, or delete any routine, file, or repository.",
+	"",
+	`Read \`${routinesFile}\`. Each routine has its \`name\`, \`enabled\`, \`schedules\`, and \`runs\`, newest first; each run has \`at\` (milliseconds), its \`outcome\`, its \`errors\`, and, for a message run whose Bot's turn ended, \`usage\` with \`tokens\` and \`cost\` in dollars.`,
+	"Count only the runs of the last 7 days. A run is useful when it posted something worth reading: a message run whose Bot did not stay quiet and that has no errors, or a command run whose output was posted. A run that stayed quiet, was skipped, or failed is not.",
+	"To tell a quiet message run, open its conversation's session file (its `outcome.sessionId`) when you need to, and look for a `stay_quiet` tool call after the run's prompt.",
+	"",
+	"Reply with one table, one row per routine with at least one run this week, most costly first: routine, runs, useful runs, tokens, cost, and a verdict.",
+	"The verdict is keep (most runs are useful), slow down (it runs much more often than it has news; say to what schedule), or retire (no useful run this week, or every run failed), with a reason of a few words.",
+	"Then one line with the week's total cost and run count, and one line naming the enabled routines that did not run at all.",
+	"If no routine ran this week, say so in one line.",
+].join("\n");
+
 /** The built-in routines, in the order they are added. */
 export const BUILT_IN_ROUTINES: readonly BuiltInRoutine[] = [
 	{
@@ -104,6 +120,28 @@ export const BUILT_IN_ROUTINES: readonly BuiltInRoutine[] = [
 			enabled: false,
 		},
 		pastPrompts: [HARNESS_REVIEW_PROMPT_V1],
+	},
+	{
+		bot: {
+			id: RECEIPT_BOT_ID,
+			kind: "routines",
+			name: "Routine receipt",
+			job: "Every Friday, list what each routine did and cost this week, and say which to keep, slow down, or retire.\nRead only: never change a routine yourself.",
+			cwd: sourceDir,
+			model: null,
+			skill: null,
+			...defaultLook(RECEIPT_BOT_ID),
+		},
+		routine: {
+			id: "routine-receipt-weekly",
+			botId: RECEIPT_BOT_ID,
+			name: "Friday routine receipt",
+			schedules: [{ kind: "weekly", days: [5], time: { hour: 17, minute: 0 } }],
+			triggers: [],
+			task: { kind: "prompt", prompt: ROUTINE_RECEIPT_PROMPT },
+			enabled: false,
+		},
+		pastPrompts: [],
 	},
 ];
 
