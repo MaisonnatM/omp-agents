@@ -74,7 +74,7 @@
   A change the Bot makes keeps every part of the routine it did not mention, so asking it to pause a routine leaves its schedule and task as they were.
   A Bot can change only its own routines, never another Bot's.
 - A Bot can end a turn quietly, without a notification or an unread mark, when it found nothing for you, such as a routine run with nothing new.
-  Say so in its job, such as "when a run finds nothing, call `stay_quiet`"; the PR shepherd's starting job already does.
+  Every Bot does so by default after a routine run that found nothing new, so its job needs no such line.
   A quiet run leaves an earlier reply you had not read still unread.
 - The server keeps the Bots in `bots.json` beside its access token, so every window of the app shows the same ones.
 
