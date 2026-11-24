@@ -146,7 +146,7 @@ function ProjectItems({ sessionId }: { sessionId: string }) {
 	const { changeModule } = useDashboardActions();
 	const { connected } = useDashboardStatus();
 	if (projects.length === 0) return null;
-	const current = projects.find(project => project.project.sessionIds.includes(sessionId));
+	const current = projects.find(project => project.sessionIds.includes(sessionId));
 	const others = projects.filter(project => project !== current);
 	return (
 		<>
@@ -159,7 +159,7 @@ function ProjectItems({ sessionId }: { sessionId: string }) {
 					</MenuSubmenuTrigger>
 					<MenuSubmenuContent>
 						{others.map(project => (
-							<MenuItem key={project.id} onClick={() => changeModule("board", { op: "join", channel: project.id, sessionId })}>
+							<MenuItem key={project.id} onClick={() => changeModule("projects", { op: "join", projectId: project.id, sessionId })}>
 								<IconFlag1 />
 								<span className="truncate">{project.name}</span>
 							</MenuItem>
@@ -168,7 +168,7 @@ function ProjectItems({ sessionId }: { sessionId: string }) {
 				</MenuSubmenu>
 			)}
 			{current && (
-				<MenuItem disabled={!connected} onClick={() => changeModule("board", { op: "leave", sessionId })}>
+				<MenuItem disabled={!connected} onClick={() => changeModule("projects", { op: "leave", sessionId })}>
 					<IconFolderDelete />
 					Remove from project
 				</MenuItem>

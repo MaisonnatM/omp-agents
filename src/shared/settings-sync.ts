@@ -57,7 +57,7 @@ export const SYNC_ITEMS: readonly SyncItem[] = [
 	{
 		id: "projects",
 		label: "Projects",
-		detail: "Each Board project's name, goal, decisions, archive, and plan, without its sessions or messages",
+		detail: "Each project's name, goal, decisions, archive, and plan, without its sessions or log",
 		path: "dashboard/projects.json",
 		source: { kind: "store", store: "projects" },
 		json: true,

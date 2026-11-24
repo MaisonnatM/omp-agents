@@ -1,5 +1,5 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
-import type { ProjectChannel } from "../src/shared/board";
+import type { Project } from "../src/shared/projects";
 import { awaitsSubagents, newestPastFirst, type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import { inAppData, inTempDir, type Workspace } from "../src/shared/workspaces";
 import { everyWord } from "../src/shared/every-word";
@@ -237,7 +237,7 @@ export function rosterFolders(groups: readonly WorkspaceGroup[], { limit, all, f
 
 /** One project of the roster: its sessions the sidebar lists, live and pinned past ones, wherever they ran. */
 export interface ProjectGroup {
-	project: ProjectChannel;
+	project: Project;
 	/** Its pinned live sessions, then its other live ones in the sidebar's order. */
 	hosts: RosterHost[];
 	/** Its pinned past sessions, then its interrupted ones. */
@@ -249,9 +249,9 @@ export interface ProjectGroup {
  * of `lists` in it, and `lists` without them, so a session in a project leaves Pinned and its workspace's folder. Ended
  * sessions stay in Past.
  */
-export function projectGroups(lists: SidebarSessions, projects: readonly ProjectChannel[]): { groups: ProjectGroup[]; rest: SidebarSessions } {
+export function projectGroups(lists: SidebarSessions, projects: readonly Project[]): { groups: ProjectGroup[]; rest: SidebarSessions } {
 	const groups = projects.map((project): ProjectGroup => ({ project, hosts: [], past: [] }));
-	const bySession = new Map(groups.flatMap(group => group.project.project.sessionIds.map(id => [id, group] as const)));
+	const bySession = new Map(groups.flatMap(group => group.project.sessionIds.map(id => [id, group] as const)));
 	if (bySession.size === 0) return { groups, rest: lists };
 	const take = <Row extends RosterHost | PastSession>(rows: Row[], into: (group: ProjectGroup) => Row[]): Row[] =>
 		rows.filter(row => {

@@ -27,26 +27,23 @@ export type LiveUpdate =
 
 /**
  * The main agent's turn started, or ran to its end; `reply` is its last text without suggested prompts, `null` when it ended on none,
- * `suggestions` the prompts that text ended on, `failure` how a provider's error ended it, `null` when it ended any other way, and
- * `quiet` whether it called {@link STAY_QUIET_TOOL}, so it leaves the session as unread as it was before the turn.
+ * `failure` how a provider's error ended it, `null` when it ended any other way, and `quiet` whether it called
+ * {@link STAY_QUIET_TOOL}, so it leaves the session as unread as it was before the turn.
  */
-export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; suggestions?: string[]; failure: TurnFailure | null; quiet: boolean };
+export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; failure: TurnFailure | null; quiet: boolean };
 
-/** The last assistant message among `messages` that has text, split from the prompts it suggests; `null` when none has text. */
-function lastReply(messages: unknown): { body: string; suggestions: string[] } | null {
+/** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
+function lastReply(messages: unknown): string | null {
 	if (!Array.isArray(messages)) return null;
 	for (const message of messages.toReversed()) {
 		if (!isObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;
 		const text = message.content
 			.flatMap(block => (isObject(block) && block.type === "text" && typeof block.text === "string" && block.text.trim() ? [block.text] : []))
 			.join("\n\n");
-		if (text) return splitSuggestions(text);
+		if (text) return splitSuggestions(text).body;
 	}
 	return null;
 }
-
-/** `reply`'s suggested prompts as an optional field, absent when it offers none. */
-const offered = (reply: { suggestions: string[] } | null): { suggestions?: string[] } => (reply?.suggestions.length ? { suggestions: reply.suggestions } : {});
 
 /** Whether an assistant message among `messages` called {@link STAY_QUIET_TOOL}. */
 const stayedQuiet = (messages: unknown): boolean =>
@@ -76,16 +73,13 @@ export function turnUpdate(event: unknown): TurnUpdate | null {
 	if (event.type === "agent_start") return { kind: "turn-started" };
 	if (event.type !== "agent_end") return null;
 	const gaveTurnBack = event.isTerminal !== false || event.awaitingAsyncWork === true;
-	if (!gaveTurnBack) return null;
-	const last = lastReply(event.messages);
-	return { kind: "turn-ended", reply: last?.body ?? null, ...offered(last), failure: turnFailureOf(event.messages), quiet: stayedQuiet(event.messages) };
+	return gaveTurnBack ? { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages), quiet: stayedQuiet(event.messages) } : null;
 }
 
-/** A turn that ended: when, in ms since the epoch, its last reply, `null` when it ended on none, and the prompts that reply suggests. */
+/** A turn that ended: when, in ms since the epoch, and its last reply, `null` when it ended on none. */
 export interface EndedTurn {
 	at: number;
 	reply: string | null;
-	suggestions?: string[];
 }
 
 /**
@@ -114,9 +108,7 @@ export function endedTurn(sessionFile: string, since = Number.NEGATIVE_INFINITY)
 		return null;
 	}
 	const at = lastAt ?? promptedAt;
-	if (at === null || at <= since || stayedQuiet(newestFirst)) return null;
-	const last = lastReply(newestFirst.toReversed());
-	return { at, reply: last?.body ?? null, ...offered(last) };
+	return at === null || at <= since || stayedQuiet(newestFirst) ? null : { at, reply: lastReply(newestFirst.toReversed()) };
 }
 
 /**

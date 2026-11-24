@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-24-remove-the-board-keep-projects-on-their-own-store
 date: 2026-11-23
 decision-makers: user, agent
 ---
@@ -8,7 +9,7 @@ decision-makers: user, agent
 
 The Board is a stored module: the dashboard is the one writer of `board.json`, the page sends changes over the socket, and sessions leave changes through the `board` tool's inbox directory, as Projects and Sport do.
 
-After each Board change, `BoardWake` (`src/server/board-wake.ts`) sends every new message, as a follow-up through the same resume path scheduled runs use, to each session it is for:
+After each Board change, `BoardWake` sends every new message, as a follow-up through the same resume path scheduled runs use, to each session it is for:
 
 - a session the message mentions with `@name`;
 - a session that posted in the thread, when a person writes there.

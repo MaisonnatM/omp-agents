@@ -1,6 +1,6 @@
 /** What a project's sessions are and touched, which its page sums up. */
 import { type PullRequest, uniquePullRequests } from "../../../src/shared/github";
-import type { BoardState, ChannelProject, Message } from "../../../src/shared/board";
+import type { Project } from "../../../src/shared/projects";
 import type { RosterHost } from "../../../src/shared/sessions";
 import { hostLabel, pastLabel } from "../../labels";
 import type { KnownSessions } from "../todo/links";
@@ -25,7 +25,7 @@ export interface ProjectWork {
 }
 
 /** {@link ProjectWork} of `project`, from every live and past session; a session still live is read from the roster, not from its saved copy. */
-export function projectWork(project: Pick<ChannelProject, "sessionIds">, { hosts, past }: KnownSessions): ProjectWork {
+export function projectWork(project: Project, { hosts, past }: KnownSessions): ProjectWork {
 	const live = new Map(hosts.map(host => [host.sessionId, host]));
 	const saved = new Map(past.map(session => [session.sessionId, session]));
 	const issues = new Set<string>();
@@ -44,10 +44,4 @@ export function projectWork(project: Pick<ChannelProject, "sessionIds">, { hosts
 		pullRequests: uniquePullRequests(sessions.flatMap(session => session.pullRequests)),
 		issues: issues.size,
 	};
-}
-
-/** The messages of channel `channel`'s threads, oldest first: a project's log. */
-export function channelMessages(board: BoardState, channel: string): Message[] {
-	const threads = new Set(board.threads.filter(thread => thread.channel === channel).map(thread => thread.id));
-	return board.messages.filter(message => threads.has(message.thread)).toSorted((a, b) => a.at - b.at);
 }

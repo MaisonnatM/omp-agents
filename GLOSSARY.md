@@ -64,11 +64,11 @@ The detached process that holds one dashboard session's omp and lends its stdio 
 _Avoid_: Daemon, supervisor
 
 **Plan step**:
-One step of a Project's plan: a task thread in the project's channel, ticked when its task is done, with sub-steps one level deep.
-_Avoid_: Todo, checklist item
+One step of a Project's plan, ticked when done, with sub-steps one level deep, kept in the project's `steps` in `project-list.json`.
+_Avoid_: Todo, checklist item, task
 
 **Project**:
-A named effort that spans sessions and workspaces: a Board channel carrying a goal and decisions, whose task threads are its plan steps and whose messages are its log, which every session in it receives at start.
+A named effort that spans sessions and workspaces, with a goal, a checklist plan, decisions, and a dated log that every session in it receives at start.
 _Avoid_: Epic, initiative, workspace
 
 **Project memory**:

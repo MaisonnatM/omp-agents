@@ -2,97 +2,116 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openBoardFile } from "../board-module";
-import { applyBoardChange, type BoardState, emptyBoard, planOf, projectOfSession, stepNumbers } from "../shared/board";
-import { foldProjects, type LegacyProject, migrateProjectList, parseLegacyProjects } from "./project-migration";
+import { EMPTY_PROJECTS, type Project } from "../shared/projects";
+import { foldBoardProjects, migrateBoardProjects, parseOldBoard } from "./project-migration";
+import { ProjectsFile } from "./projects-file";
 
-const legacy = (over: Partial<LegacyProject> = {}): LegacyProject => ({
+const at = (iso: string) => Date.parse(iso);
+
+/** A `board.json` as the Board saved it, with the fields the migration drops. */
+const raw = () => ({
+	version: 1,
+	me: "Maxence",
+	channels: [
+		{ id: "c-general", name: "general", about: "" },
+		{
+			id: "c-project-p1",
+			name: "launch",
+			about: "",
+			project: { goal: "Ship it", decisions: ["Use Bun"], sessionIds: ["sess-1"], createdAt: at("2026-11-19T09:00:00.000Z"), archivedAt: at("2026-11-25T09:00:00.000Z") },
+		},
+	],
+	threads: [
+		{ id: "t-project-p1-a", channel: "c-project-p1", title: "Design", task: "done", lease: null, createdAt: 1 },
+		{ id: "t-project-p1-b", channel: "c-project-p1", title: "Build", task: "claimed", lease: { by: "s-sess-1", until: 9 }, createdAt: 2 },
+		{ id: "t-project-p1-log", channel: "c-project-p1", title: "Log", task: null, lease: null, createdAt: 3 },
+		{ id: "t-project-p1-b1", channel: "c-project-p1", title: "Server half", task: "review", lease: null, createdAt: 4, parent: "t-project-p1-b" },
+		{ id: "t-chat", channel: "c-general", title: "Chat", task: null, lease: null, createdAt: 5 },
+	],
+	messages: [
+		{ id: "m2", thread: "t-project-p1-b", author: "u-maxence", at: at("2026-11-21T10:00:00.000Z"), text: "Picked up." },
+		{ id: "m1", thread: "t-project-p1-log", author: "s-sess-1", at: at("2026-11-20T10:00:00.000Z"), text: "Started." },
+		{ id: "m3", thread: "t-project-p1-log", author: "bot:ann", at: at("2026-11-22T10:00:00.000Z"), text: "Checked." },
+		{ id: "m4", thread: "t-chat", author: "s-sess-2", at: 0, text: "Not a project's." },
+	],
+	extraMembers: [{ id: "bot:ann", name: "Ann", kind: "agent", sessionId: "sess-ann" }],
+	schedules: [],
+	readAt: {},
+});
+
+const board = () => parseOldBoard(raw())!;
+
+const migrated: Project = {
 	id: "p1",
-	name: "Board merge",
-	goal: "One place for projects",
+	name: "launch",
+	goal: "Ship it",
 	steps: [
 		{ id: "a", text: "Design", done: true },
 		{ id: "b", text: "Build", done: false },
 		{ id: "b1", text: "Server half", done: false, parentId: "b" },
 	],
-	decisions: ["Projects are channels"],
+	decisions: ["Use Bun"],
 	log: [
 		{ at: "2026-11-20T10:00:00.000Z", sessionId: "sess-1", text: "Started." },
-		{ at: "2026-11-21T10:00:00.000Z", text: "Reviewed." },
+		{ at: "2026-11-21T10:00:00.000Z", text: "Build: Picked up." },
+		{ at: "2026-11-22T10:00:00.000Z", sessionId: "sess-ann", text: "Checked." },
 	],
 	sessionIds: ["sess-1"],
 	createdAt: "2026-11-19T09:00:00.000Z",
-	...over,
-});
+	archivedAt: "2026-11-25T09:00:00.000Z",
+};
 
-describe("foldProjects", () => {
-	test("a project becomes a project channel with its plan, decisions, sessions, and log", () => {
-		const board = foldProjects(emptyBoard("Maxence"), [legacy()], 0);
-		const channel = board.channels.find(item => item.id === "c-project-p1")!;
-		expect(channel).toEqual({
-			id: "c-project-p1",
-			name: "board-merge",
-			about: "",
-			project: { goal: "One place for projects", decisions: ["Projects are channels"], sessionIds: ["sess-1"], createdAt: Date.parse("2026-11-19T09:00:00.000Z") },
-		});
-		const plan = planOf(board, channel.id);
-		expect(plan.map(step => [step.title, step.task])).toEqual([
-			["Design", "done"],
-			["Build", "open"],
-			["Server half", "open"],
-		]);
-		expect([...stepNumbers(plan).values()]).toEqual(["1", "2", "2.1"]);
-		expect(projectOfSession(board, "sess-1")?.id).toBe(channel.id);
-		const log = board.threads.find(thread => thread.channel === channel.id && thread.title === "Log")!;
-		expect(log.task).toBeNull();
-		expect(board.messages.filter(msg => msg.thread === log.id).map(msg => [msg.author, msg.at, msg.text])).toEqual([
-			["s-sess-1", Date.parse("2026-11-20T10:00:00.000Z"), "Started."],
-			[board.me, Date.parse("2026-11-21T10:00:00.000Z"), "Reviewed."],
-		]);
+describe("foldBoardProjects", () => {
+	test("each project channel becomes a project with its plan, decisions, sessions, and messages as its log", () => {
+		expect(foldBoardProjects(EMPTY_PROJECTS, board())).toEqual({ projects: [migrated] });
 	});
 
-	test("the result is a board the reducer accepts changes on, with names kept unique and archives in milliseconds", () => {
-		const start = emptyBoard("Maxence");
-		const withGeneral: BoardState = { ...start, channels: [...start.channels, { id: "c-x", name: "board-merge", about: "" }] };
-		const board = foldProjects(withGeneral, [legacy({ log: [] }), legacy({ id: "p2", log: [], archivedAt: "2026-11-22T00:00:00.000Z" })], 0);
-		expect(board.channels.filter(item => item.project).map(item => item.name)).toEqual(["board-merge-2", "board-merge-3"]);
-		expect(board.channels.find(item => item.id === "c-project-p2")?.project?.archivedAt).toBe(Date.parse("2026-11-22T00:00:00.000Z"));
-		expect(board.threads.some(thread => thread.title === "Log")).toBe(false);
-		expect("ok" in applyBoardChange(board, { op: "task", thread: planOf(board, "c-project-p1")[1]!.id, task: "done", lease: null })).toBe(true);
+	test("a project already in the list stays as it is, so a second fold changes nothing", () => {
+		const once = foldBoardProjects(EMPTY_PROJECTS, board());
+		expect(foldBoardProjects(once, board())).toBe(once);
 	});
 
-	test("a project already moved is skipped, and a time that does not parse falls back", () => {
-		const once = foldProjects(emptyBoard("Maxence"), [legacy({ createdAt: "soon" })], 42);
-		expect(once.channels.find(item => item.id === "c-project-p1")?.project?.createdAt).toBe(42);
-		expect(foldProjects(once, [legacy()], 0)).toBe(once);
+	test("a sub-step whose parent is no top-level step becomes a top-level step", () => {
+		const state = board();
+		state.threads = state.threads.filter(thread => thread.id !== "t-project-p1-b");
+		expect(foldBoardProjects(EMPTY_PROJECTS, state).projects[0]?.steps).toEqual([
+			{ id: "a", text: "Design", done: true },
+			{ id: "b1", text: "Server half", done: false },
+		]);
 	});
 });
 
-describe("migrateProjectList", () => {
-	let dir = "";
-	afterEach(() => rmSync(dir, { recursive: true, force: true }));
+describe("migrateBoardProjects", () => {
+	const dirs: string[] = [];
+	afterEach(() => {
+		for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+	});
+	const scratch = () => {
+		const dir = mkdtempSync(join(tmpdir(), "project-migration-"));
+		dirs.push(dir);
+		return { listPath: join(dir, "project-list.json"), boardPath: join(dir, "board.json") };
+	};
 
-	test("moves the file's projects into the board file and renames it, once", () => {
-		dir = mkdtempSync(join(tmpdir(), "project-migration-"));
-		const listPath = join(dir, "project-list.json");
-		writeFileSync(listPath, JSON.stringify({ projects: [legacy()] }));
-		const board = openBoardFile(join(dir, "board.json"));
-		migrateProjectList(board, listPath, 0);
-		expect(existsSync(listPath)).toBe(false);
-		expect(parseLegacyProjects(JSON.parse(readFileSync(`${listPath}.migrated`, "utf8")))?.projects).toHaveLength(1);
-		const saved = JSON.parse(readFileSync(join(dir, "board.json"), "utf8")) as BoardState;
-		expect(saved.channels.some(item => item.id === "c-project-p1")).toBe(true);
-		migrateProjectList(board, listPath, 0);
-		expect(board.value.channels.filter(item => item.id === "c-project-p1")).toHaveLength(1);
+	test("saves the Board's projects beside those already listed, then renames board.json", () => {
+		const { listPath, boardPath } = scratch();
+		const kept: Project = { id: "p0", name: "Older", goal: "", steps: [], decisions: [], log: [], sessionIds: [], createdAt: "2026-11-01T00:00:00.000Z" };
+		writeFileSync(listPath, JSON.stringify({ projects: [kept] }));
+		writeFileSync(boardPath, JSON.stringify(raw()));
+		const file = new ProjectsFile(listPath);
+		migrateBoardProjects(file, boardPath);
+		expect(file.value.projects).toEqual([kept, migrated]);
+		expect(JSON.parse(readFileSync(listPath, "utf8")).projects).toEqual([kept, migrated]);
+		expect(existsSync(boardPath)).toBe(false);
+		expect(existsSync(`${boardPath}.removed`)).toBe(true);
 	});
 
-	test("leaves a file that holds no project list where it is", () => {
-		dir = mkdtempSync(join(tmpdir(), "project-migration-"));
-		const listPath = join(dir, "project-list.json");
-		writeFileSync(listPath, "{ nope");
-		const board = openBoardFile(join(dir, "board.json"));
-		migrateProjectList(board, listPath, 0);
-		expect(existsSync(listPath)).toBe(true);
-		expect(board.value.channels.some(item => item.project)).toBe(false);
+	test("leaves a board.json that holds no board where it is, and does nothing without one", () => {
+		const { listPath, boardPath } = scratch();
+		const file = new ProjectsFile(listPath);
+		migrateBoardProjects(file, boardPath);
+		writeFileSync(boardPath, "{ not json");
+		migrateBoardProjects(file, boardPath);
+		expect(file.value).toEqual(EMPTY_PROJECTS);
+		expect(existsSync(boardPath)).toBe(true);
 	});
 });

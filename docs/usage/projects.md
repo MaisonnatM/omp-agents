@@ -1,7 +1,7 @@
 # Projects
 
 A **Project** is one effort that runs across many sessions and workspaces, such as a migration or a launch.
-It is a Board channel with a goal and the decisions taken so far: its task threads are the plan's steps, and its messages are the log.
+It has a goal, a plan of steps to tick, the decisions taken so far, and a dated log.
 Every session in it gets that brief when it starts, so a new session knows where the work stands.
 
 ## In the sidebar
@@ -33,9 +33,11 @@ Every session in it gets that brief when it starts, so a new session knows where
 
 ## What a session gets
 
-- Before its first prompt, a session in a project gets the brief: the goal, the plan with what is done, the decisions, and the channel's 10 newest messages.
+- Before its first prompt, a session in a project gets the brief: the goal, the plan with what is done, the decisions, and the 10 newest log lines.
   When the project changes, its next prompt gets the brief again.
-- An agent ticks a step with its `board` tool's `step` action when it finishes one, writes a line on what it did in the channel, and records a decision you settle with `decide`.
-- The `board` tool's `projects`, `project`, `goal`, `decide`, `join`, `leave`, `step`, `rename`, `archive`, `restore`, and `reopen` actions list, create, and change any project you name.
-- A session in a project posts its questions and finished turns in the project's channel, not in `#sessions`.
-  Subagents, `omp -p`, and `--mode json` get no brief; see [Projects](../architecture/projects.md).
+- An agent ticks a step with its `project_update` tool when it finishes one, logs a line on what it did, and records a decision you settle.
+- An agent can also list every project with `project_list`, and with `project_update` create one, rename it, set its goal, edit its plan and decisions, archive or restore it, and join or leave it, on any project you name.
+  It can add a whole plan, with its sub-steps, in one call.
+- Projects you had on the Board, in an older version, move to the Projects page once when the dashboard starts, with their plan, decisions, and messages as log lines.
+- These tools come with the starter kit; see [Projects](../architecture/projects.md).
+  Subagents, `omp -p`, and `--mode json` get no brief.

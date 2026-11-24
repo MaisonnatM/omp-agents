@@ -54,10 +54,10 @@ Act only on the `requested_actions` it returns that fit the user's request, and 
 
 ## Projects
 
-A session in an omp-agents dashboard project gets the project's brief before its first prompt: the goal, the plan, the decisions, and the newest messages.
-When you finish a step of that plan, mark it with the `board` tool's `done` action and post one line on what you did, so the next session knows where the work stands.
-Record a decision the user settles with its `decide` action; add a step with `step` only for work the plan is missing.
-List projects with `projects`; create, set the goal of, join, or leave one (`project`, `goal`, `join`, `leave`) only when the user asks.
+A session in an omp-agents dashboard project gets the project's brief before its first prompt: the goal, the plan, the decisions, and the newest log lines.
+When you finish a step of that plan, call `project_update` to tick it, and log one line on what you did, so the next session knows where the work stands.
+Record a decision the user settles with `project_update` too; add a step only for work the plan is missing.
+List projects with `project_list`; create, rename, archive, or join one with `project_update` only when the user asks.
 
 ## Conditional references
 

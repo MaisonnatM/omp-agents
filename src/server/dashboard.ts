@@ -27,10 +27,9 @@ import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { activityDb, botInboxDir, botsDir, botsFile, builtInRoutinesFile, directoryOf, displayPath, endedWorktreesFile, HOME, interruptedFile, machineFile, mergesFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
-import { isStoredModuleId, type ModuleChanges, type ModuleRuns, moduleInboxes, moduleJoins, openModules, runModules, type StoredModuleId } from "../modules";
+import { type ModuleChanges, moduleInboxes, moduleJoins, openModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
-import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
 import { checkOutPullRequest } from "../pull-request-checkout";
 import { rebasePullRequest } from "../pull-request-rebase";
 import { worktreeAt } from "../git";
@@ -42,7 +41,7 @@ import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchedKinds } from "../routine
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { agentOn } from "../shared/moves";
-import { awaitsSubagents, newSessionRequest, type StartRequest, type StartResult, type View } from "../shared/sessions";
+import { awaitsSubagents, type StartRequest, type StartResult, type View } from "../shared/sessions";
 import { inAppData } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
@@ -189,8 +188,6 @@ export class Dashboard {
 	/** What the bell's checks saw last, which tells the routines' triggers what is new. */
 	readonly #triggerWatch = new TriggerWatch();
 	readonly #scheduledRunner: ScheduledRunner;
-	/** The stored modules' runs, started once the sessions are. */
-	#moduleRuns: ModuleRuns = {};
 	readonly #autoContinue: AutoContinue;
 	readonly #mergeQueue: MergeQueue;
 	readonly #mergeCleanup: MergeCleanup;
@@ -227,7 +224,7 @@ export class Dashboard {
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
 		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
 		const stores = syncStores(
-			{ sourceControl: this.#sourceControl, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile), board: this.#modules.board },
+			{ sourceControl: this.#sourceControl, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile), projects: this.#modules.projects },
 			HOME,
 			list => {
 				// Every Bot memory is read again, since a sync may have rewritten them.
@@ -336,10 +333,7 @@ export class Dashboard {
 					return true;
 				},
 			},
-		}, modules, kind => {
-			this.#broadcasts.pushList(kind);
-			if (isStoredModuleId(kind)) this.#moduleRuns[kind]?.changed?.();
-		}));
+		}, modules, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
@@ -352,10 +346,7 @@ export class Dashboard {
 					if (placed) broadcasts.pushAll();
 				});
 			},
-			onRosterChange: () => {
-				this.#waits.check();
-				for (const run of Object.values(this.#moduleRuns)) run?.rosterChanged?.();
-			},
+			onRosterChange: () => this.#waits.check(),
 			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
@@ -366,7 +357,7 @@ export class Dashboard {
 			lists.applyModule(id, change);
 			return modules[id].flush();
 		};
-		const modulesInboxes = moduleInboxes(modules, (id, change) => applyModuleNow(id, this.#moduleRuns[id]?.fromAgent?.(change) ?? change), { active: () => ownerLock.held });
+		const modulesInboxes = moduleInboxes(modules, applyModuleNow, { active: () => ownerLock.held });
 		const routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
 		const botInbox = new BotInbox(
 			botInboxDir,
@@ -383,7 +374,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
-			joinProject: (projectId, sessionId) => applyModuleNow("board", { op: "join", channel: projectId, sessionId }),
+			joinProject: (projectId, sessionId) => applyModuleNow("projects", { op: "join", projectId, sessionId }),
 			joinFor: (request, instanceId) => this.#joinFor(request, instanceId),
 			admit: this.#admit,
 			restoreWorktree: sessionIds => this.#worktrees.checkout(() => restoreEndedWorktree(this.#endedWorktrees.of(sessionIds))),
@@ -483,23 +474,6 @@ export class Dashboard {
 			now: Date.now,
 			onChange: () => broadcasts.pushList("scheduled"),
 		}));
-		this.#moduleRuns = runModules(modules, (id, change) => void lists.applyModule(id, change), {
-			hosts: () => sessions.rows(factsOf),
-			bots: () => this.#botsFile.value,
-			wake: async (sessionId, text) => (await reach(sessionId)).prompt(null, `${DASHBOARD_PROMPT_PREFIX} ${text}`, [], "followUp"),
-			wakeBot: async (botId, text) => void (await this.#bots.message(botId, text)),
-			async startSession(cwd, prompt, projectId) {
-				const result = await startSession(newSessionRequest(cwd, prompt, { projectId }));
-				if (!result.ok) throw new Error(result.error);
-				const started = sessions.get(result.instanceId);
-				if (!started) throw new Error("The session exited as it started.");
-				return started.sessionId;
-			},
-			workspaces: () => this.#workspaceCwds(),
-			active: () => ownerLock.held,
-			now: Date.now,
-			stopping,
-		});
 		this.#prWatches = new PullRequestWatches({
 			file: new PullRequestWatchesFile(pullRequestWatchesFile),
 			hosts: () => sessions.rows(factsOf),
@@ -888,7 +862,7 @@ export class Dashboard {
 			}
 			case "turn-ended": {
 				// A quiet turn, such as a Bot's routine run that found nothing, leaves the session as unread as before it.
-				this.#sessions.turnEnded(instanceId, update.quiet ? null : { at: Date.now(), reply: update.reply, suggestions: update.suggestions });
+				this.#sessions.turnEnded(instanceId, update.quiet ? null : { at: Date.now(), reply: update.reply });
 				// A session started here that a usage limit or a transient fault stopped is held for its continue.
 				const sessionId = this.#sessions.started(instanceId)?.sessionId;
 				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);

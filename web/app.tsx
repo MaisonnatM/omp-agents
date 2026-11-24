@@ -4,8 +4,6 @@ import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
-import { BOARD_PAGE } from "./components/board/module";
-import { BoardNav } from "./components/board/nav";
 import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import { HeaderTabs } from "./components/header-tabs";
@@ -15,7 +13,6 @@ import {
 	type DashboardStatus,
 	DashboardStatusContext,
 	MentionListsContext,
-	BoardContext,
 	OpenProjectsContext,
 	UserTodosContext,
 } from "./components/dashboard-context";
@@ -24,7 +21,7 @@ import { FileDialog } from "./components/file-dialog";
 import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
 import { useModulesOff } from "./modules-off";
-import { openProjectChannels, type ProjectChannel } from "../src/shared/board";
+import { openProjects, type Project } from "../src/shared/projects";
 import { PageList, PageListColumn, useWidth } from "./components/page-list";
 import { listPageOf, listPlacement } from "./page-list";
 import { NO_PLANS, Plans } from "./components/plan-usage";
@@ -64,7 +61,7 @@ import { useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
 
-const NO_PROJECTS: readonly ProjectChannel[] = [];
+const NO_PROJECTS: readonly Project[] = [];
 
 /**
  * The dashboard: the socket's state, sliced into what each part reads, and the parts. Each hook it calls owns one
@@ -80,8 +77,8 @@ export function App() {
 	const windowScope = useMemo((): WindowScope => ({ workspace }), [workspace]);
 	const focused = useFocusedSession(state, page, scope);
 	const [modulesOff] = useModulesOff();
-	const board = modulesOff.has("board") ? null : state.modules.board;
-	const projects = useMemo((): readonly ProjectChannel[] => (board === null ? NO_PROJECTS : openProjectChannels(board)), [board]);
+	const projectList = state.modules.projects;
+	const projects = useMemo((): readonly Project[] => (projectList === null || modulesOff.has("projects") ? NO_PROJECTS : openProjects(projectList)), [projectList, modulesOff]);
 	const sessions = useSessionLists(scope, state.pins, changePins, projects);
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
@@ -227,8 +224,6 @@ export function App() {
 		[state.connected, fork, resume, quick, pullRequestNew, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
-	const boardRoute = page?.kind === "board" ? page : BOARD_PAGE.home;
-	const boardList = useMemo(() => <BoardNav state={state.modules.board} hosts={visible.hosts} bots={state.bots} route={boardRoute} />, [state.modules.board, visible.hosts, state.bots, boardRoute]);
 
 	const listPage = listPageOf(page, row);
 	const pageArea = useRef<HTMLDivElement>(null);
@@ -255,7 +250,6 @@ export function App() {
 				<ScheduledSends.Provider value={state.scheduled}>
 					<UserTodosContext.Provider value={state.userTodos}>
 					<OpenProjectsContext.Provider value={projects}>
-					<BoardContext.Provider value={board}>
 						<div className="flex h-svh flex-col bg-sidebar">
 							{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
 							<SidebarProvider
@@ -276,7 +270,6 @@ export function App() {
 										unreadNotices={unreadNotices}
 										onPickWorkspace={switchWorkspace}
 										onSearch={showSearch}
-										boardList={boardList}
 									/>
 									<SidebarFoot usage={state.usage} />
 								</DashboardSidebar>
@@ -411,7 +404,6 @@ export function App() {
 							</SidebarProvider>
 							<LinkPreviewCard />
 						</div>
-					</BoardContext.Provider>
 					</OpenProjectsContext.Provider>
 					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>

@@ -32,7 +32,6 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `afterActions`: a slot under the action bar, inside the composer's frame, where the dashboard renders its suggested prompts.
 - `useRegionHeight` and `useIsTouch` move to `hooks/use-region-height.ts` and `hooks/use-is-touch.ts`, and `FilePreviewTile` to `ui/file-preview-tile.tsx`, so the dashboard's rows in the slots animate and reveal their × as the attachments do.
 - `InputMessage` is wrapped in `memo` around its `forwardRef`, so a parent's render that leaves its props unchanged skips the composer.
-- `tokenize`: which references the text field shows as chips, omp's prompt grammar by default; the Board's composer chips its members and workflows instead.
 - The default export and the `InputMessageProps`, `InputMessageSlotContext`, and `QueuedMessage` type exports are removed, since nothing imports them.
 
 ## `ui/chat-message.tsx`
@@ -118,7 +117,6 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/button.tsx`: `data-pressed` while `active`; the label truncates with an ellipsis and the icons do not shrink.
 - `ui/sidebar-menu.tsx`: `SidebarMenuButton` takes `size="short"`, `sm`'s 28px row at the surrounding text size, which `sm` drops to 12px; the sessions sidebar's page and session rows use it.
   `SidebarMenuNested` is an item that holds a list under a row of its menu, such as the open page's list in the sidebar's page list.
-  `SidebarMenuButton` also takes `leading`, any element in the icon column, such as the Board sidebar's member avatars.
 - `ui/sidebar-menu-scope.tsx`: the menu's sliding hover leaves a `SidebarMenuNested` region alone: it fades out there instead of snapping to the nearest row, a click on a gap there opens no outer row, and arrow keys skip the nested rows.
 - `ui/tabs.tsx`: `TabsList` scrolls sideways with a hidden scrollbar, and a `TabItem`'s badge is the app's `CountPill` from `web/components/count-pill.tsx`.
 - `ui/file-thumbnail.tsx`: a text file shows its first 400 characters as its thumbnail.

@@ -1,5 +1,5 @@
 /** A project's sessions in a table, running first, each with its status, the pull requests it links, and its last log line's time. */
-import { type Message, sessionMemberId } from "../../../src/shared/board";
+import type { Project } from "../../../src/shared/projects";
 import { hashForSession } from "../../../src/shared/sessions";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
@@ -10,7 +10,7 @@ import type { ProjectSession } from "./project-work";
 
 const HEAD = "h-9 font-medium whitespace-nowrap";
 
-export function SessionsTable({ log, rows, sessions, archived }: { log: readonly Message[]; rows: ProjectSession[]; sessions: KnownSessions; archived: boolean }) {
+export function SessionsTable({ project, rows, sessions, archived }: { project: Project; rows: ProjectSession[]; sessions: KnownSessions; archived: boolean }) {
 	return (
 		<Card title="Sessions">
 			{rows.length === 0 ? (
@@ -37,7 +37,7 @@ export function SessionsTable({ log, rows, sessions, archived }: { log: readonly
 						</thead>
 						<tbody>
 							{rows.map(row => (
-								<SessionRow key={row.id} row={row} lastLog={log.findLast(message => message.author === sessionMemberId(row.id))?.at} sessions={sessions} />
+								<SessionRow key={row.id} row={row} lastLog={project.log.findLast(entry => entry.sessionId === row.id)?.at} sessions={sessions} />
 							))}
 						</tbody>
 					</table>
@@ -47,7 +47,7 @@ export function SessionsTable({ log, rows, sessions, archived }: { log: readonly
 	);
 }
 
-function SessionRow({ row: { id, name, host, pullRequests }, lastLog, sessions }: { row: ProjectSession; lastLog: number | undefined; sessions: KnownSessions }) {
+function SessionRow({ row: { id, name, host, pullRequests }, lastLog, sessions }: { row: ProjectSession; lastLog: string | undefined; sessions: KnownSessions }) {
 	return (
 		<tr className="relative h-10 border-b border-border/60 last:border-b-0 hover:bg-accent/50 has-[:focus-visible]:bg-accent/50">
 			<td className="px-4">
@@ -71,8 +71,8 @@ function SessionRow({ row: { id, name, host, pullRequests }, lastLog, sessions }
 			</td>
 			<td className="px-4 text-right text-xs whitespace-nowrap text-muted-foreground tabular-nums">
 				{lastLog ? (
-					<time dateTime={new Date(lastLog).toISOString()}>
-						<Age at={lastLog} compact exact className="tabular-nums" /> ago
+					<time dateTime={lastLog}>
+						<Age at={Date.parse(lastLog)} compact exact className="tabular-nums" /> ago
 					</time>
 				) : (
 					"—"

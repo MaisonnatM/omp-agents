@@ -1,7 +1,7 @@
 import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
 import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, UnreadTurn, View } from "../src/shared/sessions";
-import type { ProjectChannel } from "../src/shared/board";
+import type { Project } from "../src/shared/projects";
 import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, projectGroups, rosterFolders, rowPlacement, searchSessions, sidebarSessions, waitingCount, workspaceGroups, workspaceSession, workspaceSwitch } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => fromPartial<RosterHost>({ instanceId: `i-${sessionId}`, sessionId, cwd, agents: [], turnWaits: false });
@@ -237,7 +237,7 @@ describe("sidebarSessions", () => {
 		const workspace = (cwd: string) => ({ cwd, cwdDisplay: cwd });
 		const live = [{ ...host("h1", "~/a"), status: "idle" as const }, { ...host("h2", "~/b"), status: "working" as const }, { ...host("h3", "~/a"), status: "idle" as const }];
 		const lists = sidebarSessions(live, [past("p1", "~/a", true), past("p2", "~/b", false)], null, new Set(["h3"]));
-		const project = fromPartial<ProjectChannel>({ id: "x", name: "Launch", project: { sessionIds: ["h2", "p1", "p2", "h3"] } });
+		const project = fromPartial<Project>({ id: "x", name: "Launch", sessionIds: ["h2", "p1", "p2", "h3"] });
 		const { groups: projects, rest } = projectGroups(lists, [project]);
 		expect(projects.map(group => [ids(group.hosts), ids(group.past)])).toEqual([[["h3", "h2"], ["p1"]]]);
 		expect(ids(rest.pinned.hosts)).toEqual([]);
