@@ -15,7 +15,7 @@
  *
  * Usage:
  *   bun scripts/evals/run.ts [--tasks scripts/evals/tasks.json] [--only id,id] [--runs 3] [--model anthropic/claude-opus-5-5:auto]
- *     [--decay] [--disable-extensions ship,bash-guard] [--disable-skills ship] [--out ~/.cache/omp-evals] [--max-cost 5] [--max-time 30m]
+ *     [--decay] [--disable-extensions ship,bash-guard] [--disable-skills ship] [--out ~/.cache/omp-evals] [--max-cost 5] [--max-time 30m] [--jobs 1]
  *     [--plan | --dry-run]
  *   bun scripts/evals/run.ts summary [--out ~/.cache/omp-evals] [--runs 3]
  * `--out` must sit outside every checkout: a run nested in one reads it.
@@ -322,6 +322,7 @@ if (import.meta.main) {
 			"max-time": { type: "string", default: "30m" },
 			"dry-run": { type: "boolean", default: false },
 			plan: { type: "boolean", default: false },
+			jobs: { type: "string", default: "1" },
 		},
 	});
 	const out = resolve(values.out);
@@ -360,6 +361,21 @@ if (import.meta.main) {
 		maxTime: values["max-time"],
 		noMcp: mcpServers.map(name => `mcp:${name}`),
 	};
+	const jobs = Number(values.jobs);
+	if (jobs > 1) {
+		if (values["dry-run"]) throw new Error("--jobs runs only without --dry-run");
+		// One child per task, each with --jobs 1: a task's runs stay in order, and each row is one short appended line.
+		const pending = tasks.filter(task => armList.some(arm => Array.from({ length: runs }, (_, i) => `${arm.name}\t${task.id}\t${i + 1}\t${values.model}`).some(key => !done.has(key))));
+		const childArgs = process.argv.slice(2).filter((arg, i, all) => arg !== "--jobs" && all[i - 1] !== "--jobs" && arg !== "--only" && all[i - 1] !== "--only" && !arg.startsWith("--jobs=") && !arg.startsWith("--only="));
+		const worker = async () => {
+			for (let task = pending.shift(); task; task = pending.shift()) {
+				await Bun.spawn(["bun", import.meta.path, ...childArgs, "--only", task.id], { stdout: "ignore", stderr: "inherit" }).exited;
+			}
+		};
+		await Promise.all(Array.from({ length: jobs }, worker));
+		printSummary(readRows(resultsFile).filter(row => row.model === values.model), runs);
+		process.exit(0);
+	}
 	const dryRows: EvalRow[] = [];
 	for (const arm of armList) {
 		for (const task of tasks) {

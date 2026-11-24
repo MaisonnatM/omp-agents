@@ -72,6 +72,7 @@ Each run appends one line to `<out>/results.jsonl`, `~/.cache/omp-evals` by defa
 A run already recorded is skipped, so a stopped run resumes.
 A run whose model could not answer, such as on a usage limit, is recorded with its `error`, left out of the summary, and retried next time; a run another model answered part of is left out of the summary too.
 `--max-cost` (5 dollars) and `--max-time` (30 minutes) bound each run; the full set at 3 runs is 60 runs.
+`--jobs N` runs N tasks at once, each in a child `run.ts --only <task>` that runs that task's runs in order and appends its rows as before, so only the order of lines in `results.jsonl` changes.
 
 `--dry-run` does everything but call the model: it prints the omp command, applies the landed change in place of the agent's, and runs the check, which must pass for every task; it records nothing.
 
