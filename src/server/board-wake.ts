@@ -49,7 +49,11 @@ export function wakePrompt(state: BoardState, members: readonly Member[], msg: M
 		lines.push("", `It runs the ${msg.attachment.command} workflow, message ${msg.id}. Work through its steps in order, and report each with the board tool's progress action:`);
 		msg.attachment.steps.forEach((step, i) => lines.push(`${i}. ${step.label}`));
 	}
-	lines.push("", `Answer in the thread with the board tool: action "post", thread "${msg.thread}". Read the whole thread first with action "read" when you need its context.`);
+	lines.push(
+		"",
+		`Answer in the thread with the board tool: action "post", thread "${msg.thread}". Read the whole thread first with action "read" when you need its context.`,
+		'When your answer leaves the user a next step, end the post with a line "Suggestions:" and one to three numbered prompts the user could send next, such as "1. Fix both", with nothing after them; the thread offers them as replies.',
+	);
 	return lines.join("\n");
 }
 
