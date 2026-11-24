@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
+- The eval set's 11 tasks that failed the same way in every run now tell the agent the interface their checks expect, such as an exact error message, a dependency's name, or an output's shape, so a run is no longer failed for guessing a name differently.
 - The eval runner takes `--jobs N` to run N tasks at once; each run and its recorded result stay the same, only the wall time drops.
 - A done Board thread with messages you have not read now stays in its channel's list, and in the channel's unread badge, until you open it; before, the badge counted it while the list hid it.
 - The eval set now scores what its tickets ask for: each run sees the pull request's description, only the tests that the change made pass decide the score, and a new column shows the share of those tests that passed. Runs can now use git, uv, and vitest inside their clone.

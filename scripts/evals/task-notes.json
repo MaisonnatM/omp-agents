@@ -1,0 +1,77 @@
+{
+	"agent-schedule-send": [
+		"`SessionFollowUps` takes one deps object with exactly `hosts()` (the live `RosterHost` rows), `isBot(request)` (whether a `StartRequest` starts a Bot's conversation), `schedule(change)` (receives one `ScheduledChange` with `op: \"add\"`, returns `true` when saved) and `now()` (epoch ms); it stores nothing itself.",
+		"`join(request, instanceId)` returns a `SessionJoin` whose `rpc` is `PLAIN_LAUNCH` plus a `tools` array: empty for a Bot's conversation, otherwise exactly one host tool named `schedule_follow_up`, for new and resumed starts alike.",
+		"The tool's arguments are `message` (the text) and `in_minutes` (a number from 1 to 10080 inclusive).",
+		"On success it calls `schedule` once with `{ op: \"add\", send }`, where `send` has exactly `id` (fresh unique string), `at` (`now()` + `in_minutes` × 60000), `reset: null` and `target: { kind: \"message\", sessionId, text }`; `sessionId` is that of the hosts row whose `instanceId` is the caller's.",
+		"Its text answer contains `new Date(at).toISOString()`.",
+		"Refusals reject the `execute` promise and call `schedule` zero times: an empty or blank message with an error containing `message must be a non-empty text.`, an out-of-range delay with `in_minutes must be from 1 to 10080.`, and a caller in no hosts row with `This session is not listed yet`."
+	],
+	"agent-speed": [
+		"`PaceNotes` is built with no arguments; `start()` takes none and starts the clock from `Date.now()` (the checks fake that clock).",
+		"`apply(payload)` takes the whole Anthropic request body (an object with a `messages` array), edits it in place, and returns `true` when it changed anything.",
+		"A tool-results message is a `user` message whose `content` holds at least one `tool_result` block; every such message in the request gets a note, other messages are left alone.",
+		"The note is one block `{ type: \"text\", text }` appended to the message's `content`, with text exactly `elapsed <N>s. ` followed by the nudge, `<N>` the whole seconds since `start()`; no prefix, no extra line breaks.",
+		"A message keeps the note it first got across requests, which carry fresh copies of it: key the note by the message's first `tool_use_id`, not object identity.",
+		"If the message's last block has `cache_control`, move that value onto the note block and delete it from the original; otherwise the note block has no `cache_control` key."
+	],
+	"agent-todo-sections": [
+		"`add-section` reads the name from the existing `section` parameter, trimmed with whitespace runs collapsed to one space, and leaves one inbox change `{ op: \"add-category\", id: <new unique id>, name }`.",
+		"A name that matches, ignoring case, a section in the list or one still waiting in the inbox adds nothing and answers, not as an error, exactly `The section \"<name>\" already exists.` with the cleaned name as the agent passed it, not the stored one.",
+		"`add` and `edit` also resolve `section` against sections still waiting in the inbox: `edit` leaves `{ op: \"categorize\", id, categoryId }`, `add` leaves an `add` change with that `categoryId`; the `add` answer stays `Added to the user's todo list (id <id>).`",
+		"The server's todo inbox applies `add-category` changes and keeps setting aside `rename-category` and `remove-category`."
+	],
+	"approved-skip-ask-human": [
+		"`ask-human` is a GitHub label on the pull request, not a status check.",
+		"`PullRequestSummary` gains an optional `labels?: string[]` of label names; summaries built or cached without it mean no labels.",
+		"`parseListAnswer` always sets `labels`, to `[]` when GitHub returns none; the list query fetches the labels' `name`s.",
+		"An approved pull request labeled `ask-human` whose move would put it in Approved (`merge`, `checks-running` or `draft`) goes to the section titled exactly `Waiting on others`, keeping its move and sorting there by the existing move rank.",
+		"Pull requests without the label, and those whose move already sends them elsewhere, stay where they are."
+	],
+	"ask-multi-select": [
+		"A `select` request gains a numeric `checkboxes` field beside `options` and `checked`: how many leading rows are checkboxes, `0` for an ordinary select and always present; `checked` keeps only indices below it.",
+		"Both RPC and Collab selects fill it only when `selectionMarker` is `\"checkbox\"`, as `markableCount` capped at the option count, or every row when `markableCount` is missing or invalid; `checkedIndices` at or above it are dropped.",
+		"The step card renders exactly `checkboxes` rows with `role=\"checkbox\"`, each ticked one with exactly one `aria-checked=\"true\"` (the drawn tick box carries `aria-hidden`).",
+		"Options after the checkbox rows render as real `<button>`s under the list, sending their original omp option index; the label drops only its leading status mark, so `✓ Done selecting` shows `Done selecting`, as direct text of an element.",
+		"The title drops omp's `(N selected) ` prefix, so the `<h3>` holds only the question's title, such as `Scope`."
+	],
+	"drop-projects-tab": [
+		"Keep `projects` in `SidebarTab` and `SIDEBAR_TABS` at its current place; the change only stops drawing its row.",
+		"`DEFAULT_TAB_LAYOUT` still lists every tab, ending with `projects` shown; `decodeTabLayout`, `encodeTabLayout`, `moveTab` and `hideTab` treat `projects` like any other tab.",
+		"Only `shownTabs(layout, absent)` changes: it never returns `projects`, still drops hidden and absent tabs, and keeps order.",
+		"The settings tab list skips the `projects` entry when drawing rows but keeps it in the stored layout; the Projects page's routing stays."
+	],
+	"idle-session-stop": [
+		"`ProcessSettings` gains `stopIdleSessionsAfterHours: number | null`; `DEFAULT_PROCESS_SETTINGS` is `{ stopIdleAfterMinutes: 30, stopIdleSessionsAfterHours: 12 }`; the offered hours are exactly `null`, 4, 12, 24 and 72.",
+		"`parseProcessSettings` requires both fields and returns `{ ok: {...} }`, or `null` when either is missing, mistyped or not offered.",
+		"`ProcessSettingsFile` fills a missing field with its default before validating, so an old minutes-only file loads; a file with an unoffered value still moves aside to `processes.json.invalid`; `apply` returns `false` only when both fields are unchanged.",
+		"`WatchedSession` gains required booleans `awaitsSubagents` (the main agent only waits on a running subagent) and `stopsWhenIdle` (the idle stop may end it).",
+		"`SessionProcessWatchDeps` replaces `stopIdleAfterMinutes()` with `settings()`, returning the whole `ProcessSettings`, read each tick, and adds `endSession(instanceId): Promise<void>` and `lastWrittenAt(instanceId): number | null` (epoch ms of the session file's last write).",
+		"A session is settled only when `status` is `\"idle\"` and `awaitsSubagents` is false; anything else resets its clock to now. When first seen settled, its clock starts at the earlier of now and `lastWrittenAt`; after that the file time is never read again.",
+		"`tick()` calls `endSession` once in the tick where settled-since + hours × 3,600,000 ≤ now, only when `owner()` is true, the hours setting is not `null` and `stopsWhenIdle` is true; it works with the minutes stop off and never ends a session that left the roster."
+	],
+	"pr-your-move-actions": [
+		"`bulkMoves` in `web/pull-requests-model.ts` takes one array of entries `{ row, pending }`: `row` is the section's `SectionRow`, `pending` is `null` or the id of the quick action whose session is starting; skip every entry whose `pending` is not `null`.",
+		"Only the `reply`, `fix-ci` and `rebase` moves give bulk groups, in that fixed order; a row counts when `row.move` is that move and `moveAction(row.pr, move)` returns an action.",
+		"It returns `{ move, items }` per move with at least one row, `items` being `{ row, action }` in input order, where `row` is the whole input entry, wrapper included."
+	],
+	"tab-history": [
+		"`HeaderTabVisit` is a string union of exactly `\"push\"` (adds a history entry), `\"replace\"` (swaps the entry on screen, keeps Back and Forward) and `\"new-tab\"`; `visitHeaderTab(row, to, visit, newId)` takes it as its third argument instead of the old boolean, and every caller passes one.",
+		"Every `HeaderTab` always has `back: string[]` and `forward: string[]`, never optional, before any `pinned: true`: new tabs are `{ id, hash, back: [], forward: [] }`, and so are the fresh tab after closing the last one and decoded tabs.",
+		"In both arrays the nearest entry is last; `back` keeps at most the exported `TAB_HISTORY_LIMIT` entries, dropping the oldest.",
+		"`stepHeaderTab(row, by)` with `by` `-1` or `1` moves only the tab on screen and returns `{ row, go }`, `go` the hash now shown or `null` when that direction is empty; it never focuses another tab, and other tabs keep their object identity.",
+		"A `\"push\"` clears the tab's `forward`; focusing a session another tab already shows updates only that tab's hash, touching neither tab's history.",
+		"A visit (other than `\"new-tab\"`) to the hash on screen, or to a `#session/<id>` link, returns the same `row` object.",
+		"Duplicating copies `back` and `forward`; closing, reopening and pinning keep them; `decodeHeaderTabs` fills missing `back`/`forward` with `[]`, closed entries included, and encode then decode round-trips histories.",
+		"Cmd+L no longer copies the tab's URL; Copy URL stays in the tab's menu."
+	],
+	"settings-search": [
+		"`settingsMatching(query, { phone })` takes the text and an options object with a boolean `phone`; when `phone` is true the section with `value` `\"phone\"` never appears.",
+		"It returns groups `{ group, entries }`: `group` an entry of `SETTINGS_GROUPS`, `entries` the matching entries of `SETTINGS_SECTIONS`, groups in `SETTINGS_GROUPS` order and entries in `SETTINGS_SECTIONS` order; groups without a match are left out.",
+		"A section matches when its `label` or one of its existing `keywords` contains the trimmed, lowercased query; a blank query matches every section. Leave the `keywords` arrays as they are."
+	],
+	"weekend-retro-fixes": [
+		"`project_update` without `projectId` from a session in no open project fails with exactly `This session is in no open project; name one with projectId: ` followed by the open projects as `<name> (id <id>)`, joined by `, ` on one line in stored order, archived ones left out, then `.`.",
+		"Every other `project_update` error message stays as it was, and the failed call leaves no project change."
+	]
+}

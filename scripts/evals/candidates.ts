@@ -4,7 +4,9 @@
  *
  * - The prompt is the branch's commit messages, plus the imports the hidden tests make of names the base lacks,
  *   so a run is not failed for naming a new function differently, and the other names and texts the tests share with
- *   the change and the base lacks, such as a setting's key, a tool parameter, or an error message.
+ *   the change and the base lacks, such as a setting's key, a tool parameter, or an error message, then the
+ *   hand-written interface notes `task-notes.json` holds for the task: what its tests pin that no name list shows,
+ *   such as a dependency's method, a fixture's fields, or an output's order.
  * - A landing is left out when it touches `desktop/` or dependencies, changes more than 300 non-test, non-doc lines,
  *   brings more than 3 test files, or its messages run past 4000 characters.
  * - `--verify` keeps a task only when its hidden check fails at the base and passes at the landed commit, run in one
@@ -13,7 +15,7 @@
  * Usage:
  *   bun scripts/evals/candidates.ts [--repo <path>] [--scan 200] [--limit 20] [--verify] > scripts/evals/tasks.json
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -85,8 +87,8 @@ export function testTerms(tests: string): { names: Set<string>; texts: Set<strin
 	return { names, texts: new Set(literals.filter(text => /^\w(.*[\w.!?)])?$/.test(text))) };
 }
 
-/** The prompt for a landing: its commit messages, then the imports of names the base does not export yet, then other new names and texts. */
-export function buildPrompt(messages: string, missing: { module: string; names: string[] }[], terms: string[] = []): string {
+/** The prompt for a landing: its commit messages, the imports of names the base does not export yet, other new names and texts, then interface notes. */
+export function buildPrompt(messages: string, missing: { module: string; names: string[] }[], terms: string[] = [], notes: string[] = []): string {
 	const lines = ["Make this change in the repository in the current directory. Its author described it in these commit messages:", "", messages.trim()];
 	if (missing.length > 0) {
 		lines.push("", "Tests will check it through these imports, so give the new code these names and paths:");
@@ -95,6 +97,10 @@ export function buildPrompt(messages: string, missing: { module: string; names: 
 	if (terms.length > 0) {
 		lines.push("", "The tests also expect these names and texts, word for word:");
 		for (const term of terms) lines.push(`- ${JSON.stringify(term)}`);
+	}
+	if (notes.length > 0) {
+		lines.push("", "Interface the checks expect:");
+		for (const note of notes) lines.push(`- ${note}`);
 	}
 	return `${lines.join("\n")}\n`;
 }
@@ -142,6 +148,9 @@ function newTerms(repo: string, base: string, landed: string, hidden: string[], 
 	return [...fresh].filter(term => !sh(`git grep -q -F ${/^[\w$]+$/.test(term) ? "-w " : ""}-e "$TERM" ${base}`, repo, { TERM: term }).ok);
 }
 
+/** Interface notes by task id, for details the hidden tests pin that the commit messages and name lists leave out. */
+export const TASK_NOTES: Record<string, string[]> = JSON.parse(readFileSync(join(import.meta.dir, "task-notes.json"), "utf8"));
+
 export function candidates(repo: string, scan: number): EvalTask[] {
 	const tasks: EvalTask[] = [];
 	const rows = git(repo, "log", "--first-parent", "main", "--merges", `-n${scan}`, "--format=%H%x09%P%x09%cs%x09%s").split("\n").filter(Boolean);
@@ -175,7 +184,7 @@ export function candidates(repo: string, scan: number): EvalTask[] {
 			base,
 			landed,
 			landedAt,
-			prompt: buildPrompt(messages, imports, terms),
+			prompt: buildPrompt(messages, imports, terms, TASK_NOTES[branch]),
 			hiddenTests: hidden,
 			check: `bun test ${hidden.map(path => `./${path}`).join(" ")}`,
 		});

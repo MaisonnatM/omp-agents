@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildPrompt, type EvalTask, exportsName, namedImports, passedTests, testTerms } from "./candidates";
+import { buildPrompt, type EvalTask, exportsName, namedImports, passedTests, TASK_NOTES, testTerms } from "./candidates";
 import { confined } from "./replay";
 import { arms, DECAY_COMPONENTS, decayPlan, decayRows, deltaBand, type EvalRow, pastCost, summarize, verdict } from "./run";
 
@@ -51,6 +51,16 @@ describe("hidden test imports", () => {
 		expect(buildPrompt("Stop idle sessions\n", [], ["stopIdleSessionsAfterHours", 'say "no"'])).toContain(
 			'word for word:\n- "stopIdleSessionsAfterHours"\n- "say \\"no\\""',
 		);
+	});
+
+	test("interface notes come last, and each names a task of the set without giving away its hidden tests", () => {
+		expect(buildPrompt("Add tabs\n", [], ["TAB_LIMIT"], ["`back` is always an array"])).toEndWith('- "TAB_LIMIT"\n\nInterface the checks expect:\n- `back` is always an array\n');
+		const tasks: EvalTask[] = JSON.parse(readFileSync(join(import.meta.dir, "tasks.json"), "utf8"));
+		for (const [id, notes] of Object.entries(TASK_NOTES)) {
+			const task = tasks.find(t => t.id === id);
+			expect(task?.prompt).toContain(notes.at(-1)!);
+			for (const file of task!.hiddenTests) expect(notes.join("\n")).not.toContain(file.split("/").at(-1)!);
+		}
 	});
 });
 
