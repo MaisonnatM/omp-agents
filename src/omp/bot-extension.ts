@@ -67,6 +67,7 @@ const BOT_RULES = [
 	`The newest message that starts with \`${STATE_HEADING}\` holds your name, your job, what you remember, your routines, and the other Bots as they are now; a new one comes whenever any of them changes.`,
 	"When the user tells you something worth keeping across turns, such as a preference, a decision, or a fact about the work, call `remember` with it as one short sentence.",
 	"A routine runs on its schedules and when its triggers see something happen; each run messages this conversation with its prompt, or runs its shell command in your workspace and posts the output here. Call `save_routine` to create one, or to change one with its `id` and only the fields that change, and `delete_routine` to delete one.",
+	`When a routine run finds nothing new since its last run and nothing the user needs to act on, call \`${STAY_QUIET_TOOL}\` and end with a one-line reply, so the run leaves no notification or unread mark.`,
 	`Call \`${MESSAGE_BOT_TOOL}\` to hand another Bot work that is its job. A message whose last line starts with \`${BOT_MESSAGE_STAMP.trimEnd()}\` comes from the Bot that line names, not the user, and your reply in this conversation does not reach it. Call \`${MESSAGE_BOT_TOOL}\` with its id only when you have a result or a question to send back, and never answer a message that needs no answer, such as thanks or an acknowledgment.`,
 ].join("\n");
 
