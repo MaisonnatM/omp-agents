@@ -3,7 +3,7 @@ import { BASE64, isNonEmpty, isObject, type Parsed } from "../json";
 import { isTodoId } from "../user-todos-parse";
 import type { BotId } from "./bot-id";
 import type { BranchChoice } from "./git";
-import { type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
+import { type CheckState, type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
 import type { ModelOption } from "./models";
 import type { TrustAsk } from "./project-trust";
 import type { AdvisorState, CompactionState, GoalSlot } from "./session-controls";
@@ -157,8 +157,17 @@ interface RosterHostBase extends SessionFacts {
 	scheduledCheck: ScheduledCheck | null;
 }
 
-/** A check that wakes a session later: a scheduled send to it, the soonest one when several wait, else a pull request it watches. */
-export type ScheduledCheck = { kind: "send"; at: number } | { kind: "pull-request" };
+/** A pull request a session watches, with its checks as the watch last saw them, `null` before the watch saw it. */
+export interface WatchedChecks {
+	pr: PullRequest;
+	checks: CheckState | null;
+}
+
+/** A check that wakes a session later: a scheduled send to it, the soonest one when several wait, else the pull requests it watches. */
+export type ScheduledCheck = { kind: "send"; at: number } | { kind: "pull-request"; prs: WatchedChecks[] };
+
+/** Whether a watched pull request's checks are done and green, or it has none, so nothing about it is left to wait on. */
+const checksPassed = ({ checks }: WatchedChecks): boolean => checks === "passing" || checks === "none";
 
 /** The tool a session calls in a turn that found nothing for the user, such as a Bot's routine run; that turn ends without marking the session unread. */
 export const STAY_QUIET_TOOL = "stay_quiet";
@@ -180,8 +189,15 @@ export type RosterHost = RosterHostBase &
 export const awaitsSubagents = (host: Pick<RosterHost, "status" | "turnWaits" | "agents">): boolean =>
 	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running");
 
-/** Whether `host`'s turn ended to wait on a scheduled check, so it needs nothing from you until the check wakes it. */
-export const awaitsScheduled = (host: Pick<RosterHost, "status" | "scheduledCheck">): boolean => host.status === "idle" && host.scheduledCheck !== null;
+/**
+ * Whether `host`'s turn ended to wait on a scheduled check, so it needs nothing from you until the check wakes it; once
+ * every pull request it watches passes its checks, it waits on you again, since a passing check wakes no session.
+ */
+export const awaitsScheduled = (host: Pick<RosterHost, "status" | "scheduledCheck">): boolean =>
+	host.status === "idle" && host.scheduledCheck !== null && !(host.scheduledCheck.kind === "pull-request" && host.scheduledCheck.prs.every(checksPassed));
+
+/** Whether `host` waits on its watched pull requests' checks, which puts its row in its workspace's Waiting on CI group. */
+export const awaitsCi = (host: Pick<RosterHost, "status" | "scheduledCheck">): boolean => awaitsScheduled(host) && host.scheduledCheck?.kind === "pull-request";
 
 /**
  * Why `host` stopped for the user, `null` while it has not: its oldest open question, else a wait with no question relayed

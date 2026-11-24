@@ -1,5 +1,6 @@
 import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
+import type { CheckState } from "../src/shared/github";
 import type { AgentRow, AgentStatus, HostStatus, PastSession, RosterHost, ScheduledCheck, UnreadTurn, View } from "../src/shared/sessions";
 import type { Project } from "../src/shared/projects";
 import { defaultCwd, discoverableSessions, latestSession, listedViews, listWorkspaces, projectGroups, rosterFolders, rowPlacement, searchSessions, sidebarSessions, waitingCount, workspaceGroups, workspaceSession, workspaceSwitch } from "./sessions";
@@ -178,7 +179,7 @@ describe("sidebarSessions", () => {
 				live("idle-delegating", "idle", false, subagents("running")),
 				live("waits-on-subagent", "working", true, subagents("idle", "running")),
 				live("waits-on-check", "idle", false, [], { kind: "send", at: 5_000 }),
-				live("waits-on-pull-request", "idle", false, [], { kind: "pull-request" }),
+				live("waits-on-pull-request", "idle", false, [], { kind: "pull-request", prs: [{ pr: { owner: "o", repo: "r", number: 1 }, checks: "pending" }] }),
 				live("works-before-check", "working", false, [], { kind: "send", at: 5_000 }),
 				live("waits-on-bash-job", "working", true, []),
 				live("works-beside-subagent", "working", false, subagents("running")),
@@ -194,6 +195,25 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.running)).toEqual(["works-before-check", "waits-on-bash-job", "works-beside-subagent", "asks"]);
 		expect(ids(lists.idle)).toEqual(["done"]);
 		expect(ids(lists.pinned.hosts)).toEqual(["pinned"]);
+	});
+
+	test("a session waiting on CI lists after the other sessions waiting on work, and leaves for idle once every pull request it watches passes", () => {
+		const watching = (sessionId: string, ...checks: (CheckState | null)[]) =>
+			fromPartial<RosterHost>({ ...host(sessionId, "~/a"), status: "idle", scheduledCheck: { kind: "pull-request", prs: checks.map((state, number) => ({ pr: { owner: "o", repo: "r", number }, checks: state })) } });
+		const lists = sidebarSessions(
+			[
+				watching("one-running", "passing", "pending"),
+				watching("not-listed-yet", null),
+				watching("one-failing", "passing", "failing"),
+				fromPartial<RosterHost>({ ...host("waits-on-check", "~/a"), status: "idle", scheduledCheck: { kind: "send", at: 5_000 } }),
+				watching("all-passed", "passing", "none"),
+			],
+			[],
+			null,
+			new Set(),
+		);
+		expect(ids(lists.awaitingWork)).toEqual(["waits-on-check", "one-running", "not-listed-yet", "one-failing"]);
+		expect(ids(lists.idle)).toEqual(["all-passed"]);
 	});
 
 	test("the waiting count takes unread turns and open questions in the selected workspace, pinned ones included, and not a turn already read or one whose session waits on its subagents or a scheduled check", () => {
