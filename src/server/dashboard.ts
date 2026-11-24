@@ -226,7 +226,7 @@ export class Dashboard {
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
 		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
 		const stores = syncStores(
-			{ sourceControl: this.#sourceControl, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile) },
+			{ sourceControl: this.#sourceControl, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile), board: this.#modules.board },
 			HOME,
 			list => {
 				// Every Bot memory is read again, since a sync may have rewritten them.
