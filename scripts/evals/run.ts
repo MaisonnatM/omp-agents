@@ -26,6 +26,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { type EvalRun, writeEvalRun } from "../../src/eval-runs";
 import { type EvalTask, passedTests, writeHiddenTests } from "./candidates";
 import { bare, changeSize, confined, endedOnError, git, pinnedConfig, prepare, price, sh, type Usage } from "./replay";
 
@@ -265,6 +266,12 @@ interface Options {
 	noMcp: string[];
 }
 
+/** How a scored run ended, as one line. */
+function outcomeOf(row: EvalRow): string {
+	const tests = row.testsTotal ? `, ${row.testsPassed}/${row.testsTotal} tests passed` : "";
+	return `${row.error ? `could not answer: ${row.error}` : row.passed ? "passed" : `failed ${row.failures.length} tests`}${tests}, $${row.cost.toFixed(2)}, ${row.minutes} min`;
+}
+
 function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun: boolean): EvalRow {
 	const dir = join(options.out, arm.name, task.id.replace(/[^\w.-]+/g, "_"), String(run));
 	rmSync(dir, { recursive: true, force: true });
@@ -280,6 +287,21 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 	// The kit's extensions keep their state, such as the ship trace, under XDG_CONFIG_HOME; a run writes its own.
 	env.XDG_CONFIG_HOME = join(dir, "config");
 	const started = Date.now();
+	// Started from an omp session, a run records itself in that session's artifacts directory, so the dashboard lists it among the session's subagents.
+	const parent = dryRun ? undefined : process.env.PI_SESSION_FILE;
+	const record: EvalRun = {
+		id: `${arm.name === FULL ? "" : `${arm.name}.`}${task.id}.${run}`.replace(/[^\w.-]+/g, "_"),
+		task: task.id,
+		arm: arm.name,
+		run,
+		model: options.model,
+		title: task.prompt.split("\n", 1)[0]!.trim(),
+		pid: process.pid,
+		sessions,
+		startedAt: started,
+		ended: null,
+	};
+	if (parent) writeEvalRun(parent, record);
 	let exitCode: number | null = 0;
 	if (dryRun) {
 		console.error(`  would run in ${clone}: sandbox-exec ${sandboxArgs.slice(2, -1).join(" ")} <prompt.md>`);
@@ -306,7 +328,7 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 		rmSync(clone, { recursive: true, force: true });
 	}
 	const { passed, failures, testsPassed, testsTotal } = check;
-	return {
+	const row: EvalRow = {
 		at: new Date().toISOString(),
 		task: task.id,
 		arm: arm.name,
@@ -324,6 +346,8 @@ function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun
 		filesChanged,
 		linesChanged,
 	};
+	if (parent) writeEvalRun(parent, { ...record, ended: { at: Date.now(), outcome: outcomeOf(row), error: error !== null } });
+	return row;
 }
 
 if (import.meta.main) {
@@ -403,8 +427,7 @@ if (import.meta.main) {
 				if (!values["dry-run"] && done.has(`${arm.name}\t${task.id}\t${run}\t${values.model}`)) continue;
 				console.error(`${arm.name} ${task.id} run ${run}`);
 				const row = runOnce(task, arm, run, options, values["dry-run"]);
-				const tests = row.testsTotal ? `, ${row.testsPassed}/${row.testsTotal} tests passed` : "";
-				console.error(`  ${row.error ? `could not answer: ${row.error}` : row.passed ? "passed" : `failed ${row.failures.length} tests`}${tests}, $${row.cost.toFixed(2)}, ${row.minutes} min`);
+				console.error(`  ${outcomeOf(row)}`);
 				if (values["dry-run"]) dryRows.push(row);
 				else appendFileSync(resultsFile, `${JSON.stringify(row)}\n`);
 			}

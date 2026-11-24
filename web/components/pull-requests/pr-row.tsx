@@ -10,7 +10,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuTrigger, DropdownMenu, Drop
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { fixOwner, isFix, type ListChange, type SectionRow, MOVES, moveAction, reason, type StackPlace, threadStarters, withReviewer } from "../../pull-requests-model";
+import { fixOwner, type ListChange, type SectionRow, MOVES, moveAction, reason, type StackPlace, threadStarters, withReviewer } from "../../pull-requests-model";
+import { PULL_REQUEST_ACTIONS } from "../../../src/pull-request-actions";
 import { hashForPullRequests, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
@@ -198,7 +199,7 @@ function RowMoveBadge({ pr, move, sessions, pending, cwd, onQuickAction }: { pr:
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
 	const owner = fixOwner(sessions, action);
-	const goesTo = owner ? ` · Send to ${owner.label}` : isFix(action) ? " · New session" : "";
+	const goesTo = owner ? ` · Send to ${owner.label}` : PULL_REQUEST_ACTIONS[action].reachesOwner ? " · New session" : "";
 	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}${goesTo}`;
 	return (
 		<Tooltip content={`${label}. ${QUICK_ACTIONS[action].description}`}>
@@ -218,7 +219,7 @@ function RowMoveBadge({ pr, move, sessions, pending, cwd, onQuickAction }: { pr:
 /** Whether `move` on `pr` waits on a fix, which goes to the session that owns the pull request. */
 const fixes = (pr: PullRequestSummary, move: MoveId): boolean => {
 	const action = moveAction(pr, move);
-	return action !== null && isFix(action);
+	return action !== null && PULL_REQUEST_ACTIONS[action].reachesOwner;
 };
 
 /** The sessions cell of a row whose fix no session owns, so the fix starts a new one. */

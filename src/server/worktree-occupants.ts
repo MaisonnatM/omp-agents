@@ -143,7 +143,8 @@ export class WorktreeOccupants {
 			const ownPath = this.#track(transcriptPath(host, null));
 			if (ownPath) own.push({ label, path: ownPath });
 			for (const agent of host.agents) {
-				if (host.source === "terminal" ? agent.status === "aborted" : agent.status !== "running") continue;
+				// An eval run works in a clone of its own under its eval folder, never in a checkout the dashboard cleans up.
+				if (agent.evalRun || (host.source === "terminal" ? agent.status === "aborted" : agent.status !== "running")) continue;
 				const key = `${host.instanceId}\0${agent.id}`;
 				active.add(key);
 				const files = this.#residents.get(key)?.files ?? new Set<string>();

@@ -57,6 +57,11 @@ export interface AgentRow {
 	/** Whether the dashboard can message it: a writable terminal room and an agent that is not aborted, or a running subagent of a session this dashboard started. */
 	canMessage: boolean;
 	queue: MessageQueue;
+	/**
+	 * An eval run that `scripts/evals/run.ts` started from the session as its own omp, which the dashboard lists and opens
+	 * but cannot stop or message, and which the session does not wait on.
+	 */
+	evalRun?: true;
 }
 
 export const SHIP_STAGES = ["ticket", "plan", "implement", "draft_pr", "interface_review", "thermonuclear", "ready_gate", "live", "merged"] as const;
@@ -185,9 +190,9 @@ export type RosterHost = RosterHostBase &
 		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null; compaction: CompactionState; advisor: AdvisorState | null; goal: GoalSlot; private: boolean }
 	);
 
-/** Whether `host`'s main agent only waits on a subagent that still runs: its turn ended, or sits only in `wait` or `task` calls. */
+/** Whether `host`'s main agent only waits on a subagent that still runs: its turn ended, or sits only in `wait` or `task` calls. An eval run is never waited on. */
 export const awaitsSubagents = (host: Pick<RosterHost, "status" | "turnWaits" | "agents">): boolean =>
-	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running");
+	(host.status === "idle" || (host.status === "working" && host.turnWaits)) && host.agents.some(agent => agent.status === "running" && !agent.evalRun);
 
 /**
  * Whether `host`'s turn ended to wait on a scheduled check, so it needs nothing from you until the check wakes it; once
@@ -398,11 +403,8 @@ export type StartRequest =
 			bot: BotId | null;
 			/** The session is deleted, with everything it wrote, when it ends, and omp remembers nothing of it; it works on no todo, task, or review draft. */
 			private: boolean;
-			/**
-			 * The session that owns the pull request this start fixes, which gets `prompt` instead of a new session: resumed first
-			 * when it ended, queued after its turn when it runs one. A new session starts as asked when it cannot take it; `null` for none.
-			 */
-			owner: string | null;
+			/** When a session here already owns `subject`, the prompt goes to it instead of a new session: as a follow-up while it runs, else resumed. */
+			reachOwner: boolean;
 	  }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
@@ -424,8 +426,8 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	taskId: null,
 	reviewDraft: false,
 	bot: null,
-	owner: null,
 	private: false,
+	reachOwner: false,
 	...options,
 });
 
@@ -488,7 +490,7 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
  */
 export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest> {
 	if (!isObject(value) || value.kind !== "new") return null;
-	const { cwd, prompt, todoId = null, projectId = null, taskId = null, reviewDraft = false, private: isPrivate = false, owner = null } = value;
+	const { cwd, prompt, todoId = null, projectId = null, taskId = null, reviewDraft = false, private: isPrivate = false, reachOwner = false } = value;
 	const images = parseImages(value.images);
 	const branch = parseBranchChoice(value.branch);
 	// `null` starts on omp's default model.
@@ -500,13 +502,14 @@ export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest
 	if (todoId !== null && !isTodoId(todoId)) return null;
 	if (projectId !== null && !isNonEmpty(projectId)) return null;
 	if (taskId !== null && !isNonEmpty(taskId)) return null;
-	if (owner !== null && !isNonEmpty(owner)) return null;
 	// Only a pull request has a review draft.
 	if (typeof reviewDraft !== "boolean" || (reviewDraft && subject.ok?.kind !== "pull-request")) return null;
 	// A private session leaves nothing behind, so nothing may link to it.
-	if (typeof isPrivate !== "boolean" || (isPrivate && (todoId !== null || projectId !== null || taskId !== null || reviewDraft || owner !== null))) return null;
+	if (typeof isPrivate !== "boolean" || (isPrivate && (todoId !== null || projectId !== null || taskId !== null || reviewDraft))) return null;
+	// Only a pull request has an owner to reach.
+	if (typeof reachOwner !== "boolean" || (reachOwner && subject.ok?.kind !== "pull-request")) return null;
 	return prompt.trim() || images.ok.length > 0
-		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, projectId, taskId, reviewDraft, private: isPrivate, owner }) }
+		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, projectId, taskId, reviewDraft, private: isPrivate, reachOwner }) }
 		: null;
 }
 

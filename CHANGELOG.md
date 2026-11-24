@@ -5,9 +5,11 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-24
 
-- On the Pull requests page, Fix CI, Reply, and Rebase now go to the session that already works on the pull request instead of starting a new one: a busy session gets it after its current turn, and an ended one is resumed first; only a pull request with no session, or one whose session cannot be resumed, gets a new session.
-- Each Your move row shows its session, or "no session", and the badge's tooltip says where the fix goes; the heading buttons ask, for example, "Confirm 4? · 3 to sessions, 1 new".
+- Each Your move row shows the session its fix goes to, or "no session", the badge's tooltip says where the fix goes, and the heading buttons ask, for example, "Confirm 4? · 3 to sessions, 1 new".
+- Fix CI, Address comments, and Resolve conflicts on a pull request now go to the session that already worked on it, resuming that session if it ended, instead of starting a new session each click.
+- Reply and Fix CI at the top of Your move do the same for each pull request, and start a new session only for a pull request no session worked on.
 - A step in a project's plan has a play button: it opens a new session in the project, already set to work on that step and its sub-steps, with the prompt written for you.
+- An eval run that a session starts with the eval runner now shows in that session's Subagents list, with the task it works on while it runs, then whether it passed, its cost, and its minutes; click it to read the run's conversation.
 - The prompt that Start session writes for the steps you picked now asks the session to tick each one it finishes.
 - Sessions waiting on a pull request's checks or a scheduled send now sit in one top-level Waiting section between the workspaces and Past, each with a line per pull request showing whether its checks are running, failing, or passing; click a line to open the pull request.
 - Once every pull request a session watches passes its checks, the session leaves Waiting on CI and shows the blue dot, so you see that CI went green without being pinged.

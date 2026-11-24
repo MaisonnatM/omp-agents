@@ -1,6 +1,6 @@
 /** What each pull request waits on next, the list's sections and stacks, what stands between a pull request and its merge, its open review threads, and the state changes it offers. */
 import { isObject, isString, oneOf, parseJson } from "../src/json";
-import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
+import { PULL_REQUEST_ACTIONS, type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
 import { type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, repoKey, samePullRequest, type SettableState, unresolvedOf } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf } from "../src/shared/moves";
 import type { ReviewDraft } from "../src/shared/review-drafts";
@@ -133,18 +133,13 @@ export function bulkMoves<R extends { row: SectionRow; pending: unknown }>(rows:
 	});
 }
 
-/** The quick actions that fix your own pull request, which go to the session that owns it rather than to a new one. */
-const FIXES: readonly PullRequestActionId[] = ["fix-ci-and-conflicts", "fix-ci", "resolve-conflicts", "address-comments"];
-
 /**
- * The session that `action` on a pull request goes to, from the pull request's sessions in the order its row's chips
- * show them: the first, a running one before an ended one and the one that opened it before one that only worked on it.
- * `null` when no session is linked to it, or for an action that is no fix, such as **Review**, which always starts a new session.
+ * The session its row shows `action` on a pull request most likely going to, from the pull request's sessions in the order
+ * its row's chips show them: the first, a running one before an ended one and the one that opened it before one that only
+ * worked on it; the server picks the owner itself when the action runs. `null` when no session is linked to it, or for an
+ * action that does not reach the owner, such as **Review**, which always starts a new session.
  */
-export const fixOwner = <S>(sessions: readonly S[], action: PullRequestActionId): S | null => (isFix(action) ? (sessions[0] ?? null) : null);
-
-/** Whether `action` fixes your own pull request, so it goes to the session that owns it when one does. */
-export const isFix = (action: PullRequestActionId): boolean => FIXES.includes(action);
+export const fixOwner = <S>(sessions: readonly S[], action: PullRequestActionId): S | null => (PULL_REQUEST_ACTIONS[action].reachesOwner ? (sessions[0] ?? null) : null);
 
 /** What a heading button that hands a move to `count` pull requests reads once armed, `owned` of them going to their sessions: `Confirm 4? · 3 to sessions, 1 new`. */
 export function confirmLabel(count: number, owned: number): string {

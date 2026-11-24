@@ -1,6 +1,6 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { fromPartial } from "@total-typescript/shoehorn";
-import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DashboardSession } from "../dashboard-session";
@@ -47,6 +47,7 @@ test("a Claude Code or Codex session neither resumes nor forks, before any omp s
 		restoreWorktree: async () => { throw new Error("A read-only resume must not add a worktree back."); },
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
+		watcherOf: () => null,
 	});
 	expect(await start({ kind: "resume", sessionId: "c1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
 	expect(await start({ kind: "fork", view: { kind: "past", sessionId: "x1" }, entryId: "e1" })).toMatchObject({ ok: false, error: expect.stringContaining("read-only") });
@@ -72,6 +73,7 @@ test("a private session does not fork, before any omp starts, since its copy wou
 		restoreWorktree: async () => {},
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		privateSessions: new PrivateSessions({ root, unpin: () => {} }),
+		watcherOf: () => null,
 	});
 	const view = { kind: "live", instanceId: "i1", agentId: null } as const;
 	expect(await start({ kind: "fork", view, entryId: "e1" })).toMatchObject({ ok: false, error: expect.stringContaining("private session") });
@@ -225,6 +227,7 @@ function claimedStarter(
 		admit,
 		restoreWorktree,
 		privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
+		watcherOf: () => null,
 	});
 }
 
@@ -235,6 +238,65 @@ function sessionForStart(instanceId: string, cwd: string): DashboardSession {
 		prompt: async () => {},
 	}), DashboardSession.prototype);
 }
+
+/** A session that records each prompt it is sent, with how. */
+function hearingSession(instanceId: string, cwd: string, heard: string[]): DashboardSession {
+	return Object.setPrototypeOf(
+		fromPartial<DashboardSession>({ ...sessionForStart(instanceId, cwd), prompt: async (_agent: unknown, text: string, _images: unknown, delivery: string) => void heard.push(`${instanceId} ${delivery} ${text}`) }),
+		DashboardSession.prototype,
+	);
+}
+
+const pr7 = { kind: "pull-request", pr: { owner: "acme", repo: "app", number: 7 } } as const;
+
+test("a pull request fix finds the session running on it first, else the watcher and the ended sessions that kept it, newest first, and sends it as a follow-up", async () => {
+	const dir = mkdtempSync("/tmp/omp-start-owner-");
+	try {
+		const claimsFile = join(dir, "claims.json");
+		const claims = new TaskClaims(claimsFile);
+		for (const [instanceId, sessionId] of [["old", "s-old"], ["new", "s-new"]] as const) {
+			claims.claim("/repo/.git", "pr:acme/app#7", instanceId, dir);
+			claims.bind(instanceId, process.pid, sessionId, dir);
+			claims.release(instanceId);
+		}
+		writeFileSync(join(dir, "s-old.jsonl"), "");
+		writeFileSync(join(dir, "s-new.jsonl"), "");
+		utimesSync(join(dir, "s-old.jsonl"), 1, 1);
+		const heard: string[] = [];
+		const sessions = new LiveSessions(() => {}, new TaskClaims(claimsFile));
+		let watcher: string | null = null;
+		const start = createStarter({
+			sessions,
+			pathFor: () => null,
+			savedFile: id => (id === "s-old" || id === "s-new" ? join(dir, `${id}.jsonl`) : null),
+			factsFor: () => ({ pullRequests: [], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }),
+			onStarted: () => {},
+			workspaceOf: async cwd => cwd,
+			linkTodo: () => {},
+			joinProject: () => {},
+			joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
+			admit: async () => {},
+			restoreWorktree: async () => {},
+			privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
+			watcherOf: () => watcher,
+		});
+		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
+		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
+		const fix = (number: number) => newSessionRequest(dir, "Fix CI", { subject: { kind: "pull-request", pr: { owner: "acme", repo: "app", number } }, branch: { kind: "work", name: "feature" }, reachOwner: true });
+		expect(await start.ownersOf(fix(7))).toEqual(["s-new", "s-old"]);
+		watcher = "s-watch";
+		expect(await start.ownersOf(fix(7))).toEqual(["s-watch", "s-new", "s-old"]);
+		expect(await start.ownersOf({ ...fix(7), reachOwner: false })).toEqual([]);
+		expect(await start.ownersOf(fix(8))).toEqual(["s-watch"]);
+		const owner = hearingSession("owner", dir, heard);
+		sessions.add(owner, pr7);
+		expect(await start.ownersOf(fix(7))).toEqual(["s-owner"]);
+		expect(await start.followUp(owner, fix(7))).toEqual({ ok: true, instanceId: "owner", workspace: dir, prompt: null });
+		expect(heard).toEqual(["owner followUp Fix CI"]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
 
 test("simultaneous task launches across registries allow one writer before checkout, and ending releases the task", async () => {
 	const dir = mkdtempSync("/tmp/omp-start-claim-");
@@ -305,6 +367,7 @@ test("a new session for a project joins it before its first message, and starts 
 			admit: async () => {},
 			restoreWorktree: async () => {},
 			privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
+			watcherOf: () => null,
 		});
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
 		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);

@@ -4,7 +4,7 @@ import { beginStart, dismissSettled, dropHidden, failStart, messageOf, refusedSt
 const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
 const resume = { kind: "resume", sessionId: "s1" } as const;
-const quick = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "todo", id: "t7", text: "fix", action: "work" }, skill: null, owner: null } as const;
+const quick = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "todo", id: "t7", text: "fix", action: "work" }, skill: null } as const;
 const ok = { ok: true, instanceId: "i1", workspace: "/tmp", prompt: null } as const;
 
 describe("starts", () => {

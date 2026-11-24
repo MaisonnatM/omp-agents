@@ -253,7 +253,7 @@ export class Dashboard {
 		const { placement } = files.facts;
 		const { factsOf } = files;
 		const pathFor = (view: View): string | null =>
-			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
+			view.kind === "past" ? files.pathOf(view.sessionId) : sessions.transcriptPath(view.instanceId, view.agentId, files.pathOf);
 		const views = (this.#views = new Views(
 			pathFor,
 			(topic, msg) => void this.#publisher?.publish(topic, JSON.stringify(msg)),
@@ -389,6 +389,7 @@ export class Dashboard {
 			admit: this.#admit,
 			restoreWorktree: sessionIds => this.#worktrees.checkout(() => restoreEndedWorktree(this.#endedWorktrees.of(sessionIds))),
 			privateSessions: this.#privateSessions,
+			watcherOf: pr => this.#prWatches.watcherOf(pr),
 		});
 		const occupants = new WorktreeOccupants();
 		const worktrees = (this.#worktrees = new Worktrees({
@@ -396,7 +397,7 @@ export class Dashboard {
 			activity: () => files.activity(),
 			serverCwd: process.cwd(),
 			mergedPullRequests,
-			live: () => occupants.snapshot(sessions.rows(factsOf), (host, agentId) => sessions.get(host.instanceId)?.transcriptPath(agentId, files.pathOf) ?? null),
+			live: () => occupants.snapshot(sessions.rows(factsOf), (host, agentId) => sessions.transcriptPath(host.instanceId, agentId, files.pathOf)),
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
 		this.#processWatch = new SessionProcessWatch({
@@ -433,12 +434,24 @@ export class Dashboard {
 				return this.#processSettings.value;
 			},
 		});
-		const startSession = (this.#startSession = request => worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null));
+		const startSession = (this.#startSession = async request => {
+			// Outside the checkout chain: resuming an owner restores its worktree through that chain.
+			if (request.kind === "new")
+				for (const sessionId of await starter.ownersOf(request)) {
+					try {
+						return await starter.followUp(await reach(sessionId), request);
+					} catch (error) {
+						// A watcher whose file is gone owns nothing; any other owner's failure is the answer, not a second session.
+						if (sessions.bySessionId(sessionId) || files.pathOf(sessionId) !== null) return { ok: false, error: errorText(error) };
+					}
+				}
+			return worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null);
+		});
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
 		const reach = async (sessionId: string): Promise<LiveSession> => {
 			const live = sessions.bySessionId(sessionId);
 			if (live) return live;
-			const result = await startSession({ kind: "resume", sessionId });
+			const result = await worktrees.start(() => starter({ kind: "resume", sessionId }), false);
 			if (!result.ok) throw new Error(`Cannot resume the session: ${result.error}`);
 			const resumed = sessions.get(result.instanceId);
 			if (!resumed) throw new Error("The session exited as it resumed.");
@@ -1041,6 +1054,8 @@ export class Dashboard {
 		const joinedOrLeft = this.#sessions.follow(hosts);
 		// Only a listing that worked knows which terminal sessions still run.
 		if (this.#rosterError === null) this.#sessions.restoreListedUnread(hosts, this.#files.pathOf);
+		// Every listing reads the eval runs again, so their rows follow the harness that records them.
+		await this.#sessions.refreshEvalRuns(this.#files.pathOf);
 		// A terminal session that asked to end before the registry listed it.
 		void this.#endInbox.drain();
 		// Every listing can change a host's row or the registry error; only a session that joins or leaves changes the past list.
