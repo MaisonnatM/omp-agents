@@ -434,12 +434,24 @@ export class Dashboard {
 				return this.#processSettings.value;
 			},
 		});
-		const startSession = (this.#startSession = request => worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null));
+		const startSession = (this.#startSession = async request => {
+			// Outside the checkout chain: resuming an owner restores its worktree through that chain.
+			if (request.kind === "new")
+				for (const sessionId of await starter.ownersOf(request)) {
+					try {
+						return await starter.followUp(await reach(sessionId), request);
+					} catch (error) {
+						// A watcher whose file is gone owns nothing; any other owner's failure is the answer, not a second session.
+						if (sessions.bySessionId(sessionId) || files.pathOf(sessionId) !== null) return { ok: false, error: errorText(error) };
+					}
+				}
+			return worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null);
+		});
 		/** The live session that continues `sessionId`, else that session resumed; rejects when it does not resume. */
 		const reach = async (sessionId: string): Promise<LiveSession> => {
 			const live = sessions.bySessionId(sessionId);
 			if (live) return live;
-			const result = await startSession({ kind: "resume", sessionId });
+			const result = await worktrees.start(() => starter({ kind: "resume", sessionId }), false);
 			if (!result.ok) throw new Error(`Cannot resume the session: ${result.error}`);
 			const resumed = sessions.get(result.instanceId);
 			if (!resumed) throw new Error("The session exited as it resumed.");

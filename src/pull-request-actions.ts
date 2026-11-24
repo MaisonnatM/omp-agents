@@ -58,7 +58,7 @@ const thermonuclear = (pr: PullRequestSummary): string =>
 export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullRequestSummary>> = {
 	"fix-ci-and-conflicts": {
 		label: "Fix CI and conflicts",
-		description: "Start a session that rebases the branch, resolves its merge conflicts, then fixes the failing checks",
+		description: "Have the session that owns the pull request, else a new one, rebase the branch, resolve its merge conflicts, then fix the failing checks",
 		applies: pr => ownOpen(pr) && pr.conflicts && pr.checks === "failing",
 		prompt: pr =>
 			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}) and the checks on its latest commit fail. ${ON_BRANCH} ${shipWork(pr, "rebase", "fix_ci")} First rebase it onto the latest base and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Then find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause of each failure that still applies after the rebase, and rerun a failure that is flaky or unrelated to this pull request instead of changing code, saying so. Run the project's checks, then push the branch with \`--force-with-lease\`. ${END_WHEN_DONE}`,
@@ -67,7 +67,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 	},
 	"fix-ci": {
 		label: "Fix CI",
-		description: "Start a session that fixes the failing checks",
+		description: "Have the session that owns the pull request, else a new one, fix the failing checks",
 		applies: pr => ownOpen(pr) && pr.checks === "failing",
 		prompt: pr =>
 			`${pullRequestContext(pr)} The checks on its latest commit fail. ${ON_BRANCH} ${shipWork(pr, "fix_ci")} Find the failing checks and read their logs ${checkLogs(pr)}. Fix the root cause, run the failing checks locally when you can, then commit and push to the PR's branch. If a failure is flaky or unrelated to this pull request, rerun it instead of changing code, and say so. ${END_WHEN_DONE}`,
@@ -76,7 +76,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 	},
 	"resolve-conflicts": {
 		label: "Resolve conflicts",
-		description: "Start a session that rebases the branch and resolves its merge conflicts",
+		description: "Have the session that owns the pull request, else a new one, rebase the branch and resolve its merge conflicts",
 		applies: pr => ownOpen(pr) && pr.conflicts,
 		prompt: pr =>
 			`${pullRequestContext(pr)} It has merge conflicts with its base branch (${baseOf(pr)}). ${ON_BRANCH} ${shipWork(pr, "rebase")} Rebase it onto the latest base and resolve every conflict keeping the intent of both sides. ${CONFLICT_STEPS} Run the project's checks, and push the branch with \`--force-with-lease\`. ${END_WHEN_DONE}`,
@@ -85,7 +85,7 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullR
 	},
 	"address-comments": {
 		label: "Address comments",
-		description: "Start a session that works through the review comments",
+		description: "Have the session that owns the pull request, else a new one, work through the review comments",
 		applies: pr => ownOpen(pr) && (pr.unresolved.count > 0 || pr.review === "changes-requested"),
 		prompt: pr => {
 			const threads = pr.unresolved.count > 0 ? `${pr.unresolved.exact ? "" : "at least "}${pr.unresolved.count} unresolved review ${pr.unresolved.count === 1 ? "thread" : "threads"}` : null;

@@ -69,7 +69,7 @@ export interface StartEnv {
 export type Starter = (request: StartRequest) => Promise<StartResult>;
 
 /** Runs `start` requests; one ready session per success, none on failure. */
-export function createStarter(env: StartEnv): Starter {
+export function createStarter(env: StartEnv): Starter & { ownersOf(request: StartRequest): Promise<string[]>; followUp(session: LiveSession, request: NewSessionRequest): Promise<StartResult> } {
 	const { sessions } = env;
 	/** Past sessions being resumed, so a second click starts no second omp on the same file. */
 	const resuming = new Set<string>();
@@ -224,41 +224,31 @@ export function createStarter(env: StartEnv): Starter {
 		return { ok: true, instanceId: session.instanceId, workspace: await env.workspaceOf(session.cwd), prompt: null };
 	}
 
-	/** When `sessionId`'s file was last written, `0` while it is not listed. */
-	const writtenAt = (sessionId: string): number => {
-		const path = env.savedFile(sessionId);
-		return path === null ? 0 : (statSync(path, { throwIfNoEntry: false })?.mtimeMs ?? 0);
-	};
-
 	/**
-	 * Sends `request`'s prompt to the session here that owns its pull request: the one running on it, else the one that
-	 * watches it, else the ended session that kept its task last, resumed. `null` when none does or none resumes.
+	 * The sessions here that own `request`'s pull request, first to try first: the one running on it, else the one that
+	 * watches it, then the ended sessions that kept its task, newest file first. Empty when the request does not reach its owner.
 	 */
-	async function reachOwner(request: NewSessionRequest): Promise<StartResult | null> {
+	async function ownersOf(request: StartRequest): Promise<string[]> {
+		if (request.kind !== "new" || !request.reachOwner) return [];
 		const identity = taskIdentity(request);
 		const pr = request.subject?.pr;
 		const dir = await directoryOf(request.cwd);
-		if (!identity || !pr || !dir) return null;
+		if (!identity || !pr || !dir) return [];
 		const running = await sessions.taskOwner(identity, dir, env.factsFor);
-		if (running) return followUp(running, request);
-		const kept = sessions.savedOwners(identity).sort((a, b) => writtenAt(b) - writtenAt(a));
+		if (running) return [running.sessionId];
+		const kept = sessions
+			.savedOwners(identity)
+			.flatMap(sessionId => {
+				const path = env.savedFile(sessionId);
+				return path === null ? [] : [{ sessionId, writtenAt: statSync(path, { throwIfNoEntry: false })?.mtimeMs ?? 0 }];
+			})
+			.sort((a, b) => b.writtenAt - a.writtenAt)
+			.map(({ sessionId }) => sessionId);
 		const watcher = env.watcherOf(pr);
-		for (const sessionId of new Set(watcher === null ? kept : [watcher, ...kept])) {
-			const live = sessions.bySessionId(sessionId);
-			if (live && !live.finished(Date.now())) return followUp(live, request);
-			if (env.savedFile(sessionId) === null) continue;
-			const resumed = await start({ kind: "resume", sessionId });
-			const session = resumed.ok ? sessions.get(resumed.instanceId) : undefined;
-			if (session) return followUp(session, request);
-		}
-		return null;
+		return [...new Set(watcher === null ? kept : [watcher, ...kept])];
 	}
 
 	const start: Starter = async request => {
-		if (request.kind === "new" && request.reachOwner) {
-			const reached = await reachOwner(request);
-			if (reached) return reached;
-		}
 		const outcome = await spawnFor(request);
 		if ("error" in outcome) return { ok: false, ...outcome };
 		const { session, prompt, first } = outcome.started;
@@ -286,7 +276,7 @@ export function createStarter(env: StartEnv): Starter {
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, workspace, prompt };
 	};
-	return start;
+	return Object.assign(start, { ownersOf, followUp });
 }
 
 /** A session attached to but not listed yet, which holds back what it reports until it is. */

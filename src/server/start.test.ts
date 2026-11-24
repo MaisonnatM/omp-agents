@@ -1,6 +1,6 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { fromPartial } from "@total-typescript/shoehorn";
-import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DashboardSession } from "../dashboard-session";
@@ -249,51 +249,50 @@ function hearingSession(instanceId: string, cwd: string, heard: string[]): Dashb
 
 const pr7 = { kind: "pull-request", pr: { owner: "acme", repo: "app", number: 7 } } as const;
 
-test("a pull request fix goes to the session running on it as a follow-up and spawns none, while a pull request no session owns starts one", async () => {
-	const dir = mkdtempSync("/tmp/omp-start-owner-");
-	try {
-		const heard: string[] = [];
-		const sessions = new LiveSessions(() => {}, new TaskClaims(join(dir, "claims.json")));
-		sessions.add(hearingSession("owner", dir, heard), pr7);
-		const start = claimedStarter(sessions);
-		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
-		spyOn(git, "checkoutDir").mockResolvedValue(dir);
-		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
-		const spawn = spyOn(DashboardSession, "start").mockImplementation(async (id, cwd) => sessionForStart(id, cwd));
-		const fix = (number: number) => newSessionRequest(dir, "Fix CI", { subject: { kind: "pull-request", pr: { owner: "acme", repo: "app", number } }, branch: { kind: "work", name: "feature" }, reachOwner: true });
-		expect(await start(fix(7))).toEqual({ ok: true, instanceId: "owner", workspace: dir, prompt: null });
-		expect(heard).toEqual(["owner followUp Fix CI"]);
-		expect(spawn).not.toHaveBeenCalled();
-		expect(await start({ ...fix(7), reachOwner: false })).toMatchObject({ ok: false, owner: { here: true, instanceId: "owner" } });
-		expect((await start(fix(8))).ok).toBe(true);
-		expect(spawn).toHaveBeenCalledTimes(1);
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
-test("a pull request fix resumes the ended session that kept the pull request and sends the fix to it", async () => {
+test("a pull request fix finds the session running on it first, else the watcher and the ended sessions that kept it, newest first, and sends it as a follow-up", async () => {
 	const dir = mkdtempSync("/tmp/omp-start-owner-");
 	try {
 		const claimsFile = join(dir, "claims.json");
-		const file = join(dir, "saved.jsonl");
-		writeFileSync(file, `${JSON.stringify({ type: "session", cwd: dir })}\n`);
 		const claims = new TaskClaims(claimsFile);
-		claims.claim("/repo/.git", "pr:acme/app#7", "ended", dir);
-		claims.bind("ended", process.pid, "s-ended", dir);
-		claims.release("ended");
+		for (const [instanceId, sessionId] of [["old", "s-old"], ["new", "s-new"]] as const) {
+			claims.claim("/repo/.git", "pr:acme/app#7", instanceId, dir);
+			claims.bind(instanceId, process.pid, sessionId, dir);
+			claims.release(instanceId);
+		}
+		writeFileSync(join(dir, "s-old.jsonl"), "");
+		writeFileSync(join(dir, "s-new.jsonl"), "");
+		utimesSync(join(dir, "s-old.jsonl"), 1, 1);
 		const heard: string[] = [];
 		const sessions = new LiveSessions(() => {}, new TaskClaims(claimsFile));
-		const start = claimedStarter(sessions, file);
+		let watcher: string | null = null;
+		const start = createStarter({
+			sessions,
+			pathFor: () => null,
+			savedFile: id => (id === "s-old" || id === "s-new" ? join(dir, `${id}.jsonl`) : null),
+			factsFor: () => ({ pullRequests: [], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }),
+			onStarted: () => {},
+			workspaceOf: async cwd => cwd,
+			linkTodo: () => {},
+			joinProject: () => {},
+			joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
+			admit: async () => {},
+			restoreWorktree: async () => {},
+			privateSessions: fromPartial<PrivateSessions>({ holds: () => false }),
+			watcherOf: () => watcher,
+		});
 		spyOn(git, "repositoryAt").mockResolvedValue("/repo/.git");
 		spyOn(commands, "withPinnedSkill").mockImplementation(async (_cwd, _skill, prompt) => prompt);
-		const spawn = spyOn(DashboardSession, "start").mockImplementation(async (id, cwd) => sessionForStart(id, cwd));
-		const resume = spyOn(DashboardSession, "resume").mockImplementation(async id => hearingSession(id, dir, heard));
-		const result = await start(newSessionRequest(dir, "Address comments", { subject: pr7, branch: { kind: "work", name: "feature" }, reachOwner: true }));
-		if (!result.ok) throw new Error(result.error);
-		expect(resume).toHaveBeenCalledTimes(1);
-		expect(spawn).not.toHaveBeenCalled();
-		expect(heard).toEqual([`${result.instanceId} followUp Address comments`]);
+		const fix = (number: number) => newSessionRequest(dir, "Fix CI", { subject: { kind: "pull-request", pr: { owner: "acme", repo: "app", number } }, branch: { kind: "work", name: "feature" }, reachOwner: true });
+		expect(await start.ownersOf(fix(7))).toEqual(["s-new", "s-old"]);
+		watcher = "s-watch";
+		expect(await start.ownersOf(fix(7))).toEqual(["s-watch", "s-new", "s-old"]);
+		expect(await start.ownersOf({ ...fix(7), reachOwner: false })).toEqual([]);
+		expect(await start.ownersOf(fix(8))).toEqual(["s-watch"]);
+		const owner = hearingSession("owner", dir, heard);
+		sessions.add(owner, pr7);
+		expect(await start.ownersOf(fix(7))).toEqual(["s-owner"]);
+		expect(await start.followUp(owner, fix(7))).toEqual({ ok: true, instanceId: "owner", workspace: dir, prompt: null });
+		expect(heard).toEqual(["owner followUp Fix CI"]);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
