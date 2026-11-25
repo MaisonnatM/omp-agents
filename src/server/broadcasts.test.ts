@@ -15,6 +15,7 @@ import { RequestLedger } from "./request-ledger";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
+import { BoardLog } from "./board-log";
 import { ProjectsFile } from "./projects-file";
 import { SportFile } from "./sport-file";
 import { createClientHandler, type SocketEnv } from "./socket";
@@ -74,7 +75,7 @@ function setup(initial: PastSession[]) {
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
 		jobs: { msg: () => ({ t: "jobs", jobs: {} }) },
-	}, { sport, projects: new ProjectsFile(join(dir, "project-list.json")) }, kind => broadcasts.pushList(kind));
+	}, { sport, projects: new ProjectsFile(join(dir, "project-list.json")), board: new BoardLog(join(dir, "board-events.jsonl")) }, kind => broadcasts.pushList(kind));
 	const broadcasts = new Broadcasts({
 		roster: () => roster,
 		past: () => sessions,
@@ -210,7 +211,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("bots", { op: "remove", id: "missing" as BotId }, peer)).toBe(false);
 		expect(lists.applyModule("sport", [{ op: "remove-log", id: "missing" }], peer)).toBe(false);
 		expect(lists.applyModule("projects", { op: "leave", sessionId: "missing" }, peer)).toBe(false);
-		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges" && msg.t !== "jobs"));
+		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges" && msg.t !== "jobs" && !(msg.t === "module" && msg.id === "board")));
 		expect(published).toEqual([]);
 	});
 

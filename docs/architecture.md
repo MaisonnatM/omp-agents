@@ -46,6 +46,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Sport](architecture/sport.md)
   - [Memory page](architecture/memory-page.md)
   - [Projects](architecture/projects.md)
+  - [Board](architecture/board.md)
 - [Notifications](architecture/notifications.md)
   - [Session notifications](architecture/notifications.md#session-notifications)
 - [Merges, and the cleanup after one](architecture/merges-and-the-cleanup-after-one.md)

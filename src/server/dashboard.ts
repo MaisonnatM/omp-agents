@@ -28,7 +28,7 @@ import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
 import { activityDb, botInboxDir, botsDir, botsFile, builtInRoutinesFile, directoryOf, displayPath, endedWorktreesFile, HOME, interruptedFile, machineFile, mergesFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
-import { type ModuleChanges, moduleInboxes, moduleJoins, openModules, type StoredModuleId } from "../modules";
+import { type ModuleChanges, type ModuleRun, isStoredModuleId, moduleInboxes, moduleJoins, moduleRuns, openModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
 import { checkOutPullRequest } from "../pull-request-checkout";
@@ -42,7 +42,7 @@ import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchedKinds } from "../routine
 import { SESSION_FORMATS } from "../session-formats";
 import { modelUpdates, upgradeModel } from "../settings";
 import { agentOn } from "../shared/moves";
-import { awaitsScheduled, awaitsSubagents, type ScheduledCheck, type StartRequest, type StartResult, type View } from "../shared/sessions";
+import { awaitsScheduled, awaitsSubagents, newSessionRequest, type ScheduledCheck, type StartRequest, type StartResult, type View } from "../shared/sessions";
 import { nextSendTo } from "../shared/scheduled";
 import { inAppData } from "../shared/workspaces";
 import { waitingOnYou } from "../slack-messages";
@@ -181,6 +181,8 @@ export class Dashboard {
 	readonly #lists: ListRegistry;
 	/** The inboxes the owner applies, each a tool's changes to one of the dashboard's files. */
 	readonly #inboxes: readonly JsonInboxDir<unknown>[];
+	/** What the modules do on their own, such as the Board's auto-start, wake, and lease sweep, by module id. */
+	#moduleRuns: ReadonlyMap<StoredModuleId, ModuleRun> = new Map();
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
@@ -355,7 +357,10 @@ export class Dashboard {
 					return true;
 				},
 			},
-		}, modules, kind => this.#broadcasts.pushList(kind)));
+		}, modules, kind => {
+			this.#broadcasts.pushList(kind);
+			if (isStoredModuleId(kind)) this.#moduleRuns.get(kind)?.changed();
+		}));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
@@ -511,6 +516,21 @@ export class Dashboard {
 			now: Date.now,
 			onChange: () => broadcasts.pushList("scheduled"),
 		}));
+		this.#moduleRuns = moduleRuns(modules, applyModuleNow, {
+			async start(cwd, prompt) {
+				const result = await startSession(newSessionRequest(cwd, prompt));
+				if (!result.ok) return { error: result.error };
+				const sessionId = sessions.get(result.instanceId)?.sessionId;
+				return sessionId ? { sessionId } : { error: "The session exited as it started." };
+			},
+			async wake(sessionId, text) {
+				const live = sessions.bySessionId(sessionId);
+				await (live ?? (await reach(sessionId))).prompt(null, text, [], "followUp");
+				return { resumed: !live };
+			},
+			owner: () => ownerLock.held,
+			now: Date.now,
+		});
 		this.#prWatches = new PullRequestWatches({
 			file: prWatchesFile,
 			hosts: () => sessions.rows(factsOf),
@@ -765,6 +785,7 @@ export class Dashboard {
 			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the file inboxes; this one takes over when it exits.`);
 		}
 		for (const inbox of this.#inboxes) inbox.watch();
+		for (const run of this.#moduleRuns.values()) run.start();
 		this.#endInbox.watch();
 		// Once the files are listed, so the notice names the sessions that stopped mid-turn with the last server.
 		await this.#notices.check(STOPPED_KINDS);
@@ -788,6 +809,7 @@ export class Dashboard {
 		this.#loops.stop();
 		this.#stopMergeQueue();
 		for (const inbox of this.#inboxes) inbox.stop();
+		for (const run of this.#moduleRuns.values()) run.stop();
 		this.#endInbox.stop();
 		await this.#sessions.dispose();
 		this.terminals.dispose();
@@ -1005,6 +1027,7 @@ export class Dashboard {
 			this.#runner.recover();
 			this.#scheduledRunner.recover();
 			for (const inbox of this.#inboxes) void inbox.drain();
+			for (const run of this.#moduleRuns.values()) run.changed();
 			// It learned what the triggers see while another server ran routines, which that server fired.
 			this.#triggerWatch.forget();
 		}

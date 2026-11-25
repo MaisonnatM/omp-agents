@@ -1,4 +1,4 @@
-# Page: sidebar, Todo, Bots, Routines, Sport, Memory, and Projects
+# Page: sidebar, Todo, Bots, Routines, Sport, Memory, Projects, and Board
 
 - `web/components/sidebar-nav.tsx`: the left sidebar's page list, **New session**, **Notifications** with its unread count, each shown tab's row with its count, and **Settings**, with the open page's own list nested under its row only while the sidebar floats, as on a phone; the Pull requests and Todo rows have no list.
   `web/components/page-list.tsx` holds `PageList`, which picks the open page's own list, and `PageListColumn`, the column at the page's left that `web/app.tsx` shows it in whenever the sidebar does not float; a line on its right edge sizes it, the width in localStorage under `omp-agents.page-list-width`.
@@ -91,6 +91,8 @@
   `stats.tsx` holds the strip of steps, sessions, linked work, and last update; `plan.tsx` the plan with its To do, Done, and All tabs, and each step's play button; `sessions-table.tsx` the sessions' table; `notes.tsx` the decisions and recent activity; `parts.tsx` the card, empty line, status badge, remove button, and add field they share.
   `stepsPrompt` in `steps-prompt.ts` writes the prompt a session started on plan steps gets, tested in `steps-prompt.test.ts`.
   `web/components/projects/module.ts` holds `PROJECTS_PAGE`, the page half of the Projects module, and `new-project.ts` holds `createProject`, which the page and the roster's **+** share, and `takeJustCreated`, which lets the new project's page select its name once; see [Projects](../architecture/projects.md).
+- `web/components/board/page.tsx`: the Board page, `BoardPage`, with the Workspaces and their sessions at the left, the open Workspace's Board tasks and the composer that posts one in the middle, and the open Board thread with its reply box at the right.
+  `web/components/board/module.ts` holds `BOARD_PAGE`, the page half of the Board module: its tab, its address `#board/<n>?workspace=<dir>`, its views, its controls, and the reducer it applies before the server answers; see [Board](../architecture/board.md).
 - `web/components/memory/page.tsx`: the Memory page, `MemoryPage`, a `PageFrame` whose header holds the `SegmentedTabs` of its two tabs, over the project memory or the bookmarks.
   `web/components/memory/module.ts` holds `MEMORY_PAGE`, the page half of the Memory module: its tab, address, title, views, shortcuts, and controls; its data comes over the module's own routes, typed in `src/shared/memory-page.ts`; see [Modules](../architecture/modules.md).
   `tabs.ts` holds `MEMORY_TABS` and `memoryHash`, each tab's address, name, and control.

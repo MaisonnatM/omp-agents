@@ -11,6 +11,7 @@ import type { Workspace } from "../../src/shared/workspaces";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { SectionTarget } from "../section";
+import { BoardPage } from "./board/page";
 import { useDashboardActions } from "./dashboard-context";
 import { MemoryPage } from "./memory/page";
 import { ProjectsPage } from "./projects/page";
@@ -68,6 +69,7 @@ const MODULE_VIEWS: { readonly [I in WebModuleId]: ModuleViews<I> } = {
 	memory: { Page: MemoryPage },
 	sport: { Page: SportPage, Nav: SportNav },
 	projects: { Page: ProjectsPage },
+	board: { Page: BoardPage },
 };
 
 /** Any module's page as {@link ModulePageView} draws it: a stored module's gets its state, any other's none. */

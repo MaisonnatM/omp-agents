@@ -15,6 +15,7 @@ The core keeps the sessions, pull requests, todos, Bots and their routines, Sett
 | Sport | `SPORT_MODULE` in `src/sport-module.ts` | `SPORT_PAGE` in `web/components/sport/module.ts` | `SportPage` and `SportNav` |
 | Memory | `MEMORY_MODULE` in `src/memory-module.ts` | `MEMORY_PAGE` in `web/components/memory/module.ts` | `MemoryPage` |
 | Projects | `PROJECTS_MODULE` in `src/projects-module.ts` | `PROJECTS_PAGE` in `web/components/projects/module.ts` | `ProjectsPage` |
+| Board | `BOARD_MODULE` in `src/board-module.ts` | `BOARD_PAGE` in `web/components/board/module.ts` | `BoardPage` |
 
 A module without a server definition keeps its server side in the core.
 
