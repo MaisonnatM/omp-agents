@@ -30,7 +30,7 @@ export function SelectorPicker({ value, catalog, label, labelId, roles = [], dis
 			{model && (levels.length > 0 || level) && (
 				<Select value={level ?? ""} disabled={disabled} onValueChange={next => onPick(next ? `${model}:${next}` : model)}>
 					<Tooltip content={`Thinking level for ${label}`}>
-						<SelectTrigger aria-label={`${label}: thinking level`}><SelectValue>{(value: string) => value || "default"}</SelectValue></SelectTrigger>
+						<SelectTrigger aria-label={`${label}: thinking level`}><SelectValue>{({ value }) => (typeof value === "string" && value) || "default"}</SelectValue></SelectTrigger>
 					</Tooltip>
 					<SelectContent>
 						<SelectItem value="">default</SelectItem>

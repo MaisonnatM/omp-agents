@@ -28,7 +28,3 @@ The second time a lesson recurs, it becomes a check: a test, a lint rule as [Tes
 - For a smoke check of something that should disappear, use `scripts/smoke-proof.ts --expect-absent`, which also proves the server serves your checkout; see [docs/agent-smoke.md](docs/agent-smoke.md).
 - In the headless desktop app, `Input.dispatchMouseEvent` on the page's DevTools port can hang and a hidden window stops painting; click through the main process's `webContents.sendInputEvent` and nudge painting with a page `Emulation.setDeviceMetricsOverride` then `clearDeviceMetricsOverride`, but that override's pixel density reaches the Browser's guest too, so read a guest's `devicePixelRatio` without it.
 - Never send `Page.reload` through a Browser guest's `debugger`: it reloads the dashboard that embeds the guest, which here looped forever; call the guest's `reload()`.
-
-## Shortcuts in dialogs
-
-- `web/popup-shortcuts.test.ts` checks that a Base UI dialog binds arrows, Home, and End with `usePopupShortcuts`, since its popup stops them before `useShortcuts`.

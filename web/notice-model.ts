@@ -37,11 +37,11 @@ export type NoticeAction =
 	| { kind: "continue-all"; sessionIds: string[] };
 
 /**
- * How a notice toasts. News toasts once while fresh and opens its link, or acts as **Continue all**, staying `timeout` ms
- * (`0` until dismissed). An update toasts until dismissed and follows its status; `dismissedElsewhere` closes it once
+ * How a notice toasts. News toasts once while fresh and opens its link, or acts as **Continue all**, staying `duration` ms
+ * (`Infinity` until dismissed). An update toasts until dismissed and follows its status; `dismissedElsewhere` closes it once
  * another tab saw it before it ran.
  */
-export type NoticeToast = { kind: "news"; timeout: number } | { kind: "update"; dismissedElsewhere: boolean };
+export type NoticeToast = { kind: "news"; duration: number } | { kind: "update"; dismissedElsewhere: boolean };
 
 export interface NoticePresentation {
 	source: NoticeSource;
@@ -81,7 +81,7 @@ const timeLabel = (at: number, now: number): string => (new Date(at).toDateStrin
 
 const creditsClause = (count: number): string => (count === 1 ? "The plan holds 1 reset credit." : `The plan holds ${count} reset credits.`);
 /** What a news notice shares: no error, no update running, no button, and a toast that closes itself. */
-const NEWS = { failed: false, busy: false, action: { kind: "none" }, toast: { kind: "news", timeout: TOAST_MS } } as const satisfies Partial<NoticePresentation>;
+const NEWS = { failed: false, busy: false, action: { kind: "none" }, toast: { kind: "news", duration: TOAST_MS } } as const satisfies Partial<NoticePresentation>;
 
 /** Who made a pull request your move: the author who asked for your review, the reviewer who asked for changes or commented, or the one who approved. */
 function actorOf({ pr, move }: Extract<Notice, { kind: "pull-request" }>) {
@@ -158,7 +158,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				face: { kind: "warning" },
 				action: { kind: "continue-all", sessionIds: notice.sessions.map(({ sessionId }) => sessionId) },
 				// It comes at the server's start, which you may not watch.
-				toast: { kind: "news", timeout: 0 },
+				toast: { kind: "news", duration: Infinity },
 			};
 		}
 		case "routine-health": {
@@ -173,7 +173,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				link: first ? { href: hashForBotRoutine(first.botId, { kind: "open", id: first.routineId }), external: false } : null,
 				face: { kind: "warning" },
 				// It comes once a day, which you may not watch.
-				toast: { kind: "news", timeout: 0 },
+				toast: { kind: "news", duration: Infinity },
 			};
 		}
 		case "dashboard-failed":
@@ -187,7 +187,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				link: null,
 				face: { kind: "update" },
 				// It comes at the server's start, which you may not watch.
-				toast: { kind: "news", timeout: 0 },
+				toast: { kind: "news", duration: Infinity },
 			};
 		case "omp":
 		case "model":

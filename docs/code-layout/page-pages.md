@@ -12,7 +12,7 @@
   Every row names its source among its facts, from `SOURCE_LABELS` in `web/labels.ts`, without replacing its workspace badge.
   The row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
   `web/components/sport/nav.tsx` is its Sport tab: **Semaine**, **Journal**, and **Progrès**, each a link to its `#sport` address.
-- `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, its `ToastData`, a toast's optional source line and a loading toast's start, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
+- `web/components/toaster.tsx`: `toasts`, the page's one UI SDK toast manager, which shows a toast from anywhere without rendering its caller again, its `ToastData`, a toast's optional source line and a loading toast's start, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
   `loadingToast` opens a toast for work that takes a while, drawn with `Spinner` from `web/components/spinner.tsx`, the Button's infinity glyph, and the time since it opened; `toasts.update` changes its words as the work goes on, and `settleToast` turns it into how the work ended, in place, which then closes as any toast does.
   `UnderToasts` draws its children in that corner under the toasts, outside their live region, as Get started's bubble does, so toasts stack above it.
   `offerUndo` shows the eight-second **Undo** toast that a todo's delete offers.

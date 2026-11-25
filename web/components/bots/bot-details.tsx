@@ -109,16 +109,18 @@ function LookButton({ bot, host, connected }: { bot: Bot; host: RosterHost | nul
 				setPicked(null);
 			}}
 		>
-			<PopoverTrigger asChild>
-				<button
-					{...activityControl("bots.look")}
-					type="button"
-					aria-label={`Change ${bot.name}'s shape and color`}
-					className="shrink-0 rounded-xl p-1 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent"
-				>
-					<BotAvatar look={look} size="hero" working={host?.status === "working"} asking={botAsking(host) !== null} />
-				</button>
-			</PopoverTrigger>
+			<PopoverTrigger
+				render={
+					<button
+						{...activityControl("bots.look")}
+						type="button"
+						aria-label={`Change ${bot.name}'s shape and color`}
+						className="shrink-0 rounded-xl p-1 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-open:bg-accent"
+					>
+						<BotAvatar look={look} size="hero" working={host?.status === "working"} asking={botAsking(host) !== null} />
+					</button>
+				}
+			/>
 			<PopoverContent align="start" collisionPadding={8} aria-label={`${bot.name}'s shape and color`} className="w-auto max-w-72 p-3">
 				<BotLookPicker name={id} look={look} disabled={!connected} onLook={setPicked} />
 			</PopoverContent>
@@ -204,10 +206,8 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 					All routines
 				</a>
 				{connected ? (
-					<Button {...activityControl("bots.routine.new")} asChild variant="ghost" size="compact" leadingIcon={IconPlusSmall}>
-						<a href={hashForBotRoutine(bot.id, { kind: "new" })} aria-current={open.kind === "new" ? "page" : undefined}>
-							New routine
-						</a>
+					<Button {...activityControl("bots.routine.new")} variant="ghost" size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForBotRoutine(bot.id, { kind: "new" })} aria-current={open.kind === "new" ? "page" : undefined} />}>
+						New routine
 					</Button>
 				) : (
 					<Button variant="ghost" size="compact" leadingIcon={IconPlusSmall} disabled>

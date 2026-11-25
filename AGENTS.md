@@ -14,5 +14,6 @@ Every land on `main` needs new lines in `CHANGELOG.md`, as [Changelog](CODING_ST
 - Then read only the file for the feature you change, from the lists in [docs/usage.md](docs/usage.md) (the interface, `docs/usage/`) and [docs/architecture.md](docs/architecture.md) (the server, `docs/architecture/`).
 - Before you work on `src/omp/` or read omp's installed source, read [omp modules](docs/architecture/omp-modules.md), which names the omp files and exports this app uses.
 - Before you run a server or verify in a browser or the desktop window, read [docs/agent-smoke.md](docs/agent-smoke.md).
+- Before you build or change a popup, list, tab, or other interactive part of the page, read `node_modules/@ui-sdk/react/docs/llms.txt`: the page's primitives come from UI SDK (`@ui-sdk/react`), and a new component also searches `node_modules/@ui-sdk/react/docs/core.md` by heading and reads `rendering.md` beside it.
 - Before you change a design choice, read the records in [docs/decisions/](docs/decisions/) that cover it, and record each choice you make there as the [decision-records skill](templates/omp/agent/skills/decision-records/SKILL.md) says.
 - Name things with the words in [GLOSSARY.md](GLOSSARY.md).

@@ -35,18 +35,20 @@ export function SessionGoalControl({ instanceId, slot, onChange, onEdit }: {
 	};
 	return goal ? (
 		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<button {...activityControl("header.goal")} type="button" disabled={action.pending} aria-label={`Goal ${STATUS[goal.status]}: ${goal.objective}`} className="min-w-0 max-w-64 shrink rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-					<Badge variant="dot" size="compact" color={goal.status === "active" ? "green" : goal.status === "budget-limited" ? "amber" : "gray"} className="min-w-0 max-w-full hover:bg-accent [&>span:last-child]:min-w-0">
-						<span className="flex min-w-0 items-center gap-1">
-							{action.pending ? <Spinner className="size-3" /> : goal.status === "complete" ? <IconCheckmark1 className="size-3" /> : null}
-							<span className="min-w-0 truncate">{goal.status === "active" ? goal.objective : goal.status === "budget-limited" ? "Budget reached" : `${STATUS[goal.status]} · ${goal.objective}`}</span>
-							{slot.kind === "set" && slot.continues && goal.status === "active" && goal.tokenBudget !== null && <span className="shrink-0 tabular-nums text-muted-foreground">{tokens.format(goal.tokensUsed)}/{tokens.format(goal.tokenBudget)}</span>}
-						</span>
-					</Badge>
-				</button>
-			</PopoverTrigger>
-			<PopoverContent align="end" className="w-80 space-y-3" onOpenAutoFocus={event => { event.preventDefault(); firstAction.current?.focus(); }}>
+			<PopoverTrigger
+				render={
+					<button {...activityControl("header.goal")} type="button" disabled={action.pending} aria-label={`Goal ${STATUS[goal.status]}: ${goal.objective}`} className="min-w-0 max-w-64 shrink rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+						<Badge variant="dot" size="compact" color={goal.status === "active" ? "green" : goal.status === "budget-limited" ? "amber" : "gray"} className="min-w-0 max-w-full hover:bg-accent [&>span:last-child]:min-w-0">
+							<span className="flex min-w-0 items-center gap-1">
+								{action.pending ? <Spinner className="size-3" /> : goal.status === "complete" ? <IconCheckmark1 className="size-3" /> : null}
+								<span className="min-w-0 truncate">{goal.status === "active" ? goal.objective : goal.status === "budget-limited" ? "Budget reached" : `${STATUS[goal.status]} · ${goal.objective}`}</span>
+								{slot.kind === "set" && slot.continues && goal.status === "active" && goal.tokenBudget !== null && <span className="shrink-0 tabular-nums text-muted-foreground">{tokens.format(goal.tokensUsed)}/{tokens.format(goal.tokenBudget)}</span>}
+							</span>
+						</Badge>
+					</button>
+				}
+			/>
+			<PopoverContent align="end" className="w-80 space-y-3" initialFocus={() => firstAction.current}>
 				<PopoverHeader>
 					<div className="flex items-center justify-between text-sm"><span>Goal</span><span className="text-xs text-muted-foreground">{STATUS[goal.status]}</span></div>
 				</PopoverHeader>

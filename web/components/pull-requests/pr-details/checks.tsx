@@ -63,11 +63,13 @@ export function ChecksSummary({ checks }: { checks: PullRequestCheck[] }) {
 		<span className="ml-auto flex min-w-6 flex-1 items-center justify-end gap-x-1.5 text-xs text-muted-foreground">
 			{summary.state === "none" ? <Icon aria-hidden className="size-3.5 shrink-0" /> : (
 				<Popover>
-					<PopoverTrigger asChild>
-						<button type="button" aria-label={`Checks: ${summary.text}`} className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-							<Icon aria-hidden className={cn("size-3.5", color)} />
-						</button>
-					</PopoverTrigger>
+					<PopoverTrigger
+						render={
+							<button type="button" aria-label={`Checks: ${summary.text}`} className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+								<Icon aria-hidden className={cn("size-3.5", color)} />
+							</button>
+						}
+					/>
 					<PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] space-y-2 p-3">
 						<p className="text-sm font-medium">{summary.heading}</p>
 						<p className="text-xs text-muted-foreground">{summary.text}</p>

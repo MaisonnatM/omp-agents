@@ -55,7 +55,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 		try {
 			await createWorkspace(path);
 		} catch (error) {
-			toasts.add({ title: `Could not create ${path}`, description: errorText(error) });
+			toasts({ title: `Could not create ${path}`, description: errorText(error) });
 			return;
 		}
 		pick(path);

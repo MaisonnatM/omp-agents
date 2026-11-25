@@ -1,24 +1,27 @@
-/** The page's toasts: the `toasts` manager that shows one from anywhere, `loadingToast` for work that takes a while, `offerUndo` after a delete or a move, and `Toaster`, which stacks them bottom right. */
+/** The page's toasts: the `toasts` queue that shows one from anywhere, `loadingToast` for work that takes a while, `offerUndo` after a delete or a move, and `Toaster`, which stacks them bottom right. */
 import { IconCrossMedium } from "central-icons";
-import { Toast } from "@base-ui/react/toast";
-import { type ReactNode, useSyncExternalStore } from "react";
+import { createToaster, Toast, ToastAction, ToastClose, type ToastData as QueuedToast, ToastDescription, ToastRegion, ToastTitle } from "@ui-sdk/react/toast";
+import { type CSSProperties, type ReactNode, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { useRegionHeight } from "@/hooks/use-region-height";
 import { useSecond } from "../use-minute";
 import { usePhoneWidth } from "../use-phone-width";
 import { Spinner } from "./spinner";
 
 /**
- * What a toast carries beyond its text: `source`, the line over its title that says where it came from, such as Slack's
- * logo and name, and `startedAt`, when a loading toast opened, in ms since the epoch.
+ * What a toast carries beyond its text, as its `data`: `source`, the line over its title that says where it came from,
+ * such as Slack's logo and name, `startedAt`, when a loading toast opened, in ms since the epoch, and `actionDisabled`,
+ * whether its action is off for now.
  */
 export interface ToastData {
 	source?: ReactNode;
 	startedAt?: number;
+	actionDisabled?: boolean;
 }
 
-/** The page's toasts: `toasts.add` shows one from anywhere, without rendering its caller again as the toasts change. */
-export const toasts = Toast.createToastManager<ToastData>();
+/** The page's toasts: `toasts(…)` shows one from anywhere, without rendering its caller again as the toasts change. */
+export const toasts = createToaster<ReactNode>();
 
 /** What a toast says. */
 export interface ToastText {
@@ -30,7 +33,7 @@ export interface ToastText {
  * Shows `text` with a spinner and the time since it opened, and returns its id. It never times out and has no
  * close button: `toasts.update` changes its text as the work goes on, and {@link settleToast} turns it into how it ended.
  */
-export const loadingToast = (text: ToastText): string => toasts.add({ ...text, type: "loading", data: { startedAt: Date.now() } });
+export const loadingToast = (text: ToastText): string => toasts.loading({ ...text, data: { startedAt: Date.now() } satisfies ToastData });
 
 /**
  * Turns the loading toast `id` into `text`, which then closes after the page's usual five seconds. Adding by id updates
@@ -38,7 +41,7 @@ export const loadingToast = (text: ToastText): string => toasts.add({ ...text, t
  * update merges into what the toast said, so it names `description` even when `text` has none, to clear the old one.
  */
 export function settleToast(id: string, text: ToastText): void {
-	toasts.add({ id, type: undefined, title: text.title, description: text.description });
+	toasts({ id, type: "default", title: text.title, description: text.description });
 }
 
 /** How long **Undo** stays after a delete or a move. */
@@ -49,14 +52,15 @@ const UNDO_MS = 8000;
  * `id` takes its place, and one `undo` shows itself, as a move back does, stays open.
  */
 export function offerUndo(id: string, title: string, undo: () => void): void {
-	toasts.add({
+	toasts({
 		id,
 		title,
-		timeout: UNDO_MS,
-		actionProps: {
-			children: "Undo",
-			onClick: () => {
-				toasts.close(id);
+		duration: UNDO_MS,
+		action: {
+			label: "Undo",
+			dismiss: false,
+			onAction: () => {
+				toasts.dismiss(id);
 				undo();
 			},
 		},
@@ -83,25 +87,46 @@ export function UnderToasts({ children }: { children: ReactNode }) {
 	return element && createPortal(children, element);
 }
 
+/** The room `height` takes in the stack of toasts and what sits under them, with the gap after it when there is any. */
+const stackRoom = (height: number | null): string => (height ? `${height + 8}px` : "0px");
+
 /**
  * Every toast of the page, stacked at the bottom right, the newest last, each under its source when it has one; on a
  * phone, where a second toast would bury the page, only the newest, at the top, clear of the composer, and the next
  * one waits under it. A toast that never times out gets a round close button on its corner, shown on hover or focus,
- * and always on a touch screen. What {@link UnderToasts} draws sits below them, outside their live region.
+ * and always on a touch screen. What {@link UnderToasts} draws sits below them, outside their region, which renders in
+ * the top layer: each measures the other to keep clear of it.
  */
 export function Toaster() {
 	const phone = usePhoneWidth();
+	const [regionRef, regionHeight] = useRegionHeight();
+	const [cornerRef, cornerHeight] = useRegionHeight();
+	const placeCorner = useCallback(
+		(element: HTMLElement | null) => {
+			setCorner(element);
+			cornerRef(element);
+		},
+		[cornerRef],
+	);
 	return (
-		<Toast.Provider toastManager={toasts} limit={phone ? 1 : undefined}>
-			<Toast.Portal>
-				<div className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-phone:top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))] max-phone:right-2 max-phone:bottom-auto max-phone:max-w-[calc(100vw-1rem)]">
-					<Toast.Viewport className="flex w-full flex-col-reverse gap-2">
-						<ToastList />
-					</Toast.Viewport>
-					<div ref={setCorner} className="contents" />
-				</div>
-			</Toast.Portal>
-		</Toast.Provider>
+		<>
+			<ToastRegion
+				ref={regionRef}
+				toaster={toasts}
+				side={phone ? "top" : "bottom"}
+				align="end"
+				maxVisible={phone ? 1 : undefined}
+				style={{ "--under-toasts": stackRoom(cornerHeight) } as CSSProperties}
+				className="right-4 bottom-[calc(2.5rem+var(--under-toasts))] w-96 max-w-[calc(100vw-2rem)] *:flex *:flex-col-reverse *:gap-2 max-phone:top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))] max-phone:right-2 max-phone:bottom-auto max-phone:max-w-[calc(100vw-1rem)]"
+			>
+				{toast => <ToastCard toast={toast} />}
+			</ToastRegion>
+			<div
+				ref={placeCorner}
+				style={{ "--over-corner": stackRoom(regionHeight) } as CSSProperties}
+				className="pointer-events-none fixed right-4 bottom-10 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col items-end gap-2 *:pointer-events-auto max-phone:top-[calc(max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))+var(--over-corner))] max-phone:right-2 max-phone:bottom-auto max-phone:max-w-[calc(100vw-1rem)]"
+			/>
+		</>
 	);
 }
 
@@ -117,42 +142,35 @@ function Elapsed({ since }: { since: number }) {
 	return <span aria-hidden className="shrink-0 text-xs tabular-nums text-muted-foreground">{clockWords(now - since)}</span>;
 }
 
-/** Each toast; on a phone, where they sit at the top, a swipe up or right puts one away, and it follows the finger. */
-function ToastList() {
-	const phone = usePhoneWidth();
-	return Toast.useToastManager<ToastData>().toasts.map(toast => {
-		const loading = toast.type === "loading";
-		const startedAt = loading ? toast.data?.startedAt : undefined;
-		return (
-			<Toast.Root
-				key={toast.id}
-				toast={toast}
-				swipeDirection={phone ? ["up", "right"] : undefined}
-				className="group/toast relative rounded-[10px] bg-popover text-[13px]/5 text-popover-foreground shadow-surface-6 data-limited:hidden max-phone:translate-x-(--toast-swipe-movement-x) max-phone:translate-y-(--toast-swipe-movement-y)"
-			>
-				<Toast.Content className="flex items-start gap-2 p-3 max-phone:flex-wrap max-phone:gap-y-1">
-					<div className="flex min-w-0 flex-1 flex-col max-phone:basis-full">
-						{toast.data?.source && <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">{toast.data.source}</div>}
-						<div className="flex min-w-0 items-center gap-2">
-							{loading && <Spinner className="size-4 text-muted-foreground" />}
-							<Toast.Title className="min-w-0 flex-1 truncate font-medium" />
-							{startedAt !== undefined && <Elapsed since={startedAt} />}
-						</div>
-						<Toast.Description className="text-muted-foreground" />
+/** One toast; on a phone, where they sit at the top, a swipe up or right puts it away, and it follows the finger. */
+function ToastCard({ toast }: { toast: QueuedToast<ReactNode> }) {
+	const data = toast.data as ToastData | undefined;
+	const loading = toast.type === "loading";
+	const startedAt = loading ? data?.startedAt : undefined;
+	return (
+		<Toast className="group/toast relative rounded-[10px] bg-popover text-[13px]/5 text-popover-foreground shadow-surface-6 max-phone:translate-x-[var(--toast-swipe-x,0px)] max-phone:translate-y-[var(--toast-swipe-y,0px)]">
+			<div className="flex items-start gap-2 p-3 max-phone:flex-wrap max-phone:gap-y-1">
+				<div className="flex min-w-0 flex-1 flex-col max-phone:basis-full">
+					{data?.source && <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">{data.source}</div>}
+					<div className="flex min-w-0 items-center gap-2">
+						{loading && <Spinner className="size-4 text-muted-foreground" />}
+						<ToastTitle className="min-w-0 flex-1 truncate font-medium" />
+						{startedAt !== undefined && <Elapsed since={startedAt} />}
 					</div>
-					<div className="contents max-phone:ms-auto max-phone:flex max-phone:gap-2">
-						<Toast.Action render={<Button variant="secondary" size="compact" className="self-center" />} />
-					</div>
-				</Toast.Content>
-				{toast.timeout === 0 && (
-					<Toast.Close
-						aria-label="Dismiss"
-						className="absolute -top-[7px] -left-[7px] flex size-6 scale-85 cursor-pointer items-center justify-center rounded-full bg-popover text-muted-foreground opacity-0 shadow-surface-2 transition-[opacity,scale] duration-150 ease-out outline-ring group-hover/toast:scale-100 group-hover/toast:opacity-100 group-focus-within/toast:scale-100 group-focus-within/toast:opacity-100 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none pointer-coarse:-top-2 pointer-coarse:-left-2 pointer-coarse:size-8 pointer-coarse:scale-100 pointer-coarse:opacity-100"
-					>
-						<IconCrossMedium aria-hidden className="size-3.5" />
-					</Toast.Close>
-				)}
-			</Toast.Root>
-		);
-	});
+					<ToastDescription className="text-muted-foreground" />
+				</div>
+				<div className="contents max-phone:ms-auto max-phone:flex max-phone:gap-2">
+					<ToastAction disabled={data?.actionDisabled} render={<Button variant="secondary" size="compact" className="self-center" />} />
+				</div>
+			</div>
+			{toast.duration === Infinity && !loading && (
+				<ToastClose
+					aria-label="Dismiss"
+					className="absolute -top-[7px] -left-[7px] flex size-6 scale-85 cursor-pointer items-center justify-center rounded-full bg-popover text-muted-foreground opacity-0 shadow-surface-2 transition-[opacity,scale] duration-150 ease-out outline-ring group-hover/toast:scale-100 group-hover/toast:opacity-100 group-focus-within/toast:scale-100 group-focus-within/toast:opacity-100 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none pointer-coarse:-top-2 pointer-coarse:-left-2 pointer-coarse:size-8 pointer-coarse:scale-100 pointer-coarse:opacity-100"
+				>
+					<IconCrossMedium aria-hidden className="size-3.5" />
+				</ToastClose>
+			)}
+		</Toast>
+	);
 }

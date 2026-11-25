@@ -67,9 +67,7 @@ export function SummaryDialog({ saved: { log, minutes, beaten, test }, plan, onC
 				)}
 			</div>
 			<div className="flex items-center justify-end gap-3 border-t border-border px-4 py-3">
-				<Button variant="tertiary" size="compact" className="rounded-full" asChild>
-					<a href={sportHash({ tab: "journal", open: log.id })} onClick={onClose}>Voir le journal</a>
-				</Button>
+				<Button variant="tertiary" size="compact" className="rounded-full" render={<a href={sportHash({ tab: "journal", open: log.id })} onClick={onClose} />}>Voir le journal</Button>
 				<Button size="compact" className="rounded-full" onClick={onClose}>Fermer</Button>
 			</div>
 		</SportDialog>

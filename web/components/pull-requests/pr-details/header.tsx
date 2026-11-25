@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 import { age, hostLabel, modeOf } from "../../../labels";
 import { useAction } from "../../../use-action";
 import { useInlineConfirm } from "../../../use-inline-confirm";
-import { useHoverPopover } from "../../../use-hover-popover";
 import { CopyableCode } from "../../copyable-code";
 import { BranchLabel, releaseBranch } from "../../git";
 import type { QuickActionsProps } from "../../quick-actions";
@@ -32,8 +31,8 @@ function LinkedSessions({ sessions, onOpen }: { sessions: RosterHost[]; onOpen: 
 	const [open, setOpen] = useState(false);
 	if (sessions.length === 0) return null;
 	return <Popover open={open} onOpenChange={setOpen}>
-		<PopoverTrigger asChild><Button size="xs" variant="ghost-muted" leadingIcon={IconBubbleText} aria-label={`Linked from ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"}`}>{sessions.length}</Button></PopoverTrigger>
-		<PopoverContent align="start" className="max-h-(--radix-popover-content-available-height) w-64 space-y-2 overflow-y-auto p-3">
+		<PopoverTrigger render={<Button size="xs" variant="ghost-muted" leadingIcon={IconBubbleText} aria-label={`Linked from ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"}`}>{sessions.length}</Button>} />
+		<PopoverContent align="start" className="max-h-(--available-height) w-64 space-y-2 overflow-y-auto p-3">
 			<p className="text-xs font-medium text-muted-foreground">Linked sessions</p>
 			<div className="flex flex-col items-start gap-2 text-xs">{sessions.map(host => <SessionChip key={host.instanceId} label={hostLabel(host)} status={host.status} title="Open the session" filled={false} onClick={event => { setOpen(false); onOpen({ kind: "live", instanceId: host.instanceId, agentId: null }, modeOf(event)); }} />)}</div>
 		</PopoverContent>
@@ -74,18 +73,19 @@ function TitleEditor({ detail, headingRef, placement, send }: { detail: PullRequ
 
 function BaseBranch({ detail, stacked, send }: { detail: PullRequestDetail; stacked: boolean; send: SendPullRequest }) {
 	const update = useAction(async (method: UpdateMethod) => { await send({ field: "update", method }); }, "Could not update the branch");
-	const popover = useHoverPopover();
 	const behind = (detail.state === "open" || detail.state === "draft") && !detail.conflicts && detail.behindBy !== null && detail.behindBy > 0;
 	if (!behind) return <span className={cn("inline-flex min-w-0 max-w-[40%]", stacked && "text-warning-foreground")} title={stacked ? `Stacked on ${detail.base}` : detail.base}><BranchLabel name={detail.base} /></span>;
 	return (
-		<Popover {...popover.root}>
-			<PopoverTrigger asChild>
-				<button {...popover.trigger} type="button" aria-label={`${detail.base}, behind by ${detail.behindBy} ${detail.behindBy === 1 ? "commit" : "commits"}`}
-					className="inline-flex min-w-0 max-w-[40%] shrink-0 cursor-help items-center gap-1 rounded-sm text-warning-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-					<BranchLabel name={detail.base} /><IconExclamationTriangle className="size-3.5 shrink-0" />
-				</button>
-			</PopoverTrigger>
-			<PopoverContent {...popover.content} align="start" aria-label="Update base branch" className="w-80 max-w-80 space-y-3 p-3 text-xs font-sans">
+		<Popover openOnHover delay={0} closeDelay={120}>
+			<PopoverTrigger
+				render={
+					<button type="button" aria-label={`${detail.base}, behind by ${detail.behindBy} ${detail.behindBy === 1 ? "commit" : "commits"}`}
+						className="inline-flex min-w-0 max-w-[40%] shrink-0 cursor-help items-center gap-1 rounded-sm text-warning-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+						<BranchLabel name={detail.base} /><IconExclamationTriangle className="size-3.5 shrink-0" />
+					</button>
+				}
+			/>
+			<PopoverContent align="start" aria-label="Update base branch" className="w-80 max-w-80 space-y-3 p-3 text-xs font-sans">
 				<p>This branch is out-of-date with <code>{detail.base}</code> by {detail.behindBy} {detail.behindBy === 1 ? "commit" : "commits"}.</p>
 				<p className="text-muted-foreground">Changes can be cleanly merged.</p>
 				<div className="flex flex-wrap gap-2"><Button size="xs" variant="outline" disabled={update.pending} onClick={() => update.run("merge")}>Update branch</Button><Button size="xs" variant="outline" disabled={update.pending} onClick={() => update.run("rebase")}>Update with rebase</Button></div>

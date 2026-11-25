@@ -69,8 +69,8 @@ function Conversations({ pr }: { pr: PullRequestSummary }) {
 /** `children` opens a card of `pr`'s latest conversations on hover. */
 export function ConversationPeek({ pr, children }: { pr: PullRequestSummary; children: ReactElement }) {
 	return (
-		<HoverCard openDelay={350} closeDelay={100}>
-			<HoverCardTrigger asChild>{children}</HoverCardTrigger>
+		<HoverCard delay={350} closeDelay={100}>
+			<HoverCardTrigger render={children} />
 			<HoverCardContent side="bottom" align="start" sideOffset={6} collisionPadding={12} className="w-80 p-0" onDragStart={event => event.stopPropagation()}>
 				<p className="flex items-center gap-1.5 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
 					<IconBubbleText className="size-3.5" />

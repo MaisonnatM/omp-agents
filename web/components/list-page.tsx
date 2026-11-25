@@ -2,7 +2,6 @@
 import { IconArrowRotateClockwise } from "central-icons";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { readTime } from "../labels";
 import type { PolledEntry } from "../polled-store";
@@ -115,14 +114,12 @@ export function PolledPageFrame<Data>({ title, meta, poll, onRefresh, actions, c
 export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, actions, children }: ListPageProps<Data>) {
 	return (
 		<PolledPageFrame title={title} meta={meta} poll={poll} onRefresh={onRefresh} actions={actions}>
-			<TooltipProvider>
 				<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", className)}>
 					{notice}
 					<PolledContent noun={noun} loading={loading} poll={poll}>
 						{children}
 					</PolledContent>
 				</div>
-			</TooltipProvider>
 		</PolledPageFrame>
 	);
 }

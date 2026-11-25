@@ -35,7 +35,7 @@ export function CheckoutMenu({ pr, cwd, onOpen }: { pr: PullRequest; cwd: string
 		if (cwd === null) return;
 		const checkout: PullRequestCheckout = { owner: pr.owner, repo: pr.repo, number: pr.number, cwd, place, skill: place === "worktree" ? readPinnedSkill() : null };
 		const done = await putJson<CheckedOutPullRequest>("/api/pull-request/checkout", checkout);
-		toasts.add(done.onHead ? CHECKED_OUT[place] : OFF_HEAD);
+		toasts(done.onHead ? CHECKED_OUT[place] : OFF_HEAD);
 		if (done.place === "worktree") onOpen({ kind: "live", instanceId: done.instanceId, agentId: null }, "replace");
 	}, "Could not check out the pull request");
 	const label = checkOut.pending ? "Checking out…" : "Check out";

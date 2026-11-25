@@ -100,12 +100,24 @@ describe("providerQuota", () => {
 
 describe("modelMatch", () => {
 	test("every word typed must appear, in any order, in the selector or a name", () => {
-		expect(modelMatch("openrouter/z-ai/glm-5.3-flash", "glm 5.3 flash", ["GLM 5.3 Flash"])).toBe(1);
-		expect(modelMatch("openrouter/z-ai/glm-5.3-flash", "FLASH glm", [])).toBe(1);
-		expect(modelMatch("anthropic/claude-opus-5-5", "opus 5.5", ["Opus 5.5", "Claude Opus 5.5"])).toBe(1);
+		expect(modelMatch({ value: "openrouter/z-ai/glm-5.3-flash", keywords: ["GLM 5.3 Flash"] }, "glm 5.3 flash")).toBe(true);
+		expect(modelMatch({ value: "openrouter/z-ai/glm-5.3-flash" }, "FLASH glm")).toBe(true);
+		expect(modelMatch({ value: "anthropic/claude-opus-5-5", keywords: ["Opus 5.5", "Claude Opus 5.5"] }, "opus 5.5")).toBe(true);
 	});
 
 	test("letters scattered across another model's name do not match", () => {
-		expect(modelMatch("cursor/gemini-3.5-flash", "glm 5.3 flash", ["Gemini 3.5 Flash"])).toBe(0);
+		expect(modelMatch({ value: "cursor/gemini-3.5-flash", keywords: ["Gemini 3.5 Flash"] }, "glm 5.3 flash")).toBe(false);
+	});
+});
+
+describe("modelMatch across names", () => {
+	test("words found only in the names match a selector that lacks them", () => {
+		expect(modelMatch({ value: "cursor/claude-4.7-opus-high", keywords: ["Claude Opus 4.7 Thinking"] }, "thinking")).toBe(true);
+		expect(modelMatch({ value: "cursor/claude-4.7-opus-high" }, "thinking")).toBe(false);
+	});
+
+	test("a typed word does not run across the selector and a name", () => {
+		expect(modelMatch({ value: "cursor/grok", keywords: ["Fast"] }, "grokfast")).toBe(false);
+		expect(modelMatch({ value: "cursor/grok", keywords: ["Fast"] }, "grok fast")).toBe(true);
 	});
 });

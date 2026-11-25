@@ -1,8 +1,8 @@
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Command as CommandPrimitive } from "cmdk";
+import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandInput, CommandItem, CommandList } from "@ui-sdk/react/command";
+import { Dialog, DialogBackdrop, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowRotateCounterClockwise, IconArrowUp, IconCmd, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPin, IconPlusSmall, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type DashboardUpdateStatus, didNotStart, shortCommit } from "../../../src/shared/dashboard-update";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -305,11 +305,15 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 		return itemsOf[viewId]();
 	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems, search, todoCategories, workspace, changeTodo]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
-	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
+	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? sections[0]?.items[0] ?? null;
+	// A new search or view highlights its first item before it paints.
+	useLayoutEffect(() => {
+		dispatch({ type: "select", itemId: sections[0]?.items[0]?.id ?? "" });
+	}, [query, viewId]);
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;
 	// Runs as the conversation matches arrive, with the sections that list them.
 	useEffect(() => {
-		const id = hits.length > 0 ? highlightOnFound(sections, frame.selected) : null;
+		const id = hits.length > 0 && selected ? highlightOnFound(sections, selected.id) : null;
 		if (id !== null) dispatch({ type: "select", itemId: id });
 	}, [hits]);
 	const empty =
@@ -327,6 +331,11 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	};
 	const onKeyDown = (event: ReactKeyboardEvent): void => {
 		if (event.nativeEvent.isComposing) return;
+		if (event.key === "Escape") {
+			// Esc steps back one level at a time, before the list clears its search; the reducer decides when it closes the palette.
+			event.preventDefault();
+			return dispatch({ type: "escape" });
+		}
 		if (event.key === "Backspace" && frame.query === "") {
 			// Going back restores the previous view's search; the key must not then delete its last character.
 			event.preventDefault();
@@ -344,83 +353,80 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	};
 
 	return (
-		<DialogPrimitive.Root
+		<Dialog
 			open
-			onOpenChange={open => {
-				if (!open) dispatch({ type: "close" });
+			onOpenChange={(open, details) => {
+				if (open) return;
+				if (details.reason === "escape-key") {
+					// Esc from outside the search field steps back the same way.
+					details.cancel();
+					return dispatch({ type: "escape" });
+				}
+				dispatch({ type: "close" });
 			}}
 		>
-			<DialogPrimitive.Portal>
-				<DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/20 dark:bg-black/50" />
-				<DialogPrimitive.Content
-					aria-describedby={undefined}
-					onEscapeKeyDown={event => {
-						// Esc steps back one level at a time; the reducer decides when it closes the palette.
-						event.preventDefault();
-						dispatch({ type: "escape" });
-					}}
-					className="fixed top-[15vh] left-1/2 z-50 flex w-[min(46rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-[0_0_0_1px_rgb(0_0_0/0.02),0_8px_16px_-4px_rgb(0_0_0/0.12),0_24px_48px_-12px_rgb(0_0_0/0.25)] outline-hidden"
+			<DialogBackdrop className="bg-black/20 dark:bg-black/50" />
+			<DialogContent
+				initialFocus={() => inputRef.current}
+				className="fixed top-[15vh] left-1/2 z-50 flex w-[min(46rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-[0_0_0_1px_rgb(0_0_0/0.02),0_8px_16px_-4px_rgb(0_0_0/0.12),0_24px_48px_-12px_rgb(0_0_0/0.25)] outline-hidden"
+			>
+				<DialogTitle className="sr-only">Command menu</DialogTitle>
+				<Command
+					filter={false}
+					loop
+					value={selected?.id ?? null}
+					onValueChange={itemId => dispatch({ type: "select", itemId: itemId ?? "" })}
+					query={frame.query}
+					onQueryChange={query => dispatch({ type: "query", query })}
 				>
-					<DialogPrimitive.Title className="sr-only">Command menu</DialogPrimitive.Title>
-					<CommandPrimitive
-						label="Command menu"
-						shouldFilter={false}
-						loop
-						value={frame.selected}
-						onValueChange={itemId => dispatch({ type: "select", itemId })}
-						onKeyDown={onKeyDown}
-					>
-						<div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
-							{state.stack.length > 1 ? (
-								<button
-									type="button"
-									aria-label={`Back from ${view.title}`}
-									onClick={() => dispatch({ type: "pop" })}
-									className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-								>
-									<IconArrowLeft className="size-3.5" />
-									{view.title}
-								</button>
-							) : (
-								<IconMagnifyingGlass className="size-4 shrink-0 text-muted-foreground" />
-							)}
-							<CommandPrimitive.Input
-								ref={inputRef}
-								autoFocus
-								value={frame.query}
-								onValueChange={query => dispatch({ type: "query", query })}
-								placeholder={view.placeholder}
-								className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-hidden placeholder:text-muted-foreground"
-							/>
-						</div>
-						<CommandPrimitive.List className="h-[min(26rem,60vh)] scroll-py-2 overflow-y-auto overscroll-contain px-2 pb-2">
-							<CommandPrimitive.Empty className="py-16 text-center text-sm text-muted-foreground">{empty}</CommandPrimitive.Empty>
+					<div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
+						{state.stack.length > 1 ? (
+							<button
+								type="button"
+								aria-label={`Back from ${view.title}`}
+								onClick={() => dispatch({ type: "pop" })}
+								className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+							>
+								<IconArrowLeft className="size-3.5" />
+								{view.title}
+							</button>
+						) : (
+							<IconMagnifyingGlass className="size-4 shrink-0 text-muted-foreground" />
+						)}
+						<CommandInput
+							ref={inputRef}
+							aria-label="Command menu"
+							onKeyDown={onKeyDown}
+							placeholder={view.placeholder}
+							className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-hidden placeholder:text-muted-foreground"
+						/>
+					</div>
+					<div className="h-[min(26rem,60vh)] scroll-py-2 overflow-y-auto overscroll-contain px-2 pb-2">
+						<CommandEmpty className="py-16 text-center text-sm text-muted-foreground empty:hidden">{empty}</CommandEmpty>
+						<CommandList>
 							{sections.map(section => (
-								<CommandPrimitive.Group
-									key={section.id}
-									heading={section.heading ?? undefined}
-									className="pt-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pt-1 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground"
-								>
+								<CommandGroup key={section.id} className="pt-2">
+									{section.heading && <CommandGroupLabel className="px-2 pt-1 pb-1.5 text-[11px] font-medium text-muted-foreground">{section.heading}</CommandGroupLabel>}
 									{section.items.map(item => (
 										<Row key={item.id} item={item} onSelect={() => run(item, primaryAction(item))} />
 									))}
-								</CommandPrimitive.Group>
+								</CommandGroup>
 							))}
-						</CommandPrimitive.List>
-					</CommandPrimitive>
-					<PaletteFooter icon={view.icon} title={view.title} primary={selected && primaryAction(selected).title} onPrimary={() => selected && run(selected, primaryAction(selected))}>
-						<ActionPanel
-							item={selected}
-							query={panelItem && state.panel ? state.panel.query : null}
-							onToggle={() => dispatch({ type: "togglePanel" })}
-							onQuery={query => dispatch({ type: "panelQuery", query })}
-							onRun={action => selected && run(selected, action)}
-							returnFocus={focusInput}
-						/>
-					</PaletteFooter>
-				</DialogPrimitive.Content>
-			</DialogPrimitive.Portal>
-		</DialogPrimitive.Root>
+						</CommandList>
+					</div>
+				</Command>
+				<PaletteFooter icon={view.icon} title={view.title} primary={selected && primaryAction(selected).title} onPrimary={() => selected && run(selected, primaryAction(selected))}>
+					<ActionPanel
+						item={selected}
+						query={panelItem && state.panel ? state.panel.query : null}
+						onToggle={() => dispatch({ type: "togglePanel" })}
+						onQuery={query => dispatch({ type: "panelQuery", query })}
+						onRun={action => selected && run(selected, action)}
+						returnFocus={focusInput}
+					/>
+				</PaletteFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
@@ -428,10 +434,11 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 function Row({ item, onSelect }: { item: PaletteItem; onSelect: () => void }) {
 	const { icon: Icon } = item;
 	return (
-		<CommandPrimitive.Item
+		<CommandItem
 			value={item.id}
+			label={item.title}
 			onSelect={onSelect}
-			className="flex h-10 cursor-default items-center gap-3 rounded-md px-2 text-sm outline-hidden select-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground"
+			className="flex h-10 cursor-default items-center gap-3 rounded-md px-2 text-sm outline-hidden select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
 		>
 			<span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground [&_svg]:size-3.5">
 				<Icon />
@@ -444,7 +451,7 @@ function Row({ item, onSelect }: { item: PaletteItem; onSelect: () => void }) {
 				<AccessoryView key={accessory.kind} accessory={accessory} />
 			))}
 			<span className="w-14 shrink-0 text-right text-xs text-muted-foreground">{item.kind}</span>
-		</CommandPrimitive.Item>
+		</CommandItem>
 	);
 }
 

@@ -93,36 +93,36 @@ export function FieldPicker({ field, current, trigger, look = "field", className
 			}}
 		>
 			<Tooltip content={`Change ${field.toLowerCase()}: ${current}`} side="bottom" forceOpen={open ? false : undefined}>
-				<PopoverTrigger asChild>
-					<Button size="compact" {...pickerButton(look, className)} aria-label={`${field}: ${current}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-						<span className="flex min-w-0 items-center gap-2">{trigger}</span>
-					</Button>
-				</PopoverTrigger>
+				<PopoverTrigger
+					render={
+						<Button size="compact" {...pickerButton(look, className)} aria-label={`${field}: ${current}`} active={open} disabled={disabled}>
+							<span className="flex min-w-0 items-center gap-2">{trigger}</span>
+						</Button>
+					}
+				/>
 			</Tooltip>
 			<PopoverContent align="start" className="w-64 p-0" onKeyDown={onKeyDown}>
 				<Command>
 					<CommandInput aria-label={`Search ${field.toLowerCase()}`} placeholder={`${field}…`} />
+					{choices !== null && <CommandEmpty>No match.</CommandEmpty>}
 					<CommandList>
 						{choices === null ? (
 							<p role={error ? "alert" : undefined} className={cn("px-3 py-2 text-xs", error ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
 								{error ?? "Loading the choices…"}
 							</p>
 						) : (
-							<>
-								<CommandEmpty>No match.</CommandEmpty>
-								<CommandGroup>
-									{choices.map((choice, index) => (
-										// cmdk never highlights an item whose value is empty, which would leave the arrow keys and Enter dead.
-										<CommandItem key={choice.value} value={choice.value || choice.label} keywords={[choice.label]} onSelect={() => pick(choice.value)}>
-											{choice.icon}
-											<span className="truncate">{choice.label}</span>
-											{choice.detail && <span className="flex-1 truncate text-muted-foreground">{choice.detail}</span>}
-											<IconCheckmark1 className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
-											{firstKey !== undefined && <Kbd size="sm">{firstKey + index}</Kbd>}
-										</CommandItem>
-									))}
-								</CommandGroup>
-							</>
+							<CommandGroup>
+								{choices.map((choice, index) => (
+									// A choice without a value of its own, as for none, keys on its label.
+									<CommandItem key={choice.value} value={choice.value || choice.label} label={choice.label} keywords={[choice.value]} onSelect={() => pick(choice.value)}>
+										{choice.icon}
+										<span className="truncate">{choice.label}</span>
+										{choice.detail && <span className="flex-1 truncate text-muted-foreground">{choice.detail}</span>}
+										<IconCheckmark1 className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
+										{firstKey !== undefined && <Kbd size="sm">{firstKey + index}</Kbd>}
+									</CommandItem>
+								))}
+							</CommandGroup>
 						)}
 					</CommandList>
 				</Command>
@@ -149,18 +149,20 @@ export function DuePicker({ dueDate, disabled, trigger, look = "field", classNam
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<Tooltip content={dueDate ? `Change the due date: ${dateLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
-				<PopoverTrigger asChild>
-					<Button size="compact" {...pickerButton(look, className)} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-						<span className="flex min-w-0 items-center gap-2">
-							{trigger ?? (
-								<>
-									{look !== "row" && <IconCalendar1 className="size-4 text-muted-foreground" />}
-									{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
-								</>
-							)}
-						</span>
-					</Button>
-				</PopoverTrigger>
+				<PopoverTrigger
+					render={
+						<Button size="compact" {...pickerButton(look, className)} aria-label={`Due date: ${dueDate ?? "none"}`} active={open} disabled={disabled}>
+							<span className="flex min-w-0 items-center gap-2">
+								{trigger ?? (
+									<>
+										{look !== "row" && <IconCalendar1 className="size-4 text-muted-foreground" />}
+										{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
+									</>
+								)}
+							</span>
+						</Button>
+					}
+				/>
 			</Tooltip>
 			<PopoverContent align="start" className="w-auto p-2">
 				<form

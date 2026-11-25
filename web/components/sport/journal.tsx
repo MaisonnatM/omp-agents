@@ -61,16 +61,15 @@ export function JournalTab({ state, open, disabled, onChange, onEdit, keys }: Jo
 		const index = state.log.findIndex(({ id }) => id === log.id);
 		void onChange([{ op: "remove-log", id: log.id }]);
 		navigate(null);
-		toasts.add({
+		toasts({
 			id: "sport-log-undo",
 			title: `Séance du ${shortDate(log.date)} supprimée`,
-			timeout: 8000,
-			actionProps: {
-				children: "Annuler",
-				onClick: () => {
+			duration: 8000,
+			action: {
+				label: "Annuler",
+				onAction: () => {
 					void onChange([{ op: "restore-log", log, index }]);
 					navigate(log.id);
-					toasts.close("sport-log-undo");
 				},
 			},
 		});

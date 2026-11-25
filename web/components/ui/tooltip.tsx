@@ -1,88 +1,16 @@
 "use client";
 
+import { useEffect, Fragment, type ReactNode } from "react";
 import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  Fragment,
-  type ReactNode,
-} from "react";
-import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+  Tooltip as TooltipPrimitive,
+  TooltipContent,
+  TooltipTrigger,
+} from "@ui-sdk/react/tooltip";
 import { motion, useMotionValue } from "framer-motion";
 import { Kbd } from "@/components/kbd";
 import { cn } from "@/lib/utils";
-import { spring, exitFallbackMs } from "@/lib/springs";
 import { fontWeights } from "@/lib/font-weight";
 import { useShape } from "@/lib/shape-context";
-import { isReturnedFocus } from "@/use-return-focus";
-
-// ---------------------------------------------------------------------------
-// Portal container context
-// ---------------------------------------------------------------------------
-
-const TooltipPortalContainerContext = createContext<HTMLElement | null>(null);
-
-function TooltipPortalContainer({
-  value,
-  children,
-}: {
-  value: HTMLElement | null;
-  children: ReactNode;
-}) {
-  return (
-    <TooltipPortalContainerContext.Provider value={value}>
-      {children}
-    </TooltipPortalContainerContext.Provider>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
-
-const DEFAULT_DELAY = 200;
-
-// Tracks whether an app-level <TooltipProvider> is above us. Each Tooltip
-// only wraps itself in a local primitive Provider when there isn't one —
-// a per-instance Provider would defeat cross-tooltip skip-delay grouping
-// (moving between adjacent tooltips would re-wait the full delay). Radix's
-// Root throws without a Provider, so the local fallback can't be dropped.
-const TooltipGroupContext = createContext(false);
-
-interface TooltipProviderProps {
-  children: ReactNode;
-  /** Hover delay before tooltips open, in ms. Defaults to 200. */
-  delayDuration?: number;
-  /** After a tooltip closes, adjacent tooltips opened within this window
-   *  skip the hover delay, in ms. Defaults to 300. */
-  skipDelayDuration?: number;
-}
-
-/** Groups descendant Tooltips so that once one opens, moving to an adjacent
- *  trigger shows its tooltip instantly instead of re-waiting the full delay.
- *  Wrap once at the app (or section) level; bare Tooltips still work without
- *  it via a per-instance fallback. */
-function TooltipProvider({
-  children,
-  delayDuration = DEFAULT_DELAY,
-  skipDelayDuration = 300,
-}: TooltipProviderProps) {
-  return (
-    <TooltipGroupContext.Provider value={true}>
-      <TooltipPrimitive.Provider
-        delayDuration={delayDuration}
-        skipDelayDuration={skipDelayDuration}
-      >
-        {children}
-      </TooltipPrimitive.Provider>
-    </TooltipGroupContext.Provider>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 type TooltipSide = "top" | "right" | "bottom" | "left";
 
@@ -97,13 +25,10 @@ interface TooltipProps {
   wrapperClassName?: string;
   side?: TooltipSide;
   sideOffset?: number;
-  /** Hover delay before this tooltip opens, in ms. Defaults to 200, or to the
-   *  ambient TooltipProvider's delayDuration when one is present. */
+  /** Hover delay before this tooltip opens, in ms. Defaults to 200; once one tooltip shows, the next opens at once. */
   delayDuration?: number;
   className?: string;
-  /** Extra classes for the portalled content element — Radix copies its
-   *  z-index onto the popper wrapper, so pass a z utility here to lift the
-   *  whole tooltip above other fixed layers (default z-50). */
+  /** Extra classes for the content element, outside the surface, such as `pointer-events-none`. */
   contentClassName?: string;
   /** When true, forces the tooltip open. When false, forces it closed. When undefined, uses default hover/focus behavior. */
   forceOpen?: boolean;
@@ -114,27 +39,6 @@ interface TooltipProps {
   /** Called when the tooltip's internal open state changes (before forceOpen is applied). */
   onOpenChange?: (open: boolean) => void;
 }
-
-// ---------------------------------------------------------------------------
-// Animation helpers
-// ---------------------------------------------------------------------------
-
-function getSlideOffset(side: TooltipSide) {
-  switch (side) {
-    case "top":
-      return { y: 4 };
-    case "bottom":
-      return { y: -4 };
-    case "left":
-      return { x: 4 };
-    case "right":
-      return { x: -4 };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Tooltip
-// ---------------------------------------------------------------------------
 
 /** Keystroke chip rendered inside the (inverted) tooltip surface. */
 function TooltipKbd({ children }: { children: ReactNode }) {
@@ -153,37 +57,14 @@ function Tooltip({
   wrapperClassName,
   side = "top",
   sideOffset = 8,
-  delayDuration,
+  delayDuration = 200,
   className,
   contentClassName,
   forceOpen,
-  onOpenChange: onOpenChangeProp,
+  onOpenChange,
   followCursor,
 }: TooltipProps) {
-  const [internalOpen, setInternalOpen] = useState(false);
-  const open = forceOpen !== undefined ? forceOpen : internalOpen;
-  const [mounted, setMounted] = useState(false);
   const shape = useShape();
-  const portalContainer = useContext(TooltipPortalContainerContext);
-  const hasAmbientProvider = useContext(TooltipGroupContext);
-
-  useEffect(() => {
-    if (open) setMounted(true);
-  }, [open]);
-
-  // Fallback release for the deferred unmount: onAnimationComplete is the
-  // primary signal, but rAF-driven animation callbacks can stall in
-  // throttled/background tabs. The exit tween runs at spring.fast.exit, so
-  // the fallback tracks that tier.
-  useEffect(() => {
-    if (open) return;
-    const id = setTimeout(() => setMounted(false), exitFallbackMs(spring.fast));
-    return () => clearTimeout(id);
-  }, [open]);
-
-  const handleExitComplete = () => {
-    if (!open) setMounted(false);
-  };
 
   // Cursor-follow offset from the trigger's center, driven as a motion value
   // so per-move updates skip React re-renders.
@@ -194,7 +75,6 @@ function Tooltip({
     if (forceOpen && followCursor) followOffset.set(0);
   }, [forceOpen, followCursor, followOffset]);
   const handleFollowMove = (event: React.PointerEvent) => {
-    if (!followCursor) return;
     const rect = event.currentTarget.getBoundingClientRect();
     followOffset.set(
       followCursor === "y"
@@ -203,93 +83,56 @@ function Tooltip({
     );
   };
 
-  const slideOffset = getSlideOffset(side);
-
-  // An explicit delayDuration overrides the ambient provider's delay; left
-  // undefined, the Root inherits it from the nearest provider.
-  const tooltip = (
-    <TooltipPrimitive.Root delayDuration={delayDuration} open={open} onOpenChange={(v) => { setInternalOpen(v); onOpenChangeProp?.(v); }}>
-      <TooltipPrimitive.Trigger
-        asChild
-        onPointerMove={followCursor ? handleFollowMove : undefined}
-        // A closing dialog handing the focus back: the trigger was already read, and a tooltip here would take the next Escape.
-        onFocus={(event) => { if (isReturnedFocus(event.currentTarget)) event.preventDefault(); }}
-      >
-        {disabled ? <span className={cn("inline-flex", wrapperClassName)}>{children}</span> : children}
-      </TooltipPrimitive.Trigger>
-      {mounted && (
-        <TooltipPrimitive.Portal forceMount container={portalContainer ?? undefined}>
-          <TooltipPrimitive.Content
-            side={side}
-            sideOffset={sideOffset}
-            forceMount
-            className={cn("z-50", contentClassName)}
-          >
-            <motion.div
-              style={
-                followCursor === "y"
-                  ? { y: followOffset }
-                  : followCursor === "x"
-                    ? { x: followOffset }
-                    : undefined
-              }
-            >
-              <motion.div
-                className={cn(
-                  // Trim recenters the label; the padding bump only applies
-                  // where text-box is supported, keeping the same overall
-                  // height (~26px) as untrimmed browsers.
-                  "max-w-64 text-pretty bg-foreground text-background text-[12px] px-2 py-1",
-                  "[text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both]:py-2",
-                  shape.bg,
-                  className
-                )}
-                style={{ fontVariationSettings: fontWeights.medium }}
-                initial={{ opacity: 0, ...slideOffset }}
-                animate={{
-                  opacity: open ? 1 : 0,
-                  x: 0,
-                  y: 0,
-                }}
-                transition={open ? spring.fast : spring.fast.exit}
-                onAnimationComplete={handleExitComplete}
-              >
-                {shortcut?.length ? (
-                  // A flex row escapes the surface's text-box trim, so the
-                  // label re-applies it; otherwise the row would sit taller
-                  // than a tooltip without chips.
-                  <span className="flex items-center gap-1.5">
-                    <span className="[text-box:trim-both_cap_alphabetic]">{content}</span>
-                    {shortcut.map((key, index) => (
-                      <Fragment key={key}>
-                        {index > 0 && <span className="text-background/60 [text-box:trim-both_cap_alphabetic]">or</span>}
-                        <TooltipKbd>{key}</TooltipKbd>
-                      </Fragment>
-                    ))}
-                  </span>
-                ) : (
-                  content
-                )}
-              </motion.div>
-            </motion.div>
-          </TooltipPrimitive.Content>
-        </TooltipPrimitive.Portal>
-      )}
-    </TooltipPrimitive.Root>
-  );
-
-  // Fallback: Radix's Root requires a Provider above it, so without an
-  // ambient TooltipProvider each instance carries its own with the library's
-  // default delay. Grouped skip-delay needs the shared app-level
-  // TooltipProvider.
-  if (hasAmbientProvider) return tooltip;
-
   return (
-    <TooltipPrimitive.Provider delayDuration={delayDuration ?? DEFAULT_DELAY}>
-      {tooltip}
-    </TooltipPrimitive.Provider>
+    <TooltipPrimitive delay={delayDuration} open={forceOpen} onOpenChange={(open) => onOpenChange?.(open)}>
+      <TooltipTrigger
+        render={disabled ? <span className={cn("inline-flex", wrapperClassName)}>{children}</span> : children}
+        onPointerMove={followCursor ? handleFollowMove : undefined}
+      />
+      <TooltipContent
+        side={side}
+        sideOffset={sideOffset}
+        className={cn(
+          "transition-[opacity,translate] duration-150 ease-out motion-reduce:transition-none data-instant:transition-none data-starting-style:opacity-0 data-ending-style:opacity-0 data-[side=bottom]:data-starting-style:-translate-y-1 data-[side=left]:data-starting-style:translate-x-1 data-[side=right]:data-starting-style:-translate-x-1 data-[side=top]:data-starting-style:translate-y-1",
+          contentClassName
+        )}
+      >
+        <motion.div
+          className={cn(
+            // Trim recenters the label; the padding bump only applies
+            // where text-box is supported, keeping the same overall
+            // height (~26px) as untrimmed browsers.
+            "max-w-64 text-pretty bg-foreground text-background text-[12px] px-2 py-1",
+            "[text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both]:py-2",
+            shape.bg,
+            className
+          )}
+          style={{
+            fontVariationSettings: fontWeights.medium,
+            ...(followCursor === "y" ? { y: followOffset } : followCursor === "x" ? { x: followOffset } : undefined),
+          }}
+        >
+          {shortcut?.length ? (
+            // A flex row escapes the surface's text-box trim, so the
+            // label re-applies it; otherwise the row would sit taller
+            // than a tooltip without chips.
+            <span className="flex items-center gap-1.5">
+              <span className="[text-box:trim-both_cap_alphabetic]">{content}</span>
+              {shortcut.map((key, index) => (
+                <Fragment key={key}>
+                  {index > 0 && <span className="text-background/60 [text-box:trim-both_cap_alphabetic]">or</span>}
+                  <TooltipKbd>{key}</TooltipKbd>
+                </Fragment>
+              ))}
+            </span>
+          ) : (
+            content
+          )}
+        </motion.div>
+      </TooltipContent>
+    </TooltipPrimitive>
   );
 }
 
-export { Tooltip, TooltipPortalContainer, TooltipProvider };
-export type { TooltipProps, TooltipProviderProps, TooltipSide };
+export { Tooltip };
+export type { TooltipProps, TooltipSide };

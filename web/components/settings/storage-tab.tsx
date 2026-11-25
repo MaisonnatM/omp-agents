@@ -1,4 +1,4 @@
-import * as Dialog from "@radix-ui/react-dialog";
+import { Dialog, DialogBackdrop, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { IconArrowRotateClockwise, IconCheckmark1, IconFormCircle, IconCrossMedium, IconTrashCan } from "central-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
@@ -140,56 +140,54 @@ interface ConfirmDialogProps {
 }
 function ConfirmDialog({ open, onOpenChange, chosen, sandboxes, label, onConfirm }: ConfirmDialogProps) {
 	return (
-		<Dialog.Root open={open} onOpenChange={onOpenChange}>
-			<Dialog.Portal>
-				<Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
-				<Dialog.Content className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-lg border border-border bg-background p-5 text-foreground shadow-md">
-					<Dialog.Title className="text-base font-medium">Clean up these files?</Dialog.Title>
-					<Dialog.Description className="mt-1 text-sm text-muted-foreground">
-						Cleanup runs one step at a time. Stopping waits for the current step to finish. Deleted files cannot be restored by the dashboard.
-					</Dialog.Description>
-					<ul className="my-4 space-y-2 text-sm">
-						{chosen.map(row => (
-							<li key={row.step} className="flex justify-between gap-4">
-								<span>{row.label}</span><span className="tabular-nums text-muted-foreground">{row.size}</span>
-							</li>
-						))}
-					</ul>
-					{chosen.some(row => row.step === "archive") && (
-						<p className="mt-2 text-sm">Cold sessions leave the roster, History, and Resume. Their compressed archive stays on disk.</p>
-					)}
-					{chosen.some(row => row.step === "stale") && <p className="mt-2 text-sm">Old debug reports and replicas are permanently deleted.</p>}
-					{chosen.some(row => row.step === CACHE_STEP) && (
-						<p className="mt-2 text-sm">Pruned packages download again when a project needs them.</p>
-					)}
-					{chosen.some(row => isSandboxStep(row.step)) && (
-						<p className="mt-2 text-sm">
-							Sandbox files, ignored files, and commits omp did not bring back are permanently deleted. Close other shells and editors using these folders first.
-						</p>
-					)}
-					{chosen.some(row => row.step === "changedSandboxes") && (
-						<p className="mt-2 text-sm">Sandboxes with leftover changes lose those edits too, unless omp already brought them back to your checkout.</p>
-					)}
-					{chosen.flatMap(row => isSandboxStep(row.step) ? [{ step: row.step, label: row.label }] : []).map(({ step, label }) => (
-						<details key={step} className="mt-3 text-xs text-muted-foreground">
-							<summary className="cursor-pointer">Review: {label}</summary>
-							<ul className="mt-2 space-y-2">
-								{sandboxTargets(step, sandboxes).map(plan => (
-									<li key={plan.path} className="flex items-baseline justify-between gap-4">
-										<span className="break-all">{plan.path}</span>
-										<span className="shrink-0 tabular-nums">{plan.bytes === null ? "Size unavailable" : formatBytes(plan.bytes)}</span>
-									</li>
-								))}
-							</ul>
-						</details>
+		<Dialog open={open} onOpenChange={next => onOpenChange(next)}>
+			<DialogBackdrop />
+			<DialogContent className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-lg border border-border bg-background p-5 text-foreground shadow-md">
+				<DialogTitle className="text-base font-medium">Clean up these files?</DialogTitle>
+				<DialogDescription className="mt-1 text-sm text-muted-foreground">
+					Cleanup runs one step at a time. Stopping waits for the current step to finish. Deleted files cannot be restored by the dashboard.
+				</DialogDescription>
+				<ul className="my-4 space-y-2 text-sm">
+					{chosen.map(row => (
+						<li key={row.step} className="flex justify-between gap-4">
+							<span>{row.label}</span><span className="tabular-nums text-muted-foreground">{row.size}</span>
+						</li>
 					))}
-					<div className="mt-5 flex justify-end gap-2">
-						<Button variant="secondary" size="compact" onClick={() => onOpenChange(false)}>Cancel</Button>
-						<Button variant="destructive-outline" size="compact" className="tabular-nums" leadingIcon={IconTrashCan} onClick={onConfirm}>{label}</Button>
-					</div>
-				</Dialog.Content>
-			</Dialog.Portal>
-		</Dialog.Root>
+				</ul>
+				{chosen.some(row => row.step === "archive") && (
+					<p className="mt-2 text-sm">Cold sessions leave the roster, History, and Resume. Their compressed archive stays on disk.</p>
+				)}
+				{chosen.some(row => row.step === "stale") && <p className="mt-2 text-sm">Old debug reports and replicas are permanently deleted.</p>}
+				{chosen.some(row => row.step === CACHE_STEP) && (
+					<p className="mt-2 text-sm">Pruned packages download again when a project needs them.</p>
+				)}
+				{chosen.some(row => isSandboxStep(row.step)) && (
+					<p className="mt-2 text-sm">
+						Sandbox files, ignored files, and commits omp did not bring back are permanently deleted. Close other shells and editors using these folders first.
+					</p>
+				)}
+				{chosen.some(row => row.step === "changedSandboxes") && (
+					<p className="mt-2 text-sm">Sandboxes with leftover changes lose those edits too, unless omp already brought them back to your checkout.</p>
+				)}
+				{chosen.flatMap(row => isSandboxStep(row.step) ? [{ step: row.step, label: row.label }] : []).map(({ step, label }) => (
+					<details key={step} className="mt-3 text-xs text-muted-foreground">
+						<summary className="cursor-pointer">Review: {label}</summary>
+						<ul className="mt-2 space-y-2">
+							{sandboxTargets(step, sandboxes).map(plan => (
+								<li key={plan.path} className="flex items-baseline justify-between gap-4">
+									<span className="break-all">{plan.path}</span>
+									<span className="shrink-0 tabular-nums">{plan.bytes === null ? "Size unavailable" : formatBytes(plan.bytes)}</span>
+								</li>
+							))}
+						</ul>
+					</details>
+				))}
+				<div className="mt-5 flex justify-end gap-2">
+					<Button variant="secondary" size="compact" onClick={() => onOpenChange(false)}>Cancel</Button>
+					<Button variant="destructive-outline" size="compact" className="tabular-nums" leadingIcon={IconTrashCan} onClick={onConfirm}>{label}</Button>
+				</div>
+			</DialogContent>
+		</Dialog>
 	);
 }
 

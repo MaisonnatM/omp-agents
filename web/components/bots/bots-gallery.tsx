@@ -86,9 +86,7 @@ export function BotsGallery({ rows, routines }: BotsGalleryProps) {
 			title="Bots"
 			meta="Teammates with one conversation you come back to, a job, and a memory"
 			actions={
-				<Button asChild size="compact" leadingIcon={IconPlusSmall}>
-					<a href={hashForNewBot()}>New Bot</a>
-				</Button>
+				<Button size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForNewBot()} />}>New Bot</Button>
 			}
 		>
 			{rows === null ? (

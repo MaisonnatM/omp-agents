@@ -1,79 +1,39 @@
 import * as React from "react"
-import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
-import { Menu as MenuPrimitive } from "@base-ui/react/menu"
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuContent,
+  MenuContextTrigger,
+  MenuGroup,
+  MenuGroupLabel as MenuPrimitiveGroupLabel,
+  MenuItem as MenuPrimitiveItem,
+  MenuItemIndicator,
+  MenuRadioGroup,
+  MenuRadioItem as MenuPrimitiveRadioItem,
+  MenuSeparator as MenuPrimitiveSeparator,
+  MenuSub,
+  MenuSubContent,
+  MenuSubTrigger,
+  MenuTrigger,
+} from "@ui-sdk/react/menu"
 import { IconCheckmark1, IconChevronRightSmall } from "central-icons";
 
 import { cn } from "@/lib/utils"
 
-// A context menu and a dropdown menu share Base UI's menu parts, so the items
-// below render in either popup: one item tree can back both openers.
-
-function ContextMenu({
-  ...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
-  return <ContextMenuPrimitive.Root data-slot="context-menu" {...props} />
-}
-
-/** Opens on right-click, long-press, and, from the keyboard, the context-menu key or Shift+F10. */
-function ContextMenuTrigger({
-  onContextMenu,
-  onKeyDown,
-  ...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Trigger>) {
-  return (
-    <ContextMenuPrimitive.Trigger
-      data-slot="context-menu-trigger"
-      onContextMenu={(event) => {
-        onContextMenu?.(event)
-        // React passes up events from the popups the trigger's content portals out, which are not right-clicks on it.
-        if (!event.currentTarget.contains(event.target as Node)) event.preventBaseUIHandler()
-      }}
-      onKeyDown={(event) => {
-        onKeyDown?.(event)
-        if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return
-        // Not every platform raises `contextmenu` for these keys, so open the menu at the focused element.
-        event.preventDefault()
-        const target = event.target as HTMLElement
-        const { left, bottom } = target.getBoundingClientRect()
-        target.dispatchEvent(
-          new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: left, clientY: bottom })
-        )
-      }}
-      {...props}
-    />
-  )
-}
+// A context menu and a dropdown menu are one UI SDK menu with a different
+// trigger, so the items below render in either popup.
 
 const popupClassName =
   "max-h-(--available-height) min-w-48 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-hidden"
 
+/** Opens on right-click, long-press, and, from the keyboard, the context-menu key or Shift+F10. */
+const ContextMenuTrigger = MenuContextTrigger
+
 function ContextMenuContent({
   className,
   ...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Popup>) {
-  return (
-    <ContextMenuPrimitive.Portal>
-      <ContextMenuPrimitive.Positioner className="z-50 outline-hidden">
-        <ContextMenuPrimitive.Popup
-          data-slot="context-menu-content"
-          className={cn(popupClassName, className)}
-          {...props}
-        />
-      </ContextMenuPrimitive.Positioner>
-    </ContextMenuPrimitive.Portal>
-  )
-}
-
-function DropdownMenu({
-  ...props
-}: React.ComponentProps<typeof MenuPrimitive.Root>) {
-  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
-}
-
-function DropdownMenuTrigger({
-  ...props
-}: React.ComponentProps<typeof MenuPrimitive.Trigger>) {
-  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+}: React.ComponentProps<typeof MenuContent>) {
+  return <MenuContent className={cn(popupClassName, className)} {...props} />
 }
 
 function DropdownMenuContent({
@@ -83,24 +43,16 @@ function DropdownMenuContent({
   sideOffset = 4,
   alignOffset = 0,
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.Popup> &
-  Pick<React.ComponentProps<typeof MenuPrimitive.Positioner>, "side" | "align" | "sideOffset" | "alignOffset">) {
+}: React.ComponentProps<typeof MenuContent>) {
   return (
-    <MenuPrimitive.Portal>
-      <MenuPrimitive.Positioner
-        className="z-50 outline-hidden"
-        side={side}
-        align={align}
-        sideOffset={sideOffset}
-        alignOffset={alignOffset}
-      >
-        <MenuPrimitive.Popup
-          data-slot="dropdown-menu-content"
-          className={cn(popupClassName, className)}
-          {...props}
-        />
-      </MenuPrimitive.Positioner>
-    </MenuPrimitive.Portal>
+    <MenuContent
+      side={side}
+      align={align}
+      sideOffset={sideOffset}
+      alignOffset={alignOffset}
+      className={cn(popupClassName, className)}
+      {...props}
+    />
   )
 }
 
@@ -111,13 +63,13 @@ function MenuItem({
   className,
   variant = "default",
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.Item> & {
+}: Omit<React.ComponentProps<typeof MenuPrimitiveItem>, "destructive"> & {
   variant?: "default" | "destructive"
 }) {
   return (
-    <MenuPrimitive.Item
-      data-slot="menu-item"
+    <MenuPrimitiveItem
       data-variant={variant}
+      destructive={variant === "destructive"}
       className={cn(
         itemClassName,
         "data-[variant=destructive]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:[&_svg]:text-current!",
@@ -128,15 +80,18 @@ function MenuItem({
   )
 }
 
+/** An item that follows a link, as a click on the link would. */
 function MenuLinkItem({
   className,
-  closeOnClick = true,
+  href,
+  target,
+  rel,
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.LinkItem>) {
+}: Omit<React.ComponentProps<typeof MenuPrimitiveItem>, "render"> &
+  Pick<React.ComponentProps<"a">, "href" | "target" | "rel">) {
   return (
-    <MenuPrimitive.LinkItem
-      data-slot="menu-link-item"
-      closeOnClick={closeOnClick}
+    <MenuPrimitiveItem
+      render={<a href={href} target={target} rel={rel} />}
       className={cn(itemClassName, className)}
       {...props}
     />
@@ -146,20 +101,13 @@ function MenuLinkItem({
 function MenuSeparator({
   className,
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.Separator>) {
+}: React.ComponentProps<typeof MenuPrimitiveSeparator>) {
   return (
-    <MenuPrimitive.Separator
-      data-slot="menu-separator"
+    <MenuPrimitiveSeparator
       className={cn("-mx-1 my-1 h-px bg-border", className)}
       {...props}
     />
   )
-}
-
-function MenuSubmenu({
-  ...props
-}: React.ComponentProps<typeof MenuPrimitive.SubmenuRoot>) {
-  return <MenuPrimitive.SubmenuRoot data-slot="menu-submenu" {...props} />
 }
 
 /** A row that opens its submenu on hover, click, or →; `value` reads the current choice before the chevron. */
@@ -168,11 +116,10 @@ function MenuSubmenuTrigger({
   value,
   children,
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.SubmenuTrigger> & { value?: React.ReactNode }) {
+}: Omit<React.ComponentProps<typeof MenuSubTrigger>, "children"> & { children?: React.ReactNode; value?: React.ReactNode }) {
   return (
-    <MenuPrimitive.SubmenuTrigger
-      data-slot="menu-submenu-trigger"
-      className={cn(itemClassName, "data-popup-open:bg-accent data-popup-open:text-accent-foreground", className)}
+    <MenuSubTrigger
+      className={cn(itemClassName, "data-open:bg-accent data-open:text-accent-foreground", className)}
       {...props}
     >
       {children}
@@ -180,7 +127,7 @@ function MenuSubmenuTrigger({
         {value !== undefined && <span className="truncate">{value}</span>}
         <IconChevronRightSmall />
       </span>
-    </MenuPrimitive.SubmenuTrigger>
+    </MenuSubTrigger>
   )
 }
 
@@ -188,30 +135,33 @@ function MenuSubmenuContent({
   className,
   sideOffset = 4,
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.Popup> &
-  Pick<React.ComponentProps<typeof MenuPrimitive.Positioner>, "sideOffset">) {
+}: React.ComponentProps<typeof MenuSubContent>) {
   return (
-    <MenuPrimitive.Portal>
-      <MenuPrimitive.Positioner className="z-50 outline-hidden" side="inline-end" align="start" sideOffset={sideOffset} alignOffset={-5}>
-        <MenuPrimitive.Popup
-          data-slot="menu-submenu-content"
-          className={cn(popupClassName, className)}
-          {...props}
-        />
-      </MenuPrimitive.Positioner>
-    </MenuPrimitive.Portal>
+    <MenuSubContent
+      sideOffset={sideOffset}
+      className={cn(popupClassName, className)}
+      {...props}
+    />
   )
+}
+
+type CheckItemProps = Omit<React.ComponentProps<typeof MenuCheckboxItem>, "value" | "children"> & {
+  children?: React.ReactNode
+  /** Names the option in the menu's actions; a generated one by default. */
+  value?: string
 }
 
 /** A row that turns a setting on and off, drawn as a switch at its end. */
 function MenuSwitchItem({
   className,
   children,
+  value,
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.CheckboxItem>) {
+}: CheckItemProps) {
+  const id = React.useId()
   return (
-    <MenuPrimitive.CheckboxItem
-      data-slot="menu-switch-item"
+    <MenuCheckboxItem
+      value={value ?? id}
       className={cn(itemClassName, "group", className)}
       {...props}
     >
@@ -222,7 +172,7 @@ function MenuSwitchItem({
       >
         <span className="size-3 rounded-full bg-background shadow-xs transition-transform group-data-checked:translate-x-3 motion-reduce:transition-none" />
       </span>
-    </MenuPrimitive.CheckboxItem>
+    </MenuCheckboxItem>
   )
 }
 
@@ -230,46 +180,35 @@ function MenuSwitchItem({
 function MenuCheckItem({
   className,
   children,
+  value,
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.CheckboxItem>) {
+}: CheckItemProps) {
+  const id = React.useId()
   return (
-    <MenuPrimitive.CheckboxItem
-      data-slot="menu-check-item"
+    <MenuCheckboxItem
+      value={value ?? id}
       className={cn(itemClassName, className)}
       {...props}
     >
       {children}
-      <MenuPrimitive.CheckboxItemIndicator keepMounted className="ml-auto pl-4 data-unchecked:invisible">
+      <MenuItemIndicator keepMounted className="ml-auto pl-4 data-unchecked:invisible">
         <IconCheckmark1 />
-      </MenuPrimitive.CheckboxItemIndicator>
-    </MenuPrimitive.CheckboxItem>
+      </MenuItemIndicator>
+    </MenuCheckboxItem>
   )
-}
-
-function MenuGroup({
-  ...props
-}: React.ComponentProps<typeof MenuPrimitive.Group>) {
-  return <MenuPrimitive.Group data-slot="menu-group" {...props} />
 }
 
 /** A {@link MenuGroup}'s heading, muted above its items, as Capy's menus name their sections. */
 function MenuGroupLabel({
   className,
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.GroupLabel>) {
+}: React.ComponentProps<typeof MenuPrimitiveGroupLabel>) {
   return (
-    <MenuPrimitive.GroupLabel
-      data-slot="menu-group-label"
+    <MenuPrimitiveGroupLabel
       className={cn("flex items-center px-2 pt-1.5 pb-1 text-xs text-muted-foreground", className)}
       {...props}
     />
   )
-}
-
-function MenuRadioGroup({
-  ...props
-}: React.ComponentProps<typeof MenuPrimitive.RadioGroup>) {
-  return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />
 }
 
 /** One choice of a {@link MenuRadioGroup}, checked at its end while chosen; every row keeps the check's room, so trailing text stays aligned. */
@@ -277,18 +216,17 @@ function MenuRadioItem({
   className,
   children,
   ...props
-}: React.ComponentProps<typeof MenuPrimitive.RadioItem>) {
+}: Omit<React.ComponentProps<typeof MenuPrimitiveRadioItem>, "children"> & { children?: React.ReactNode }) {
   return (
-    <MenuPrimitive.RadioItem
-      data-slot="menu-radio-item"
+    <MenuPrimitiveRadioItem
       className={cn(itemClassName, className)}
       {...props}
     >
       {children}
-      <MenuPrimitive.RadioItemIndicator keepMounted className="ml-auto pl-4 data-unchecked:invisible">
+      <MenuItemIndicator keepMounted className="ml-auto pl-4 data-unchecked:invisible">
         <IconCheckmark1 />
-      </MenuPrimitive.RadioItemIndicator>
-    </MenuPrimitive.RadioItem>
+      </MenuItemIndicator>
+    </MenuPrimitiveRadioItem>
   )
 }
 
@@ -306,17 +244,17 @@ function MenuShortcut({
 }
 
 export {
-  ContextMenu,
+  Menu as ContextMenu,
   ContextMenuTrigger,
   ContextMenuContent,
-  DropdownMenu,
-  DropdownMenuTrigger,
+  Menu as DropdownMenu,
+  MenuTrigger as DropdownMenuTrigger,
   DropdownMenuContent,
   MenuItem,
   MenuLinkItem,
   MenuSeparator,
   MenuShortcut,
-  MenuSubmenu,
+  MenuSub as MenuSubmenu,
   MenuSubmenuTrigger,
   MenuSubmenuContent,
   MenuGroup,

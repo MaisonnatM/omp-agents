@@ -55,7 +55,7 @@ mock.module(dir + "/ui/menu.tsx", () => ({
 	MenuRadioGroup: ({ children, onValueChange }) => ((pick = onValueChange), createElement("div", null, children)),
 	MenuRadioItem: ({ children, value }) => createElement("button", { "data-item": value, onClick: () => pick(value) }, children),
 }));
-mock.module(dir + "/toaster.tsx", () => ({ toasts: { add: noop } }));
+mock.module(dir + "/toaster.tsx", () => ({ toasts: noop }));
 const { createRoot } = await import("react-dom/client");
 const { ReviewPanel } = await import(dir + "/review-panel.tsx");
 const { liveDraftKey, useComposerDraft } = await import(dir + "/../composer-drafts.ts");

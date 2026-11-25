@@ -50,8 +50,9 @@ export function TodoRow({ entry, siblings, category, workspace, day, sessions, d
 	const rowProps = drag.rowProps(entry, siblings);
 	const pickerOf = (field: TodoField) => ({ open: picker === field, onOpenChange: (next: boolean) => onPicker(next ? field : null) });
 	return (
-		<ContextMenu disabled={disabled || isEditing}>
+		<ContextMenu>
 			<ContextMenuTrigger
+				disabled={disabled || isEditing}
 				render={
 					<li
 						data-todo-id={todo.id}
@@ -187,8 +188,8 @@ interface ArchivedRowProps {
 /** An archived todo's row: when it was cleared, and the buttons that put it back or delete it for good. */
 export function ArchivedRow({ todo, disabled, open, onOpen, onChange }: ArchivedRowProps) {
 	return (
-		<ContextMenu disabled={disabled}>
-			<ContextMenuTrigger render={<li />} data-todo-id={todo.id} className={cn("group/todo flex h-8 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent/50", open && "bg-accent")}>
+		<ContextMenu>
+			<ContextMenuTrigger disabled={disabled} render={<li />} data-todo-id={todo.id} className={cn("group/todo flex h-8 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent/50", open && "bg-accent")}>
 				<IconArchive className="size-4 shrink-0 text-muted-foreground" />
 				<button
 					type="button"

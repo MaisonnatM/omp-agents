@@ -118,7 +118,7 @@ function DisplayMenu({ pulls, display, onDisplay }: { pulls: PullRequests; displ
 						<MenuSubmenuContent className="w-52">
 							<MenuRadioGroup value={order.sort} onValueChange={(sort: PullRequestSort) => onSort(sort)}>
 								{PULL_REQUEST_SORTS.map(sort => (
-									<MenuRadioItem key={sort} value={sort} closeOnClick>
+									<MenuRadioItem key={sort} value={sort} closeOnSelect>
 										{SORT_LABELS[sort]}
 									</MenuRadioItem>
 								))}
@@ -129,7 +129,7 @@ function DisplayMenu({ pulls, display, onDisplay }: { pulls: PullRequests; displ
 							</MenuItem>
 						</MenuSubmenuContent>
 					</MenuSubmenu>
-					<MenuSwitchItem {...activityControl("pull-requests.display.empty")} checked={display.empty} closeOnClick={false} onCheckedChange={empty => onDisplay({ ...display, empty })}>
+					<MenuSwitchItem {...activityControl("pull-requests.display.empty")} checked={display.empty} closeOnSelect={false} onCheckedChange={empty => onDisplay({ ...display, empty })}>
 						Show empty sections
 					</MenuSwitchItem>
 					{everyRepo.length > 0 && (

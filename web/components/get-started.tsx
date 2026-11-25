@@ -1,4 +1,4 @@
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { IconArrowLeft, IconArrowRight, IconCheckmark1, IconCrossMedium, IconExclamationCircle, IconPlusSmall } from "central-icons";
 import { useCallback, useEffect, useId } from "react";
 import { Button } from "@/components/ui/button";
@@ -78,11 +78,9 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
 function CloseButton() {
 	return (
 		<Tooltip content="Close" shortcut={["Esc"]} side="bottom">
-			<DialogPrimitive.Close asChild>
-				<Button variant="ghost" size="icon-compact" aria-label="Close" {...activityControl("get-started.close")}>
-					<IconCrossMedium />
-				</Button>
-			</DialogPrimitive.Close>
+			<DialogClose render={<Button variant="ghost" size="icon-compact" aria-label="Close" {...activityControl("get-started.close")} />}>
+				<IconCrossMedium />
+			</DialogClose>
 		</Tooltip>
 	);
 }
@@ -219,39 +217,36 @@ export function GetStarted({ route, vacantHome, firstSession, rosterError, onClo
 
 	return (
 		<>
-			<DialogPrimitive.Root open={open} onOpenChange={next => !next && close()}>
-				<DialogPrimitive.Portal>
-					<DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 dark:bg-black/80" />
-					<DialogPrimitive.Content
-						aria-describedby={undefined}
-						onOpenAutoFocus={event => event.preventDefault()}
-						className="fixed top-1/2 left-1/2 z-50 flex h-[min(42rem,calc(100vh-2rem))] w-[min(56rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
-					>
-						<DialogPrimitive.Title className="sr-only">Set up omp agents</DialogPrimitive.Title>
-						{place === "welcome" ? (
-							<Welcome titleId={titleId} done={done} onStart={() => setPlace(STEPS.find(step => !done[step.id])?.id ?? "provider")} onDismiss={dismiss} />
-						) : (
-							<Wizard
-								place={place}
-								titleId={titleId}
-								done={done}
-								requiredFinished={requiredFinished}
-								rosterError={rosterError}
-								onPlace={setPlace}
-								onDismiss={dismiss}
-								onNewSession={() => openNewSession()}
-								body={{
-									provider: <ProviderStep providers={providerEntry} />,
-									terminal: <TerminalStep terminal={terminal} />,
-									kit: <KitStep kit={kit} />,
-									tools: <ToolsStep facts={{ github, integrations: integrationsEntry, kit }} onKitStep={() => setPlace("kit")} onRefresh={() => check.run()} refreshing={check.pending} />,
-									session: <SessionStep sessions={firstSession} />,
-								}}
-							/>
-						)}
-					</DialogPrimitive.Content>
-				</DialogPrimitive.Portal>
-			</DialogPrimitive.Root>
+			<Dialog open={open} onOpenChange={next => !next && close()}>
+				<DialogBackdrop className="data-ending-style:animate-out data-ending-style:fade-out-0 data-open:animate-in data-open:fade-in-0" />
+				<DialogContent
+					initialFocus="none"
+					className="fixed top-1/2 left-1/2 z-50 flex h-[min(42rem,calc(100vh-2rem))] w-[min(56rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden data-ending-style:animate-out data-ending-style:fade-out-0 data-ending-style:zoom-out-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 motion-reduce:animate-none"
+				>
+					<DialogTitle className="sr-only">Set up omp agents</DialogTitle>
+					{place === "welcome" ? (
+						<Welcome titleId={titleId} done={done} onStart={() => setPlace(STEPS.find(step => !done[step.id])?.id ?? "provider")} onDismiss={dismiss} />
+					) : (
+						<Wizard
+							place={place}
+							titleId={titleId}
+							done={done}
+							requiredFinished={requiredFinished}
+							rosterError={rosterError}
+							onPlace={setPlace}
+							onDismiss={dismiss}
+							onNewSession={() => openNewSession()}
+							body={{
+								provider: <ProviderStep providers={providerEntry} />,
+								terminal: <TerminalStep terminal={terminal} />,
+								kit: <KitStep kit={kit} />,
+								tools: <ToolsStep facts={{ github, integrations: integrationsEntry, kit }} onKitStep={() => setPlace("kit")} onRefresh={() => check.run()} refreshing={check.pending} />,
+								session: <SessionStep sessions={firstSession} />,
+							}}
+						/>
+					)}
+				</DialogContent>
+			</Dialog>
 			{surface === "bubble" && (
 				<UnderToasts>
 					<Bubble finished={requiredFinished} onDismiss={dismiss} />

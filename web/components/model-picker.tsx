@@ -172,9 +172,9 @@ interface ModelPickerProps {
 /** `Default` among the effort choices; omp's own levels are never empty. */
 const DEFAULT_LEVEL = "";
 
-/** @base-ui/react 1.8.0 Menu.SubmenuRoot's onOpenChange details.reason: these closes
- * navigate to the parent. Item selection closes the outer menu instead. */
-const BACK_TO_MENU: Record<string, true> = { "trigger-hover": true, "sibling-open": true, "list-navigation": true, "escape-key": true, "trigger-press": true };
+/** UI SDK MenuSub's onOpenChange details.reason: these closes navigate to the parent. Item selection closes the outer
+ * menu instead. */
+const BACK_TO_MENU: Record<string, true> = { "trigger-hover": true, "submenu-switch": true, back: true, "escape-key": true, "trigger-press": true };
 
 /** `300K` and `1M`, as model ids name their context sizes, whatever the browser's locale. */
 const tokens = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
@@ -240,7 +240,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 							loading={pending}
 							aria-label={`Choose model and effort: ${current ? modelDescription(current) : unset}, effort ${effort.current ? levelLabel(effort.current) : "Default"}`}
 							active={open !== null}
-							className="[&>span:last-child>svg:last-child]:transition-transform data-popup-open:[&>span:last-child>svg:last-child]:rotate-180 motion-reduce:[&>span:last-child>svg:last-child]:transition-none"
+							className="[&>span:last-child>svg:last-child]:transition-transform data-open:[&>span:last-child>svg:last-child]:rotate-180 motion-reduce:[&>span:last-child>svg:last-child]:transition-none"
 						/>
 					}
 				>
@@ -256,9 +256,9 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 				finalFocus={() => {
 					const refocus = picked.current && composer !== null;
 					picked.current = false;
-					if (!refocus) return true;
+					if (!refocus) return undefined;
 					composer.current?.focus();
-					return false;
+					return document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
 				}}
 			>
 				{fast && (
@@ -295,7 +295,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 								}}
 							>
 								{variants.map(model => (
-									<MenuRadioItem key={model.id} value={selectorOf(model)} closeOnClick>
+									<MenuRadioItem key={model.id} value={selectorOf(model)} closeOnSelect>
 										{tokens.format(model.contextWindow ?? 0)}
 									</MenuRadioItem>
 								))}
@@ -316,12 +316,12 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 							}}
 						>
 							{effort.allowDefault && (
-								<MenuRadioItem value={DEFAULT_LEVEL} closeOnClick>
+								<MenuRadioItem value={DEFAULT_LEVEL} closeOnSelect>
 									Default
 								</MenuRadioItem>
 							)}
 							{levels.map(level => (
-								<MenuRadioItem key={level} value={level} closeOnClick>
+								<MenuRadioItem key={level} value={level} closeOnSelect>
 									{levelLabel(level)}
 								</MenuRadioItem>
 							))}
@@ -381,7 +381,7 @@ function ModelSearch({ list, current, disabled, onPick }: { list: ModelList; cur
 			closeOnSelect={false}
 			filter={modelMatch}
 			listClassName="max-h-80"
-			// Base UI's menu would read typed letters as type-ahead and arrows as its own navigation; Escape still closes the submenu.
+			// UI SDK's menu would read typed letters as type-ahead and arrows as its own navigation; Escape still closes the submenu.
 			onKeyDown={event => {
 				if (event.key !== "Escape") event.stopPropagation();
 			}}

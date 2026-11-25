@@ -49,7 +49,7 @@ export class ActionRunner<A extends unknown[]> {
 			(error: unknown) => {
 				const text = errorText(error);
 				this.#set({ kind: "failed", args, error: text });
-				if (this.failureTitle !== null && this.#listeners.size > 0) toasts.add({ title: this.failureTitle, description: text });
+				if (this.failureTitle !== null && this.#listeners.size > 0) toasts({ title: this.failureTitle, description: text });
 			},
 		);
 	};

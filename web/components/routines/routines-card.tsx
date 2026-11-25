@@ -36,9 +36,7 @@ export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardP
 			title={bot.name}
 			meta="Routines"
 			actions={
-				<Button asChild variant="ghost" size="compact" leadingIcon={IconArrowLeft}>
-					<a href={hashForBots(bot.id)}>Back to {bot.name}</a>
-				</Button>
+				<Button variant="ghost" size="compact" leadingIcon={IconArrowLeft} render={<a href={hashForBots(bot.id)} />}>Back to {bot.name}</Button>
 			}
 		>
 			<div className="px-4 py-6">
@@ -52,9 +50,7 @@ export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardP
 								{runningHere} of {routines.length} on schedule
 							</p>
 						</div>
-						<Button {...activityControl("bots.routine.new")} asChild variant="outline" size="compact" leadingIcon={IconPlusSmall}>
-							<a href={hashForBotRoutine(bot.id, { kind: "new" })}>New routine</a>
-						</Button>
+						<Button {...activityControl("bots.routine.new")} variant="outline" size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForBotRoutine(bot.id, { kind: "new" })} />}>New routine</Button>
 					</header>
 					{routines.length === 0 ? (
 						<p className="px-4 py-8 text-center text-sm text-muted-foreground">No routines yet. New routine makes one.</p>

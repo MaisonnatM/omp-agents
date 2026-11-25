@@ -1,5 +1,14 @@
 import * as React from "react"
-import { Command as CommandPrimitive } from "cmdk"
+import {
+  Command as CommandPrimitive,
+  CommandEmpty as CommandEmptyPrimitive,
+  CommandGroup as CommandGroupPrimitive,
+  CommandGroupLabel,
+  CommandInput as CommandInputPrimitive,
+  CommandItem as CommandItemPrimitive,
+  CommandList as CommandListPrimitive,
+  CommandSeparator as CommandSeparatorPrimitive,
+} from "@ui-sdk/react/command"
 import { IconMagnifyingGlass } from "central-icons";
 
 import { cn } from "@/lib/utils"
@@ -10,7 +19,6 @@ function Command({
 }: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
-      data-slot="command"
       className={cn(
         "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
         className
@@ -23,15 +31,14 @@ function Command({
 function CommandInput({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandInputPrimitive>) {
   return (
     <div
       data-slot="command-input-wrapper"
       className="flex h-9 items-center gap-2 border-b px-3"
     >
       <IconMagnifyingGlass className="size-4 shrink-0 opacity-50" />
-      <CommandPrimitive.Input
-        data-slot="command-input"
+      <CommandInputPrimitive
         className={cn(
           "flex h-10 w-full rounded-md bg-transparent py-3 text-base sm:text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
           className
@@ -45,10 +52,9 @@ function CommandInput({
 function CommandList({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.List>) {
+}: React.ComponentProps<typeof CommandListPrimitive>) {
   return (
-    <CommandPrimitive.List
-      data-slot="command-list"
+    <CommandListPrimitive
       className={cn(
         "max-h-[300px] scroll-py-1 overflow-x-hidden overflow-y-auto",
         className
@@ -59,12 +65,12 @@ function CommandList({
 }
 
 function CommandEmpty({
+  className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Empty>) {
+}: React.ComponentProps<typeof CommandEmptyPrimitive>) {
   return (
-    <CommandPrimitive.Empty
-      data-slot="command-empty"
-      className="py-6 text-center text-sm"
+    <CommandEmptyPrimitive
+      className={cn("py-6 text-center text-sm empty:hidden", className)}
       {...props}
     />
   )
@@ -72,27 +78,31 @@ function CommandEmpty({
 
 function CommandGroup({
   className,
+  heading,
+  children,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Group>) {
+}: Omit<React.ComponentProps<typeof CommandGroupPrimitive>, "children"> & { heading?: React.ReactNode; children?: React.ReactNode }) {
   return (
-    <CommandPrimitive.Group
-      data-slot="command-group"
-      className={cn(
-        "overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground",
-        className
-      )}
+    <CommandGroupPrimitive
+      className={cn("overflow-hidden p-1 text-foreground", className)}
       {...props}
-    />
+    >
+      {heading && (
+        <CommandGroupLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+          {heading}
+        </CommandGroupLabel>
+      )}
+      {children}
+    </CommandGroupPrimitive>
   )
 }
 
 function CommandSeparator({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
+}: React.ComponentProps<typeof CommandSeparatorPrimitive>) {
   return (
-    <CommandPrimitive.Separator
-      data-slot="command-separator"
+    <CommandSeparatorPrimitive
       className={cn("-mx-1 h-px bg-border", className)}
       {...props}
     />
@@ -102,12 +112,11 @@ function CommandSeparator({
 function CommandItem({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Item>) {
+}: React.ComponentProps<typeof CommandItemPrimitive>) {
   return (
-    <CommandPrimitive.Item
-      data-slot="command-item"
+    <CommandItemPrimitive
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
         className
       )}
       {...props}

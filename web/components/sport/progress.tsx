@@ -1,6 +1,5 @@
 /** The Sport page's progress: the cards of each figure, the chart of the one picked against its target, and the records. */
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
+import { Radio, RadioGroup } from "@ui-sdk/react/radio";
 import { lazy, Suspense, useState } from "react";
 import type { SportState } from "../../../src/shared/sport";
 import { records } from "../../../src/sport-week";
@@ -22,11 +21,11 @@ export function ProgressTab({ state, today }: { state: SportState; today: string
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 max-phone:px-6 @3xl/sport:px-6">
 			<RadioGroup aria-label="Mesures" value={figureId(card.figure)} onValueChange={next => setPicked(cards.map(entry => figureId(entry.figure)).find(id => id === next) ?? picked)} className="grid grid-cols-2 gap-3 @4xl/sport:grid-cols-5">
 				{cards.map(entry => (
-					<Radio.Root key={figureId(entry.figure)} value={figureId(entry.figure)} {...activityControl("sport.progress.card")} className="flex min-w-0 cursor-pointer flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring data-[checked]:border-primary data-[checked]:ring-1 data-[checked]:ring-primary">
+					<Radio key={figureId(entry.figure)} value={figureId(entry.figure)} {...activityControl("sport.progress.card")} className="flex min-w-0 cursor-pointer flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring data-[checked]:border-primary data-[checked]:ring-1 data-[checked]:ring-primary">
 						<span className="max-w-full text-xs text-pretty text-muted-foreground">{entry.label}</span>
 						<span className="text-2xl font-semibold tabular-nums">{entry.value}</span>
 						<span className="max-w-full text-xs text-pretty text-muted-foreground">{entry.detail}</span>
-					</Radio.Root>
+					</Radio>
 				))}
 			</RadioGroup>
 			<section aria-label={chart.title} className="flex flex-col gap-3 rounded-xl border border-border p-4">
@@ -35,7 +34,7 @@ export function ProgressTab({ state, today }: { state: SportState; today: string
 						<h2 className="text-sm font-semibold">{chart.title}</h2>
 						{chart.sentence && <p className="text-xs text-muted-foreground">{chart.sentence}</p>}
 					</div>
-					<SegmentedTabs value={range.id} onValueChange={value => setRange(RANGES.find(({ id }) => id === value) ?? range)} activationMode="manual">
+					<SegmentedTabs value={range.id} onValueChange={value => setRange(RANGES.find(({ id }) => id === value) ?? range)} activation="manual">
 						<SegmentedTabsList aria-label="Période">
 							{RANGES.map(entry => (
 								<SegmentedTab key={entry.id} value={entry.id} {...activityControl("sport.progress.range")}>{entry.label}</SegmentedTab>

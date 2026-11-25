@@ -4,7 +4,7 @@ import { useState } from "react";
 import { type PullRequestList, type LinkedPullRequest, type PullRequest, pullRequestUrl, repoKey } from "../../../src/shared/github";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useShortcuts } from "../../shortcuts";
 import { useClipboard } from "../../use-copy";
@@ -137,12 +137,10 @@ export function PullRequestDetailPage({ files, onDock, ...props }: PullRequestDe
 	);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<TooltipProvider>
 				<Header title="Pull requests" meta="Your pull requests and review requests on GitHub" leading={back} />
 				<div className="flex min-h-0 flex-1 flex-col">
 					<PullRequestDetails {...props} placement="page" tab={tab} onTab={choose} path={files?.path ?? null} findable />
 				</div>
-			</TooltipProvider>
 		</div>
 	);
 }

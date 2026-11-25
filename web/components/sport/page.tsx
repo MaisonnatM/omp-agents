@@ -64,7 +64,7 @@ export function SportPage({ state, route, disabled, onChange }: SportPageProps) 
 	const bodyweight = bodyweightOf(state);
 	const logFor = (date: string, workout: LogTarget["workout"]) => setTarget({ date, workout, log: workout?.log ?? null });
 	const check = (next: RoutineCheck) => {
-		onChange([{ op: "set-check", check: next }]).catch((err: unknown) => toasts.add({ title: "Rien n'est enregistré", description: errorText(err) }));
+		onChange([{ op: "set-check", check: next }]).catch((err: unknown) => toasts({ title: "Rien n'est enregistré", description: errorText(err) }));
 	};
 	const checklistOf = (to: TimerTarget): TimerChecklist => ({
 		date: to.date,
@@ -179,7 +179,7 @@ function ViewTabs({ tab, className, fill = false }: { tab: SportRoute["tab"]; cl
 				const view = SPORT_TABS.find(({ route }) => route.tab === next);
 				if (view) location.hash = sportHash(view.route);
 			}}
-			activationMode="manual"
+			activation="manual"
 			className={className}
 		>
 			<SegmentedTabsList aria-label="Vue" className={fill ? "w-full" : undefined}>

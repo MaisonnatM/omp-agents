@@ -111,7 +111,7 @@ function MemoryBar({ rows, configPath, context }: { rows: BarRows; configPath: s
 					</span>
 					<Select value={value} disabled={busy || backend.workspace !== undefined} onValueChange={next => next !== value && save(backend, next)}>
 						<SelectTrigger aria-labelledby={backendLabel} aria-describedby={picked?.description ? hintId : undefined} className="w-40">
-							<SelectValue>{(shown: unknown) => formatValue(backend, shown)}</SelectValue>
+							<SelectValue>{({ value }) => formatValue(backend, value)}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							{options.map(option => (

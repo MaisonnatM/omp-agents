@@ -8,7 +8,7 @@ import { errorText } from "../../src/json";
 import { blockedByWorkspace, DICTATION_BUSY, type DictationSettings, processingText } from "../../src/shared/dictation";
 import type { ClientMsg } from "../../src/shared/protocol";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { Popover, PopoverContent } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { isPhonePage, putJson } from "../api";
 import { useComposerReplacements } from "../composer-drafts";
@@ -157,6 +157,7 @@ export function useDictation({ composer, text, editorRef, send, connected }: Dic
 /** The microphone button, in the composer's action bar; the setup popover opens from it. Nothing for a composer without dictation. */
 export function DictationButton({ dictation }: { dictation: ComposerDictation }) {
 	const { available, own, elsewhere, setup, connected, toggle, keepSelection, enable, closeSetup, onKeyDown } = dictation;
+	const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
 	if (!available) return null;
 	const active = capturing(own);
 	const open = setup !== null;
@@ -166,30 +167,29 @@ export function DictationButton({ dictation }: { dictation: ComposerDictation })
 			<Tooltip content={tooltip} shortcut={elsewhere || !connected ? undefined : shortcutLabels("dictate")} side="top" forceOpen={open ? false : undefined}>
 				{/* A disabled button takes no pointer events, so the tooltip that says why sits on a wrapper. */}
 				<span className="inline-flex">
-					<PopoverAnchor asChild>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label="Dictate a prompt"
-							aria-pressed={active}
-							// The popover opens once a capture finds dictation off, so it hangs from an anchor and its state is set here.
-							aria-haspopup="dialog"
-							aria-expanded={open}
-							// Kept focusable while it transcribes, so the focus stays on the button as the capture ends.
-							aria-disabled={own?.phase === "transcribing" || undefined}
-							disabled={elsewhere || (!connected && !active)}
-							active={active || open}
-							className={active ? "text-foreground" : undefined}
-							onPointerDown={keepSelection}
-							onKeyDown={onKeyDown}
-							onClick={toggle}
-						>
-							<IconMicrophone aria-hidden="true" />
-						</Button>
-					</PopoverAnchor>
+					<Button
+						ref={setAnchor}
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Dictate a prompt"
+						aria-pressed={active}
+						// The popover opens once a capture finds dictation off, so it hangs from an anchor and its state is set here.
+						aria-haspopup="dialog"
+						aria-expanded={open}
+						// Kept focusable while it transcribes, so the focus stays on the button as the capture ends.
+						aria-disabled={own?.phase === "transcribing" || undefined}
+						disabled={elsewhere || (!connected && !active)}
+						active={active || open}
+						className={active ? "text-foreground" : undefined}
+						onPointerDown={keepSelection}
+						onKeyDown={onKeyDown}
+						onClick={toggle}
+					>
+						<IconMicrophone aria-hidden="true" />
+					</Button>
 				</span>
 			</Tooltip>
-			<PopoverContent align="end" side="top" className="w-80 space-y-3 p-3">
+			<PopoverContent anchor={anchor ?? undefined} align="end" side="top" className="w-80 space-y-3 p-3">
 				{setup?.phase === "off" && <SetupOff setup={setup} onEnable={enable} onClose={closeSetup} />}
 				{setup?.phase === "enabled" && (
 					<div className="space-y-1">
@@ -237,10 +237,8 @@ function SetupOff({ setup, onEnable, onClose }: { setup: Extract<Setup, { phase:
 				</p>
 			)}
 			<div className="flex justify-end gap-2">
-				<Button asChild variant="ghost" size="compact">
-					<a href={hashForSettings("files")} onClick={onClose}>
-						Open config
-					</a>
+				<Button variant="ghost" size="compact" render={<a href={hashForSettings("files")} onClick={onClose} />}>
+					Open config
 				</Button>
 				{!blocked && (
 					<Button size="compact" loading={setup.enabling} onClick={onEnable}>

@@ -7,7 +7,7 @@ const flags = { at: NOW, seen: false, read: false };
 
 test("a Slack message opens in Slack and toasts briefly", () => {
 	const shown = presentNotice({ id: "s", ...flags, kind: "slack", from: "Ann", avatarUrl: null, text: "hi", permalink: "https://slack/x", type: "dm", count: 2 }, NOW);
-	expect(shown).toMatchObject({ source: "slack", headline: "Ann sent you 2 messages", preview: "hi", link: { href: "https://slack/x", external: true }, action: { kind: "none" }, toast: { kind: "news", timeout: TOAST_MS } });
+	expect(shown).toMatchObject({ source: "slack", headline: "Ann sent you 2 messages", preview: "hi", link: { href: "https://slack/x", external: true }, action: { kind: "none" }, toast: { kind: "news", duration: TOAST_MS } });
 });
 
 test("a provider out of credit names its footer row, so the API key reads as API credits", () => {
@@ -38,7 +38,7 @@ test("an omp-agents update that did not start says where omp-agents went back to
 		preview: "omp-agents went back to a1b2c3d until origin/main has a newer commit. e5f6a7b did not start (exited with code 1).",
 		failed: true,
 		action: { kind: "none" },
-		toast: { kind: "news", timeout: 0 },
+		toast: { kind: "news", duration: Infinity },
 	});
 });
 
@@ -59,6 +59,6 @@ test("sessions that stopped mid-turn are counted, named as past sessions are, st
 		preview: "Fix the login · api · Untitled session",
 		link: { href: "#session/s1", external: false },
 		action: { kind: "continue-all", sessionIds: ["s1", "s2", "s3"] },
-		toast: { kind: "news", timeout: 0 },
+		toast: { kind: "news", duration: Infinity },
 	});
 });

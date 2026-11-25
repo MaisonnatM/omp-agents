@@ -30,10 +30,8 @@ const NARROW_SR_ONLY = "@max-[30rem]/artifacts:sr-only";
 function LinkAction({ control, label, url, download, children }: { control: ControlId; label: string; url: string | null; download?: string; children: ReactNode }) {
 	return (
 		<Tooltip content={label} side="bottom" disabled={url === null}>
-			<Button {...activityControl(control)} asChild variant="ghost" size="icon-compact" aria-label={label} className="aria-disabled:pointer-events-none aria-disabled:opacity-50">
-				<a href={url ?? undefined} {...(download ? { download } : { target: "_blank", rel: "noopener noreferrer" })} aria-disabled={url === null || undefined}>
-					{children}
-				</a>
+			<Button {...activityControl(control)} variant="ghost" size="icon-compact" aria-label={label} className="aria-disabled:pointer-events-none aria-disabled:opacity-50" render={<a href={url ?? undefined} {...(download ? { download } : { target: "_blank", rel: "noopener noreferrer" })} aria-disabled={url === null || undefined} />}>
+				{children}
 			</Button>
 		</Tooltip>
 	);
@@ -127,7 +125,7 @@ function ArtifactTitle({ artifacts, artifact, onPick }: { artifacts: Artifact[];
 						{artifacts.map(each => {
 							const EachIcon = ARTIFACT_KIND[each.kind].icon;
 							return (
-								<MenuRadioItem key={each.file} value={each.file} closeOnClick>
+								<MenuRadioItem key={each.file} value={each.file} closeOnSelect>
 									<EachIcon />
 									<span className="min-w-0 flex-1">
 										<span className="block truncate">{each.title}</span>
@@ -167,9 +165,9 @@ export function VersionBar({ artifact, version, onPick }: { artifact: Artifact; 
 							<span className={NARROW_HIDDEN}>Version</span> {version.number} of {count}
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="start" side="top" className="max-w-96">
-							<MenuRadioGroup aria-label="Versions" value={version.number} onValueChange={(number: number) => onPick(number)}>
+							<MenuRadioGroup aria-label="Versions" value={String(version.number)} onValueChange={(number: string) => onPick(Number(number))}>
 								{artifact.versions.toReversed().map(each => (
-									<MenuRadioItem key={each.number} value={each.number} closeOnClick>
+									<MenuRadioItem key={each.number} value={String(each.number)} closeOnSelect>
 										<span className="w-6 shrink-0 tabular-nums text-muted-foreground">v{each.number}</span>
 										<span className="min-w-0 flex-1 truncate">{each.save.note ?? (each.number === 1 ? "First version" : "No note")}</span>
 										<span className="pl-3 text-xs whitespace-nowrap text-muted-foreground">{listTime(each.save.savedAt)}</span>

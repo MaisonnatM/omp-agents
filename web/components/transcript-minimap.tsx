@@ -115,25 +115,27 @@ const Line = memo(function Line({ turn, index, active, onJump }: { turn: Outline
 	const title = titleOf(turn);
 	const description = descriptionOf(turn);
 	return (
-		<HoverCard openDelay={80} closeDelay={100}>
-			<HoverCardTrigger asChild>
-				<button
-					{...activityControl("minimap.jump")}
-					type="button"
-					data-slot="minimap-line"
-					data-active={active || undefined}
-					aria-current={active ? "step" : undefined}
-					onClick={() => onJump(turn.id)}
-					className={cn(RAIL_BUTTON, "h-2 text-muted-foreground/40 transition-colors hover:text-foreground focus-visible:text-foreground data-active:text-foreground data-[state=open]:text-foreground", FALLOFF)}
-				>
-					<svg aria-hidden="true" viewBox="0 0 24 2" preserveAspectRatio="none" className="h-0.5 w-3 overflow-visible transition-[width] duration-200 ease-out motion-reduce:transition-none">
-						<rect fill="currentColor" width="24" height="2" />
-					</svg>
-					<span className="sr-only">
-						Turn {index + 1}: {title}
-					</span>
-				</button>
-			</HoverCardTrigger>
+		<HoverCard delay={80} closeDelay={100}>
+			<HoverCardTrigger
+				render={
+					<button
+						{...activityControl("minimap.jump")}
+						type="button"
+						data-slot="minimap-line"
+						data-active={active || undefined}
+						aria-current={active ? "step" : undefined}
+						onClick={() => onJump(turn.id)}
+						className={cn(RAIL_BUTTON, "h-2 text-muted-foreground/40 transition-colors hover:text-foreground focus-visible:text-foreground data-active:text-foreground data-open:text-foreground", FALLOFF)}
+					>
+						<svg aria-hidden="true" viewBox="0 0 24 2" preserveAspectRatio="none" className="h-0.5 w-3 overflow-visible transition-[width] duration-200 ease-out motion-reduce:transition-none">
+							<rect fill="currentColor" width="24" height="2" />
+						</svg>
+						<span className="sr-only">
+							Turn {index + 1}: {title}
+						</span>
+					</button>
+				}
+			/>
 			<HoverCardContent side="right" align="center" sideOffset={8} className="w-64 p-3">
 				<p className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
 					{turn.routine && <TaskIcon task={turn.routine.task} className="size-3.5 shrink-0 text-muted-foreground" />}

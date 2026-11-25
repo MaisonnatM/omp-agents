@@ -103,7 +103,7 @@ export function ContextSources({ range, active }: { range: AnalyticsRange; activ
 				<h3 id="analytics-context" className="text-sm font-semibold">Context sources</h3>
 				<div className="flex flex-wrap gap-2">
 					<Select<string>
-						items={workspaces}
+						items={Object.entries(workspaces).map(([value, label]) => ({ value, label }))}
 						value={cwd ?? ALL}
 						onValueChange={next => {
 							setCwd(next ? next : null);
@@ -117,7 +117,7 @@ export function ContextSources({ range, active }: { range: AnalyticsRange; activ
 							{Object.entries(workspaces).map(([value, label]) => <SelectItem key={value} value={value} title={value || undefined}>{label}</SelectItem>)}
 						</SelectContent>
 					</Select>
-					<Select<string> items={sessions} value={sessionId ?? ALL} onValueChange={next => setSessionId(next ? next : null)}>
+					<Select<string> items={Object.entries(sessions).map(([value, label]) => ({ value, label }))} value={sessionId ?? ALL} onValueChange={next => setSessionId(next ? next : null)}>
 						<SelectTrigger aria-label="Session" className="max-w-72">
 							<SelectValue />
 						</SelectTrigger>

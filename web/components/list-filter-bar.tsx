@@ -4,11 +4,11 @@
  * what the list shows while the search or **Filter** keep nothing.
  */
 import { IconCrossMedium, IconFilter1, IconSettingsSliderHor } from "central-icons";
-import { type ComponentType, type ReactNode, type Ref, type RefObject, useId, useRef, useState } from "react";
+import { type ComponentType, type ReactNode, type Ref, type RefObject, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuCheckItem, MenuRadioGroup, MenuRadioItem, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
-import { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
@@ -80,7 +80,7 @@ export function setField<K extends string>({
 		clear,
 		// Checking one leaves the menu open, so you can check several.
 		items: options.map(({ key, label, count }) => (
-			<MenuCheckItem {...activityControl(control)} key={key} checked={checked.has(key)} disabled={disabled?.(key)} closeOnClick={false} onCheckedChange={() => onChecked(withToggled(checked, key))}>
+			<MenuCheckItem {...activityControl(control)} key={key} checked={checked.has(key)} disabled={disabled?.(key)} closeOnSelect={false} onCheckedChange={() => onChecked(withToggled(checked, key))}>
 				<span className="truncate">{label}</span>
 				{count !== undefined && <span className="ml-auto pl-3 text-xs text-muted-foreground tabular-nums">{count}</span>}
 			</MenuCheckItem>
@@ -114,11 +114,11 @@ export function dayField({
 		clear: () => onValue(null),
 		items: (
 			<MenuRadioGroup value={value === null ? "any" : String(value)} onValueChange={(next: string) => onValue(DAY_RANGES.find(days => String(days) === next) ?? null)}>
-				<MenuRadioItem {...activityControl(control)} value="any" closeOnClick>
+				<MenuRadioItem {...activityControl(control)} value="any" closeOnSelect>
 					Any time
 				</MenuRadioItem>
 				{DAY_RANGES.map(days => (
-					<MenuRadioItem {...activityControl(control)} key={days} value={String(days)} closeOnClick>
+					<MenuRadioItem {...activityControl(control)} key={days} value={String(days)} closeOnSelect>
 						{labels[days]}
 					</MenuRadioItem>
 				))}
@@ -282,8 +282,8 @@ export function DisplayButton({
 /**
  * {@link DisplayButton} with a panel it opens, such as **Repositories…**: `menu` gets the function that opens it, a
  * popover under the same button, `title` over `description` then `children`, which unmount as it closes, and which
- * hands focus back to **Display**. The button is marked while `active` or while the panel is up; `onEscapeKeyDown`
- * can keep the panel open on Esc.
+ * hands focus back to **Display**. The button is marked while `active` or while the panel is up; `escapeKeepsOpen`
+ * can keep the panel open on Esc, given the element Esc was pressed in.
  */
 export function DisplayWithPanel({
 	label,
@@ -293,7 +293,7 @@ export function DisplayWithPanel({
 	title,
 	description,
 	panelClassName,
-	onEscapeKeyDown,
+	escapeKeepsOpen,
 	children,
 }: {
 	label: string;
@@ -304,35 +304,34 @@ export function DisplayWithPanel({
 	description: string;
 	/** The panel's width, such as `w-96`. */
 	panelClassName: string;
-	onEscapeKeyDown?: (event: KeyboardEvent) => void;
+	escapeKeepsOpen?: (target: EventTarget | null) => boolean;
 	children: ReactNode;
 }) {
 	const [panel, setPanel] = useState(false);
-	const button = useRef<HTMLButtonElement>(null);
-	const titleId = useId();
+	const [button, setButton] = useState<HTMLButtonElement | null>(null);
 	return (
-		<Popover open={panel} onOpenChange={setPanel}>
-			<PopoverAnchor asChild>
-				<span className="inline-flex">
-					<DisplayButton label={label} control={control} active={active || panel} tooltipHidden={panel} buttonRef={button}>
-						{menu(() => setPanel(true))}
-					</DisplayButton>
-				</span>
-			</PopoverAnchor>
+		<Popover
+			open={panel}
+			onOpenChange={(next, details) => {
+				if (!next && details.reason === "escape-key" && escapeKeepsOpen?.(details.event?.target ?? null)) return details.cancel();
+				setPanel(next);
+			}}
+		>
+			<span className="inline-flex">
+				<DisplayButton label={label} control={control} active={active || panel} tooltipHidden={panel} buttonRef={setButton}>
+					{menu(() => setPanel(true))}
+				</DisplayButton>
+			</span>
 			<PopoverContent
+				anchor={button ?? undefined}
 				align="end"
 				collisionPadding={8}
-				aria-labelledby={titleId}
 				// With no trigger of its own, the popover hands focus back to **Display** as it closes.
-				onCloseAutoFocus={event => {
-					event.preventDefault();
-					button.current?.focus();
-				}}
-				onEscapeKeyDown={onEscapeKeyDown}
-				className={cn("max-h-(--radix-popover-content-available-height) max-w-[calc(100vw-2rem)] space-y-3 overflow-y-auto p-3", panelClassName)}
+				finalFocus={button ?? "trigger"}
+				className={cn("max-h-(--available-height) max-w-[calc(100vw-2rem)] space-y-3 overflow-y-auto p-3", panelClassName)}
 			>
 				<PopoverHeader>
-					<PopoverTitle id={titleId} className="text-sm">
+					<PopoverTitle className="text-sm">
 						{title}
 					</PopoverTitle>
 					<PopoverDescription className="text-xs">{description}</PopoverDescription>
@@ -351,7 +350,7 @@ export function GroupingSubmenu<G extends string>({ groupings, labels, value, co
 			<MenuSubmenuContent className="w-48">
 				<MenuRadioGroup value={value} onValueChange={(next: G) => onValue(next)}>
 					{groupings.map(grouping => (
-						<MenuRadioItem {...activityControl(control)} key={grouping} value={grouping} closeOnClick>
+						<MenuRadioItem {...activityControl(control)} key={grouping} value={grouping} closeOnSelect>
 							{labels[grouping]}
 						</MenuRadioItem>
 					))}

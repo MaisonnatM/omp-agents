@@ -1,8 +1,11 @@
-import { afterEach, expect, mock, spyOn, test } from "bun:test";
+import { afterEach, expect, mock, test } from "bun:test";
 import { toasts } from "./components/toaster";
 import { type ActionState, ActionRunner } from "./use-action";
 
-afterEach(() => mock.restore());
+afterEach(() => {
+	toasts.dismiss();
+	mock.restore();
+});
 
 /** Runs `action` with `args` and resolves with the state it settles to. */
 function settle<A extends unknown[]>(action: ActionRunner<A>, ...args: A): Promise<ActionState<A>> {
@@ -29,22 +32,22 @@ test("a second press while the work runs starts nothing", async () => {
 });
 
 test("a failure stays with its arguments until the next run or a dismiss, and toasts only when titled and shown", async () => {
-	const added = spyOn(toasts, "add");
+	const shown = () => toasts.toasts().map(({ title, description }) => ({ title, description }));
 	const inline = new ActionRunner(async (_: number) => {
 		throw new Error("refused");
 	}, null);
 	expect(await settle(inline, 7)).toEqual({ kind: "failed", args: [7], error: "refused" });
 	inline.dismiss();
 	expect(inline.state).toEqual({ kind: "idle" });
-	expect(added).not.toHaveBeenCalled();
+	expect(shown()).toEqual([]);
 
 	const toasted = new ActionRunner(() => {
 		throw new Error("thrown at once");
 	}, "Could not save");
 	expect(await settle(toasted)).toEqual({ kind: "failed", args: [], error: "thrown at once" });
-	expect(added).not.toHaveBeenCalled();
+	expect(shown()).toEqual([]);
 	const unsubscribe = toasted.subscribe(() => {});
 	await settle(toasted);
 	unsubscribe();
-	expect(added.mock.calls.map(([toast]) => toast)).toEqual([{ title: "Could not save", description: "thrown at once" }]);
+	expect(shown()).toEqual([{ title: "Could not save", description: "thrown at once" }]);
 });

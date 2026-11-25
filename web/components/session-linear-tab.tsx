@@ -68,7 +68,7 @@ function IssueToolbar({ linked, shown, onPick }: { linked: string[]; shown: stri
 						<DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
 							<MenuRadioGroup aria-label="Linked issues" value={shown ?? ""} onValueChange={onPick}>
 								{linked.map(id => (
-									<MenuRadioItem key={id} value={id} closeOnClick className="font-mono">
+									<MenuRadioItem key={id} value={id} closeOnSelect className="font-mono">
 										{id}
 									</MenuRadioItem>
 								))}

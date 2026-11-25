@@ -7,7 +7,7 @@ import { type PullRequest, prKey, repoKey, type RepoPullRequests } from "../../.
 import { type RefObject, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { filters, NO_FILTER, type PullRequestFilter } from "../../pull-requests-filter";
@@ -256,7 +256,6 @@ function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route:
 	return (
 		<aside aria-label="Pull request details" style={{ width }} className="relative flex max-w-[calc(100%-20rem)] shrink-0 flex-col border-l border-border">
 			<Separator {...resize} axis="vertical" label="Resize the pull request details" min={MIN_DETAILS} max={MAX_DETAILS} now={width} className="inset-y-0 -left-1.5 w-3 cursor-col-resize select-none" />
-			<TooltipProvider>
 				<div className="flex h-(--page-header-height) shrink-0 items-center justify-end gap-1 border-b border-border px-3">
 					<Tooltip content="Open as a page" side="bottom">
 						<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Open as a page" onClick={expand}>
@@ -272,7 +271,6 @@ function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route:
 				<div className="flex min-h-0 flex-1 flex-col">
 					<PullRequestDetails hosts={hosts} target={route.target} path={route.files?.path ?? null} tab={tab} onTab={setTab} placement="sidebar" findable />
 				</div>
-			</TooltipProvider>
 		</aside>
 	);
 }

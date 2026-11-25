@@ -38,7 +38,7 @@ interface SidebarNavProps {
 export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNewSession, onTab, settingsRoute, unreadNotices }: SidebarNavProps) {
 	const sub = list !== null && (
 		<SidebarMenuNested>
-			<ScrollArea className="ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[30svh] pl-1 [&>div]:!block [&>div]:!min-w-0">
+			<ScrollArea className="ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[30svh] pl-1">
 				{list}
 			</ScrollArea>
 		</SidebarMenuNested>

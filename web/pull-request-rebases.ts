@@ -165,7 +165,7 @@ async function drain(): Promise<void> {
 			run.left -= 1;
 			if (!run.bulk) settleToast(run.toast, text);
 			// A bulk run's toast counts the rebased ones and those that had their base; what stopped one gets a toast of its own.
-			else if (outcome === "conflict" || outcome === "failed") toasts.add(text);
+			else if (outcome === "conflict" || outcome === "failed") toasts(text);
 			if (run.left > 0) continue;
 			if (run.bulk) settleToast(run.toast, summary(run));
 			run.hooks.refresh();

@@ -10,12 +10,12 @@ export const DASHBOARD_UPDATE_URL = "/api/dashboard/update";
 export async function updateDashboard(): Promise<void> {
 	try {
 		const outcome = await putJson<DashboardUpdateOutcome>(DASHBOARD_UPDATE_URL, {});
-		toasts.add(
+		toasts(
 			outcome.kind === "current"
 				? { title: "omp-agents already runs the newest commit" }
 				: { title: `Restarting omp-agents at ${outcome.to.slice(0, 7)}`, description: outcome.installed ? "Installed the packages the new bun.lock names." : undefined },
 		);
 	} catch (err) {
-		toasts.add({ title: "omp-agents did not update", description: errorText(err) });
+		toasts({ title: "omp-agents did not update", description: errorText(err) });
 	}
 }

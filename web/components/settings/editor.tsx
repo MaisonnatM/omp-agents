@@ -327,7 +327,7 @@ function OptionSelect({ labelId, hintId, value, options, disabled, onPick }: { l
 	return (
 		<Select value={value} disabled={disabled} onValueChange={next => (typeof next === "string" || typeof next === "number") && onPick(next)}>
 			<SelectTrigger aria-labelledby={labelId} aria-describedby={hintId} className="max-w-64 tabular-nums">
-				<SelectValue>{(shown: unknown) => listed.find(option => option.value === shown)?.label ?? String(shown)}</SelectValue>
+				<SelectValue>{({ value }) => listed.find(option => option.value === value)?.label ?? String(value)}</SelectValue>
 			</SelectTrigger>
 			<SelectContent>
 				{listed.map(option => (

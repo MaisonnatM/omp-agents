@@ -1,6 +1,5 @@
 /** What an open row of a Bot's routines card shows: the picked run, the task whole, the schedule to change in place, and Edit and Delete. */
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
+import { Radio, RadioGroup } from "@ui-sdk/react/radio";
 import { IconPencil, IconTrashCan } from "central-icons";
 import { useId, useState } from "react";
 import type { Routine, RoutineRun, RoutineTask, TriggerEvent, Weekday } from "../../../src/routines";
@@ -176,13 +175,13 @@ function ScheduleEditor({ routine, disabled }: { routine: Routine; disabled: boo
 					className="flex w-fit gap-0.5 rounded-lg bg-input/40 p-0.5"
 				>
 					{CADENCE_LIST.map(cadence => (
-						<Radio.Root
+						<Radio
 							key={cadence}
 							value={cadence}
 							className="inline-flex h-6 cursor-pointer items-center rounded-md px-2.5 text-xs font-medium text-muted-foreground outline-none transition-colors select-none hover:bg-background/55 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-background data-[checked]:text-foreground data-[checked]:shadow-xs/10 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-60 motion-reduce:transition-none dark:hover:bg-input/32 dark:data-[checked]:bg-input/72"
 						>
 							{CADENCES[cadence].label}
-						</Radio.Root>
+						</Radio>
 					))}
 				</RadioGroup>
 				{compact && compact.cadence !== "hourly" && (
@@ -201,7 +200,7 @@ function ScheduleEditor({ routine, disabled }: { routine: Routine; disabled: boo
 				{compact?.cadence === "weekly" && (
 					<Select value={compact.day} disabled={disabled} onValueChange={(day: Weekday | null) => day !== null && save({ ...compact, day })}>
 						<SelectTrigger aria-label="Day">
-							<SelectValue>{(day: Weekday) => dayName(day)}</SelectValue>
+							<SelectValue>{({ value }) => dayName(value as Weekday)}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							{WEEK.map(day => (
@@ -257,9 +256,7 @@ function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) 
 	}
 	return (
 		<div className="flex items-center justify-end gap-1">
-			<Button asChild variant="ghost" size="compact" leadingIcon={IconPencil}>
-				<a href={hashForBotRoutine(botId, { kind: "edit", id })}>Edit</a>
-			</Button>
+			<Button variant="ghost" size="compact" leadingIcon={IconPencil} render={<a href={hashForBotRoutine(botId, { kind: "edit", id })} />}>Edit</Button>
 			<Button {...activityControl("bots.routine.delete")} variant="ghost" size="compact" leadingIcon={IconTrashCan} disabled={disabled} onClick={() => setConfirming(true)}>
 				Delete
 			</Button>

@@ -135,14 +135,14 @@ export function usePicking(webview: Webview, draftKey: string, shownAt: string |
 	/** Attaches `file` to the composer, or says to open the conversation when none is mounted; whether it attached. */
 	const attachFile = (file: File): boolean => {
 		const attached = attachToComposer(draftKey, file);
-		toasts.add({ title: attached ? "Added to the composer" : "Open the session's conversation to attach the capture" });
+		toasts({ title: attached ? "Added to the composer" : "Open the session's conversation to attach the capture" });
 		return attached;
 	};
 	// Picking stops only once the chip and its picture are in the composer, so a failed capture or a closed conversation keeps the marks to try again.
 	const attach = useAction(async ({ marks, comment, pageWidth }: Marking) => {
 		const picked = await webview.resolveSelection();
 		const png = await webview.capture();
-		if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
+		if (png === null) return void toasts({ title: "Could not capture the Browser" });
 		const outlined = elements.filter(box => picked.some(element => element.id === box.id));
 		if (!attachFile(await annotationFile(png, marks, outlined, pageWidth, color, shownAt))) return;
 		choose(null);
@@ -169,7 +169,7 @@ export function usePicking(webview: Webview, draftKey: string, shownAt: string |
 		attaching: attach.pending,
 		screenshot: async () => {
 			const png = await webview.capture();
-			if (png === null) return void toasts.add({ title: "Could not capture the Browser" });
+			if (png === null) return void toasts({ title: "Could not capture the Browser" });
 			attachFile(screenshotFile(png, shownAt));
 		},
 	};

@@ -109,11 +109,13 @@ export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: 
 			}}
 		>
 			<div className="relative">
-				<PopoverTrigger asChild>
-					<Button size="icon" variant="glass" aria-label={composerLabel({ pending, reviewStarted })}>
-						<IconBubbleText className="size-4" />
-					</Button>
-				</PopoverTrigger>
+				<PopoverTrigger
+					render={
+						<Button size="icon" variant="glass" aria-label={composerLabel({ pending, reviewStarted })}>
+							<IconBubbleText className="size-4" />
+						</Button>
+					}
+				/>
 				{badge}
 			</div>
 			<PopoverContent
@@ -122,10 +124,7 @@ export function PullRequestComposer({ detail, openDraft, send, onDraftPosted }: 
 				sideOffset={8}
 				aria-label="Pull request composer"
 				className="w-96 max-w-[calc(100vw-2rem)] p-4"
-				onOpenAutoFocus={event => {
-					event.preventDefault();
-					(mode === "review" ? reviewRef : commentRef).current?.focus();
-				}}
+				initialFocus={() => (mode === "review" ? reviewRef : commentRef).current}
 			>
 				<div className="mb-3 flex items-center justify-between gap-2">
 					{reviewable ? (
