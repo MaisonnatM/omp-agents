@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- In the Board tab of the sidebar, a Workspace's sessions now sit a little apart from the Workspace above them.
 - The Board now looks and works like a Slack channel: pictures and names on each message, messages grouped by author and split by day, a reply line under each message, a hover toolbar with **Reply in thread**, and a Slack-style thread pane that Escape closes.
 - The Board's message box is now the New session composer: pick the model, thinking level, and skill the session starts on, with `/` suggestions and dictation; the **Needs** picker is gone, and the thread's reply box uses the session composer.
 - The Board now has its own tab at the top of the sidebar, beside Sessions; under it the sidebar lists the Board's workspaces and their sessions, and the page gets the full width.
