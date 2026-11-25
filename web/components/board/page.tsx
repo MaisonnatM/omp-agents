@@ -10,7 +10,8 @@ import { hashForSession, type PastSession, type PromptImage, type RosterHost, ty
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
-import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import { splitSuggestions } from "../../../src/shared/transcript";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from "@/components/ui/message-scroller";
@@ -434,8 +435,8 @@ const clampThread = (width: number, room: number): number => Math.round(Math.max
 /** The Board thread as Slack's thread pane, at the width you drag its left edge to, under the session details sidebar's tab row: **Thread**, the Board task, a line with the reply count, the replies, and the reply box; then the conversation and sidebar tabs of the session its replies wake. Escape closes it. */
 function Thread({ state, task, reply, core, workspace, channel, closeHref, onSearch, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; core: CoreData; workspace: Workspace; channel: string; closeHref: string; onSearch: () => void; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const sessions = core.sessions;
-	// The thread and its reply box address the same session; a thread with none, or one not listed yet, shows only **Thread**.
-	const target = wakeTarget(task, { kind: "user" });
+	// The thread shows the session a reply wakes, or on a done Board task the last one that worked on it; a thread with none, or one not listed yet, shows only **Thread**.
+	const target = wakeTarget(task, { kind: "user" }) ?? (task.doneAt !== null ? (startedOn(task).at(-1) ?? null) : null);
 	const name = target ? sessionLabel(target, sessions).name : null;
 	const host = target ? (sessions.hosts.find(each => each.sessionId === target) ?? null) : null;
 	const past = target ? (sessions.past.find(each => each.sessionId === target) ?? null) : null;
@@ -481,7 +482,7 @@ function Thread({ state, task, reply, core, workspace, channel, closeHref, onSea
 		scrollsItself: true,
 		content: (
 			<>
-				<ThreadMessages state={state} task={task} reply={reply} sessions={sessions} />
+				<ThreadMessages state={state} task={task} reply={reply} sessions={sessions} disabled={disabled} onChange={onChange} />
 				<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
 			</>
 		),
@@ -546,12 +547,14 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 	return <DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={row?.cwd ?? null} tabs={tabs} trailing={close} />;
 }
 
-/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. */
-function ThreadMessages({ state, task, reply, sessions }: { state: BoardState; task: BoardTask; reply: number | null; sessions: KnownSessions }) {
+/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. Under a done Board task's last reply sit its session's suggested prompts; each sends itself as the user's reply, which starts a new session on the thread. */
+function ThreadMessages({ state, task, reply, sessions, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const status = statusOf(state, task);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const replies = said(task);
 	const count = replies.length;
+	const last = replies.at(-1);
+	const suggestions = task.doneAt !== null && last?.by.kind === "session" ? splitSuggestions(last.text).suggestions : [];
 	let previous: { at: number; by: BoardAuthor } = task;
 	return (
 		<MessageScrollerProvider autoScroll={reply === null}>
@@ -575,6 +578,15 @@ function ThreadMessages({ state, task, reply, sessions }: { state: BoardState; t
 										<MessageScrollerItem messageId={`reply-${index}`}>
 											<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped} highlighted={index === reply}>
 												<BoardText text={replyText(entry.by, entry.text)} />
+												{entry === last && suggestions.length > 0 && (
+													<div {...activityControl("board.thread.suggestion")} role="group" aria-label="Suggested next steps" className="flex flex-wrap gap-1.5 pt-1.5">
+														{suggestions.map(prompt => (
+															<Button key={prompt} variant="outline" size="compact" disabled={disabled} onClick={() => void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: prompt, ...(task.launch ? { launch: task.launch } : {}) })}>
+																{prompt}
+															</Button>
+														))}
+													</div>
+												)}
 											</MessageRow>
 										</MessageScrollerItem>
 									</li>
@@ -607,7 +619,7 @@ function ScrollToReply({ reply }: { reply: number }) {
 /** The thread's `@` menu offers sessions only, so a reply can point its session at another. */
 const THREAD_MENTIONS = ["session"] as const;
 
-/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here. */
+/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name`, or on a done Board task starts a new one, on the model, thinking level, and skill picked here. */
 function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
 	const reply = async ({ prompt, images, model, thinking, skill }: ComposerSend) => {
@@ -617,7 +629,11 @@ function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { t
 	return (
 		<div {...activityControl("board.reply")} className="shrink-0">
 			<NewSession
-				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply", mentions: THREAD_MENTIONS }}
+				board={{
+					placeholder: task.doneAt !== null ? "Reply to start a new session on it…" : name ? `Reply to ${name}…` : "Reply…",
+					sendLabel: task.doneAt !== null ? "Send reply; a new session takes it from the thread" : name ? "Send reply; it wakes the session if it stopped" : "Send reply",
+					mentions: THREAD_MENTIONS,
+				}}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
 				launch={null}

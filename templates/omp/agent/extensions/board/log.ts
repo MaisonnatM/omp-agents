@@ -112,15 +112,18 @@ export const lapsed = (state: BoardState, now: number): BoardTask[] =>
 	state.tasks.filter(task => task.doneAt === null && (task.claim ? task.claim.until <= now : task.start !== null && task.start.at + LEASE_MS <= now));
 
 /**
- * The session a reply on `task` by `by` wakes: the claimer; on a done Board task, the session that marked it done;
- * else the session started on it, else the thread's author when a session wrote it; never the replier itself.
+ * The session a reply on `task` by `by` wakes: the claimer, else the session started on it, else the thread's author
+ * when a session wrote it; never the replier itself. A done Board task wakes nobody: a reply from the user reopens it,
+ * and a new session starts on its thread.
  */
 export function wakeTarget(task: BoardTask, by: BoardAuthor): string | null {
-	let finisher: string | null = null;
-	for (const entry of task.replies) if ("note" in entry && entry.note.kind === "done") finisher = entry.note.sessionId;
-	const target = task.claim?.sessionId ?? (task.doneAt !== null ? finisher : null) ?? task.start?.sessionId ?? (task.by.kind === "session" ? task.by.sessionId : null);
+	if (task.doneAt !== null) return null;
+	const target = task.claim?.sessionId ?? task.start?.sessionId ?? (task.by.kind === "session" ? task.by.sessionId : null);
 	return target !== null && !(by.kind === "session" && by.sessionId === target) ? target : null;
 }
+
+/** The sessions started on `task`, oldest first: one per round, since a reply on a done Board task starts a new one. */
+export const startedOn = (task: BoardTask): string[] => task.replies.flatMap(entry => ("note" in entry && entry.note.kind === "started" ? [entry.note.sessionId] : []));
 
 /** The text of `change` an event keeps, on one line for a title, trimmed for a body. */
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
@@ -182,7 +185,14 @@ export function fold(state: BoardState, event: BoardEvent): BoardState {
 	const note = (task: BoardTask, note: BoardNote): BoardTask => ({ ...task, replies: [...task.replies, { at, note }] });
 	switch (event.op) {
 		case "reply":
-			return { ...state, tasks: edit(event.task, task => ({ ...task, replies: [...task.replies, { at, by: event.by, text: event.text.trim(), ...(event.launch ? { launch: event.launch } : {}) }] })) };
+			return {
+				...state,
+				tasks: edit(event.task, task => {
+					const replied = { ...task, replies: [...task.replies, { at, by: event.by, text: event.text.trim(), ...(event.launch ? { launch: event.launch } : {}) }] };
+					// The user's reply on a done Board task reopens it, so a new session starts on its thread with the launch the reply picked.
+					return task.doneAt !== null && event.by.kind === "user" ? { ...replied, doneAt: null, start: null, launch: event.launch ?? task.launch } : replied;
+				}),
+			};
 		case "claim":
 			return { ...state, tasks: edit(event.task, task => note({ ...task, claim: { sessionId: event.sessionId, at, until: at + LEASE_MS } }, { kind: "claimed", sessionId: event.sessionId })) };
 		case "renew":

@@ -83,6 +83,23 @@ describe("BoardRunner", () => {
 		expect(board.state().tasks[0]?.replies.at(-1)).toMatchObject({ note: { kind: "woke", sessionId: "s1" } });
 	});
 
+	test("a reply on a done Board task starts a new session that reads the thread, and wakes the one that finished nobody", async () => {
+		const board = harness();
+		board.runner.changed();
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "First" });
+		await settle();
+		board.apply({ op: "claim", sessionId: "s1", task: 1 });
+		board.apply({ op: "done", sessionId: "s1", task: 1, text: "Committed on board-first.\n\nSuggestions:\n1. Merge on main" });
+		board.apply({ op: "reply", by: { kind: "user" }, task: 1, text: "Merge on main" });
+		await settle();
+		expect(board.wakes).toEqual([]);
+		expect(board.starts).toHaveLength(2);
+		expect(board.starts[1]?.prompt).toContain("Earlier sessions worked on it and ended: s1.");
+		expect(board.starts[1]?.prompt).toContain("Session s1: Committed on board-first.");
+		expect(board.starts[1]?.prompt).toContain("The user: Merge on main");
+		expect(board.state().tasks[0]?.start?.sessionId).toBe("s2");
+	});
+
 	test("the sweep returns a lapsed claim to ready, which starts a new session", async () => {
 		const board = harness();
 		board.runner.changed();

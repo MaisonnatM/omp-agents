@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-25
 decision-makers: Maxence Maisonnat
+superseded-by: 2026-11-25-board-sessions-end-on-suggestions-and-a-reply-starts-a-new-session
 ---
 
 # Board sessions land and end themselves

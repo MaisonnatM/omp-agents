@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyChange, type BoardChange, type BoardState, emptyBoard, LEASE_MS, lapsed, parseChange, readLog, statusOf, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
+import { applyChange, type BoardChange, type BoardState, emptyBoard, LEASE_MS, lapsed, parseChange, readLog, startedOn, statusOf, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
 import { BoardLog } from "./board-log";
 
 const WS = "/work/app";
@@ -81,7 +81,7 @@ describe("the Board's projection", () => {
 		expect(lapsed(state, LEASE_MS).map(each => each.id)).toEqual([1]);
 	});
 
-	test("a reply wakes the claimer, the finisher once done, else the started session or a session author, never the replier", () => {
+	test("a reply wakes the claimer, else the started session or a session author, never the replier, and nobody once done", () => {
 		const posted = play([[0, { op: "post", by: session("author"), workspace: WS, title: "One" }]]);
 		expect(wakeTarget(task(posted, 1), user)).toBe("author");
 		expect(wakeTarget(task(posted, 1), session("author"))).toBeNull();
@@ -94,8 +94,26 @@ describe("the Board's projection", () => {
 		const started = play([[1, { op: "start", task: 1, sessionId: "fresh" }]], byUser);
 		expect(wakeTarget(task(started, 1), user)).toBe("fresh");
 		const done = play([[2, { op: "done", sessionId: "worker", task: 1 }]], claimed);
-		expect(wakeTarget(task(done, 1), user)).toBe("worker");
-		expect(wakeTarget(task(done, 1), session("worker"))).toBeNull();
+		expect(wakeTarget(task(done, 1), user)).toBeNull();
+		expect(wakeTarget(task(done, 1), session("other"))).toBeNull();
+	});
+
+	test("the user's reply on a done Board task reopens it for a new session on the reply's launch; a session's reply does not", () => {
+		const launch = { model: { provider: "anthropic", id: "claude-opus-5-5" }, thinking: "high", skill: null };
+		const done = play([
+			[0, { op: "post", by: user, workspace: WS, title: "One" }],
+			[1, { op: "start", task: 1, sessionId: "first" }],
+			[2, { op: "claim", sessionId: "first", task: 1 }],
+			[3, { op: "done", sessionId: "first", task: 1, text: "Committed.\n\nSuggestions:\n1. Merge on main" }],
+		]);
+		expect(unstartedReady(done)).toEqual([]);
+		const bySession = play([[4, { op: "reply", by: session("other"), task: 1, text: "Noted" }]], done);
+		expect(statusOf(bySession, task(bySession, 1))).toEqual({ kind: "done" });
+		const reopened = play([[4, { op: "reply", by: user, task: 1, text: "Merge on main", launch }]], done);
+		expect(statusOf(reopened, task(reopened, 1))).toEqual({ kind: "ready" });
+		expect(unstartedReady(reopened).map(each => each.id)).toEqual([1]);
+		expect(task(reopened, 1).launch).toEqual(launch);
+		expect(startedOn(task(reopened, 1))).toEqual(["first"]);
 	});
 
 	test("a reply keeps the launch picked for the session it wakes", () => {
