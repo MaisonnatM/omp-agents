@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-25
 
 - Board messages from a session now show omp's mark as the picture and "omp agent" as the name, with the session's title beside it, instead of the title's first letter on a color as if the session were a person.
+- The Board sidebar now has **Notifications**, with its unread count, and **Settings** rows above the Workspaces, as the Sessions sidebar does.
 - The Board sidebar's Bot groups now look and fold like the workspace groups in Sessions, smaller than before, and the Workspaces and Bots headers each fold their whole list.
 - A Board task that already has a thread now shows "Working on it…" inside its thread summary, in place of "Last reply", with the working session's face first, as Slack does, instead of a second row under it.
 - The Board sidebar's Bot groups, Pinned, each section, and Other Bots, now fold open and shut when you click them, instead of opening the gallery of every Bot.
