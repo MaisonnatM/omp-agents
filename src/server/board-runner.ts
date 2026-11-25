@@ -21,7 +21,7 @@ const finish = (id: number): string =>
 	[
 		"When the work is done, finish it yourself, and leave merging to the user:",
 		"1. If you changed files, commit them on your branch; where the repository has no .omp/land.json, push the branch and open a draft PR. Land or merge only when the user's last reply asks for it, such as \"Merge on main\".",
-		`2. Mark Board task #${id} done with the board tool. Its text is the message the user reads in the thread: a short lead line, a few bullets on what changed and where, the branch or the PR link, then a Suggestions block, a line "Suggestions:" followed by one to three numbered prompts, best first, such as "1. Merge on main". The user picks one or replies, and a new session takes it from the thread.`,
+		`2. Mark Board task #${id} done with the board tool. Its text is the message the user reads in the thread: a short lead line, a few bullets on what changed and where, the branch or the PR link, then a Suggestions block, a line "Suggestions:" followed by one to three numbered prompts, best first, such as "1. Merge on main". When the work changed something the user can see, such as a page, a dialog, or a layout, put the screenshots you checked in that text as ![<what it shows>](<absolute PNG path>), one per changed state, so the thread shows them. The user picks one or replies, and a new session takes it from the thread.`,
 		"3. Call end_session; your committed branch stays.",
 	].join("\n");
 

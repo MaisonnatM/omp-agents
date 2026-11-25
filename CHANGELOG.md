@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- A Board session that changes something you can see now puts its screenshots in the message that closes the task, so the thread shows them.
 - Board messages from a session now show omp's mark as the picture and "omp agent" as the name, with the session's title beside it, instead of the title's first letter on a color as if the session were a person.
 - The Board sidebar now has **Notifications**, with its unread count, and **Settings** rows above the Workspaces, as the Sessions sidebar does.
 - The Board sidebar's Bot groups now look and fold like the workspace groups in Sessions, smaller than before, and the Workspaces and Bots headers each fold their whole list.
