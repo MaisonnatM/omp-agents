@@ -12,6 +12,7 @@ import type { Workspace } from "../../src/shared/workspaces";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { Completions } from "../pane-store";
+import type { ModelList } from "../reads";
 import type { SectionTarget } from "../section";
 import { BoardPage } from "./board/page";
 import { useDashboardActions } from "./dashboard-context";
@@ -43,6 +44,8 @@ export interface CoreData {
 	onPickWorkspace: (cwd: string | null) => void;
 	/** The running sessions in the sidebar's workspace. */
 	hosts: RosterHost[];
+	/** Each live session's model list, which a Board thread's **Session** tab's composer offers. */
+	models: ReadonlyMap<string, ModelList>;
 	/** Every live and past session, in any workspace, which a project's page names and links. */
 	sessions: KnownSessions;
 	/** The page section a sidebar link last chose, to unfold, scroll to, and focus. */

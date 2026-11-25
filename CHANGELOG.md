@@ -6,6 +6,9 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-25
 
 - The Board now has tabs under the Workspace's name, as a Slack channel does: **Messages**, the Board tasks, then **Bots**, **Pull requests**, **Memory**, **Projects**, and **Settings**, each showing only what belongs to that Workspace; Settings lists just the sections that read one workspace, such as Models, Files, and Worktrees.
+- A session's Board reply can now suggest what to answer next: the Board thread's reply box lists those prompts, and a click, a number key, or Enter sends one.
+- A session the Board starts is now named after its Board task's work, such as "Fix sidebar badge count", instead of "Claim Board task 5 on omp-agents".
+- The Board thread's pane now has tabs, as a session's right sidebar does: **Thread** for the Board task and its replies, and a tab named after the session working on it that shows that session's conversation, with its composer while it runs. Its header line now sits level with the Board's.
 - A reply in a Board thread now reaches a session even after its Board task is done: it wakes the session that finished it. The reply box is now the full New session composer, so you pick the model, thinking level, and skill the woken session runs on, and the Board's message box drops its workspace picker; the sidebar switches Workspaces.
 - On the Board, your messages and replies now show your Slack profile picture when Slack is connected in Settings › Integrations.
 - Board messages and replies now show as formatted text, with lists, code, and links, and sessions are told to write their Board replies as a short lead line and a list instead of one long paragraph.
@@ -198,14 +201,3 @@ The dashboard shows the same lines in Settings › What's new.
 - Ship: `ship_stage` now reads the same pull request as waiting for review too, instead of sending its session to Fix CI.
 - Agents now ask for several independent tool calls at once more often and see how long they have been working, so Claude sessions should finish sooner. Set OMP_AGENT_PACE=0 to turn it off.
 - Builds and test runs from parallel sessions wait less: the machine now shares a third of its CPU cores between them instead of a quarter.
-
-## 2026-11-19
-
-- A new Bot designer interviews you one question at a time, starting from the goal rather than the steps, and asks how to check the Bot's work and where feedback on it shows up, so the Bot it creates can improve itself. A designer you already made keeps its job until you edit it.
-- The dashboard now works with omp 19.0.0: the process list and Start dev server use omp's new background service manager, and old task sandboxes still get cleaned up.
-- Behind the scenes: the five omp patches are ported to omp 19.0.0; the tool-contracts patch got smaller because omp now does part of it.
-- A question that lets you pick several options now shows a checkbox on each option that ticks as you click it, and, when asked one step at a time, a Done selecting button instead of numbered rows with Done among them.
-- The session's right sidebar has a Linear tab, which opens by itself when the conversation links a Linear issue and shows that issue with its status, priority, assignee, and description, or any other issue whose id or link you type, read through the Linear server in Settings › MCP servers.
-- Settings › MCP servers offers Linear in its catalog, and every installed server now shows a logo: Linear's and Marked's marks, and the site's own icon for other servers.
-- Checklists in pull request descriptions no longer show a bullet beside each checkbox.
-- A dashboard that an omp session starts, such as an agent's test run on another port, no longer runs your routines or messages your Bots; only the dashboard you opened does, so two dashboards stop fighting over the same Bot conversation.

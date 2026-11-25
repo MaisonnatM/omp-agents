@@ -11,15 +11,21 @@ import { repeat } from "./loops";
 /** How often the sweep looks for lapsed claims. */
 export const SWEEP_MS = 30_000;
 
-/** What a session started on Board task `task` reads first. */
+/**
+ * What a session started on Board task `task` reads first. omp titles the session from this prompt, so the task leads
+ * and the Board's steps sit in a `<board-task>` block the titler skips; as plain lines they name every session
+ * "Claim Board task 5" instead of its work.
+ */
 export const startPrompt = (task: BoardTask): string =>
 	[
-		`Board task #${task.id} on the omp-agents Board is ready, and this session was started to do it: ${task.title}`,
+		task.title,
 		...(task.text ? ["", task.text] : []),
 		"",
-		`First claim it with the board tool (action claim, task ${task.id}), which also shows its Board thread.`,
+		`<board-task id="${task.id}">`,
+		`This session was started to do Board task #${task.id}. First claim it with the board tool (action claim, task ${task.id}), which also shows its Board thread.`,
 		"The claim holds a 15-minute lease: renew it while you work.",
 		"Reply on the thread to ask or report, and when you finish, mark it done with a line on what you did.",
+		"</board-task>",
 	].join("\n");
 
 const authorName = (by: BoardAuthor): string => (by.kind === "user" ? "The user" : `Session ${by.sessionId}`);
