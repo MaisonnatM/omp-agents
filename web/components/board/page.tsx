@@ -394,8 +394,6 @@ function noteText(note: BoardNote, sessions: KnownSessions): string {
 			return `${name(note.sessionId)}'s lease ran out, so a new session starts on it.`;
 		case "unclaimed":
 			return `${name(note.sessionId)} never claimed it, so a new session starts on it.`;
-		case "ready":
-			return `#${note.task} is done, so this Board task is ready.`;
 		case "woke":
 			return `${name(note.sessionId)} had stopped. The reply woke it.`;
 		case "done":

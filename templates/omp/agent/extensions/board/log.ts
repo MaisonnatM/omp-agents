@@ -59,7 +59,6 @@ export type BoardNote =
 	| { kind: "renewed"; sessionId: string }
 	| { kind: "expired"; sessionId: string }
 	| { kind: "unclaimed"; sessionId: string | null }
-	| { kind: "ready"; task: number }
 	| { kind: "woke"; sessionId: string }
 	| { kind: "done"; sessionId: string };
 
@@ -193,9 +192,7 @@ export function fold(state: BoardState, event: BoardEvent): BoardState {
 				const closed = note({ ...task, claim: null, doneAt: at }, { kind: "done", sessionId: event.sessionId });
 				return event.text?.trim() ? { ...closed, replies: [...closed.replies, { at, by: { kind: "session", sessionId: event.sessionId }, text: event.text.trim() }] } : closed;
 			});
-			const after = { ...state, tasks };
-			// Each Board task this one held back, and that waits on nothing else now, gets a line saying it is ready.
-			return { ...after, tasks: tasks.map(task => (task.needs.includes(event.task) && task.doneAt === null && !task.claim && statusOf(after, task).kind === "ready" ? note(task, { kind: "ready", task: event.task }) : task)) };
+			return { ...state, tasks };
 		}
 		case "start":
 			return {
