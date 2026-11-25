@@ -1,7 +1,6 @@
 /** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
-import { IconCalendarClock, IconClock, IconFlag1, IconFolderDelete, IconLayoutColumn, IconPause } from "central-icons";
+import { IconCalendarClock, IconCircleX, IconClock, IconFlag1, IconFolderDelete, IconLayoutColumn, IconPause } from "central-icons";
 import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
-import { pullRequestUrl } from "../../src/shared/github";
 import { awaitsCi, awaitsScheduled, awaitsSubagents, type PastSession, type RosterHost, type View, type WatchedChecks } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
@@ -19,7 +18,6 @@ import { type InlineConfirm, useInlineConfirm } from "../use-inline-confirm";
 import { Age } from "./age";
 import { OpenProjectsContext, useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Spinner } from "./spinner";
-import { ChecksIcon } from "./pull-requests/pr-row";
 import { type RowStatus, StatusDot, statusLabel } from "./status-dot";
 
 /** The muted facts after a session's name: the parts that apply. */
@@ -281,21 +279,26 @@ function HostStatus({ host, status }: { host: RosterHost; status: RowStatus }) {
 	return <StatusDot status={status} />;
 }
 
-const CHECKS_WORDS: Record<NonNullable<WatchedChecks["checks"]>, string> = { pending: "running", failing: "failing", passing: "passing", none: "no checks" };
-
-/** A pull request a session in Waiting on CI watches, under its row: how its checks stand, and a link to it on GitHub. */
-function WatchedPullRequest({ pr, checks }: WatchedChecks) {
+/** How many pull requests a session in Waiting on CI watches still wait on checks, and how many fail, beside its title. */
+function WatchedChecksCount({ prs }: { prs: WatchedChecks[] }) {
+	const waiting = prs.filter(watched => watched.checks === null || watched.checks === "pending").length;
+	const failing = prs.filter(watched => watched.checks === "failing").length;
+	if (waiting === 0 && failing === 0) return null;
 	return (
-		<a
-			href={pullRequestUrl(pr)}
-			target="_blank"
-			rel="noreferrer"
-			className="flex h-5 items-center gap-1.5 rounded-md pr-2 pl-5 text-xs tabular-nums text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-		>
-			{checks === null ? <IconClock aria-hidden={false} aria-label="Not listed yet" className="size-3 shrink-0" /> : <ChecksIcon checks={checks} />}
-			<span className="truncate">{`${pr.repo} #${pr.number}`}</span>
-			<span className="ml-auto shrink-0">{checks === null ? "waiting" : CHECKS_WORDS[checks]}</span>
-		</a>
+		<span className="flex h-4 items-center gap-1.5 text-2xs leading-none font-medium tabular-nums">
+			{waiting > 0 && (
+				<span role="img" aria-label={`${waiting} waiting on checks`} className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
+					<IconClock aria-hidden className="size-3" />
+					{waiting}
+				</span>
+			)}
+			{failing > 0 && (
+				<span role="img" aria-label={`${failing} failing checks`} className="flex items-center gap-0.5 text-red-600 dark:text-red-400">
+					<IconCircleX aria-hidden className="size-3" />
+					{failing}
+				</span>
+			)}
+		</span>
 	);
 }
 
@@ -319,6 +322,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, placement,
 					badge={
 						<span className="flex items-center gap-1.5">
 							<RunningJobs instanceId={host.instanceId} />
+							{awaitsCi(host) && host.scheduledCheck?.kind === "pull-request" && <WatchedChecksCount prs={host.scheduledCheck.prs} />}
 							{isPrivate && <PrivateChip />}
 							{workspace}
 						</span>
@@ -329,7 +333,6 @@ export const HostRow = memo(function HostRow({ session: host, pinned, placement,
 					placement={placement}
 					onOpen={onOpen}
 				/>
-				{awaitsCi(host) && host.scheduledCheck?.kind === "pull-request" && host.scheduledCheck.prs.map(watched => <WatchedPullRequest key={`${watched.pr.owner}/${watched.pr.repo}#${watched.pr.number}`} {...watched} />)}
 			</>
 		</RowMenu>
 	);
