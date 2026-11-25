@@ -137,7 +137,7 @@ function LiveConversation({
 		setDraft,
 		completions,
 		onComplete: (reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "live", view }, text, cursor }),
-		composer: { sessionId: shown?.sessionId ?? null, changed },
+		composer: { sessionId: shown?.sessionId ?? null, changed, categories: null },
 	});
 
 	const stop = useAction((reqId: number) => request({ t: "interrupt", reqId, view }), "Could not stop the turn");
