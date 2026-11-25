@@ -122,7 +122,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	},
 	controls: [
 		{ id: "board.workspace", label: "Board sidebar workspace row", area: "Board" },
-		{ id: "board.bots", label: "Board sidebar Bot group row", area: "Board" },
+		{ id: "board.bots", label: "Board sidebar Bot group row, folds it", area: "Board" },
 		{ id: "board.task.open", label: "Board task message, which opens its thread", area: "Board" },
 		{ id: "board.post", label: "Board composer Send button or Enter", area: "Board" },
 		{ id: "board.reply", label: "Board thread reply Send button or Enter", area: "Board" },
