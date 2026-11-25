@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-25
+
+- A session waiting on CI no longer lists its pull requests under its row; its row shows a clock with how many still wait on checks and a red cross with how many fail.
+
 ## 2026-11-24
 
 - The session details sidebar's Overview tab has a Jobs section that lists the commands the agent runs in the background, live, with how long each has run and its last line of output.
