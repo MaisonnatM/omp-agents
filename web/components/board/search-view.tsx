@@ -129,12 +129,13 @@ export function SearchResults({ state, route, workspace, core }: { state: BoardS
 	if (!search) return null;
 	const open = workspace?.cwd ?? null;
 	const channel = workspace ? folder(workspace.cwdDisplay) : "No workspace";
-	const thread = route.thread !== null && state.tasks.some(task => task.id === route.thread && task.workspace === open) ? route.thread : null;
+	const routeThread = route.view.tab === "messages" ? route.view.thread : null;
+	const thread = routeThread !== null && state.tasks.some(task => task.id === routeThread && task.workspace === open) ? routeThread : null;
 	const { query } = search;
 	const scope = scopeOf(search.scope, thread);
 	const hits = searchBoard(state, search, open, thread);
 	const words = searchWords(query);
-	const searchHref = (next: BoardSearch | null) => hashForBoard(open, route.thread, { search: next });
+	const searchHref = (next: BoardSearch | null) => hashForBoard(open, routeThread, { search: next });
 	const workspaceName = (cwd: string): string => folder(core.workspaces.find(each => each.cwd === cwd)?.cwdDisplay ?? cwd);
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">

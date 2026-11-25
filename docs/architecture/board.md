@@ -15,7 +15,7 @@ It imports nothing, so the starter kit can ship it.
 
 - `post` adds a Board task in a Workspace with a title, text, labels, and the Board tasks it `needs`.
 - `reply` adds a reply to its Board thread.
-- `claim` and `renew` give a session a lease of `LEASE_MS`, 15 minutes; `done` ends it and adds a `ready` note to each Board task it unblocks.
+- `claim` and `renew` give a session a lease of `LEASE_MS`, 15 minutes; `done` ends it.
 - `start`, `woke`, and `expire` come from the server alone: a session started on a Board task, or failed to; a reply woke a stopped session; a lease ran out.
   `parseChange` refuses them from the page and the tool.
 

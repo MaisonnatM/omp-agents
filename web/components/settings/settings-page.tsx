@@ -39,6 +39,8 @@ const PANEL = "space-y-10 rounded-md focus-visible:ring-2 focus-visible:ring-rin
 interface FileSelection {
 	path: string | null;
 	open: (path: string) => void;
+	/** The address of a section on the same page: global Settings', or a Board's Settings tab's. */
+	sectionHash: (section: SettingsSection) => string;
 }
 
 const loadAlert = (error: string): ReactNode => (
@@ -65,7 +67,7 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 				{loadAlert(agentSettings.error)}
 				{configFile && (
 					<p className="text-sm text-muted-foreground">
-						<a href={hashForSettings("files")} onClick={() => selection.open(configFile.path)} className={LINK}>
+						<a href={selection.sectionHash("files")} onClick={() => selection.open(configFile.path)} className={LINK}>
 							Fix config.yml in Files
 						</a>
 					</p>
@@ -91,24 +93,24 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 	};
 }
 
+/** Which settings a page holds: all of them, with a header picker for the workspace, or one workspace's sections, as on a Board's Settings tab, whose section links stay on that tab. */
+export type SettingsScope =
+	| { kind: "all"; onPickWorkspace: (cwd: string | null) => void; workspaceList: WorkspaceList<Workspace>; trustedProjects: TrustedProject[] }
+	| { kind: "workspace"; sectionHash: (section: SettingsSection) => string };
+
 /** One section of the settings: omp's usage, the dashboard's own choices, or omp's routing and files for one workspace or for the user only, each editable in place. */
 export function SettingsPage({
 	section,
 	cwd,
-	onPickWorkspace,
 	workspaces,
-	workspaceList,
-	trustedProjects,
+	scope,
 }: {
 	section: SettingsSection;
 	/** The sidebar's workspace, `null` for all workspaces, which reads your user files only. */
 	cwd: string | null;
-	onPickWorkspace: (cwd: string | null) => void;
 	/** The workspaces the header's picker offers and Settings › Workspaces lists. */
 	workspaces: Workspace[];
-	workspaceList: WorkspaceList<Workspace>;
-	/** The projects whose agent code the user trusted, for Settings › Workspaces. */
-	trustedProjects: TrustedProject[];
+	scope: SettingsScope;
 }) {
 	const { settings, editing } = useSettingsEditing(cwd);
 	const [openFile, setOpenFile] = useState<string | null>(null);
@@ -119,7 +121,7 @@ export function SettingsPage({
 	}, [section]);
 
 	const panels: Record<SettingsSection, ReactNode> = {
-		...ompPanels(settings, cwd, editing, { path: openFile, open: setOpenFile }),
+		...ompPanels(settings, cwd, editing, { path: openFile, open: setOpenFile, sectionHash: scope.kind === "all" ? hashForSettings : scope.sectionHash }),
 		"omp-memory":
 			settings.data === null ? (
 				settingsReadNote(settings)
@@ -134,7 +136,7 @@ export function SettingsPage({
 		integrations: <IntegrationsTab active={section === "integrations"} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
-		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} trustedProjects={trustedProjects} />,
+		workspaces: scope.kind === "all" && <WorkspacesTab workspaces={workspaces} list={scope.workspaceList} trustedProjects={scope.trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
 		phone: <PhoneAccessTab active={section === "phone"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
@@ -145,7 +147,7 @@ export function SettingsPage({
 		modules: <ModulesTab />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
-	const body = SETTINGS_SECTIONS.filter(({ value }) => value !== "extensions" && !(isPhonePage() && value === "phone")).map(({ value, label }) => (
+	const body = SETTINGS_SECTIONS.filter(({ value, group }) => value !== "extensions" && !(isPhonePage() && value === "phone") && (scope.kind === "all" || group === "workspace")).map(({ value, label }) => (
 		<section key={value} aria-label={label} hidden={section !== value} tabIndex={0} className={PANEL}>
 			{panels[value]}
 		</section>
@@ -156,7 +158,7 @@ export function SettingsPage({
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			{shown.group === "workspace" ? (
 				<Header title={shown.label} meta={cwd === null ? shown.meta.none : shown.meta.workspace}>
-					<WorkspacePicker cwd={cwd} workspaces={workspaces} onPick={onPickWorkspace} />
+					{scope.kind === "all" && <WorkspacePicker cwd={cwd} workspaces={workspaces} onPick={scope.onPickWorkspace} />}
 				</Header>
 			) : (
 				<Header title={shown.label} />

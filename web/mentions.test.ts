@@ -62,7 +62,7 @@ const tokenAt = (text: string, cursor = text.length): MentionToken => {
 const fileItem = (path: string): CompletionItem => ({ kind: "file", label: path, description: null, text: `@${path} `, cursor: path.length + 2 });
 const labels = (sections: MenuSection[]) => sections.map(({ title, options }) => [title, options.map(option => option.label)]);
 const menu = (text: string, { files = null, changed = [], cursor = text.length }: { files?: CompletionItem[] | null; changed?: ChangedFile[]; cursor?: number } = {}) =>
-	mentionMenu({ text, token: tokenAt(text, cursor), data, composer: { sessionId: "s-self", changed }, files });
+	mentionMenu({ text, token: tokenAt(text, cursor), data, composer: { sessionId: "s-self", changed, categories: null }, files });
 const pick = (text: string, label: string, cursor = text.length) =>
 	menu(text, { cursor }).flatMap(section => section.options).find(option => option.label === label)?.edit;
 
@@ -177,7 +177,7 @@ describe("mentionMenu", () => {
 			text: "@todo:",
 			token: tokenAt("@todo:"),
 			data: { ...data, todos: Array.from({ length: 60 }, (_, index) => todo(`t${index}`, `Todo ${index}`)) },
-			composer: { sessionId: null, changed: [] },
+			composer: { sessionId: null, changed: [], categories: null },
 			files: null,
 		});
 		expect(many[0].options).toHaveLength(50);
@@ -188,5 +188,11 @@ describe("mentionMenu", () => {
 		expect(pick("@pr:fix then merge", "Fix login", 7)).toEqual({ text: "[acme/webapp#7 Fix login](https://github.com/acme/webapp/pull/7)  then merge", cursor: 65 });
 		expect(pick("@session:", "webapp")).toEqual({ text: 'omp session "webapp" (id s-live) ', cursor: 33 });
 		expect(pick("@session:", "Login bug hunt")).toEqual({ text: 'omp session "Login bug hunt" (id s-old) ', cursor: 40 });
+	});
+
+	test("a composer offering only sessions lists them on `@` and ignores other categories", () => {
+		const sessionsOnly = (text: string) => mentionMenu({ text, token: tokenAt(text), data, composer: { sessionId: null, changed: [], categories: ["session"] }, files: [fileItem("src/")] });
+		expect(labels(sessionsOnly("@"))).toEqual([["Sessions", ["Login work", "webapp", "Login bug hunt"]]]);
+		expect(labels(sessionsOnly("@login"))).toEqual([["Sessions", ["Login work", "Login bug hunt"]]]);
 	});
 });

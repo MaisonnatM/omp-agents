@@ -94,6 +94,12 @@ export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 /** The settings section `segment` names, else Analytics, which bare `#settings`, an unknown section, and nothing remembered open. */
 export const settingsSection = (segment: string | null): SettingsSection => SETTINGS_SECTIONS.find(({ value }) => value === segment)?.value ?? "analytics";
 
+/** The sections that read one workspace, as a Board's Settings tab lists them. */
+export const WORKSPACE_SECTIONS = SETTINGS_SECTIONS.filter(section => section.group === "workspace");
+
+/** The workspace section `segment` names, else the first. */
+export const workspaceSection = (segment: string | null): SettingsSection => WORKSPACE_SECTIONS.find(({ value }) => value === segment)?.value ?? WORKSPACE_SECTIONS[0]!.value;
+
 /** The settings sidebar's groups holding a section whose label or a keyword contains `query`, ignoring case, each with those sections in the sidebar's order; `phone` drops Phone access, which a paired phone does not list. */
 export const settingsMatching = (query: string, { phone }: { phone: boolean }) => {
 	const needle = query.trim().toLowerCase();

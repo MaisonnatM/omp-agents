@@ -66,7 +66,7 @@ function BotComposer({ bot, connected, starters, completions }: { bot: Bot; conn
 		setDraft: setText,
 		completions,
 		onComplete: (reqId, value, cursor) => post({ t: "complete", reqId, scope: { kind: "new", cwd: bot.cwd }, text: value, cursor }),
-		composer: { sessionId: bot.sessionId, changed: [] },
+		composer: { sessionId: bot.sessionId, changed: [], categories: null },
 	});
 	const suggestions = useSuggestions({
 		prompts: connected && !send.pending ? starters : NO_STARTERS,

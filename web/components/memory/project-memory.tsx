@@ -35,8 +35,8 @@ type Open = { key: string } | "new" | null;
 /** The key of a draft: the row's key, or `""` for the new one, which no row key can be. */
 const draftKey = (row: Row | null): string => row?.key ?? "";
 
-/** `repo`, the repository the address names; every repository's when it names none, or one no workspace holds. */
-export function ProjectMemoryTab({ repo }: { repo: string | null }) {
+/** `repo`, the repository the address names; every repository's when it names none, or one no workspace holds. `pinned`, as on a Board's Memory tab, keeps it to `repo`: no repository picker, and no fallback to every repository's. */
+export function ProjectMemoryTab({ repo, pinned = false }: { repo: string | null; pinned?: boolean }) {
 	const view = useEditableRead<ProjectMemoryView>(PROJECT_MEMORY_URL);
 	if (view.data === null) {
 		return (
@@ -46,7 +46,8 @@ export function ProjectMemoryTab({ repo }: { repo: string | null }) {
 		);
 	}
 	const shown = repo === null ? undefined : view.data.repos.find(each => each.root === repo);
-	return <RepoMemory key={shown?.root ?? ""} scope={shown ?? null} repos={view.data.repos} view={view} />;
+	if (pinned && !shown) return <p className="px-4 py-4 text-sm text-muted-foreground">No project memory in this Workspace yet. An agent records one with its project_memory tool.</p>;
+	return <RepoMemory key={shown?.root ?? ""} scope={shown ?? null} repos={view.data.repos} view={view} pinned={pinned} />;
 }
 
 /** **All projects**, then the repositories, each with how many memories it holds; picking one opens its address. */
@@ -95,7 +96,7 @@ function RepoPicker({ scope, repos }: { scope: ProjectMemoryRepo | null; repos: 
 }
 
 /** The repository picker, kind filter, search, and New memory over the table, with the open memory beside it; `scope` `null` shows every repository's. */
-function RepoMemory({ scope, repos, view }: { scope: ProjectMemoryRepo | null; repos: ProjectMemoryRepo[]; view: Editable<ProjectMemoryView> }) {
+function RepoMemory({ scope, repos, view, pinned }: { scope: ProjectMemoryRepo | null; repos: ProjectMemoryRepo[]; view: Editable<ProjectMemoryView>; pinned: boolean }) {
 	const [open, setOpen] = useState<Open>(null);
 	const [query, setQuery] = useState("");
 	const [kind, setKind] = useState<MemoryKind | null>(null);
@@ -137,7 +138,7 @@ function RepoMemory({ scope, repos, view }: { scope: ProjectMemoryRepo | null; r
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2">
-				<RepoPicker scope={scope} repos={repos} />
+				{!pinned && <RepoPicker scope={scope} repos={repos} />}
 				<div role="group" aria-label="Kind" className="flex items-center gap-1">
 					{chips.map(chip => (
 						<Button key={chip.label} variant="ghost" size="compact" active={kind === chip.value} aria-pressed={kind === chip.value} onClick={() => setKind(chip.value)}>

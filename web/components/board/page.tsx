@@ -4,21 +4,19 @@
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconUser } from "central-icons";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { hashForSession, type View } from "../../../src/shared/sessions";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { hashForSession, type PastSession, type RosterHost, type View } from "../../../src/shared/sessions";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import type { Workspace } from "../../../src/shared/workspaces";
-import { Header } from "../page-header";
+import { Header, HeaderTitleShown } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
-import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { IconComponent } from "@/lib/icon-context";
 import { getJson } from "../../api";
 import { useShowConversation } from "../../pane-store";
 import { UNREAD } from "../../reads";
@@ -27,14 +25,19 @@ import { boardDraftKey, boardThreadDraftKey } from "../../composer-drafts";
 import { useStoredState } from "../../stored-state";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
-import { ClosableTab } from "../closable-tab";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { useDashboardActions } from "../dashboard-context";
+import { useModulesOff } from "../../modules-off";
 import type { CoreData } from "../module-views";
 import { NewSession } from "../new-session";
 import { ViewConversation } from "../pane";
+import type { ChangesSession } from "../overview-changes";
+import { type DetailsTab, DetailsSidebarFrame } from "../details-sidebar-frame";
+import { sessionOverviewTab, sessionWorkTabs, useOpenTabOnNew, useSessionWork, workTabOpeners } from "../session-details";
+import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../todo/links";
-import type { BoardControlId, BoardRoute } from "./module";
+import type { BoardRoute, BoardView } from "./module";
+import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
@@ -49,31 +52,36 @@ interface BoardPageProps {
 
 export function BoardPage({ route, core, state, disabled, onChange }: BoardPageProps) {
 	useMinute();
+	const [off] = useModulesOff();
 	const searchField = useRef<BoardSearchFieldHandle>(null);
 	if (state === null) return <p className="px-6 py-6 text-sm text-muted-foreground">Loading the Board…</p>;
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
 	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";
 	const tasks = state.tasks.filter(task => task.workspace === open);
-	const thread = route.thread === null ? null : (tasks.find(task => task.id === route.thread) ?? null);
+	const tabs = boardTabsOn(off);
+	// A tab whose module is off is gone, so its address opens Messages.
+	const view: BoardView = tabs.some(each => each.id === route.view.tab) ? route.view : { tab: "messages", thread: null };
+	const thread = view.tab !== "messages" || view.thread === null ? null : (tasks.find(task => task.id === view.thread) ?? null);
 	return (
 		<div className="flex h-full min-h-0 flex-1">
 			<section aria-label="Board" className="flex min-w-[360px] flex-1 flex-col">
-				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name}>
-					{openWorkspace && (
+				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name} ruled={false}>
+					{openWorkspace && view.tab === "messages" && (
 						<BoardSearchField
 							key={`${route.search?.query ?? ""}|${route.search?.scope ?? ""}`}
 							ref={searchField}
 							current={route.search}
 							channel={name}
 							thread={thread?.id ?? null}
-							searchHref={search => hashForBoard(open, route.thread, { search })}
+							searchHref={search => hashForBoard(open, thread?.id ?? null, { search })}
 						/>
 					)}
 				</Header>
-				{route.search ? (
+				<ChannelTabs tab={view.tab} tabs={tabs} workspace={open} />
+				{view.tab === "messages" && route.search ? (
 					<SearchResults state={state} route={route} workspace={openWorkspace} core={core} />
-				) : (
+				) : view.tab === "messages" ? (
 					<>
 						<MessageScrollerProvider autoScroll>
 							<MessageScroller className="flex-1">
@@ -86,7 +94,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 												return (
 													<li key={task.id}>
 														{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
-														<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === route.thread} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
+														<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === thread?.id} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
 													</li>
 												);
 											})}
@@ -98,6 +106,12 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 						</MessageScrollerProvider>
 						{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
 					</>
+				) : (
+					<HeaderTitleShown.Provider value={false}>
+						<div className="flex min-h-0 flex-1">
+							<WorkspaceTab view={view} workspace={open} core={core} disabled={disabled} />
+						</div>
+					</HeaderTitleShown.Provider>
 				)}
 			</section>
 			{thread && openWorkspace && (
@@ -214,11 +228,6 @@ export function Avatar({ by, sessions, size = "message" }: { by: BoardAuthor; se
 	);
 }
 
-/** The tag beside a session's name that says it is one, as Slack tags an app. */
-export function SessionTag() {
-	return <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">Session</span>;
-}
-
 /** The author's name, which opens the session for a session, and a tag that says it is one, as Slack tags an app. */
 function AuthorName({ by, sessions }: { by: BoardAuthor; sessions: KnownSessions }) {
 	if (by.kind === "user") return <span className="text-[15px] font-bold">You</span>;
@@ -230,6 +239,10 @@ function AuthorName({ by, sessions }: { by: BoardAuthor; sessions: KnownSessions
 			<SessionTag />
 		</span>
 	);
+}
+
+export function SessionTag() {
+	return <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">Session</span>;
 }
 
 /** One message row: avatar, name, and time, or for a grouped one only the time on hover in the avatar's place. */
@@ -261,33 +274,20 @@ function MessageRow({ by, at, sessions, grouped, highlighted = false, toolbar, c
 	);
 }
 
-function StatusBadge({ status, sessions }: { status: BoardStatus; sessions: KnownSessions }) {
-	switch (status.kind) {
-		case "ready":
-			return (
-				<Badge variant="dot" size="compact" color="blue">
-					ready
-				</Badge>
-			);
-		case "waiting":
-			return (
-				<Badge variant="dot" size="compact" color="gray">
-					waiting on #{status.on}
-				</Badge>
-			);
-		case "claimed":
-			return (
-				<Badge variant="dot" size="compact" color="amber">
-					claimed by {sessionLabel(status.sessionId, sessions).name} · {Math.max(0, Math.ceil((status.until - Date.now()) / 60_000))} min left
-				</Badge>
-			);
-		case "done":
-			return (
-				<Badge variant="dot" size="compact" color="green">
-					done
-				</Badge>
-			);
-	}
+/** A row under a Board task still in work, in the thread summary's style: who works on it, with shimmering text, as a Slack bot shows it is thinking. */
+function WorkingLine({ sessionId, sessions, href }: { sessionId: string | null; sessions: KnownSessions; href: string }) {
+	return (
+		<a {...activityControl("board.task.open")} href={href} className="mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background">
+			{sessionId ? (
+				<Avatar by={{ kind: "session", sessionId }} sessions={sessions} size="summary" />
+			) : (
+				<span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+					<IconAiBotHead className="size-4" />
+				</span>
+			)}
+			<span className="shimmer-text text-[13px]">{sessionId ? `${sessionLabel(sessionId, sessions).name} is on it…` : "Starting a session…"}</span>
+		</a>
+	);
 }
 
 /** A Board task's or reply's text as Markdown, with single line breaks kept, as a Bot's message shows. */
@@ -299,20 +299,21 @@ function BoardText({ text }: { text: string }) {
 	);
 }
 
-/** The message's text, its Board task number, status, and labels. */
-function TaskBody({ state, task, sessions }: { state: BoardState; task: BoardTask; sessions: KnownSessions }) {
+/** The message's text and its labels. */
+function TaskBody({ task }: { task: BoardTask }) {
+	const labels = Object.entries(task.labels);
 	return (
 		<>
 			<BoardText text={task.text || task.title} />
-			<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-				<span className="text-xs text-muted-foreground tabular-nums">#{task.id}</span>
-				<StatusBadge status={statusOf(state, task)} sessions={sessions} />
-				{Object.entries(task.labels).map(([key, value]) => (
-					<Badge key={key} variant="dot" size="compact" color="gray">
-						{key}={value}
-					</Badge>
-				))}
-			</span>
+			{labels.length > 0 && (
+				<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
+					{labels.map(([key, value]) => (
+						<Badge key={key} variant="dot" size="compact" color="gray">
+							{key}={value}
+						</Badge>
+					))}
+				</span>
+			)}
 		</>
 	);
 }
@@ -321,6 +322,7 @@ const said = (task: BoardTask): Extract<BoardReply, { by: BoardAuthor }>[] => ta
 
 function TaskMessage({ state, task, sessions, open, grouped, href }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string }) {
 	const replies = said(task);
+	const status = statusOf(state, task);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const toolbar = (
 		<>
@@ -340,8 +342,9 @@ function TaskMessage({ state, task, sessions, open, grouped, href }: { state: Bo
 	);
 	return (
 		<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={grouped} highlighted={open} toolbar={toolbar}>
-			<TaskBody state={state} task={task} sessions={sessions} />
+			<TaskBody task={task} />
 			{replies.length > 0 && <ThreadSummary replies={replies} sessions={sessions} href={href} />}
+			{(status.kind === "ready" || status.kind === "claimed") && <WorkingLine sessionId={session} sessions={sessions} href={href} />}
 		</MessageRow>
 	);
 }
@@ -403,27 +406,23 @@ function Composer({ workspace, core, disabled, onChange }: { workspace: Workspac
 	);
 }
 
-function noteText(note: BoardNote, sessions: KnownSessions): string {
+/** The thread's grey line for a note, or null for routine lease steps the thread does not show. */
+function noteText(note: BoardNote, sessions: KnownSessions): string | null {
 	const name = (id: string | null): string => (id === null ? "The session" : sessionLabel(id, sessions).name);
 	switch (note.kind) {
 		case "started":
-			return `Started ${name(note.sessionId)} on this Board task.`;
+		case "claimed":
+		case "renewed":
+		case "done":
+			return null;
 		case "start-failed":
 			return `No session could start on it: ${note.error}`;
-		case "claimed":
-			return `${name(note.sessionId)} claimed this Board task. Lease 15 min.`;
-		case "renewed":
-			return `${name(note.sessionId)} renewed its lease.`;
 		case "expired":
 			return `${name(note.sessionId)}'s lease ran out, so a new session starts on it.`;
 		case "unclaimed":
 			return `${name(note.sessionId)} never claimed it, so a new session starts on it.`;
-		case "ready":
-			return `#${note.task} is done, so this Board task is ready.`;
 		case "woke":
 			return `${name(note.sessionId)} had stopped. The reply woke it.`;
-		case "done":
-			return `${name(note.sessionId)} marked this Board task done.`;
 	}
 }
 
@@ -436,16 +435,16 @@ const STEP = 16;
 
 const clampThread = (width: number, room: number): number => Math.round(Math.max(MIN_THREAD, Math.min(MAX_THREAD, room - MIN_CHANNEL, width)));
 
-type ThreadTabValue = "thread" | "session";
-
-/** The Board thread as Slack's thread pane, at the width you drag its left edge to, under a row of tabs as the session details sidebar draws them: **Thread**, the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; and **Session**, the conversation of the session its replies wake. Escape closes it. */
+/** The Board thread as Slack's thread pane, at the width you drag its left edge to, under the session details sidebar's tab row: **Thread**, the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; then the conversation and sidebar tabs of the session its replies wake. Escape closes it. */
 function Thread({ state, task, reply, core, workspace, channel, closeHref, onSearch, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; core: CoreData; workspace: Workspace; channel: string; closeHref: string; onSearch: () => void; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const sessions = core.sessions;
-	const [tab, setTab] = useState<ThreadTabValue>("thread");
-	// The thread and its reply box address the same session; a thread with none shows only **Thread**.
+	// The thread and its reply box address the same session; a thread with none, or one not listed yet, shows only **Thread**.
 	const target = wakeTarget(task, { kind: "user" });
 	const name = target ? sessionLabel(target, sessions).name : null;
-	const shown: ThreadTabValue = target ? tab : "thread";
+	const host = target ? (sessions.hosts.find(each => each.sessionId === target) ?? null) : null;
+	const past = target ? (sessions.past.find(each => each.sessionId === target) ?? null) : null;
+	const instanceId = host?.instanceId ?? null;
+	const view = useMemo<View | null>(() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : past && target ? { kind: "past", sessionId: target } : null), [instanceId, past, target]);
 	const [width, setWidth] = useStoredState("omp-agents.board-thread-width", raw => {
 		const stored = Number(raw);
 		return stored >= MIN_THREAD && stored <= MAX_THREAD ? stored : THREAD_WIDTH;
@@ -476,63 +475,79 @@ function Thread({ state, task, reply, core, workspace, channel, closeHref, onSea
 		document.addEventListener("keydown", close);
 		return () => document.removeEventListener("keydown", close);
 	}, [closeHref]);
+	const label = `Thread #${task.id} in #${channel}`;
+	const thread: DetailsTab<"thread"> = {
+		value: "thread",
+		icon: IconBubble3,
+		name: "Thread",
+		control: "board.thread.tab.thread",
+		count: 0,
+		scrollsItself: true,
+		content: (
+			<>
+				<ThreadMessages state={state} task={task} reply={reply} sessions={sessions} />
+				<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
+			</>
+		),
+	};
+	const close = (
+		<>
+			<Tooltip content="Search in thread">
+				<Button {...activityControl("board.thread.search")} variant="ghost" size="icon-xs" aria-label="Search in thread" onClick={onSearch}>
+					<IconMagnifyingGlass />
+				</Button>
+			</Tooltip>
+			<Button {...activityControl("board.thread.close")} variant="ghost" size="icon-xs" aria-label="Close thread" render={<a href={closeHref} />}>
+				<IconCrossMedium />
+			</Button>
+		</>
+	);
 	return (
 		<aside aria-label={`Thread #${task.id}`} style={{ width }} className="relative flex max-w-[calc(100%-360px)] shrink-0 flex-col border-l border-border">
 			<Separator {...resize} axis="vertical" label="Resize the thread" min={MIN_THREAD} max={MAX_THREAD} now={width} className="inset-y-0 -left-1.5 w-3 cursor-col-resize select-none" />
-			<TabsPrimitive.Tabs value={shown} onValueChange={value => setTab(value === "session" ? "session" : "thread")} className="flex min-h-0 flex-1 flex-col">
-				{/* Content-box, so the hairline sits under the full header height, level with the Board header's. */}
-				<header className="box-content flex h-(--page-header-height) shrink-0 items-center gap-1 border-b border-border px-2">
-					<h2 className="sr-only">Thread #{task.id} in #{channel}</h2>
-					<TabsPrimitive.TabsList aria-label="Thread views" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
-						<ThreadTab value="thread" icon={IconBubble3} name="Thread" active={shown === "thread"} control="board.thread.tab.thread" />
-						{target && name && <ThreadTab value="session" icon={IconAiBotHead} name={name} active={shown === "session"} control="board.thread.tab.session" />}
-					</TabsPrimitive.TabsList>
-					<Tooltip content="Search in thread">
-						<Button {...activityControl("board.thread.search")} variant="ghost" size="icon-xs" aria-label="Search in thread" onClick={onSearch}>
-							<IconMagnifyingGlass />
-						</Button>
-					</Tooltip>
-					<Button {...activityControl("board.thread.close")} variant="ghost" size="icon-xs" aria-label="Close thread" render={<a href={closeHref} />}>
-						<IconCrossMedium />
-					</Button>
-				</header>
-				<TabsPrimitive.TabsPanel value="thread" className="flex min-h-0 flex-1 flex-col outline-none">
-					<ThreadMessages state={state} task={task} reply={reply} sessions={sessions} />
-					<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
-				</TabsPrimitive.TabsPanel>
-				{target && (
-					<TabsPrimitive.TabsPanel value="session" className="relative flex min-h-0 flex-1 flex-col outline-none">
-						<SessionTab sessionId={target} core={core} />
-					</TabsPrimitive.TabsPanel>
-				)}
-			</TabsPrimitive.Tabs>
+			{target && name && view ? (
+				<SessionThreadTabs label={label} thread={thread} close={close} sessionId={target} name={name} view={view} host={host} past={past} core={core} />
+			) : (
+				<DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={null} tabs={[thread]} trailing={close} />
+			)}
 		</aside>
 	);
 }
 
-/** One of the thread's tabs, drawn as the session details sidebar draws its first tab, which stays open; the row scrolls when they overflow. */
-function ThreadTab({ value, icon: Icon, name, active, control }: { value: ThreadTabValue; icon: IconComponent; name: string; active: boolean; control: BoardControlId }) {
-	return (
-		<ClosableTab name={name} active={active} onClose={null} closeControl="details.tab.close" activePadding="pr-2.5" className={cn("min-w-0 shrink-0", active && "bg-active text-foreground")}>
-			{body => (
-				<TabsPrimitive.TabsTab value={value} {...activityControl(control)} title={name} className={body}>
-					<Icon aria-hidden="true" className="size-3.5 shrink-0" />
-					<span className="truncate">{name}</span>
-				</TabsPrimitive.TabsTab>
-			)}
-		</ClosableTab>
-	);
-}
+/** The Board thread's open tabs, kept across threads. */
+const THREAD_TABS = "omp-agents.board-thread-tabs";
 
-/** The **Session** tab: the conversation of the session the Board task's replies wake, live with its composer, or saved and read-only, where the Thread tab's reply wakes it. */
-function SessionTab({ sessionId, core }: { sessionId: string; core: CoreData }) {
-	const host = core.sessions.hosts.find(each => each.sessionId === sessionId) ?? null;
-	const past = core.sessions.past.find(each => each.sessionId === sessionId) ?? null;
-	const instanceId = host?.instanceId ?? null;
-	const view = useMemo<View | null>(() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : past ? { kind: "past", sessionId } : null), [instanceId, past, sessionId]);
+/** Opens the woken session's PRs, Linear, and Review tabs in the thread once it shows one, as the session details sidebar does. */
+const THREAD_OPENERS = workTabOpeners(THREAD_TABS);
+
+/** Opens the woken session's conversation tab the first time each session shows in a thread while the page is open. */
+const conversationShown = newIdsOnOpen();
+
+/** The thread's tabs once it has a session to wake: **Thread**, that session's conversation, then the session details sidebar's **Overview**, **Diffs**, **PRs**, **Artifacts**, **Review**, and **Linear** for it, opened from +. */
+function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, past, core }: { label: string; thread: DetailsTab<"thread">; close: ReactNode; sessionId: string; name: string; view: View; host: RosterHost | null; past: PastSession | null; core: CoreData }) {
+	const row = host ?? past;
+	const working = host?.status === "working";
+	// Loaded while the thread shows, not only on its conversation tab: the Artifacts and Review tabs read it too.
 	useShowConversation(view);
-	if (view === null) return <p className="px-5 py-6 text-sm text-muted-foreground">This session's conversation isn't listed yet.</p>;
-	return <ViewConversation view={view} focused={false} host={host} lastHost={null} session={past} models={(instanceId !== null && core.models.get(instanceId)) || UNREAD} workspaces={core.workspaces} header={false} />;
+	const work = useSessionWork({ view, sessionId, working, hosts: core.sessions.hosts, row }, THREAD_OPENERS);
+	const ids = useMemo(() => [sessionId], [sessionId]);
+	useOpenTabOnNew(conversationShown, THREAD_TABS, sessionId, ids, "session");
+	const session = useMemo<ChangesSession>(() => ({ sessionId, cwd: row?.cwd ?? null, facts: row }), [sessionId, row]);
+	const tabs: DetailsTab<string>[] = [
+		thread,
+		{
+			value: "session",
+			icon: IconAiBotHead,
+			name,
+			control: "board.thread.tab.session",
+			count: 0,
+			scrollsItself: true,
+			content: <ViewConversation view={view} focused={false} host={host} lastHost={null} session={past} models={(view.kind === "live" && core.models.get(view.instanceId)) || UNREAD} workspaces={core.workspaces} header={false} />,
+		},
+		sessionOverviewTab(view, working, null, session),
+		...sessionWorkTabs(work),
+	];
+	return <DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={row?.cwd ?? null} tabs={tabs} trailing={close} />;
 }
 
 /** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies and the Board's grey lines. */
@@ -546,7 +561,7 @@ function ThreadMessages({ state, task, reply, sessions }: { state: BoardState; t
 				<MessageScrollerViewport>
 					<MessageScrollerContent className="gap-0 py-2">
 						<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={false}>
-							<TaskBody state={state} task={task} sessions={sessions} />
+							<TaskBody task={task} />
 						</MessageRow>
 						<div className="flex items-center gap-3 px-5 py-2 text-[13px] text-muted-foreground">
 							<span className="shrink-0">{count === 0 ? "No replies yet" : `${count} ${count === 1 ? "reply" : "replies"}`}</span>
@@ -555,11 +570,13 @@ function ThreadMessages({ state, task, reply, sessions }: { state: BoardState; t
 						<ol className="flex flex-col">
 							{task.replies.map((entry, index) => {
 								if ("note" in entry) {
+									const text = noteText(entry.note, sessions);
+									if (text === null) return null;
 									previous = null;
 									return (
 										<li key={index} className="flex gap-2 px-5 py-0.5 text-[13px] text-muted-foreground">
 											<span className="w-9 shrink-0 pt-px text-right text-[11px] tabular-nums">{shortClock(entry.at)}</span>
-											<span className="min-w-0 flex-1 italic">{noteText(entry.note, sessions)}</span>
+											<span className="min-w-0 flex-1 italic">{text}</span>
 										</li>
 									);
 								}
@@ -594,6 +611,9 @@ function ScrollToReply({ reply }: { reply: number }) {
 	return null;
 }
 
+/** The thread's `@` menu offers sessions only, so a reply can point its session at another. */
+const THREAD_MENTIONS = ["session"] as const;
+
 /** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here, and the prompts a session's last reply suggests list under it. */
 function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
@@ -606,7 +626,7 @@ function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { t
 	return (
 		<div {...activityControl("board.reply")} className="shrink-0">
 			<NewSession
-				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply", suggestions }}
+				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply", suggestions, mentions: THREAD_MENTIONS }}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
 				launch={null}
