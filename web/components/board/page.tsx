@@ -370,25 +370,23 @@ function Composer({ workspace, core, disabled, onChange }: { workspace: Workspac
 	);
 }
 
-function noteText(note: BoardNote, sessions: KnownSessions): string {
+/** The thread's grey line for a note, or null for routine lease steps the thread does not show. */
+function noteText(note: BoardNote, sessions: KnownSessions): string | null {
 	const name = (id: string | null): string => (id === null ? "The session" : sessionLabel(id, sessions).name);
 	switch (note.kind) {
 		case "started":
-			return `Started ${name(note.sessionId)} on this Board task.`;
+		case "claimed":
+		case "renewed":
+		case "done":
+			return null;
 		case "start-failed":
 			return `No session could start on it: ${note.error}`;
-		case "claimed":
-			return `${name(note.sessionId)} claimed this Board task. Lease 15 min.`;
-		case "renewed":
-			return `${name(note.sessionId)} renewed its lease.`;
 		case "expired":
 			return `${name(note.sessionId)}'s lease ran out, so a new session starts on it.`;
 		case "unclaimed":
 			return `${name(note.sessionId)} never claimed it, so a new session starts on it.`;
 		case "woke":
 			return `${name(note.sessionId)} had stopped. The reply woke it.`;
-		case "done":
-			return `${name(note.sessionId)} marked this Board task done.`;
 	}
 }
 
@@ -529,11 +527,13 @@ function ThreadMessages({ state, task, sessions }: { state: BoardState; task: Bo
 						<ol className="flex flex-col">
 							{task.replies.map((entry, index) => {
 								if ("note" in entry) {
+									const text = noteText(entry.note, sessions);
+									if (text === null) return null;
 									previous = null;
 									return (
 										<li key={index} className="flex gap-2 px-5 py-0.5 text-[13px] text-muted-foreground">
 											<span className="w-9 shrink-0 pt-px text-right text-[11px] tabular-nums">{shortClock(entry.at)}</span>
-											<span className="min-w-0 flex-1 italic">{noteText(entry.note, sessions)}</span>
+											<span className="min-w-0 flex-1 italic">{text}</span>
 										</li>
 									);
 								}
