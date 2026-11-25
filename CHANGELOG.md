@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- A Board thread no longer gets a "#5 is done, so this Board task is ready" line when the Board task it waited on finishes; its ready badge already says so.
 - The Board now has tabs under the Workspace's name, as a Slack channel does: **Messages**, the Board tasks, then **Bots**, **Pull requests**, **Memory**, **Projects**, and **Settings**, each showing only what belongs to that Workspace; Settings lists just the sections that read one workspace, such as Models, Files, and Worktrees.
 - A session's Board reply can now suggest what to answer next: the Board thread's reply box lists those prompts, and a click, a number key, or Enter sends one.
 - A session the Board starts is now named after its Board task's work, such as "Fix sidebar badge count", instead of "Claim Board task 5 on omp-agents".
