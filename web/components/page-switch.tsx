@@ -113,7 +113,7 @@ export const PageSwitch = memo(function PageSwitch({
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	if (page && isModulePage(page)) {
 		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
-		const core = { routines, bots, todos: userTodos, listed, workspace, workspaces, onPickWorkspace: pickWorkspace, hosts: visible.hosts, models, sessions: { hosts, past }, section: sectionTarget, newSessionCompletions };
+		const core = { routines, bots, botLasts, projects: modules.projects, todos: userTodos, listed, workspace, workspaces, onPickWorkspace: pickWorkspace, hosts: visible.hosts, models, sessions: { hosts, past }, section: sectionTarget, newSessionCompletions };
 		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
 	}
 	switch (page?.kind) {
@@ -152,14 +152,7 @@ export const PageSwitch = memo(function PageSwitch({
 			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} todoOf={todoId => todoSeed(userTodos, todoId)} />;
 		case "settings":
 			return (
-				<SettingsPage
-					section={page.section}
-					cwd={workspace}
-					onPickWorkspace={pickWorkspace}
-					workspaces={workspaces}
-					workspaceList={workspaceList}
-					trustedProjects={trustedProjects}
-				/>
+				<SettingsPage section={page.section} cwd={workspace} workspaces={workspaces} scope={{ kind: "all", onPickWorkspace: pickWorkspace, workspaceList, trustedProjects }} />
 			);
 		case "pull-requests":
 			return <PullRequestsPage hosts={visible.hosts} past={visible.past} route={page} />;

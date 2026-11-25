@@ -21,13 +21,15 @@ interface ProjectsPageProps {
 	state: ProjectList | null;
 	disabled: boolean;
 	onChange: OnProjectChange;
+	/** The empty state's title, for a page showing only some projects, such as a Board's Projects tab. */
+	empty?: string;
 }
 
 const ABOUT = "Efforts that span sessions";
 
 const HEAD = "h-10 font-medium whitespace-nowrap";
 
-export function ProjectsPage({ route, core, state, disabled, onChange }: ProjectsPageProps) {
+export function ProjectsPage({ route, core, state, disabled, onChange, empty = "No projects yet" }: ProjectsPageProps) {
 	if (state === null) {
 		return (
 			<PageFrame title="Projects" meta={ABOUT}>
@@ -47,7 +49,7 @@ export function ProjectsPage({ route, core, state, disabled, onChange }: Project
 						<EmptyMedia variant="icon">
 							<IconFlag1 />
 						</EmptyMedia>
-						<EmptyTitle>No projects yet</EmptyTitle>
+						<EmptyTitle>{empty}</EmptyTitle>
 						<EmptyDescription>A project gathers the sessions of one effort, with its goal, plan, decisions, and log, which each session in it gets at its start.</EmptyDescription>
 					</EmptyHeader>
 					<NewProjectButton disabled={disabled} />

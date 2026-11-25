@@ -9,7 +9,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { hashForSession, type View } from "../../../src/shared/sessions";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import type { Workspace } from "../../../src/shared/workspaces";
-import { Header } from "../page-header";
+import { Header, HeaderTitleShown } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
@@ -29,11 +29,13 @@ import { Age } from "../age";
 import { ClosableTab } from "../closable-tab";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { useDashboardActions } from "../dashboard-context";
+import { useModulesOff } from "../../modules-off";
 import type { CoreData } from "../module-views";
 import { NewSession } from "../new-session";
 import { ViewConversation } from "../pane";
 import { type KnownSessions, sessionLabel } from "../todo/links";
-import type { BoardControlId, BoardRoute } from "./module";
+import type { BoardControlId, BoardRoute, BoardView } from "./module";
+import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
 
 interface BoardPageProps {
@@ -46,44 +48,58 @@ interface BoardPageProps {
 
 export function BoardPage({ route, core, state, disabled, onChange }: BoardPageProps) {
 	useMinute();
+	const [off] = useModulesOff();
 	if (state === null) return <p className="px-6 py-6 text-sm text-muted-foreground">Loading the Board…</p>;
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
 	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";
 	const tasks = state.tasks.filter(task => task.workspace === open);
-	const thread = route.thread === null ? null : (tasks.find(task => task.id === route.thread) ?? null);
+	const tabs = boardTabsOn(off);
+	// A tab whose module is off is gone, so its address opens Messages.
+	const view: BoardView = tabs.some(each => each.id === route.view.tab) ? route.view : { tab: "messages", thread: null };
+	const thread = view.tab !== "messages" || view.thread === null ? null : (tasks.find(task => task.id === view.thread) ?? null);
 	return (
 		<div className="flex h-full min-h-0 flex-1">
 			<section aria-label="Board" className="flex min-w-[360px] flex-1 flex-col">
-				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name} />
-				<MessageScrollerProvider autoScroll>
-					<MessageScroller className="flex-1">
-						<MessageScrollerViewport>
-							<MessageScrollerContent className="justify-end gap-0 pt-6 pb-2">
-								<ChannelIntro name={name} />
-								<ol aria-label="Board tasks" className="flex flex-col">
-									{tasks.map((task, index) => {
-										const previous = tasks[index - 1];
-										return (
-											<li key={task.id}>
-												{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
-												<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === route.thread} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
-											</li>
-										);
-									})}
-								</ol>
-							</MessageScrollerContent>
-						</MessageScrollerViewport>
-						<MessageScrollerButton />
-					</MessageScroller>
-				</MessageScrollerProvider>
-				{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
+				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name} ruled={false} />
+				<ChannelTabs tab={view.tab} tabs={tabs} workspace={open} />
+				{view.tab === "messages" ? (
+					<>
+						<MessageScrollerProvider autoScroll>
+							<MessageScroller className="flex-1">
+								<MessageScrollerViewport>
+									<MessageScrollerContent className="justify-end gap-0 pt-6 pb-2">
+										<ChannelIntro name={name} />
+										<ol aria-label="Board tasks" className="flex flex-col">
+											{tasks.map((task, index) => {
+												const previous = tasks[index - 1];
+												return (
+													<li key={task.id}>
+														{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
+														<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === thread?.id} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
+													</li>
+												);
+											})}
+										</ol>
+									</MessageScrollerContent>
+								</MessageScrollerViewport>
+								<MessageScrollerButton />
+							</MessageScroller>
+						</MessageScrollerProvider>
+						{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
+					</>
+				) : (
+					<HeaderTitleShown.Provider value={false}>
+						<div className="flex min-h-0 flex-1">
+							<WorkspaceTab view={view} workspace={open} core={core} disabled={disabled} />
+						</div>
+					</HeaderTitleShown.Provider>
+				)}
 			</section>
 			{thread && openWorkspace && <Thread key={thread.id} state={state} task={thread} core={core} workspace={openWorkspace} channel={name} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
 		</div>
 	);
 }
-
 const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
 
 /** Slack starts a later message from the same author within five minutes of the last one without its avatar and name. */
