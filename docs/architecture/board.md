@@ -49,3 +49,4 @@ Its address is `#board?workspace=<dir>`, and `#board/<n>?workspace=<dir>` opens 
 `q=<words>` shows the search results, with `in=thread` or `in=all` widening or narrowing them from the open Workspace, and `reply=<index>` highlights that reply of the open Board thread.
 `searchBoard` in `web/components/board/search.ts` runs the search on the page's copy of the Board, so the server answers no search request.
 The page sends `post` and `reply` as the user; the server parses them with `BOARD_MODULE.store.parse`, which accepts nothing else from the page.
+The log keeps text only, so the composers' images go first to `PUT /api/board/images` in `src/server/board-images.ts`, which saves each under `board-images/` in the data directory by its hash and answers their paths; the text names each as `![image](<path>)`, which the page shows through `GET /api/media` and the session reads.

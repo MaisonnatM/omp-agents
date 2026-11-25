@@ -51,7 +51,7 @@ interface NewSessionProps {
 	 * Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at
 	 * `thinking` when it names a level; through `skill` when it names one.
 	 */
-	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId" | "projectId">) => void;
+	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId" | "projectId">) => void | Promise<void>;
 	/** Start the same session at `when` instead, with no page open; resolves once the server saved it. */
 	onSchedule?: (op: ScheduledOp, when: ScheduleWhen) => Promise<void>;
 	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
@@ -64,7 +64,7 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/** Only the composer, docked in the Board: sending posts a Board task or a reply with what `placeholder` and `sendLabel` say, so it attaches no files, schedules nothing, and picks no directory; `mentions` narrows its `@` menu to those categories. */
+	/** Only the composer, docked in the Board: sending posts a Board task or a reply with what `placeholder` and `sendLabel` say, with its attached files, so it schedules nothing and picks no directory; `mentions` narrows its `@` menu to those categories. */
 	board?: { placeholder: string; sendLabel: string; mentions?: readonly CategoryId[] };
 }
 
@@ -203,7 +203,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			{scheduled && checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 		</>
 	);
-	// The Board keeps no attachments or schedule, since its log holds text only.
+	// The Board schedules nothing; a post takes its attachments with it, and a failed one puts them and the text back.
 	const composer = (
 		<ComposerEditor value={editorRef}>
 			{/* On the Board the composer spans the channel, as Slack's does. */}
@@ -221,8 +221,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							completion.close();
 							if (scheduled) save.run(text.trim());
 							else if (board) {
-								onStart({ ...opOf(text.trim()), images: [] });
 								setDraft("");
+								void attachments.take(text.trim(), async (prompt, images) => onStart({ ...opOf(prompt), images }), () => setDraft(text));
 							} else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
 						}}
 						placeholder={scheduled ? "Message this session…" : board ? board.placeholder : "Describe the work; omp starts when you send it"}
@@ -239,7 +239,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						rightSlot={({ openFilePicker }) => (
 							<>
 								{!board && <ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />}
-								{!scheduled && !board && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
+								{!scheduled && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
 								<DictationButton dictation={dictation} />
 							</>
 						)}
@@ -251,7 +251,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						editorProps={{
 							...completion.editorProps,
 							onKeyDown,
-							onPaste: scheduled || board ? undefined : attachments.onPaste,
+							onPaste: scheduled ? undefined : attachments.onPaste,
 						}}
 					/>
 				</div>

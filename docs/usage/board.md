@@ -38,7 +38,8 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 ## Post a Board task
 
 - Type in the composer at the foot of the page and press Enter; Shift+Enter starts a new line.
-  It is the New session composer without its directory picker: pick the model, thinking level, and skill the session runs on, `/` and `@` suggest, and the microphone dictates; it attaches no files and schedules nothing.
+  It is the New session composer without its directory picker: pick the model, thinking level, and skill the session runs on, `/` and `@` suggest, the microphone dictates, and the paperclip, a drop, or a paste attaches files; it schedules nothing.
+  An attached image is saved under `~/.local/share/omp-agents/board-images/` and shows under the message, and the session reads it from that path; a text file or document goes into the text as in a session.
   The first line is the title, and the rest is the detail.
 - The sidebar's Workspaces switch the Board to another Workspace.
 - A session's `board` tool can make a Board task wait on another one, which starts its session only once that one is done.
