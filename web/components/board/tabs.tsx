@@ -16,12 +16,12 @@ import { PullRequestsPage } from "../pull-requests/pull-requests-page";
 import { SettingsPage } from "../settings/settings-page";
 import { BOARD_TABS, type BoardTab, type BoardTabDef, type BoardView } from "./module";
 
-const TAB = "-mb-px inline-flex h-9 shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent text-sm font-medium text-muted-foreground transition-colors hover:text-foreground aria-selected:border-foreground aria-selected:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
+const TAB = "inline-flex h-9 shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent text-sm font-medium text-muted-foreground transition-colors hover:text-foreground aria-selected:border-foreground aria-selected:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
 
 /** The tabs whose module is on; a tab showing a module's page goes while that module is off. */
 export const boardTabsOn = (off: ReadonlySet<WebModuleId>): BoardTabDef[] => BOARD_TABS.filter(each => each.module === null || !off.has(each.module));
 
-/** The row of tabs under the Workspace's name, underlined on the header's rule as under a Slack channel's; it scrolls sideways in a narrow column. */
+/** The row of tabs under the Workspace's name, underlined on the header's rule as under a Slack channel's; it scrolls sideways in a narrow column. The rule is an inset shadow the selected tab's underline covers, not a border a tab overlaps with a negative margin: that 1px overflow let a click scroll the row down a pixel, so the rule flickered. */
 export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: readonly BoardTabDef[]; workspace: string | null }) {
 	return (
 		<TabsPrimitive.Tabs
@@ -32,7 +32,7 @@ export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: rea
 			}}
 			activation="manual"
 		>
-			<TabsPrimitive.TabsList aria-label="Board tabs" className="flex gap-4 overflow-x-auto border-b border-border px-6 [scrollbar-width:none] max-phone:px-3">
+			<TabsPrimitive.TabsList aria-label="Board tabs" className="flex gap-4 overflow-x-auto px-6 shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] max-phone:px-3">
 				{tabs.map(({ id, label, icon: Icon }) => (
 					<TabsPrimitive.TabsTab key={id} value={id} className={TAB} {...activityControl("board.tab")}>
 						<Icon aria-hidden className="size-4 shrink-0" />
