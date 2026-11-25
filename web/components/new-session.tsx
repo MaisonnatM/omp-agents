@@ -10,6 +10,7 @@ import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useComposerDraft } from "../composer-drafts";
 import { folderName, PRIVATE_NOTE } from "../labels";
+import type { CategoryId } from "../mentions";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
 import { useDraftModelSelection } from "../use-draft-model";
@@ -64,8 +65,8 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/** Only the composer, docked in the Board: sending posts a Board task or a reply with what `placeholder` and `sendLabel` say, so it attaches no files, schedules nothing, and picks no directory; `suggestions` list under its action bar while the draft is empty. */
-	board?: { placeholder: string; sendLabel: string; suggestions?: string[] };
+	/** Only the composer, docked in the Board: sending posts a Board task or a reply with what `placeholder` and `sendLabel` say, so it attaches no files, schedules nothing, and picks no directory; `suggestions` list under its action bar while the draft is empty, and `mentions` narrows its `@` menu to those categories. */
+	board?: { placeholder: string; sendLabel: string; suggestions?: string[]; mentions?: readonly CategoryId[] };
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -137,7 +138,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	}, [typeable]);
 	const privacy = linked ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
 	const projectPill = project === null || !onDropProject ? null : <ProjectPill name={project} onDrop={onDropProject} disabled={starting} />;
-	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
+	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [], categories: board?.mentions ?? null } });
 	const { send } = useDashboardActions();
 	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
 	const dictation = useDictation({ composer: draftKey !== null && !starting ? { draftKey, cwd } : null, text: draft, editorRef, send, connected });

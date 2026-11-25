@@ -1,15 +1,54 @@
 /** The Board module's page half, which `WEB_MODULES` in `web/modules.ts` lists; its components are in this folder. See docs/architecture/board.md. */
-import { IconBubble2 } from "central-icons";
+import { IconBrain, IconBubble2, IconBubbleText, IconFlag1, IconPullRequest, IconRobot, IconSettingsGear1 } from "central-icons";
 import { applyChange, type BoardChange, type BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import type { StoredPageModule } from "../../modules";
 
-/** The Board page: Workspace `workspace`'s Board tasks, the first Workspace's for `null`, with Board task `thread`'s Board thread open beside them. */
+/** The tabs across the top of a Workspace's Board, as across a Slack channel: its Board tasks, then what else the Workspace holds; `module` names the module whose page a tab shows, which hides the tab while it is off. */
+export const BOARD_TABS = [
+	{ id: "messages", label: "Messages", icon: IconBubbleText, module: null },
+	{ id: "bots", label: "Bots", icon: IconRobot, module: null },
+	{ id: "pull-requests", label: "Pull requests", icon: IconPullRequest, module: null },
+	{ id: "memory", label: "Memory", icon: IconBrain, module: "memory" },
+	{ id: "projects", label: "Projects", icon: IconFlag1, module: "projects" },
+	{ id: "settings", label: "Settings", icon: IconSettingsGear1, module: null },
+] as const;
+
+export type BoardTab = (typeof BOARD_TABS)[number]["id"];
+export type BoardTabDef = (typeof BOARD_TABS)[number];
+
+/** What a Workspace's Board shows: its Board tasks with Board task `thread`'s Board thread open beside them, its settings on the section `section` names, the first for `null`, or another tab. */
+export type BoardView = { tab: "messages"; thread: number | null } | { tab: "settings"; section: string | null } | { tab: Exclude<BoardTab, "messages" | "settings"> };
+
+/** The Board page: Workspace `workspace`'s view, the first Workspace's for `null`. */
 export interface BoardRoute {
 	workspace: string | null;
-	thread: number | null;
+	view: BoardView;
 }
 
-export type BoardControlId = "board.workspace" | "board.task.open" | "board.post" | "board.reply" | "board.thread.close" | "board.thread.tab.thread" | "board.thread.tab.session" | "board.session.open";
+export const boardTab = (id: BoardTab) => BOARD_TABS.find(each => each.id === id)!;
+
+/** The view the address's rest names: a number is a Board thread, `settings/<section>` a settings section, else a tab, Messages for an unknown one. */
+function parseView(rest: string | null): BoardView {
+	if (rest !== null && /^\d+$/.test(rest)) return { tab: "messages", thread: Number(rest) };
+	const [head, section = null] = rest?.split("/") ?? [];
+	const tab = BOARD_TABS.find(each => each.id === head)?.id ?? "messages";
+	if (tab === "messages") return { tab, thread: null };
+	if (tab === "settings") return { tab, section: section || null };
+	return { tab };
+}
+
+function viewRest(view: BoardView): string | null {
+	switch (view.tab) {
+		case "messages":
+			return view.thread === null ? null : String(view.thread);
+		case "settings":
+			return view.section === null ? "settings" : `settings/${view.section}`;
+		default:
+			return view.tab;
+	}
+}
+
+export type BoardControlId = "board.workspace" | "board.tab" | "board.task.open" | "board.post" | "board.reply" | "board.thread.close" | "board.thread.tab.thread" | "board.thread.tab.session" | "board.session.open";
 
 export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, BoardChange, never, BoardControlId> = {
 	id: "board",
@@ -17,28 +56,27 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	about: "Board tasks you and your sessions post for each other in a workspace; a session starts on each one once it is ready.",
 	offNote: "While the Board is off, sessions it starts or wakes keep running, and the board tool still works.",
 	listsItself: true,
-	home: { workspace: null, thread: null },
-	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace. */
+	home: { workspace: null, view: { tab: "messages", thread: null } },
+	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace, `#board/<tab>?workspace=<cwd>` another tab, and `#board/settings/<section>?workspace=<cwd>` one of its settings. */
 	address: {
-		parse: (rest, query) => {
-			const thread = rest !== null && /^\d+$/.test(rest) ? Number(rest) : null;
-			return { workspace: query.get("workspace"), thread };
-		},
-		rest: route => (route.thread === null ? null : String(route.thread)),
+		parse: (rest, query) => ({ workspace: query.get("workspace"), view: parseView(rest) }),
+		rest: route => viewRest(route.view),
 		query: route => (route.workspace === null ? null : new URLSearchParams({ workspace: route.workspace }).toString()),
 	},
-	title: route => (route.thread === null ? "Board" : `Board · #${route.thread}`),
+	title: ({ view }) => (view.tab !== "messages" ? `Board · ${boardTab(view.tab).label}` : view.thread === null ? "Board" : `Board · #${view.thread}`),
 	views: [
 		{ key: "board", label: "Board" },
 		{ key: "board/thread", label: "A Board thread" },
+		...BOARD_TABS.filter(each => each.id !== "messages").map(each => ({ key: `board/${each.id}` as const, label: `The Board's ${each.label} tab` })),
 	],
-	view: route => (route.thread === null ? "board" : "board/thread"),
+	view: ({ view }) => (view.tab !== "messages" ? `board/${view.tab}` : view.thread === null ? "board" : "board/thread"),
 	shortcuts: {
 		category: "Board",
 		goTo: { label: "Go to the Board", command: "Go to Board", keys: [] },
 		rows: [],
 	},
 	controls: [
+		{ id: "board.tab", label: "Board tab across the top of a Workspace", area: "Board" },
 		{ id: "board.workspace", label: "Board sidebar workspace row", area: "Board" },
 		{ id: "board.task.open", label: "Board task message, which opens its thread", area: "Board" },
 		{ id: "board.post", label: "Board composer Send button or Enter", area: "Board" },

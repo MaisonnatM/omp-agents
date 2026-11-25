@@ -31,6 +31,8 @@ export interface Composer {
 	sessionId: string | null;
 	/** The files its agent changed, in first-touch order. */
 	changed: ChangedFile[];
+	/** The categories its menu offers, `null` for every one; with one, `@` lists that category's rows straight away. */
+	categories: readonly CategoryId[] | null;
 }
 
 /** The draft and caret a row leaves. */
@@ -237,9 +239,11 @@ export interface MenuInput {
 /** The menu for the `@` token. */
 export function mentionMenu({ text, token, data, composer, files }: MenuInput): MenuSection[] {
 	const replace = (insert: string): Edit => ({ text: text.slice(0, token.start) + insert + text.slice(token.end), cursor: token.start + insert.length });
+	const offered = composer.categories ? CATEGORIES.filter(category => composer.categories?.includes(category.id)) : CATEGORIES;
+	const only = offered.length === 1 ? offered[0] : null;
 	const query = mentionQuery(token);
-	if (query.kind === "home") {
-		const recent = recentlyChanged(composer.changed, 3).map(path => ({
+	if (query.kind === "home" && !only) {
+		const recent = (offered.some(category => category.id === "file") ? recentlyChanged(composer.changed, 3) : []).map(path => ({
 			icon: IconFileBend,
 			label: path,
 			detail: null,
@@ -247,13 +251,14 @@ export function mentionMenu({ text, token, data, composer, files }: MenuInput): 
 			edit: replace(`${path.includes(" ") ? `@"${path}"` : `@${path}`} `),
 			opens: false,
 		}));
-		const categories = CATEGORIES.map(category => ({ icon: category.icon, label: category.title, detail: null, edit: replace(`@${category.prefix}:`), opens: true }));
+		const categories = offered.map(category => ({ icon: category.icon, label: category.title, detail: null, edit: replace(`@${category.prefix}:`), opens: true }));
 		return [...(recent.length > 0 ? [{ title: null, options: recent }] : []), { title: null, options: categories }];
 	}
-	return CATEGORIES.filter(category => wants(query, category.id)).flatMap(category => {
+	const words = query.kind === "home" ? "" : query.words;
+	return offered.filter(category => only || wants(query, category.id)).flatMap(category => {
 		const options = category
-			.options({ words: query.words, data, composer, files: files ?? [], replace })
-			.slice(0, query.kind === "search" ? category.searchLimit : 50);
+			.options({ words, data, composer, files: files ?? [], replace })
+			.slice(0, query.kind === "search" && !only ? category.searchLimit : 50);
 		return options.length > 0 ? [{ title: category.title, options }] : [];
 	});
 }

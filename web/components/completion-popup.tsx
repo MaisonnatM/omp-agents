@@ -176,7 +176,9 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 			// omp completes skills as `/skill:<name>`; its answer's edit puts that where the `$` was.
 			const request =
 				trigger.kind === "mention"
-					? fileSearch(text, trigger.token)
+					? composer.categories && !composer.categories.includes("file")
+						? null
+						: fileSearch(text, trigger.token)
 					: trigger.kind === "skill"
 						? { text: `${text.slice(0, trigger.start)}/skill:${text.slice(trigger.start + 1)}`, cursor: cursor + "skill:".length }
 						: { text, cursor };

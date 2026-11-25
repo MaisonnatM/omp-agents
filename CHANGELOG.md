@@ -6,6 +6,8 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-25
 
 - The Board thread's tab row is now a session's right sidebar: besides **Thread** and the session's conversation, its + opens that session's **Overview**, **Diffs**, **PRs**, **Artifacts**, **Review**, and **Linear** tabs, and a tab you open stays open across threads. A session's right sidebar header line now sits level with the page header beside it.
+- The Board now has tabs under the Workspace's name, as a Slack channel does: **Messages**, the Board tasks, then **Bots**, **Pull requests**, **Memory**, **Projects**, and **Settings**, each showing only what belongs to that Workspace; Settings lists just the sections that read one workspace, such as Models, Files, and Worktrees.
+- In a Board thread's reply box, typing an at sign now lists your sessions straight away, so a reply can point its session at another one; the other at-sign suggestions stay out of the thread for now.
 - A session's Board reply can now suggest what to answer next: the Board thread's reply box lists those prompts, and a click, a number key, or Enter sends one.
 - A session the Board starts is now named after its Board task's work, such as "Fix sidebar badge count", instead of "Claim Board task 5 on omp-agents".
 - The Board thread's pane now has tabs, as a session's right sidebar does: **Thread** for the Board task and its replies, and a tab named after the session working on it that shows that session's conversation, with its composer while it runs. Its header line now sits level with the Board's.
