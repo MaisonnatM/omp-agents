@@ -1,4 +1,4 @@
-import type { Integrations } from "../integrations";
+import { integrationFetch, integrationSignedIn, type Integrations } from "../integrations";
 import { NoLinearServer, readLinearIssue } from "../linear";
 import {
 	addMcpServerFrom,
@@ -10,6 +10,7 @@ import {
 	startMcpServerSignIn,
 } from "../mcp-servers";
 import { ClientConfigError } from "../mcp-clients";
+import { yourAvatar } from "../slack-messages";
 import { McpRefused } from "../omp/mcp";
 import type { IntegrationTarget, McpIntegration } from "../shared/accounts";
 import { linearIssueId } from "../shared/linear";
@@ -36,6 +37,9 @@ export function integrationRoutes({ get, write }: RouteKit, integrations: Integr
 
 	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */
 	const slackClient = write((body) => checked(parseSlackClient(body)), integrations.saveSlackClient, refuseClient);
+
+	/** `GET /api/integrations/slack/me`: `{ avatarUrl }`, your Slack profile picture, `null` while Slack is signed out. */
+	const slackMe = get(() => answer(async () => ({ avatarUrl: (await integrationSignedIn("slack")) ? await yourAvatar(integrationFetch("slack")) : null })));
 
 	/** `GET /api/mcp-servers[?fresh]`: every user-level MCP server omp loads, where omp stands with each, and its sign-in under way. */
 	const mcpServers = get((params) => answer(() => loadMcpServers(params.has("fresh"))));
@@ -81,6 +85,7 @@ export function integrationRoutes({ get, write }: RouteKit, integrations: Integr
 		"/api/mcp-servers/enabled": { PUT: mcpServerEnabled },
 		"/api/mcp-servers/remove": { PUT: mcpServerRemove },
 		"/api/integrations/slack/client": { PUT: slackClient },
+		"/api/integrations/slack/me": { GET: slackMe },
 		"/api/linear/issue": { GET: linearIssue },
 	};
 }

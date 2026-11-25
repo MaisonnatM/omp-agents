@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { getJson } from "../../api";
 import { activityControl } from "../../activity";
 import { boardDraftKey, boardThreadDraftKey } from "../../composer-drafts";
 import { useStoredState } from "../../stored-state";
@@ -132,15 +133,37 @@ function hueOf(id: string): string {
 	return HUES[Math.abs(hash) % HUES.length] ?? "bg-sky-600";
 }
 
-/** The author's square picture: a person for you, a session's initial on its own color for a session. */
+/** Your Slack profile picture, asked once per page load to refresh the stored one, which shows meanwhile; `undefined` when the ask failed. */
+let yourPicture: Promise<string | null | undefined> | null = null;
+
+/** Your square picture: your Slack profile picture, else a person. */
+function YourAvatar({ size, box }: { size: "message" | "summary"; box: string }) {
+	const [url, setUrl] = useStoredState<string | null>("omp-agents.slack-picture", raw => raw || null, value => value ?? "");
+	useEffect(() => {
+		yourPicture ??= getJson<{ avatarUrl: string | null }>("/api/integrations/slack/me").then(
+			answer => answer.avatarUrl,
+			() => undefined,
+		);
+		let live = true;
+		void yourPicture.then(found => {
+			if (live && found !== undefined && found !== url) setUrl(found);
+		});
+		return () => {
+			live = false;
+		};
+	}, [url, setUrl]);
+	if (url) return <img aria-hidden src={url} alt="" referrerPolicy="no-referrer" className={cn("shrink-0 object-cover", box)} />;
+	return (
+		<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-foreground text-background", box)}>
+			<IconUser className={size === "message" ? "size-5" : "size-3.5"} />
+		</span>
+	);
+}
+
+/** The author's square picture: yours for you, a session's initial on its own color for a session. */
 function Avatar({ by, sessions, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
 	const box = size === "message" ? "size-9 rounded-lg text-sm" : "size-6 rounded-md text-[11px]";
-	if (by.kind === "user")
-		return (
-			<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-foreground text-background", box)}>
-				<IconUser className={size === "message" ? "size-5" : "size-3.5"} />
-			</span>
-		);
+	if (by.kind === "user") return <YourAvatar size={size} box={box} />;
 	const name = sessionLabel(by.sessionId, sessions).name;
 	return (
 		<span aria-hidden className={cn("flex shrink-0 items-center justify-center font-semibold text-white", hueOf(by.sessionId), box)}>
