@@ -49,7 +49,7 @@ export function ProjectsPage({ route, core, state, disabled, onChange, empty = "
 						<EmptyMedia variant="icon">
 							<IconFlag1 />
 						</EmptyMedia>
-						<EmptyTitle>No projects yet</EmptyTitle>
+						<EmptyTitle>{empty}</EmptyTitle>
 						<EmptyDescription>A project gathers the sessions of one effort, with its goal, plan, decisions, and log, which each session in it gets at its start.</EmptyDescription>
 					</EmptyHeader>
 					<NewProjectButton disabled={disabled} />
