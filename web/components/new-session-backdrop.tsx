@@ -13,10 +13,10 @@ const BACKDROPS = {
 	aurora: { label: "Aurora", draw: (className: string) => <Aurora className={className} /> },
 	fire: { label: "Fire", draw: (className: string) => <Fire className={className} /> },
 	eclipse: { label: "Eclipse", draw: (className: string) => <Eclipse className={className} /> },
-	"black-hole": { label: "Black hole", draw: (className: string) => <BlackHole className={className} /> },
+	"black-hole": { label: "Black hole", draw: (className: string) => <BlackHole className={className} />, centred: true },
 	horizon: { label: "Horizon", draw: (className: string) => <Horizon className={className} /> },
 	galaxy: { label: "Galaxy", draw: (className: string) => <Galaxy className={className} /> },
-	globe: { label: "Globe", draw: (className: string) => <DitherGlobe className={className} /> },
+	globe: { label: "Globe", draw: (className: string) => <DitherGlobe className={className} />, centred: true },
 } as const;
 
 type BackdropName = keyof typeof BACKDROPS;
@@ -30,13 +30,15 @@ const readBackdrop = (): BackdropName => {
 	return isBackdrop(stored) ? stored : "retro-grid";
 };
 
-// It fills the page's lower part and fades out under the title.
-const BACKDROP_BOX = "pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[40%] opacity-70 [mask-image:linear-gradient(to_bottom,transparent,black_35%)]";
+// A scene fills the page's lower part and fades out under the title.
+const STRIP_BOX = "pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[40%] opacity-70 [mask-image:linear-gradient(to_bottom,transparent,black_35%)]";
+// An object such as the globe sits whole behind the page, faded so the title stays readable.
+const CENTRED_BOX = "pointer-events-none absolute inset-0 -z-10 opacity-40";
 
 /** The new session page's dither backdrop, and the header select that picks it; the pick persists in this browser. */
 export function useNewSessionBackdrop(pillClassName: string) {
 	const [name, setName] = useState(readBackdrop);
-	const backdrop = <div aria-hidden>{BACKDROPS[name].draw(BACKDROP_BOX)}</div>;
+	const backdrop = <div aria-hidden>{BACKDROPS[name].draw("centred" in BACKDROPS[name] ? CENTRED_BOX : STRIP_BOX)}</div>;
 	const picker = (
 		<select
 			aria-label="Background"
