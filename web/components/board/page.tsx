@@ -3,9 +3,8 @@
  * split by day, each with its thread summary and a hover toolbar, over the composer that posts one; the open Board
  * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconArrowUpRight, IconBrain, IconBubble3, IconBubbleText, IconCrossMedium, IconFlag1, IconHashtag, IconPullRequest, IconRobot, IconSettingsGear1, IconUser } from "central-icons";
-import * as TabsPrimitive from "@ui-sdk/react/tabs";
-import { type ComponentType, type ReactNode, useEffect } from "react";
+import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
+import { type ReactNode, useEffect } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
@@ -17,9 +16,6 @@ import { MessageScroller, MessageScrollerButton, MessageScrollerContent, Message
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson } from "../../api";
-import { botRows } from "../../bots-model";
-import { hashForPage, SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
-import { workspaceCwd } from "../../sessions";
 import { activityControl } from "../../activity";
 import { boardDraftKey, boardThreadDraftKey } from "../../composer-drafts";
 import { useStoredState } from "../../stored-state";
@@ -27,15 +23,12 @@ import { useMinute } from "../../use-minute";
 import { Age } from "../age";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { useDashboardActions } from "../dashboard-context";
+import { useModulesOff } from "../../modules-off";
 import type { CoreData } from "../module-views";
 import { NewSession } from "../new-session";
-import { ProjectMemoryTab } from "../memory/project-memory";
-import { BotsGallery } from "../bots/bots-gallery";
-import { ProjectsPage } from "../projects/page";
-import { SettingsPage } from "../settings/settings-page";
-import { PullRequestsPage } from "../pull-requests/pull-requests-page";
 import { type KnownSessions, sessionLabel } from "../todo/links";
-import { BOARD_TABS, type BoardRoute, type BoardTab } from "./module";
+import type { BoardRoute, BoardView } from "./module";
+import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
 
 interface BoardPageProps {
@@ -48,18 +41,22 @@ interface BoardPageProps {
 
 export function BoardPage({ route, core, state, disabled, onChange }: BoardPageProps) {
 	useMinute();
+	const [off] = useModulesOff();
 	if (state === null) return <p className="px-6 py-6 text-sm text-muted-foreground">Loading the Board…</p>;
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
 	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";
 	const tasks = state.tasks.filter(task => task.workspace === open);
-	const thread = route.thread === null ? null : (tasks.find(task => task.id === route.thread) ?? null);
+	const tabs = boardTabsOn(off);
+	// A tab whose module is off is gone, so its address opens Messages.
+	const view: BoardView = tabs.some(each => each.id === route.view.tab) ? route.view : { tab: "messages", thread: null };
+	const thread = view.tab !== "messages" || view.thread === null ? null : (tasks.find(task => task.id === view.thread) ?? null);
 	return (
 		<div className="flex h-full min-h-0 flex-1">
 			<section aria-label="Board" className="flex min-w-[360px] flex-1 flex-col">
 				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name} ruled={false} />
-				<ChannelTabs tab={route.tab} workspace={open} />
-				{route.tab === "messages" ? (
+				<ChannelTabs tab={view.tab} tabs={tabs} workspace={open} />
+				{view.tab === "messages" ? (
 					<>
 						<MessageScrollerProvider autoScroll>
 							<MessageScroller className="flex-1">
@@ -72,7 +69,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 												return (
 													<li key={task.id}>
 														{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
-														<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === route.thread} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
+														<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === thread?.id} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
 													</li>
 												);
 											})}
@@ -87,111 +84,15 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 				) : (
 					<HeaderTitleShown.Provider value={false}>
 						<div className="flex min-h-0 flex-1">
-							<WorkspaceTab tab={route.tab} section={route.section ?? null} workspace={open} core={core} disabled={disabled} />
+							<WorkspaceTab view={view} workspace={open} core={core} disabled={disabled} />
 						</div>
 					</HeaderTitleShown.Provider>
 				)}
 			</section>
-			{route.tab === "messages" && thread && openWorkspace && <Thread key={thread.id} state={state} task={thread} core={core} workspace={openWorkspace} channel={name} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
+			{thread && openWorkspace && <Thread key={thread.id} state={state} task={thread} core={core} workspace={openWorkspace} channel={name} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
 		</div>
 	);
 }
-
-/** Each tab's icon, the one the app shows for the same thing elsewhere. */
-const TAB_ICONS: Record<BoardTab, ComponentType<{ className?: string; "aria-hidden"?: boolean }>> = {
-	messages: IconBubbleText,
-	bots: IconRobot,
-	"pull-requests": IconPullRequest,
-	memory: IconBrain,
-	projects: IconFlag1,
-	settings: IconSettingsGear1,
-};
-
-/** The row of tabs under the Workspace's name, underlined as under a Slack channel's; each opens its own address. */
-function ChannelTabs({ tab, workspace }: { tab: BoardTab; workspace: string | null }) {
-	return (
-		<TabsPrimitive.Tabs
-			value={tab}
-			onValueChange={next => {
-				const picked = BOARD_TABS.find(each => each.id === next);
-				if (picked) location.hash = hashForPage({ kind: "board", workspace, tab: picked.id, thread: null });
-			}}
-			activation="manual"
-		>
-			<TabsPrimitive.TabsList aria-label="Board tabs" className="flex shrink-0 gap-4 border-b border-border px-5">
-				{BOARD_TABS.map(each => {
-					const Icon = TAB_ICONS[each.id];
-					return (
-						<TabsPrimitive.TabsTab
-							key={each.id}
-							value={each.id}
-							className="-mb-px inline-flex h-9 shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent text-sm font-medium text-muted-foreground transition-colors hover:text-foreground aria-selected:border-foreground aria-selected:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
-							{...activityControl("board.tab")}
-						>
-							<Icon aria-hidden className="size-4 shrink-0" />
-							{each.label}
-						</TabsPrimitive.TabsTab>
-					);
-				})}
-			</TabsPrimitive.TabsList>
-		</TabsPrimitive.Tabs>
-	);
-}
-
-/** A tab other than Messages: the page it names, kept to the sessions, Bots, repository, and projects of the Workspace. */
-function WorkspaceTab({ tab, section, workspace, core, disabled }: { tab: Exclude<BoardTab, "messages">; section: string | null; workspace: string | null; core: CoreData; disabled: boolean }) {
-	const { changeModule } = useDashboardActions();
-	const { hosts, past } = core.sessions;
-	const here = <Row extends Parameters<typeof workspaceCwd>[0]>(rows: Row[]): Row[] => rows.filter(row => workspaceCwd(row) === workspace);
-	switch (tab) {
-		case "bots":
-			return <BotsGallery rows={core.bots === null ? null : botRows(core.bots.filter(bot => bot.cwd === workspace), hosts, core.botLasts)} routines={core.routines} />;
-		case "pull-requests":
-			return <PullRequestsPage hosts={here(hosts)} past={here(past)} route={{ target: null }} />;
-		case "memory":
-			return <ProjectMemoryTab repo={workspace} />;
-		case "projects": {
-			const ran = new Set([...here(hosts), ...here(past)].map(row => row.sessionId));
-			const projects = core.projects && { projects: core.projects.projects.filter(project => project.sessionIds.some(id => ran.has(id))) };
-			return <ProjectsPage route={{ open: null }} core={core} state={projects} disabled={disabled} onChange={change => changeModule("projects", change)} />;
-		}
-		case "settings":
-			return <WorkspaceSettings workspace={workspace} workspaces={core.workspaces} section={section} />;
-	}
-}
-
-/** The Settings sections that read one workspace, as Settings lists them. */
-const WORKSPACE_SECTIONS = SETTINGS_SECTIONS.filter(section => section.group === "workspace");
-
-/** Settings kept to the Workspace, with no workspace picker: its sections down the left, the open one, which the address names, at the right. */
-function WorkspaceSettings({ workspace, workspaces, section: named }: { workspace: string | null; workspaces: CoreData["workspaces"]; section: string | null }) {
-	const section: SettingsSection = WORKSPACE_SECTIONS.find(({ value }) => value === named)?.value ?? "models";
-	return (
-		<TabsPrimitive.Tabs
-			value={section}
-			onValueChange={next => {
-				location.hash = hashForPage({ kind: "board", workspace, tab: "settings", thread: null, section: String(next) });
-			}}
-			orientation="vertical"
-			className="flex min-h-0 flex-1"
-		>
-			<TabsPrimitive.TabsList aria-label="Workspace settings" className="flex w-48 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border p-2">
-				{WORKSPACE_SECTIONS.map(({ value, label, icon: Icon }) => (
-					<TabsPrimitive.TabsTab
-						key={value}
-						value={value}
-						className="flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-selected:bg-accent aria-selected:font-medium aria-selected:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
-					>
-						<Icon aria-hidden className="size-4 shrink-0" />
-						{label}
-					</TabsPrimitive.TabsTab>
-				))}
-			</TabsPrimitive.TabsList>
-			<SettingsPage key={workspace ?? ""} section={section} cwd={workspace} workspaces={workspaces} />
-		</TabsPrimitive.Tabs>
-	);
-}
-
 const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
 
 /** Slack starts a later message from the same author within five minutes of the last one without its avatar and name. */

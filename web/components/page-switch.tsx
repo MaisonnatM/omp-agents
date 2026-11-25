@@ -152,14 +152,7 @@ export const PageSwitch = memo(function PageSwitch({
 			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} todoOf={todoId => todoSeed(userTodos, todoId)} />;
 		case "settings":
 			return (
-				<SettingsPage
-					section={page.section}
-					cwd={workspace}
-					onPickWorkspace={pickWorkspace}
-					workspaces={workspaces}
-					workspaceList={workspaceList}
-					trustedProjects={trustedProjects}
-				/>
+				<SettingsPage section={page.section} cwd={workspace} workspaces={workspaces} scope={{ kind: "all", onPickWorkspace: pickWorkspace, workspaceList, trustedProjects }} />
 			);
 		case "pull-requests":
 			return <PullRequestsPage hosts={visible.hosts} past={visible.past} route={page} />;
