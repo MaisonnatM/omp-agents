@@ -5,7 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
-- The Board sidebar's Bot groups now look and fold like the workspace groups in Sessions, smaller than before.
+- The Board sidebar's Bot groups now look and fold like the workspace groups in Sessions, smaller than before, and the Workspaces and Bots headers each fold their whole list.
 - The Board sidebar's Bot groups, Pinned, each section, and Other Bots, now fold open and shut when you click them, instead of opening the gallery of every Bot.
 - Clicking a session on the Board, in its sidebar, on a message's author, on "Working on it…", or with **Open its session**, now opens that session's conversation in its Board thread instead of leaving the Board for Sessions.
 - Board sessions no longer merge their own work. Each ends by telling you in its Board thread what it did and suggesting next steps, such as Merge on main, then stops.

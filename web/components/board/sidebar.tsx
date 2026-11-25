@@ -79,11 +79,16 @@ interface BoardSidebarProps {
 
 export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessions, bots }: BoardSidebarProps) {
 	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+	const toggle = (key: string) => setCollapsed(prev => {
+		const next = new Set(prev);
+		if (!next.delete(key)) next.add(key);
+		return next;
+	});
 	if (state === null) return <p className="px-4 py-2 text-xs text-muted-foreground">Loading the Board…</p>;
 	const { workspaces, open } = boardWorkspaces(state, sidebar, picked, route);
 	return (
 		<SidebarContent>
-			<SidebarGroup>
+			<SidebarGroup collapsible open={!collapsed.has("workspaces")} onOpenChange={() => toggle("workspaces")}>
 				<SidebarGroupLabel>Workspaces</SidebarGroupLabel>
 				<SidebarMenu aria-label="Board workspaces" className="gap-px">
 					{workspaces.map(workspace => {
@@ -135,9 +140,9 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 					})}
 				</SidebarMenu>
 			</SidebarGroup>
-			<SidebarGroup className="pb-0">
+			<SidebarGroup collapsible open={!collapsed.has("bots")} onOpenChange={() => toggle("bots")}>
 				<SidebarGroupLabel>Bots</SidebarGroupLabel>
-			</SidebarGroup>
+				<div>
 			{bots !== null && botGroups(bots).map(group => {
 				const key = botGroupKey(group);
 				return (
@@ -146,11 +151,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 						className="py-0"
 						collapsible
 						open={!collapsed.has(key)}
-						onOpenChange={() => setCollapsed(prev => {
-							const next = new Set(prev);
-							if (!next.delete(key)) next.add(key);
-							return next;
-						})}
+						onOpenChange={() => toggle(key)}
 					>
 						<SidebarGroupLabel icon={GROUP_ICONS[group.kind]} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
 							{botGroupLabel(group)}
@@ -168,6 +169,8 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 					</SidebarGroup>
 				);
 			})}
+				</div>
+			</SidebarGroup>
 		</SidebarContent>
 	);
 }
