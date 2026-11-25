@@ -14,10 +14,8 @@ import { cn } from "@/lib/utils";
 
 // ─── Slot helpers (render / asChild polymorphism) ────────────────────────────
 //
-// A local slot instead of a primitive-library one so every menu part exists in
-// exactly one flavor-neutral copy: Radix's Slot would leak into the Base UI
-// flavor, and Base UI's useRender the other way around. Supports both the
-// library's `render={<Link/>}` convention and shadcn's `asChild`.
+// The sidebar's own slot, kept apart from the primitives library so its parts
+// stay plain elements. Supports both `render={<Link/>}` and shadcn's `asChild`.
 
 type SlotProps = {
   className?: string;

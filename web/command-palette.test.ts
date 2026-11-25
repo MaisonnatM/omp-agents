@@ -204,3 +204,48 @@ describe("chordAction", () => {
 		expect(chordAction(entry, keyEvent("p", "KeyP", { ctrl: true }), false)).toBeUndefined();
 	});
 });
+
+describe("paletteSections matching", () => {
+	const described = (base: PaletteItem, extra: Partial<PaletteItem>): PaletteItem => ({ ...base, ...extra });
+
+	test("a search that matches only an item's subtitle or keywords still lists it", () => {
+		const items = [
+			described(item("session:s", "running", "Notes"), { subtitle: "kubernetes rollout" }),
+			described(item("command:k", "commands", "Open settings"), { keywords: ["kubernetes"] }),
+			item("session:x", "running", "Notes"),
+		];
+		expect(listed(paletteSections(items, "kubernetes", {}, NOW)).toSorted()).toEqual([
+			["commands", ["command:k"]],
+			["running", ["session:s"]],
+		]);
+	});
+
+	test("an item the search does not match is absent, leaving only what the search becomes", () => {
+		const items = [item("session:r", "running", "Deploy web"), item("command:c", "commands", "Open settings"), item("fallback:create-todo", "fallback", "Create todo")];
+		expect(listed(paletteSections(items, "zzqx", {}, NOW))).toEqual([["fallback", ["fallback:create-todo"]]]);
+	});
+
+	test("a searched item lists only when it holds every typed word, which may sit across its title, subtitle and keywords", () => {
+		const items = [
+			item("todo:one-word", "todos", "Fix login"),
+			described(item("todo:split", "todos", "Fix login"), { subtitle: "deploy pipeline" }),
+			described(item("settings:split", "settings", "Login"), { keywords: ["deploy"] }),
+		];
+		expect(listed(paletteSections(items, "login deploy", {}, NOW)).toSorted()).toEqual([
+			["settings", ["settings:split"]],
+			["todos", ["todo:split"]],
+		]);
+	});
+
+	test("frecency lifts a section whose best match ties another's above it", () => {
+		const items = [item("session:r", "running", "Deploy web"), item("session:p", "past", "Deploy web")];
+		expect(listed(paletteSections(items, "deploy", {}, NOW))).toEqual([
+			["running", ["session:r"]],
+			["past", ["session:p"]],
+		]);
+		expect(listed(paletteSections(items, "deploy", { "session:p": { count: 2, last: NOW } }, NOW))).toEqual([
+			["past", ["session:p"]],
+			["running", ["session:r"]],
+		]);
+	});
+});

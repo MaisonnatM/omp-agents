@@ -381,7 +381,7 @@ function ModelSearch({ list, current, disabled, onPick }: { list: ModelList; cur
 			closeOnSelect={false}
 			filter={modelMatch}
 			listClassName="max-h-80"
-			// Base UI's menu would read typed letters as type-ahead and arrows as its own navigation; Escape still closes the submenu.
+			// UI SDK's menu would read typed letters as type-ahead and arrows as its own navigation; Escape still closes the submenu.
 			onKeyDown={event => {
 				if (event.key !== "Escape") event.stopPropagation();
 			}}

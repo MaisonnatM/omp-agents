@@ -75,7 +75,7 @@ export function CommandResults({ search, list, empty, disabled, selectionDisable
 	const match = filter ?? fuzzy;
 	return (
 		<Command
-			filter={shown.size > 0 ? (item, query) => shown.has(item.value) || match(item, query) : filter}
+			filter={(item, query) => shown.has(item.value) || match(item, query)}
 			query={search?.query?.value}
 			onQueryChange={search?.query?.onChange}
 			onKeyDown={onKeyDown}

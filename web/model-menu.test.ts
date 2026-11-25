@@ -109,3 +109,15 @@ describe("modelMatch", () => {
 		expect(modelMatch({ value: "cursor/gemini-3.5-flash", keywords: ["Gemini 3.5 Flash"] }, "glm 5.3 flash")).toBe(false);
 	});
 });
+
+describe("modelMatch across names", () => {
+	test("words found only in the names match a selector that lacks them", () => {
+		expect(modelMatch({ value: "cursor/claude-4.7-opus-high", keywords: ["Claude Opus 4.7 Thinking"] }, "thinking")).toBe(true);
+		expect(modelMatch({ value: "cursor/claude-4.7-opus-high" }, "thinking")).toBe(false);
+	});
+
+	test("a typed word does not run across the selector and a name", () => {
+		expect(modelMatch({ value: "cursor/grok", keywords: ["Fast"] }, "grokfast")).toBe(false);
+		expect(modelMatch({ value: "cursor/grok", keywords: ["Fast"] }, "grok fast")).toBe(true);
+	});
+});
