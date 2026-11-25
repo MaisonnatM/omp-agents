@@ -9,7 +9,7 @@ export interface BoardRoute {
 	thread: number | null;
 }
 
-export type BoardControlId = "board.workspace" | "board.task.open" | "board.post" | "board.reply" | "board.thread.close" | "board.session.open";
+export type BoardControlId = "board.workspace" | "board.task.open" | "board.post" | "board.reply" | "board.thread.close" | "board.thread.tab.thread" | "board.thread.tab.session" | "board.session.open";
 
 export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, BoardChange, never, BoardControlId> = {
 	id: "board",
@@ -44,6 +44,8 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		{ id: "board.post", label: "Board composer Send button or Enter", area: "Board" },
 		{ id: "board.reply", label: "Board thread reply Send button or Enter", area: "Board" },
 		{ id: "board.thread.close", label: "Board thread close button", area: "Board" },
+		{ id: "board.thread.tab.thread", label: "Board thread Thread tab", area: "Board" },
+		{ id: "board.thread.tab.session", label: "Board thread Session tab", area: "Board" },
 		{ id: "board.session.open", label: "Board session link, in the sidebar or a thread", area: "Board" },
 	],
 	store: {

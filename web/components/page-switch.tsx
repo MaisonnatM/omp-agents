@@ -113,7 +113,7 @@ export const PageSwitch = memo(function PageSwitch({
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	if (page && isModulePage(page)) {
 		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
-		const core = { routines, bots, todos: userTodos, listed, workspace, workspaces, onPickWorkspace: pickWorkspace, hosts: visible.hosts, sessions: { hosts, past }, section: sectionTarget, newSessionCompletions };
+		const core = { routines, bots, todos: userTodos, listed, workspace, workspaces, onPickWorkspace: pickWorkspace, hosts: visible.hosts, models, sessions: { hosts, past }, section: sectionTarget, newSessionCompletions };
 		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
 	}
 	switch (page?.kind) {
