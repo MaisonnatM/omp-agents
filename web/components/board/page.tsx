@@ -4,7 +4,7 @@
  * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
 import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
-import { type ReactNode, useEffect, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header } from "../page-header";
@@ -16,9 +16,16 @@ import { MessageScroller, MessageScrollerButton, MessageScrollerContent, Message
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { boardDraftKey } from "../../composer-drafts";
+import { boardDraftKey, boardThreadDraftKey, useComposerDraft } from "../../composer-drafts";
+import { useShortcuts } from "../../shortcuts";
+import { useStoredState } from "../../stored-state";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
+import { useCompletion } from "../completion-popup";
+import { ComposerEditor } from "../composer";
+import { DictationButton, DictationRow, useDictation } from "../composer-dictation";
+import { Separator, useDragSeparator } from "../drag-separator";
+import type { PromptEditorHandle } from "../prompt-editor";
 import { useDashboardActions } from "../dashboard-context";
 import type { CoreData } from "../module-views";
 import { NewSession } from "../new-session";
@@ -69,7 +76,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 				</MessageScrollerProvider>
 				{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
 			</section>
-			{thread && <Thread key={thread.id} state={state} task={thread} sessions={core.sessions} channel={name} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
+			{thread && openWorkspace && <Thread key={thread.id} state={state} task={thread} core={core} workspace={openWorkspace} channel={name} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
 		</div>
 	);
 }
@@ -346,17 +353,39 @@ function noteText(note: BoardNote, sessions: KnownSessions): string {
 	}
 }
 
-/** The Board thread as Slack's thread pane: the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; Escape closes it. */
-function Thread({ state, task, sessions, channel, closeHref, disabled, onChange }: { state: BoardState; task: BoardTask; sessions: KnownSessions; channel: string; closeHref: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
-	const [text, setText] = useState("");
+const THREAD_WIDTH = 400;
+const MIN_THREAD = 320;
+const MAX_THREAD = 900;
+/** Narrowest the Board tasks get beside the thread, as the channel's `min-w-[360px]` says. */
+const MIN_CHANNEL = 360;
+const STEP = 16;
+
+const clampThread = (width: number, room: number): number => Math.round(Math.max(MIN_THREAD, Math.min(MAX_THREAD, room - MIN_CHANNEL, width)));
+
+/** The Board thread as Slack's thread pane, at the width you drag its left edge to: the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; Escape closes it. */
+function Thread({ state, task, core, workspace, channel, closeHref, disabled, onChange }: { state: BoardState; task: BoardTask; core: CoreData; workspace: Workspace; channel: string; closeHref: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+	const sessions = core.sessions;
 	const count = said(task).length;
-	const target = wakeTarget(task, { kind: "user" });
-	const send = (value: string) => {
-		const reply = value.trim();
-		if (!reply || disabled) return;
-		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: reply });
-		setText("");
-	};
+	const [width, setWidth] = useStoredState("omp-agents.board-thread-width", raw => {
+		const stored = Number(raw);
+		return stored >= MIN_THREAD && stored <= MAX_THREAD ? stored : THREAD_WIDTH;
+	});
+	const room = (element: HTMLElement): number => element.closest("aside")!.parentElement!.clientWidth;
+	// The line sits on the thread's left edge: dragging it left widens the thread.
+	const resize = useDragSeparator({
+		value: width,
+		onValue: setWidth,
+		axis: "vertical",
+		direction: -1,
+		keyStep: STEP,
+		shiftSteps: 4,
+		min: MIN_THREAD,
+		max: MAX_THREAD,
+		reset: THREAD_WIDTH,
+		size: room,
+		clamp: (next, element) => clampThread(next, room(element)),
+		read: (event, start) => clampThread(start.value - (event.clientX - start.coordinate), start.size),
+	});
 	// Escape closes the thread wherever focus is, unless a menu or dialog is open and takes it first.
 	useEffect(() => {
 		const close = (event: globalThis.KeyboardEvent) => {
@@ -370,7 +399,8 @@ function Thread({ state, task, sessions, channel, closeHref, disabled, onChange 
 	// A grey line ends a run of messages, so the reply after it shows its avatar and name again.
 	let previous: { at: number; by: BoardAuthor } | null = task;
 	return (
-		<aside aria-label={`Thread #${task.id}`} className="flex w-[clamp(320px,40%,420px)] shrink-0 flex-col border-l border-border">
+		<aside aria-label={`Thread #${task.id}`} style={{ width }} className="relative flex max-w-[calc(100%-360px)] shrink-0 flex-col border-l border-border">
+			<Separator {...resize} axis="vertical" label="Resize the thread" min={MIN_THREAD} max={MAX_THREAD} now={width} className="inset-y-0 -left-1.5 w-3 cursor-col-resize select-none" />
 			<header className="flex min-h-(--page-header-height) shrink-0 items-center gap-2 border-b border-border px-5">
 				<h2 className="text-sm font-semibold">Thread</h2>
 				<span className="flex min-w-0 flex-1 items-center gap-0.5 text-[13px] text-muted-foreground">
@@ -421,17 +451,70 @@ function Thread({ state, task, sessions, channel, closeHref, disabled, onChange 
 					<MessageScrollerButton />
 				</MessageScroller>
 			</MessageScrollerProvider>
-			<div className="shrink-0 px-3 pb-3">
+			<ThreadComposer task={task} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
+		</aside>
+	);
+}
+
+/** The thread's reply box, the session composer without its pickers: `/` and `@` suggestions, dictation, and a draft kept per Board task. */
+function ThreadComposer({ task, core, workspace, disabled, onChange }: { task: BoardTask; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+	const { send } = useDashboardActions();
+	const editorRef = useRef<PromptEditorHandle>(null);
+	const draftKey = boardThreadDraftKey(task.id);
+	const [draft, setDraft] = useComposerDraft(draftKey, "");
+	const target = wakeTarget(task, { kind: "user" });
+	const completion = useCompletion({
+		editorRef,
+		draft,
+		setDraft,
+		completions: core.newSessionCompletions,
+		onComplete: (reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd: workspace.cwd }, text, cursor }),
+		composer: { sessionId: target, changed: [] },
+	});
+	const dictation = useDictation({ composer: disabled ? null : { draftKey, cwd: workspace.cwd }, text: draft, editorRef, send, connected: !disabled });
+	const onComposerKey = useShortcuts({
+		dictate: dictation.toggle,
+		focusComposer: () => {
+			const editor = editorRef.current;
+			if (!editor?.editable()) return false;
+			editor.focus();
+		},
+	});
+	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+		if (completion.onMenuKeyDown(event)) return;
+		dictation.onKeyDown(event);
+		onComposerKey(event);
+		// Escape leaves the reply box first, as in a session's composer; a second one closes the thread.
+		if (!event.defaultPrevented && event.key === "Escape") {
+			event.currentTarget.blur();
+			event.preventDefault();
+		}
+	};
+	const reply = (value: string) => {
+		const text = value.trim();
+		if (!text || disabled) return;
+		completion.close();
+		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text });
+		setDraft("");
+	};
+	return (
+		<ComposerEditor value={editorRef}>
+			<div {...activityControl("board.reply")} className="relative shrink-0 px-3 pb-3">
+				{completion.popup}
 				<InputMessage
-					{...activityControl("board.reply")}
-					value={text}
-					onValueChange={setText}
-					onSend={send}
-					placeholder={target ? `Reply to ${sessionLabel(target, sessions).name}…` : "Reply…"}
+					editorRef={editorRef}
+					value={draft}
+					onValueChange={completion.onValueChange}
+					onSend={reply}
+					placeholder={target ? `Reply to ${sessionLabel(target, core.sessions).name}…` : "Reply…"}
+					rightSlot={() => <DictationButton dictation={dictation} />}
 					disabled={disabled}
+					locked={dictation.locked}
+					beforeEditor={<DictationRow dictation={dictation} />}
 					sendLabel={target ? "Send reply; it wakes the session if it stopped" : "Send reply"}
+					editorProps={{ ...completion.editorProps, onKeyDown }}
 				/>
 			</div>
-		</aside>
+		</ComposerEditor>
 	);
 }

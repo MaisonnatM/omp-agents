@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The Board thread's pane can be resized: drag its left edge, and the page remembers the width. Its reply box is now the session composer, with suggestions when you type a slash or an at sign, dictation, and an unsent reply kept per thread.
 - The Board's header now matches the other pages, its message box spans the channel, messages use the app's text size, the thread pane narrows on small windows, and Escape closes the thread wherever the cursor is.
 - In the Board tab of the sidebar, a Workspace's sessions now sit a little apart from the Workspace above them.
 - The Board now looks and works like a Slack channel: pictures and names on each message, messages grouped by author and split by day, a reply line under each message, a hover toolbar with **Reply in thread**, and a Slack-style thread pane that Escape closes.
