@@ -10,6 +10,7 @@ The dashboard shows the same lines in Settings › What's new.
 - A session asking several questions now offers Next beside Back once a question is answered, so you can move both ways between them.
 - Fixed: a dev server or test browser that a session started in the background, such as with nohup, now counts as that session's process, so it stops once the session sits idle or ends instead of running on and filling the Mac's memory.
 - Apps a session opens, such as Docker Desktop, stay running when the session ends.
+- Behind the scenes: a decay check now scores the runs that drop a skill or extension, where before every such run failed its tests because the run's folder name held a colon.
 - Behind the scenes: menus, dialogs, tabs, tooltips, and the command palette now run on one interface library, UI SDK, in place of three, so they behave the same way everywhere.
 - The New session page has a Background menu in its header: pick Retro grid, Aurora, Fire, Eclipse, Black hole, Horizon, Galaxy, or Globe; the dashboard remembers your pick.
 - A session waiting on CI no longer lists its pull requests under its row; its row shows a clock with how many still wait on checks and a red cross with how many fail.

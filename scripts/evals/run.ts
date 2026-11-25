@@ -273,7 +273,8 @@ function outcomeOf(row: EvalRow): string {
 }
 
 function runOnce(task: EvalTask, arm: Arm, run: number, options: Options, dryRun: boolean): EvalRow {
-	const dir = join(options.out, arm.name, task.id.replace(/[^\w.-]+/g, "_"), String(run));
+	// uv refuses a virtual environment under a path segment holding `:`, which every decay arm's name has.
+	const dir = join(options.out, arm.name.replace(/[^\w.-]+/g, "_"), task.id.replace(/[^\w.-]+/g, "_"), String(run));
 	rmSync(dir, { recursive: true, force: true });
 	const repo = task.repo ?? options.repo;
 	const clone = prepare(repo, task.base, dir);
