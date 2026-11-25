@@ -5,7 +5,7 @@
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconRobot, IconUser } from "central-icons";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { hashForSession, type PastSession, type PromptImage, type RosterHost, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
@@ -339,8 +339,33 @@ function TaskBody({ task }: { task: BoardTask }) {
 
 const said = (task: BoardTask): Extract<BoardReply, { by: BoardAuthor }>[] => task.replies.filter((entry): entry is Extract<BoardReply, { by: BoardAuthor }> => "by" in entry);
 
+/** How many replies of each Board task's thread you have seen, by task id, kept in this browser. */
+const SEEN_KEY = "omp-agents.board-thread-seen";
+const seenListeners = new Set<() => void>();
+let seen: Record<string, number> = {};
+try {
+	seen = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "{}") as Record<string, number>;
+} catch {}
+function markSeen(id: number, count: number) {
+	if (seen[id] === count) return;
+	seen = { ...seen, [id]: count };
+	localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+	for (const listener of seenListeners) listener();
+}
+const useSeen = (): Record<string, number> =>
+	useSyncExternalStore(
+		listener => {
+			seenListeners.add(listener);
+			return () => seenListeners.delete(listener);
+		},
+		() => seen,
+	);
+/** Replies past the ones seen that someone else wrote: the unread count, as Slack's thread pill. */
+const unreadOf = (task: BoardTask, seenCount: number | undefined): number => said(task).slice(seenCount ?? 0).filter(reply => reply.by.kind !== "user").length;
+
 function TaskMessage({ state, task, sessions, open, grouped, href }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string }) {
 	const replies = said(task);
+	const seenMap = useSeen();
 	const status = statusOf(state, task);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const toolbar = (
@@ -362,14 +387,14 @@ function TaskMessage({ state, task, sessions, open, grouped, href }: { state: Bo
 	return (
 		<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={grouped} highlighted={open} toolbar={toolbar}>
 			<TaskBody task={task} />
-			{replies.length > 0 && <ThreadSummary replies={replies} sessions={sessions} href={href} />}
+			{replies.length > 0 && <ThreadSummary replies={replies} unread={open ? 0 : unreadOf(task, seenMap[task.id])} sessions={sessions} href={href} />}
 			{(status.kind === "ready" || status.kind === "claimed") && <WorkingLine sessionId={session} sessions={sessions} href={href} />}
 		</MessageRow>
 	);
 }
 
 /** Who replied, how many replies, and when the last came, which opens the thread, as under a Slack message. */
-function ThreadSummary({ replies, sessions, href }: { replies: Extract<BoardReply, { by: BoardAuthor }>[]; sessions: KnownSessions; href: string }) {
+function ThreadSummary({ replies, unread, sessions, href }: { replies: Extract<BoardReply, { by: BoardAuthor }>[]; unread: number; sessions: KnownSessions; href: string }) {
 	const authors = [...new Map(replies.map(reply => [authorKey(reply.by), reply.by])).values()].slice(0, 5);
 	const last = replies.at(-1);
 	return (
@@ -386,6 +411,11 @@ function ThreadSummary({ replies, sessions, href }: { replies: Extract<BoardRepl
 			<span className="text-[13px] font-bold text-blue-600 hover:underline dark:text-blue-400">
 				{replies.length} {replies.length === 1 ? "reply" : "replies"}
 			</span>
+			{unread > 0 && (
+				<span aria-label={`${unread} unread`} className="rounded-full bg-blue-600 px-1.5 text-[11px] leading-4 font-bold text-white tabular-nums dark:bg-blue-500">
+					{unread}
+				</span>
+			)}
 			{last && (
 				<span className="text-[13px] text-muted-foreground group-hover/summary:hidden">
 					Last reply <Age at={last.at} className="tabular-nums" /> ago
@@ -450,6 +480,8 @@ const clampThread = (width: number, room: number): number => Math.round(Math.max
 /** The Board thread as Slack's thread pane, at the width you drag its left edge to, under the session details sidebar's tab row: **Thread**, the Board task, a line with the reply count, the replies, and the reply box; then the conversation and sidebar tabs of the session its replies wake. Escape closes it. */
 function Thread({ state, task, reply, core, workspace, channel, closeHref, onSearch, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; core: CoreData; workspace: Workspace; channel: string; closeHref: string; onSearch: () => void; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const sessions = core.sessions;
+	const replyCount = said(task).length;
+	useEffect(() => markSeen(task.id, replyCount), [task.id, replyCount]);
 	// The thread and its reply box address the same session; a thread with none, or one not listed yet, shows only **Thread**.
 	const target = wakeTarget(task, { kind: "user" });
 	const name = target ? sessionLabel(target, sessions).name : null;
