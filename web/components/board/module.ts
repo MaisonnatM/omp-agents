@@ -53,7 +53,6 @@ function viewRest(view: BoardView): string | null {
 
 export type BoardControlId =
 	| "board.workspace"
-	| "board.tab"
 	| "board.task.open"
 	| "board.post"
 	| "board.reply"
@@ -115,7 +114,6 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		rows: [],
 	},
 	controls: [
-		{ id: "board.tab", label: "Board tab across the top of a Workspace", area: "Board" },
 		{ id: "board.workspace", label: "Board sidebar workspace row", area: "Board" },
 		{ id: "board.task.open", label: "Board task message, which opens its thread", area: "Board" },
 		{ id: "board.post", label: "Board composer Send button or Enter", area: "Board" },
