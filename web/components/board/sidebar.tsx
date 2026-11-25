@@ -10,11 +10,10 @@ import { hashForPage } from "../../routing";
 import { CountPill } from "../count-pill";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute } from "./module";
-import type { BoardSearch } from "./search";
 
 /** The Board's address: Workspace `workspace`, Board task `thread`'s thread open, with `search`'s results shown, or its reply `reply` highlighted. */
-export const hashForBoard = (workspace: string | null, thread: number | null = null, extra: { search?: BoardSearch | null; reply?: number | null } = {}): string =>
-	hashForPage({ kind: "board", workspace, thread, search: extra.search ?? null, reply: extra.reply ?? null });
+export const hashForBoard = (workspace: string | null, thread: number | null = null, { search = null, reply = null }: Partial<Pick<BoardRoute, "search" | "reply">> = {}): string =>
+	hashForPage({ kind: "board", workspace, thread, search, reply });
 
 /**
  * The Workspaces the Board lists: the sidebar's, then any a Board task or `route` names, and the one it shows:

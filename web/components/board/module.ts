@@ -2,7 +2,7 @@
 import { IconBubble2 } from "central-icons";
 import { applyChange, type BoardChange, type BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import type { StoredPageModule } from "../../modules";
-import type { BoardScope, BoardSearch } from "./search";
+import { type BoardSearch, scopeOf } from "./search";
 
 /** The Board page: Workspace `workspace`'s Board tasks, the first Workspace's for `null`, with Board task `thread`'s Board thread open beside them, `search`'s results in place of the Board tasks, and reply `reply` of the thread highlighted. */
 export interface BoardRoute {
@@ -11,8 +11,6 @@ export interface BoardRoute {
 	search: BoardSearch | null;
 	reply: number | null;
 }
-
-const SCOPES: readonly BoardScope[] = ["thread", "workspace", "all"];
 
 export type BoardControlId =
 	| "board.workspace"
@@ -27,6 +25,7 @@ export type BoardControlId =
 	| "board.search.scope"
 	| "board.search.clear"
 	| "board.search.result"
+	| "board.search.all"
 	| "board.thread.search";
 
 export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, BoardChange, never, BoardControlId> = {
@@ -41,12 +40,11 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		parse: (rest, query) => {
 			const thread = rest !== null && /^\d+$/.test(rest) ? Number(rest) : null;
 			const q = query.get("q")?.trim() ?? "";
-			const scope = SCOPES.find(each => each === query.get("in")) ?? "workspace";
 			const reply = query.get("reply");
 			return {
 				workspace: query.get("workspace"),
 				thread,
-				search: q ? { query: q, scope: scope === "thread" && thread === null ? "workspace" : scope } : null,
+				search: q ? { query: q, scope: scopeOf(query.get("in"), thread) } : null,
 				reply: thread !== null && reply !== null && /^\d+$/.test(reply) ? Number(reply) : null,
 			};
 		},
@@ -87,6 +85,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		{ id: "board.search.scope", label: "Board search scope menu: thread, workspace, or all workspaces", area: "Board" },
 		{ id: "board.search.clear", label: "Board search results close button", area: "Board" },
 		{ id: "board.search.result", label: "Board search result, which opens its message", area: "Board" },
+		{ id: "board.search.all", label: "Board search Search all workspaces button, when nothing matched", area: "Board" },
 		{ id: "board.thread.search", label: "Board thread Search in thread button", area: "Board" },
 	],
 	store: {

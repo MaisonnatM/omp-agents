@@ -5,8 +5,8 @@
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
-import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconChevronDownSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconUser } from "central-icons";
-import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconUser } from "central-icons";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { hashForSession, type View } from "../../../src/shared/sessions";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -14,9 +14,8 @@ import { Header } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuRadioGroup, MenuRadioItem } from "@/components/ui/menu";
 import { Button } from "@/components/ui/button";
-import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
+import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { IconComponent } from "@/lib/icon-context";
@@ -37,7 +36,8 @@ import { ViewConversation } from "../pane";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardControlId, BoardRoute } from "./module";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
-import { type BoardHit, type BoardScope, type BoardSearch, matchRanges, replyText, searchBoard, snippet, termsOf } from "./search";
+import { replyText } from "./search";
+import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -49,34 +49,22 @@ interface BoardPageProps {
 
 export function BoardPage({ route, core, state, disabled, onChange }: BoardPageProps) {
 	useMinute();
-	const searchField = useRef<HTMLInputElement>(null);
-	const [scope, setScope] = useState<BoardScope>(route.search?.scope ?? "workspace");
-	const routeScope = route.search?.scope;
-	useEffect(() => {
-		if (routeScope) setScope(routeScope);
-	}, [routeScope]);
+	const searchField = useRef<BoardSearchFieldHandle>(null);
 	if (state === null) return <p className="px-6 py-6 text-sm text-muted-foreground">Loading the Board…</p>;
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
 	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";
 	const tasks = state.tasks.filter(task => task.workspace === open);
 	const thread = route.thread === null ? null : (tasks.find(task => task.id === route.thread) ?? null);
-	const shownScope: BoardScope = scope === "thread" && thread === null ? "workspace" : scope;
-	const searchInThread = () => {
-		setScope("thread");
-		searchField.current?.focus();
-	};
 	return (
 		<div className="flex h-full min-h-0 flex-1">
 			<section aria-label="Board" className="flex min-w-[360px] flex-1 flex-col">
 				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name}>
 					{openWorkspace && (
-						<SearchField
-							key={route.search?.query ?? ""}
-							inputRef={searchField}
-							initial={route.search?.query ?? ""}
-							scope={shownScope}
-							onScope={setScope}
+						<BoardSearchField
+							key={`${route.search?.query ?? ""}|${route.search?.scope ?? ""}`}
+							ref={searchField}
+							current={route.search}
 							channel={name}
 							thread={thread?.id ?? null}
 							searchHref={search => hashForBoard(open, route.thread, { search })}
@@ -84,14 +72,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 					)}
 				</Header>
 				{route.search ? (
-					<SearchResults
-						search={{ query: route.search.query, scope: route.search.scope }}
-						hits={searchBoard(state, route.search, open, thread?.id ?? null)}
-						core={core}
-						channel={name}
-						thread={thread?.id ?? null}
-						searchHref={search => hashForBoard(open, route.thread, { search })}
-					/>
+					<SearchResults state={state} route={route} workspace={openWorkspace} core={core} />
 				) : (
 					<>
 						<MessageScrollerProvider autoScroll>
@@ -129,7 +110,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 					workspace={openWorkspace}
 					channel={name}
 					closeHref={hashForBoard(open, null, { search: route.search })}
-					onSearch={searchInThread}
+					onSearch={() => searchField.current?.scopeTo("thread")}
 					disabled={disabled}
 					onChange={onChange}
 				/>
@@ -138,176 +119,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 	);
 }
 
-const scopeLabel = (scope: BoardScope, channel: string, thread: number | null): string => (scope === "thread" ? `thread #${thread}` : scope === "workspace" ? `#${channel}` : "all workspaces");
-
-/**
- * The header's search field, as Slack's: a scope chip, **in #workspace**, **in thread #N** while a thread is open, or
- * **in all workspaces**, then the query; Enter shows the results, Escape clears the field or closes the results.
- */
-function SearchField({ inputRef, initial, scope, onScope, channel, thread, searchHref }: { inputRef: RefObject<HTMLInputElement | null>; initial: string; scope: BoardScope; onScope: (scope: BoardScope) => void; channel: string; thread: number | null; searchHref: (search: BoardSearch | null) => string }) {
-	const [draft, setDraft] = useState(initial);
-	const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-		if (event.key === "Enter") {
-			event.preventDefault();
-			const query = draft.trim();
-			location.hash = searchHref(query ? { query, scope } : null);
-		} else if (event.key === "Escape" && (draft || initial)) {
-			// Taken here, so the thread's Escape does not close it as well.
-			event.preventDefault();
-			setDraft("");
-			if (initial) location.hash = searchHref(null);
-			event.currentTarget.blur();
-		}
-	};
-	return (
-		<div role="search" className="flex h-8 w-80 max-w-full items-center gap-1 rounded-lg border border-border bg-muted/60 pr-2 pl-1 focus-within:border-ring focus-within:bg-background">
-			<DropdownMenu>
-				<DropdownMenuTrigger
-					{...activityControl("board.search.scope")}
-					render={<Button variant="ghost" size="compact" leadingIcon={IconMagnifyingGlass} trailingIcon={IconChevronDownSmall} aria-label={`Search in ${scopeLabel(scope, channel, thread)}`} className="max-w-40 min-w-0 shrink-0 text-muted-foreground" />}
-				>
-					<span className="truncate">in {scopeLabel(scope, channel, thread)}</span>
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="start" className="max-w-72">
-					<MenuRadioGroup
-						aria-label="Search in"
-						value={scope}
-						onValueChange={(value: string) => {
-							onScope(value === "thread" || value === "all" ? value : "workspace");
-							inputRef.current?.focus();
-						}}
-					>
-						{thread !== null && (
-							<MenuRadioItem value="thread" closeOnSelect>
-								<IconBubble3 />
-								This thread, #{thread}
-							</MenuRadioItem>
-						)}
-						<MenuRadioItem value="workspace" closeOnSelect>
-							<IconHashtag />
-							<span className="truncate">{channel}</span>
-						</MenuRadioItem>
-						<MenuRadioItem value="all" closeOnSelect>
-							<IconMagnifyingGlass />
-							All workspaces
-						</MenuRadioItem>
-					</MenuRadioGroup>
-				</DropdownMenuContent>
-			</DropdownMenu>
-			<input
-				ref={inputRef}
-				{...activityControl("board.search")}
-				type="search"
-				aria-label={`Search in ${scopeLabel(scope, channel, thread)}`}
-				placeholder="Search"
-				value={draft}
-				onChange={event => setDraft(event.target.value)}
-				onKeyDown={onKeyDown}
-				className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
-			/>
-		</div>
-	);
-}
-
-/** `text` with every part a term covers marked, as Slack marks a search's words. */
-function Marked({ text, terms }: { text: string; terms: readonly string[] }) {
-	const parts: ReactNode[] = [];
-	let at = 0;
-	for (const { start, end } of matchRanges(text, terms)) {
-		parts.push(text.slice(at, start));
-		parts.push(
-			<mark key={start} className="rounded-sm bg-amber-200 px-px text-foreground dark:bg-amber-400/35">
-				{text.slice(start, end)}
-			</mark>,
-		);
-		at = end;
-	}
-	parts.push(text.slice(at));
-	return <>{parts}</>;
-}
-
-/** The search's results in place of the Board tasks, as Slack's results page: a line with the count and the scope, then one card per message, newest first. */
-function SearchResults({ search, hits, core, channel, thread, searchHref }: { search: BoardSearch; hits: BoardHit[]; core: CoreData; channel: string; thread: number | null; searchHref: (search: BoardSearch | null) => string }) {
-	const terms = termsOf(search.query);
-	const where = scopeLabel(search.scope, channel, thread);
-	const workspaceName = (cwd: string): string => folder(core.workspaces.find(each => each.cwd === cwd)?.cwdDisplay ?? cwd);
-	return (
-		<div className="flex min-h-0 flex-1 flex-col">
-			<div className="flex shrink-0 items-center gap-2 px-5 pt-4 pb-2">
-				<h3 className="min-w-0 flex-1 truncate text-sm">
-					<span className="font-semibold">
-						{hits.length} {hits.length === 1 ? "result" : "results"}
-					</span>{" "}
-					for “{search.query}” <span className="text-muted-foreground">in {where}</span>
-				</h3>
-				<Tooltip content="Close search">
-					<Button {...activityControl("board.search.clear")} variant="ghost" size="icon-xs" aria-label="Close search" render={<a href={searchHref(null)} />}>
-						<IconCrossMedium />
-					</Button>
-				</Tooltip>
-			</div>
-			<div className="min-h-0 flex-1 overflow-y-auto pb-4">
-				{hits.length === 0 ? (
-					<div className="flex flex-col items-center gap-2 px-5 py-16 text-center">
-						<IconMagnifyingGlass aria-hidden className="size-6 text-muted-foreground" />
-						<p className="text-sm font-semibold">No results for “{search.query}”</p>
-						<p className="max-w-sm text-sm text-muted-foreground">Check the spelling or try fewer words{search.scope === "all" ? "." : ", or search every workspace."}</p>
-						{search.scope !== "all" && (
-							<Button variant="outline" size="compact" render={<a href={searchHref({ query: search.query, scope: "all" })} />}>
-								Search all workspaces
-							</Button>
-						)}
-					</div>
-				) : (
-					<ol aria-label="Search results" className="flex flex-col gap-2 px-5">
-						{hits.map(hit => (
-							<li key={`${hit.task.id}:${hit.reply ?? "task"}`}>
-								<SearchResult hit={hit} terms={terms} sessions={core.sessions} workspace={workspaceName(hit.task.workspace)} />
-							</li>
-						))}
-					</ol>
-				)}
-			</div>
-		</div>
-	);
-}
-
-/** One result card, as Slack's: the workspace and the Board task it sits in with its day, then the author, time, and the text with the query's words marked; a click opens it in its thread. */
-function SearchResult({ hit, terms, sessions, workspace }: { hit: BoardHit; terms: readonly string[]; sessions: KnownSessions; workspace: string }) {
-	const { task, reply, by, at } = hit;
-	return (
-		<a
-			{...activityControl("board.search.result")}
-			href={hashForBoard(task.workspace, task.id, { reply })}
-			className="flex flex-col gap-1.5 rounded-lg border border-border bg-background px-3 py-2.5 hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-ring"
-		>
-			<span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-				<IconHashtag aria-hidden className="size-3 shrink-0" />
-				<span className="shrink-0 font-semibold text-foreground">{workspace}</span>
-				<span aria-hidden>·</span>
-				<span className="min-w-0 truncate">{reply === null ? `#${task.id}` : `Reply in thread #${task.id}: ${task.title}`}</span>
-				<span className="ml-auto shrink-0 pl-2">{dayLabel(at)}</span>
-			</span>
-			<span className="flex gap-2">
-				<Avatar by={by} sessions={sessions} />
-				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span className="flex min-w-0 items-baseline gap-2">
-						<span className="truncate text-sm font-bold">{by.kind === "user" ? "You" : sessionLabel(by.sessionId, sessions).name}</span>
-						{by.kind === "session" && <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">Session</span>}
-						<time dateTime={new Date(at).toISOString()} className="shrink-0 text-xs text-muted-foreground tabular-nums">
-							{clock(at)}
-						</time>
-					</span>
-					<span className="line-clamp-3 text-sm leading-relaxed break-words">
-						<Marked text={snippet(hit.text, terms)} terms={terms} />
-					</span>
-				</span>
-			</span>
-		</a>
-	);
-}
-
-const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
+export const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
 
 /** Slack starts a later message from the same author within five minutes of the last one without its avatar and name. */
 const GROUP_MS = 5 * 60_000;
@@ -320,12 +132,12 @@ function continues(previous: { at: number; by: BoardAuthor }, next: { at: number
 
 const sameDay = (a: number, b: number): boolean => new Date(a).toDateString() === new Date(b).toDateString();
 
-const clock = (at: number): string => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+export const clock = (at: number): string => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 /** The time in the 36px avatar column, without its AM or PM, as Slack shows it there. */
 const shortClock = (at: number): string => clock(at).replace(/\s?[AP]M$/i, "");
 
-function dayLabel(at: number): string {
+export function dayLabel(at: number): string {
 	const now = Date.now();
 	if (sameDay(at, now)) return "Today";
 	if (sameDay(at, now - 86_400_000)) return "Yesterday";
@@ -391,7 +203,7 @@ function YourAvatar({ size, box }: { size: "message" | "summary"; box: string })
 }
 
 /** The author's square picture: yours for you, a session's initial on its own color for a session. */
-function Avatar({ by, sessions, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
+export function Avatar({ by, sessions, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
 	const box = size === "message" ? "size-9 rounded-lg text-sm" : "size-6 rounded-md text-[11px]";
 	if (by.kind === "user") return <YourAvatar size={size} box={box} />;
 	const name = sessionLabel(by.sessionId, sessions).name;
@@ -402,6 +214,11 @@ function Avatar({ by, sessions, size = "message" }: { by: BoardAuthor; sessions:
 	);
 }
 
+/** The tag beside a session's name that says it is one, as Slack tags an app. */
+export function SessionTag() {
+	return <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">Session</span>;
+}
+
 /** The author's name, which opens the session for a session, and a tag that says it is one, as Slack tags an app. */
 function AuthorName({ by, sessions }: { by: BoardAuthor; sessions: KnownSessions }) {
 	if (by.kind === "user") return <span className="text-[15px] font-bold">You</span>;
@@ -410,7 +227,7 @@ function AuthorName({ by, sessions }: { by: BoardAuthor; sessions: KnownSessions
 			<a {...activityControl("board.session.open")} href={hashForSession(by.sessionId)} title={sessionLabel(by.sessionId, sessions).name} className="truncate text-sm font-bold hover:underline">
 				{sessionLabel(by.sessionId, sessions).name}
 			</a>
-			<span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">Session</span>
+			<SessionTag />
 		</span>
 	);
 }
@@ -721,17 +538,10 @@ function SessionTab({ sessionId, core }: { sessionId: string; core: CoreData }) 
 /** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies and the Board's grey lines. */
 function ThreadMessages({ state, task, reply, sessions }: { state: BoardState; task: BoardTask; reply: number | null; sessions: KnownSessions }) {
 	const count = said(task).length;
-	// A search result opens its reply highlighted, scrolled to the middle once the scroller has settled at the bottom.
-	const found = useRef<HTMLLIElement>(null);
-	useEffect(() => {
-		if (reply === null) return;
-		const frame = requestAnimationFrame(() => found.current?.scrollIntoView({ block: "center" }));
-		return () => cancelAnimationFrame(frame);
-	}, [reply]);
 	// A grey line ends a run of messages, so the reply after it shows its avatar and name again.
 	let previous: { at: number; by: BoardAuthor } | null = task;
 	return (
-		<MessageScrollerProvider autoScroll>
+		<MessageScrollerProvider autoScroll={reply === null}>
 			<MessageScroller className="flex-1">
 				<MessageScrollerViewport>
 					<MessageScrollerContent className="gap-0 py-2">
@@ -756,10 +566,12 @@ function ThreadMessages({ state, task, reply, sessions }: { state: BoardState; t
 								const grouped = previous !== null && continues(previous, entry);
 								previous = entry;
 								return (
-									<li key={index} ref={index === reply ? found : undefined}>
-										<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped} highlighted={index === reply}>
-											<BoardText text={replyText(entry.by, entry.text)} />
-										</MessageRow>
+									<li key={index}>
+										<MessageScrollerItem messageId={`reply-${index}`}>
+											<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped} highlighted={index === reply}>
+												<BoardText text={replyText(entry.by, entry.text)} />
+											</MessageRow>
+										</MessageScrollerItem>
 									</li>
 								);
 							})}
@@ -768,8 +580,18 @@ function ThreadMessages({ state, task, reply, sessions }: { state: BoardState; t
 				</MessageScrollerViewport>
 				<MessageScrollerButton />
 			</MessageScroller>
+			{reply !== null && <ScrollToReply reply={reply} />}
 		</MessageScrollerProvider>
 	);
+}
+
+/** Scrolls the thread to reply `reply`, centred, once it opens with one picked; the scroller does not follow the end meanwhile. */
+function ScrollToReply({ reply }: { reply: number }) {
+	const { scrollToMessage } = useMessageScroller();
+	useEffect(() => {
+		scrollToMessage(`reply-${reply}`, { align: "center" });
+	}, [reply, scrollToMessage]);
+	return null;
 }
 
 /** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here, and the prompts a session's last reply suggests list under it. */

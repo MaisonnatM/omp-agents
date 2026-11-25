@@ -1,4 +1,6 @@
 /** The Board's search, as Slack's: every word of the query must appear in a Board task or a reply, in the open thread, the open Workspace, or every Workspace. */
+import { everyWord, searchWords, snippetOf } from "../../../src/shared/every-word";
+import { plainMarkdown } from "../../../src/shared/plain-markdown";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import type { BoardAuthor, BoardState, BoardTask } from "../../../templates/omp/agent/extensions/board/log";
 
@@ -10,7 +12,10 @@ export interface BoardSearch {
 	scope: BoardScope;
 }
 
-/** One message that matched: a Board task when `reply` is `null`, else its reply at that index of `task.replies`. */
+/** The scope `value` names, the open Workspace for any other value, and for `thread` while no Board thread is open. */
+export const scopeOf = (value: string | null | undefined, thread: number | null): BoardScope => (value === "all" ? "all" : value === "thread" && thread !== null ? "thread" : "workspace");
+
+/** One message that matched: a Board task when `reply` is `null`, else its reply at that index of `task.replies`; `text` is the part of it that matched. */
 export interface BoardHit {
 	task: BoardTask;
 	reply: number | null;
@@ -19,25 +24,21 @@ export interface BoardHit {
 	text: string;
 }
 
-/** The query's words, lowercased; quotes and extra spaces drop out. */
-export const termsOf = (query: string): string[] => [...new Set(query.toLowerCase().replace(/["“”]/g, " ").split(/\s+/).filter(Boolean))];
-
 /** A reply's text as the thread shows it: a session's without its `Suggestions:` block. */
 export const replyText = (by: BoardAuthor, text: string): string => (by.kind === "session" ? splitSuggestions(text).body : text);
 
 /** The messages matching `search`, newest first; `workspace` and `thread` are the open ones, which the narrower scopes read. */
 export function searchBoard(state: BoardState, search: BoardSearch, workspace: string | null, thread: number | null): BoardHit[] {
-	const terms = termsOf(search.query);
-	if (terms.length === 0) return [];
-	const matches = (text: string): boolean => {
-		const lower = text.toLowerCase();
-		return terms.every(term => lower.includes(term));
-	};
-	const tasks = state.tasks.filter(task => (search.scope === "all" ? true : search.scope === "workspace" ? task.workspace === workspace : task.id === thread));
+	const words = searchWords(search.query);
+	if (words.length === 0) return [];
+	const matches = everyWord(search.query);
+	const holdsAny = (text: string): boolean => words.some(word => text.toLowerCase().includes(word));
+	const scope = scopeOf(search.scope, thread);
+	const tasks = state.tasks.filter(task => (scope === "all" ? true : scope === "workspace" ? task.workspace === workspace : task.id === thread));
 	const hits: BoardHit[] = [];
 	for (const task of tasks) {
-		const searchable = [task.title, task.text, ...Object.entries(task.labels).map(([key, value]) => `${key}=${value}`)].join("\n");
-		if (matches(searchable)) hits.push({ task, reply: null, by: task.by, at: task.at, text: task.text || task.title });
+		const parts = [task.text, task.title, Object.entries(task.labels).map(([key, value]) => `${key}=${value}`).join(" ")].filter(Boolean);
+		if (matches(parts.join("\n"))) hits.push({ task, reply: null, by: task.by, at: task.at, text: parts.find(matches) ?? parts.find(holdsAny) ?? parts[0] ?? "" });
 		task.replies.forEach((entry, index) => {
 			if (!("by" in entry)) return;
 			const text = replyText(entry.by, entry.text);
@@ -47,12 +48,12 @@ export function searchBoard(state: BoardState, search: BoardSearch, workspace: s
 	return hits.sort((a, b) => b.at - a.at);
 }
 
-/** The parts of `text` any term covers, in order and merged where they touch, to mark. */
-export function matchRanges(text: string, terms: readonly string[]): { start: number; end: number }[] {
+/** The parts of `text` any word covers, in order and merged where they touch, to mark. */
+export function matchRanges(text: string, words: readonly string[]): { start: number; end: number }[] {
 	const lower = text.toLowerCase();
 	const found: { start: number; end: number }[] = [];
-	for (const term of terms) {
-		for (let at = lower.indexOf(term); at !== -1; at = lower.indexOf(term, at + term.length)) found.push({ start: at, end: at + term.length });
+	for (const word of words) {
+		for (let at = lower.indexOf(word); at !== -1; at = lower.indexOf(word, at + word.length)) found.push({ start: at, end: at + word.length });
 	}
 	found.sort((a, b) => a.start - b.start);
 	const merged: { start: number; end: number }[] = [];
@@ -64,16 +65,5 @@ export function matchRanges(text: string, terms: readonly string[]): { start: nu
 	return merged;
 }
 
-/** At most `max` characters of `text` on one line without its Markdown marks, starting a little before its first match, with `…` where it was cut. */
-export function snippet(text: string, terms: readonly string[], max = 280): string {
-	const flat = text
-		.replace(/^\s*(?:[-*+]|\d+\.|#{1,6})\s+/gm, "")
-		.replace(/\*\*|__|`/g, "")
-		.replace(/\s+/g, " ")
-		.trim();
-	if (flat.length <= max) return flat;
-	const first = matchRanges(flat, terms)[0]?.start ?? 0;
-	const start = Math.max(0, Math.min(first - 60, flat.length - max));
-	const cut = flat.slice(start, start + max);
-	return `${start > 0 ? "…" : ""}${cut}${start + max < flat.length ? "…" : ""}`;
-}
+/** At most `max` characters of `text` on one line without its Markdown marks, starting a little before the query's first word. */
+export const snippet = (text: string, query: string, max = 280): string => snippetOf(plainMarkdown(text), query, max, 60);
