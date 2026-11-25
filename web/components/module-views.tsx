@@ -5,7 +5,8 @@
 import type { ComponentType } from "react";
 import type { ModuleChanges, ModuleValues, StoredModuleId } from "../../src/modules";
 import type { Routine } from "../../src/routines";
-import type { Bot } from "../../src/shared/bots";
+import type { Bot, BotId, BotLast } from "../../src/shared/bots";
+import type { ProjectList } from "../../src/shared/projects";
 import type { RosterHost } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import type { UserTodoList } from "../../src/user-todos-shared";
@@ -26,6 +27,10 @@ export interface CoreData {
 	routines: Routine[];
 	/** The Bots, `null` until they load. */
 	bots: Bot[] | null;
+	/** Each Bot's last message, which a Board's Bots tab shows on its cards. */
+	botLasts: Readonly<Record<BotId, BotLast | null>>;
+	/** The projects, `null` until the server first sends them, which a Board's Projects tab lists. */
+	projects: ProjectList | null;
 	/** The todo list, `null` until the server sends it. */
 	todos: UserTodoList | null;
 	/** The sessions are listed, so `workspaces` holds every workspace the sidebar offers. */

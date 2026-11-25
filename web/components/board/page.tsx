@@ -7,7 +7,7 @@ import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser }
 import { type ReactNode, useEffect } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
-import { Header } from "../page-header";
+import { Header, HeaderTitleShown } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,9 @@ import { MessageScroller, MessageScrollerButton, MessageScrollerContent, Message
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson } from "../../api";
+import { botRows } from "../../bots-model";
+import { hashForPage } from "../../routing";
+import { workspaceCwd } from "../../sessions";
 import { activityControl } from "../../activity";
 import { boardDraftKey, boardThreadDraftKey } from "../../composer-drafts";
 import { useStoredState } from "../../stored-state";
@@ -25,8 +28,13 @@ import { Separator, useDragSeparator } from "../drag-separator";
 import { useDashboardActions } from "../dashboard-context";
 import type { CoreData } from "../module-views";
 import { NewSession } from "../new-session";
+import { ProjectMemoryTab } from "../memory/project-memory";
+import { BotsGallery } from "../bots/bots-gallery";
+import { ProjectsPage } from "../projects/page";
+import { PullRequestsPage } from "../pull-requests/pull-requests-page";
+import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
 import { type KnownSessions, sessionLabel } from "../todo/links";
-import type { BoardRoute } from "./module";
+import { BOARD_TABS, type BoardRoute, type BoardTab } from "./module";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
 
 interface BoardPageProps {
@@ -49,32 +57,87 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 		<div className="flex h-full min-h-0 flex-1">
 			<section aria-label="Board" className="flex min-w-[360px] flex-1 flex-col">
 				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name} />
-				<MessageScrollerProvider autoScroll>
-					<MessageScroller className="flex-1">
-						<MessageScrollerViewport>
-							<MessageScrollerContent className="justify-end gap-0 pt-6 pb-2">
-								<ChannelIntro name={name} />
-								<ol aria-label="Board tasks" className="flex flex-col">
-									{tasks.map((task, index) => {
-										const previous = tasks[index - 1];
-										return (
-											<li key={task.id}>
-												{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
-												<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === route.thread} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
-											</li>
-										);
-									})}
-								</ol>
-							</MessageScrollerContent>
-						</MessageScrollerViewport>
-						<MessageScrollerButton />
-					</MessageScroller>
-				</MessageScrollerProvider>
-				{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
+				<ChannelTabs tab={route.tab} workspace={open} />
+				{route.tab === "messages" ? (
+					<>
+						<MessageScrollerProvider autoScroll>
+							<MessageScroller className="flex-1">
+								<MessageScrollerViewport>
+									<MessageScrollerContent className="justify-end gap-0 pt-6 pb-2">
+										<ChannelIntro name={name} />
+										<ol aria-label="Board tasks" className="flex flex-col">
+											{tasks.map((task, index) => {
+												const previous = tasks[index - 1];
+												return (
+													<li key={task.id}>
+														{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
+														<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === route.thread} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
+													</li>
+												);
+											})}
+										</ol>
+									</MessageScrollerContent>
+								</MessageScrollerViewport>
+								<MessageScrollerButton />
+							</MessageScroller>
+						</MessageScrollerProvider>
+						{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
+					</>
+				) : (
+					<HeaderTitleShown.Provider value={false}>
+						<div className="flex min-h-0 flex-1">
+							<WorkspaceTab tab={route.tab} workspace={open} core={core} disabled={disabled} />
+						</div>
+					</HeaderTitleShown.Provider>
+				)}
 			</section>
-			{thread && openWorkspace && <Thread key={thread.id} state={state} task={thread} core={core} workspace={openWorkspace} channel={name} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
+			{route.tab === "messages" && thread && openWorkspace && <Thread key={thread.id} state={state} task={thread} core={core} workspace={openWorkspace} channel={name} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
 		</div>
 	);
+}
+
+/** The row of tabs under the Workspace's name, as under a Slack channel's; each opens its own address. */
+function ChannelTabs({ tab, workspace }: { tab: BoardTab; workspace: string | null }) {
+	return (
+		<div className="flex shrink-0 items-center border-b border-border px-5 py-1.5">
+			<SegmentedTabs
+				value={tab}
+				onValueChange={next => {
+					const picked = BOARD_TABS.find(each => each.id === next);
+					if (picked) location.hash = hashForPage({ kind: "board", workspace, tab: picked.id, thread: null });
+				}}
+				activation="manual"
+			>
+				<SegmentedTabsList aria-label="Board tabs">
+					{BOARD_TABS.map(each => (
+						<SegmentedTab key={each.id} value={each.id} {...activityControl("board.tab")}>
+							{each.label}
+						</SegmentedTab>
+					))}
+				</SegmentedTabsList>
+			</SegmentedTabs>
+		</div>
+	);
+}
+
+/** A tab other than Messages: the page it names, kept to the sessions, Bots, repository, and projects of the Workspace. */
+function WorkspaceTab({ tab, workspace, core, disabled }: { tab: Exclude<BoardTab, "messages">; workspace: string | null; core: CoreData; disabled: boolean }) {
+	const { changeModule } = useDashboardActions();
+	const { hosts, past } = core.sessions;
+	const here = <Row extends Parameters<typeof workspaceCwd>[0]>(rows: Row[]): Row[] => rows.filter(row => workspaceCwd(row) === workspace);
+	switch (tab) {
+		case "bots":
+			return <BotsGallery rows={core.bots === null ? null : botRows(core.bots.filter(bot => bot.cwd === workspace), hosts, core.botLasts)} routines={core.routines} />;
+		case "pull-requests":
+			return <PullRequestsPage hosts={here(hosts)} past={here(past)} route={{ target: null }} />;
+		case "memory":
+			return <ProjectMemoryTab repo={workspace} />;
+		case "projects": {
+			const ran = new Set([...here(hosts), ...here(past)].map(row => row.sessionId));
+			const projects = core.projects && { projects: core.projects.projects.filter(project => project.sessionIds.some(id => ran.has(id))) };
+			return <ProjectsPage route={{ open: null }} core={core} state={projects} disabled={disabled} onChange={change => changeModule("projects", change)} />;
+		}
+	}
 }
 
 const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;

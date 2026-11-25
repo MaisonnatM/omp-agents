@@ -11,7 +11,7 @@ import { CountPill } from "../count-pill";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute } from "./module";
 
-export const hashForBoard = (workspace: string | null, thread: number | null = null): string => hashForPage({ kind: "board", workspace, thread });
+export const hashForBoard = (workspace: string | null, thread: number | null = null): string => hashForPage({ kind: "board", workspace, tab: "messages", thread });
 
 /**
  * The Workspaces the Board lists: the sidebar's, then any a Board task or `route` names, and the one it shows:

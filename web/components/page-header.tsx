@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import { cn } from "@/lib/utils";
 
 interface HeaderProps {
@@ -16,6 +16,9 @@ interface HeaderProps {
 	end?: ReactNode;
 }
 
+/** Whether a header's title shows; a page drawn inside another page's tab, which names it, hides it from sight and keeps its meta and controls. */
+export const HeaderTitleShown = createContext(true);
+
 /**
  * The title, an optional meta line, and controls that head a pane or a page.
  * The title keeps at least 16rem beside the controls, or its whole width when shorter; when they would leave it less,
@@ -23,13 +26,14 @@ interface HeaderProps {
  * The trailing controls take no width until they show, so a title shares its row with them only while they do.
  */
 export function Header({ title, meta, status, alert = false, leading, trailing, children, end }: HeaderProps) {
+	const titleShown = useContext(HeaderTitleShown);
 	return (
 		<header className="@container/header shrink-0 border-b border-border">
 			<div className="flex min-h-(--page-header-height) flex-wrap items-center gap-x-4 px-6 max-phone:px-3">
 				<div className="group/reveal flex min-h-(--page-header-height) max-w-max min-w-0 grow basis-64 items-center gap-2">
 					{leading}
 					<div className="min-w-0">
-						<h2 className="truncate text-sm font-semibold">{title}</h2>
+						<h2 className={cn("truncate text-sm font-semibold", !titleShown && "sr-only")}>{title}</h2>
 						{meta !== undefined && <p className="truncate text-xs text-muted-foreground">{meta}</p>}
 					</div>
 					{trailing !== undefined && (
