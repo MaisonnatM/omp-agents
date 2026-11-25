@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The New session page has a Background menu in its header: pick Retro grid, Aurora, Fire, Eclipse, Black hole, Horizon, Galaxy, or Globe; the dashboard remembers your pick.
 - A session waiting on CI no longer lists its pull requests under its row; its row shows a clock with how many still wait on checks and a red cross with how many fail.
 - Fixed: the "routine runs exited early" notification no longer lists a run that started late only because the Mac was asleep, such as the catch-up runs when you open the lid.
 - Fixed: a routine set to post its output When it fails no longer counts as exited early each time it hands work to its Bot on purpose.
