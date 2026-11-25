@@ -9,6 +9,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalSt
 import { type PastSession, type PromptImage, type RosterHost, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
+import { AppMark } from "../app-mark";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { splitSuggestions } from "../../../src/shared/transcript";
@@ -195,14 +196,6 @@ function ChannelIntro({ name }: { name: string }) {
 	);
 }
 
-const HUES = ["bg-sky-600", "bg-violet-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-teal-600", "bg-indigo-600", "bg-orange-600"];
-
-function hueOf(id: string): string {
-	let hash = 0;
-	for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) | 0;
-	return HUES[Math.abs(hash) % HUES.length] ?? "bg-sky-600";
-}
-
 /** Your Slack profile picture, asked once per page load to refresh the stored one, which shows meanwhile; `undefined` when the ask failed. */
 let yourPicture: Promise<string | null | undefined> | null = null;
 
@@ -230,27 +223,28 @@ function YourAvatar({ size, box }: { size: "message" | "summary"; box: string })
 	);
 }
 
-/** The author's square picture: yours for you, a session's initial on its own color for a session. */
-export function Avatar({ by, sessions, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
+/** The author's square picture: yours for you, omp's mark for a session. */
+export function Avatar({ by, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
 	const box = size === "message" ? "size-9 rounded-lg text-sm" : "size-6 rounded-md text-[11px]";
 	if (by.kind === "user") return <YourAvatar size={size} box={box} />;
-	const name = sessionLabel(by.sessionId, sessions).name;
 	return (
-		<span aria-hidden className={cn("flex shrink-0 items-center justify-center font-semibold text-white", hueOf(by.sessionId), box)}>
-			{name.trim().charAt(0).toUpperCase() || "S"}
+		<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-muted", box)}>
+			<AppMark className={size === "message" ? "size-5" : "size-3.5"} />
 		</span>
 	);
 }
 
-/** The author's name, which opens the session's conversation in its Board thread for a session, and a tag that says it is one, as Slack tags an app. */
+/** The author's name: "omp agent" with a tag that says it is a session, as Slack tags an app, then the session's title, which opens its conversation in its Board thread. */
 function AuthorName({ by, sessions, state, workspace }: { by: BoardAuthor; sessions: KnownSessions; state: BoardState; workspace: string }) {
 	if (by.kind === "user") return <span className="text-[15px] font-bold">You</span>;
+	const title = sessionLabel(by.sessionId, sessions).name;
 	return (
 		<span className="flex min-w-0 items-center gap-1">
-			<a {...activityControl("board.session.open")} href={hashForBoardSession(state, workspace, by.sessionId)} onClick={revealSessionTab} title={sessionLabel(by.sessionId, sessions).name} className="truncate text-sm font-bold hover:underline">
-				{sessionLabel(by.sessionId, sessions).name}
-			</a>
+			<span className="shrink-0 text-sm font-bold">omp agent</span>
 			<SessionTag />
+			<a {...activityControl("board.session.open")} href={hashForBoardSession(state, workspace, by.sessionId)} onClick={revealSessionTab} title={title} className="truncate text-xs text-muted-foreground hover:underline">
+				{title}
+			</a>
 		</span>
 	);
 }
