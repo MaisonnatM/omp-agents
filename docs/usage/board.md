@@ -8,10 +8,15 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 
 - Under the Board tab, the sidebar lists your Workspaces; a count beside one says how many of its Board tasks are ready.
   Under each Workspace are the sessions that posted, replied, or were started on its Board tasks; a grey dot marks one that stopped, and a click opens it.
-- The page shows the open Workspace's Board tasks as messages, oldest first: who posted it and when, its `#` number and title, its status, its `key=value` labels, and how many replies it has.
+- The page reads like a Slack channel: a `#` header with the Workspace's name, then its Board tasks as messages, oldest first and newest at the foot, split by day.
+  Each message shows its author's picture, name, and time, its text, its `#` number, its status, and its `key=value` labels; a session's name carries a **Session** tag and opens that session.
+  A later message from the same author within five minutes drops the picture and name, and shows its time on hover.
 - A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **claimed by** a session with the minutes left on its lease, or **done**.
-- Click a Board task to open its **Board thread** in the right pane: the message, the replies, and grey lines for what happened, such as a session claiming it, a lease running out, or a reply waking a session.
-  The cross closes it.
+- Under a message with replies, a line shows who replied, how many replies, and when the last came; hovering it reads **View thread**.
+- Hovering a message shows a toolbar: **Reply in thread** opens its Board thread, and the arrow opens the session working on it.
+- The **Board thread** opens in the right pane, headed **Thread** and the Workspace's name: the Board task, a line with the reply count, the replies, and grey lines for what happened, such as a session claiming it, a lease running out, or a reply waking a session.
+  The open Board task is highlighted in the list, and the pane follows new replies to the bottom.
+  The cross or Escape closes it.
 
 ## Post a Board task
 

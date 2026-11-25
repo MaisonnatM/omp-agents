@@ -1,22 +1,26 @@
 /**
- * The Board page: the open Workspace's Board tasks as messages with a composer that posts one, and the open Board
- * task's Board thread at the right; the sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
+ * The Board page, laid out as a Slack channel: the open Workspace's Board tasks as messages, grouped by author and
+ * split by day, each with its thread summary and a hover toolbar, over the composer that posts one; the open Board
+ * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconCrossMedium } from "central-icons";
-import { useState } from "react";
+import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
+import { type KeyboardEvent, type ReactNode, useState } from "react";
+import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
-import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
-import { boardDraftKey } from "../../composer-drafts";
+import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
+import { boardDraftKey } from "../../composer-drafts";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
 import { useDashboardActions } from "../dashboard-context";
-import { NewSession } from "../new-session";
 import type { CoreData } from "../module-views";
+import { NewSession } from "../new-session";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute } from "./module";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
@@ -34,34 +38,157 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 	if (state === null) return <p className="px-6 py-6 text-sm text-muted-foreground">Loading the Board…</p>;
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
+	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";
 	const tasks = state.tasks.filter(task => task.workspace === open);
 	const thread = route.thread === null ? null : (tasks.find(task => task.id === route.thread) ?? null);
 	return (
 		<div className="flex h-full min-h-0 flex-1">
 			<main className="flex min-w-0 flex-1 flex-col">
-				<header className="flex h-14 shrink-0 flex-col justify-center border-b border-border px-6">
-					<h1 className="truncate text-sm font-semibold">{openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace"}</h1>
-					<p className="text-xs text-muted-foreground">Each message is a Board task, and a session starts on it.</p>
+				<header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-5">
+					<IconHashtag aria-hidden className="size-4 text-muted-foreground" />
+					<h1 className="truncate text-[15px] font-bold">{name}</h1>
 				</header>
-				<ol aria-label="Board tasks" className="flex min-h-0 flex-1 flex-col overflow-y-auto py-2">
-					{tasks.length === 0 && <li className="px-6 py-6 text-sm text-muted-foreground">No Board tasks yet. Post one below.</li>}
-					{tasks.map(task => (
-						<li key={task.id}>
-							<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === route.thread} href={hashForBoard(open, task.id)} />
-						</li>
-					))}
-				</ol>
+				<MessageScrollerProvider autoScroll>
+					<MessageScroller className="flex-1">
+						<MessageScrollerViewport>
+							<MessageScrollerContent className="justify-end gap-0 pt-6 pb-2">
+								<ChannelIntro name={name} />
+								<ol aria-label="Board tasks" className="flex flex-col">
+									{tasks.map((task, index) => {
+										const previous = tasks[index - 1];
+										return (
+											<li key={task.id}>
+												{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
+												<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === route.thread} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
+											</li>
+										);
+									})}
+								</ol>
+							</MessageScrollerContent>
+						</MessageScrollerViewport>
+						<MessageScrollerButton />
+					</MessageScroller>
+				</MessageScrollerProvider>
 				{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
 			</main>
-			{thread && <Thread state={state} task={thread} sessions={core.sessions} workspace={openWorkspace} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
+			{thread && <Thread key={thread.id} state={state} task={thread} sessions={core.sessions} channel={name} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
 		</div>
 	);
 }
 
 const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
 
-function authorName(by: BoardAuthor, sessions: KnownSessions): string {
-	return by.kind === "user" ? "You" : sessionLabel(by.sessionId, sessions).name;
+/** Slack starts a later message from the same author within five minutes of the last one without its avatar and name. */
+const GROUP_MS = 5 * 60_000;
+
+const authorKey = (by: BoardAuthor): string => (by.kind === "user" ? "user" : by.sessionId);
+
+function continues(previous: { at: number; by: BoardAuthor }, next: { at: number; by: BoardAuthor }): boolean {
+	return authorKey(previous.by) === authorKey(next.by) && next.at - previous.at < GROUP_MS && sameDay(previous.at, next.at);
+}
+
+const sameDay = (a: number, b: number): boolean => new Date(a).toDateString() === new Date(b).toDateString();
+
+const clock = (at: number): string => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+/** The time in the 36px avatar column, without its AM or PM, as Slack shows it there. */
+const shortClock = (at: number): string => clock(at).replace(/\s?[AP]M$/i, "");
+
+function dayLabel(at: number): string {
+	const now = Date.now();
+	if (sameDay(at, now)) return "Today";
+	if (sameDay(at, now - 86_400_000)) return "Yesterday";
+	return new Date(at).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+}
+
+/** The day's line across the messages, with its name in a pill, as Slack splits a channel by day. */
+function DayDivider({ at }: { at: number }) {
+	return (
+		<div role="separator" aria-label={dayLabel(at)} className="relative my-2 flex items-center px-5">
+			<span className="h-px flex-1 bg-border" />
+			<span className="rounded-full border border-border bg-background px-3 py-0.5 text-xs font-semibold">{dayLabel(at)}</span>
+			<span className="h-px flex-1 bg-border" />
+		</div>
+	);
+}
+
+function ChannelIntro({ name }: { name: string }) {
+	return (
+		<div className="flex flex-col gap-1 px-5 pb-4">
+			<h2 className="flex items-center gap-1 text-xl font-bold">
+				<IconHashtag aria-hidden className="size-5" />
+				{name}
+			</h2>
+			<p className="text-sm text-muted-foreground">This is the very beginning of the {name} Board. Each message you send here is a Board task, and a session starts on it.</p>
+		</div>
+	);
+}
+
+const HUES = ["bg-sky-600", "bg-violet-600", "bg-emerald-600", "bg-amber-600", "bg-rose-600", "bg-teal-600", "bg-indigo-600", "bg-orange-600"];
+
+function hueOf(id: string): string {
+	let hash = 0;
+	for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+	return HUES[Math.abs(hash) % HUES.length] ?? "bg-sky-600";
+}
+
+/** The author's square picture: a person for you, a session's initial on its own color for a session. */
+function Avatar({ by, sessions, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
+	const box = size === "message" ? "size-9 rounded-lg text-sm" : "size-6 rounded-md text-[11px]";
+	if (by.kind === "user")
+		return (
+			<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-foreground text-background", box)}>
+				<IconUser className={size === "message" ? "size-5" : "size-3.5"} />
+			</span>
+		);
+	const name = sessionLabel(by.sessionId, sessions).name;
+	return (
+		<span aria-hidden className={cn("flex shrink-0 items-center justify-center font-semibold text-white", hueOf(by.sessionId), box)}>
+			{name.trim().charAt(0).toUpperCase() || "S"}
+		</span>
+	);
+}
+
+/** The author's name, which opens the session for a session, and a tag that says it is one, as Slack tags an app. */
+function AuthorName({ by, sessions }: { by: BoardAuthor; sessions: KnownSessions }) {
+	if (by.kind === "user") return <span className="text-[15px] font-bold">You</span>;
+	return (
+		<span className="flex min-w-0 items-center gap-1">
+			<a {...activityControl("board.session.open")} href={hashForSession(by.sessionId)} className="truncate text-[15px] font-bold hover:underline">
+				{sessionLabel(by.sessionId, sessions).name}
+			</a>
+			<span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">Session</span>
+		</span>
+	);
+}
+
+/** One message row: avatar, name, and time, or for a grouped one only the time on hover in the avatar's place. */
+function MessageRow({ by, at, sessions, grouped, highlighted = false, toolbar, children }: { by: BoardAuthor; at: number; sessions: KnownSessions; grouped: boolean; highlighted?: boolean; toolbar?: ReactNode; children: ReactNode }) {
+	return (
+		<div className={cn("group/message relative flex gap-2 px-5 hover:bg-accent/40", grouped ? "py-0.5" : "pt-2 pb-1", highlighted && "bg-amber-100/60 hover:bg-amber-100/80 dark:bg-amber-500/10 dark:hover:bg-amber-500/15")}>
+			<div className="flex w-9 shrink-0 justify-end">
+				{grouped ? (
+					<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="invisible pt-0.5 text-[11px] text-muted-foreground tabular-nums group-hover/message:visible">
+						{shortClock(at)}
+					</time>
+				) : (
+					<Avatar by={by} sessions={sessions} />
+				)}
+			</div>
+			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+				{!grouped && (
+					<span className="flex min-w-0 items-baseline gap-2">
+						<AuthorName by={by} sessions={sessions} />
+						<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="shrink-0 text-xs text-muted-foreground tabular-nums hover:underline">
+							{clock(at)}
+						</time>
+					</span>
+				)}
+				{children}
+			</div>
+			{toolbar && <div className="invisible absolute -top-4 right-5 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 shadow-sm group-focus-within/message:visible group-hover/message:visible">{toolbar}</div>}
+		</div>
+	);
 }
 
 function StatusBadge({ status, sessions }: { status: BoardStatus; sessions: KnownSessions }) {
@@ -93,19 +220,13 @@ function StatusBadge({ status, sessions }: { status: BoardStatus; sessions: Know
 	}
 }
 
-function TaskMessage({ state, task, sessions, open, href }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; href: string }) {
-	const said = task.replies.filter(entry => "by" in entry);
-	const last = task.replies.at(-1);
+/** The message's text, its Board task number, status, and labels. */
+function TaskBody({ state, task, sessions }: { state: BoardState; task: BoardTask; sessions: KnownSessions }) {
 	return (
-		<a {...activityControl("board.task.open")} href={href} aria-current={open ? "true" : undefined} className={cn("flex flex-col gap-1 px-6 py-2.5 hover:bg-accent/50", open && "bg-accent/60")}>
-			<span className="flex items-baseline gap-2 text-sm">
-				<span className="font-semibold">{authorName(task.by, sessions)}</span>
-				<Age at={task.at} exact className="text-xs text-muted-foreground tabular-nums" />
-			</span>
-			<span className="text-sm text-pretty">
-				<span className="text-muted-foreground tabular-nums">#{task.id}</span> {task.title}
-			</span>
-			<span className="flex flex-wrap items-center gap-1.5">
+		<>
+			<p className="text-[15px] leading-relaxed whitespace-pre-wrap text-pretty">{task.text || task.title}</p>
+			<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
+				<span className="text-xs text-muted-foreground tabular-nums">#{task.id}</span>
 				<StatusBadge status={statusOf(state, task)} sessions={sessions} />
 				{Object.entries(task.labels).map(([key, value]) => (
 					<Badge key={key} variant="dot" size="compact" color="gray">
@@ -113,11 +234,63 @@ function TaskMessage({ state, task, sessions, open, href }: { state: BoardState;
 					</Badge>
 				))}
 			</span>
-			{task.replies.length > 0 && last && (
-				<span className="text-xs text-muted-foreground">
-					{said.length} {said.length === 1 ? "reply" : "replies"} · last <Age at={last.at} className="tabular-nums" />
+		</>
+	);
+}
+
+const said = (task: BoardTask): Extract<BoardReply, { by: BoardAuthor }>[] => task.replies.filter((entry): entry is Extract<BoardReply, { by: BoardAuthor }> => "by" in entry);
+
+function TaskMessage({ state, task, sessions, open, grouped, href }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string }) {
+	const replies = said(task);
+	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
+	const toolbar = (
+		<>
+			<Tooltip content="Reply in thread">
+				<Button {...activityControl("board.task.open")} variant="ghost" size="icon-xs" aria-label={`Reply in thread #${task.id}`} render={<a href={href} />}>
+					<IconBubble3 />
+				</Button>
+			</Tooltip>
+			{session && (
+				<Tooltip content="Open its session">
+					<Button {...activityControl("board.session.open")} variant="ghost" size="icon-xs" aria-label="Open its session" render={<a href={hashForSession(session)} />}>
+						<IconArrowUpRight />
+					</Button>
+				</Tooltip>
+			)}
+		</>
+	);
+	return (
+		<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={grouped} highlighted={open} toolbar={toolbar}>
+			<TaskBody state={state} task={task} sessions={sessions} />
+			{replies.length > 0 && <ThreadSummary replies={replies} sessions={sessions} href={href} />}
+		</MessageRow>
+	);
+}
+
+/** Who replied, how many replies, and when the last came, which opens the thread, as under a Slack message. */
+function ThreadSummary({ replies, sessions, href }: { replies: Extract<BoardReply, { by: BoardAuthor }>[]; sessions: KnownSessions; href: string }) {
+	const authors = [...new Map(replies.map(reply => [authorKey(reply.by), reply.by])).values()].slice(0, 5);
+	const last = replies.at(-1);
+	return (
+		<a
+			{...activityControl("board.task.open")}
+			href={href}
+			className="group/summary -ml-1 mt-1 flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background"
+		>
+			<span className="flex gap-0.5">
+				{authors.map(by => (
+					<Avatar key={authorKey(by)} by={by} sessions={sessions} size="summary" />
+				))}
+			</span>
+			<span className="text-[13px] font-bold text-blue-600 hover:underline dark:text-blue-400">
+				{replies.length} {replies.length === 1 ? "reply" : "replies"}
+			</span>
+			{last && (
+				<span className="text-[13px] text-muted-foreground group-hover/summary:hidden">
+					Last reply <Age at={last.at} className="tabular-nums" />
 				</span>
 			)}
+			<span className="hidden flex-1 text-[13px] text-muted-foreground group-hover/summary:inline">View thread</span>
 		</a>
 	);
 }
@@ -175,9 +348,10 @@ function noteText(note: BoardNote, sessions: KnownSessions): string {
 	}
 }
 
-function Thread({ state, task, sessions, workspace, closeHref, disabled, onChange }: { state: BoardState; task: BoardTask; sessions: KnownSessions; workspace: Workspace | null; closeHref: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+/** The Board thread as Slack's thread pane: the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; Escape closes it. */
+function Thread({ state, task, sessions, channel, closeHref, disabled, onChange }: { state: BoardState; task: BoardTask; sessions: KnownSessions; channel: string; closeHref: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const [text, setText] = useState("");
-	const said = task.replies.filter(entry => "by" in entry).length;
+	const count = said(task).length;
 	const target = wakeTarget(task, { kind: "user" });
 	const send = (value: string) => {
 		const reply = value.trim();
@@ -185,64 +359,74 @@ function Thread({ state, task, sessions, workspace, closeHref, disabled, onChang
 		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: reply });
 		setText("");
 	};
+	const close = (event: KeyboardEvent<HTMLElement>) => {
+		if (event.key !== "Escape" || event.defaultPrevented) return;
+		event.preventDefault();
+		location.hash = closeHref;
+	};
+	// A grey line ends a run of messages, so the reply after it shows its avatar and name again.
+	let previous: { at: number; by: BoardAuthor } | null = task;
 	return (
-		<aside aria-label={`Thread #${task.id}`} className="flex w-[400px] shrink-0 flex-col border-l border-border">
-			<header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
-				<div className="min-w-0 flex-1">
-					<h2 className="text-sm font-semibold">Thread #{task.id}</h2>
-					{workspace && <p className="truncate text-xs text-muted-foreground">{folder(workspace.cwdDisplay)}</p>}
-				</div>
+		<aside aria-label={`Thread #${task.id}`} onKeyDown={close} className="flex w-[420px] shrink-0 flex-col border-l border-border">
+			<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+				<h2 className="text-[15px] font-bold">Thread</h2>
+				<span className="flex min-w-0 flex-1 items-center gap-0.5 text-[13px] text-muted-foreground">
+					<IconHashtag aria-hidden className="size-3.5 shrink-0" />
+					<span className="truncate">{channel}</span>
+				</span>
 				<Button {...activityControl("board.thread.close")} variant="ghost" size="icon-xs" aria-label="Close thread" render={<a href={closeHref} />}>
 					<IconCrossMedium />
 				</Button>
 			</header>
-			<div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
-				<div className="flex flex-col gap-1">
-					<span className="flex items-baseline gap-2 text-sm">
-						<span className="font-semibold">{authorName(task.by, sessions)}</span>
-						<Age at={task.at} exact className="text-xs text-muted-foreground tabular-nums" />
-					</span>
-					<p className="text-sm text-pretty">
-						<span className="text-muted-foreground tabular-nums">#{task.id}</span> {task.title}
-					</p>
-					{task.text && task.text !== task.title && <p className="text-sm whitespace-pre-wrap text-pretty">{task.text}</p>}
-					<span>
-						<StatusBadge status={statusOf(state, task)} sessions={sessions} />
-					</span>
-				</div>
-				<div className="flex items-center gap-2 text-xs text-muted-foreground">
-					<span>
-						{said} {said === 1 ? "reply" : "replies"}
-					</span>
-					<span className="h-px flex-1 bg-border" />
-				</div>
-				<ol className="flex flex-col gap-2.5">
-					{task.replies.map((entry, index) =>
-						"note" in entry ? (
-							<li key={index} className="text-xs text-muted-foreground">
-								<Age at={entry.at} className="tabular-nums" /> · {noteText(entry.note, sessions)}
-							</li>
-						) : (
-							<li key={index} className="flex flex-col gap-0.5">
-								<span className="flex items-baseline gap-2 text-sm">
-									<span className="font-semibold">{authorName(entry.by, sessions)}</span>
-									<Age at={entry.at} exact className="text-xs text-muted-foreground tabular-nums" />
+			<MessageScrollerProvider autoScroll>
+				<MessageScroller className="flex-1">
+					<MessageScrollerViewport>
+						<MessageScrollerContent className="gap-0 py-2">
+							<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={false}>
+								<TaskBody state={state} task={task} sessions={sessions} />
+							</MessageRow>
+							<div className="flex items-center gap-3 px-5 py-2 text-[13px] text-muted-foreground">
+								<span className="shrink-0">
+									{count === 0 ? "No replies yet" : `${count} ${count === 1 ? "reply" : "replies"}`}
 								</span>
-								<p className="text-sm whitespace-pre-wrap text-pretty">{entry.text}</p>
-							</li>
-						),
-					)}
-				</ol>
-			</div>
+								<span className="h-px flex-1 bg-border" />
+							</div>
+							<ol className="flex flex-col">
+								{task.replies.map((entry, index) => {
+									if ("note" in entry) {
+										previous = null;
+										return (
+											<li key={index} className="flex gap-2 px-5 py-0.5 text-[13px] text-muted-foreground">
+												<span className="w-9 shrink-0 pt-px text-right text-[11px] tabular-nums">{shortClock(entry.at)}</span>
+												<span className="min-w-0 flex-1 italic">{noteText(entry.note, sessions)}</span>
+											</li>
+										);
+									}
+									const grouped = previous !== null && continues(previous, entry);
+									previous = entry;
+									return (
+										<li key={index}>
+											<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped}>
+												<p className="text-[15px] leading-relaxed whitespace-pre-wrap text-pretty">{entry.text}</p>
+											</MessageRow>
+										</li>
+									);
+								})}
+							</ol>
+						</MessageScrollerContent>
+					</MessageScrollerViewport>
+					<MessageScrollerButton />
+				</MessageScroller>
+			</MessageScrollerProvider>
 			<div className="shrink-0 px-3 pb-3">
 				<InputMessage
 					{...activityControl("board.reply")}
 					value={text}
 					onValueChange={setText}
 					onSend={send}
-					placeholder={target ? `Reply. It reaches ${sessionLabel(target, sessions).name}, and wakes it if it stopped.` : "Reply on this Board thread."}
+					placeholder={target ? `Reply to ${sessionLabel(target, sessions).name}…` : "Reply…"}
 					disabled={disabled}
-					sendLabel="Send reply"
+					sendLabel={target ? "Send reply; it wakes the session if it stopped" : "Send reply"}
 				/>
 			</div>
 		</aside>
