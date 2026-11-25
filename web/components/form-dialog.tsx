@@ -1,5 +1,5 @@
 /** `FormDialog`, the dialog shell the dashboard's forms share, with its header, error line, and Cmd+Enter submit chord. */
-import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from "@ui-sdk/react/dialog";
+import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { IconCrossMedium } from "central-icons";
 import type { KeyboardEvent, ReactNode, RefObject } from "react";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,6 @@ export function FormDialog({ busy, onClose, className, children, onKeyDown, init
 	return (
 		<Dialog
 			open
-			container={document.body}
 			dismissible={!busy}
 			onOpenChange={(open, details) => {
 				if (open) return;
@@ -50,7 +49,7 @@ export function FormDialog({ busy, onClose, className, children, onKeyDown, init
 				onClose();
 			}}
 		>
-			<DialogBackdrop className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
+			<DialogBackdrop />
 			<DialogContent
 				onKeyDown={onKeyDown}
 				initialFocus={initialFocus && (() => initialFocus.current)}

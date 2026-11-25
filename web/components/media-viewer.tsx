@@ -1,5 +1,5 @@
 /** `ImageViewer`, one image of a list shown large, which the Overview tab's Images section, the transcript's tool images, the thumbnails under agent text, and a pull request's Markdown images open. */
-import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@ui-sdk/react/dialog";
+import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { IconChevronLeftSmall, IconChevronRightSmall, IconCrossMedium, IconSquareArrowTopRight } from "central-icons";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -35,8 +35,8 @@ export function ImageViewer({ src, caption, index, count, detail, actions, previ
 		if (next >= 0 && next < count) onIndex(next);
 	};
 	return (
-		<Dialog open container={document.body} onOpenChange={next => !next && onClose()}>
-			<DialogBackdrop className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
+		<Dialog open onOpenChange={next => !next && onClose()}>
+			<DialogBackdrop />
 			<DialogContent
 				// The dialog itself takes focus, so no header tooltip opens and one Esc closes it.
 				initialFocus="content"

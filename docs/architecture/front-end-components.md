@@ -36,6 +36,7 @@ Only the main PR detail registers the copy-number and copy-link shortcuts.
 
 Every fixed list of choices uses UI SDK's `Select`, wrapped in `web/components/ui/select.tsx` with the menu's popup and row look, in place of the browser's `<select>`.
 `FormDialog` is UI SDK's `Dialog`, so a `Select` in its form opens and takes focus there, and Esc in one of the form's pickers closes only the picker, since UI SDK closes only the topmost popup.
+Every dialog imports `Dialog` and `DialogBackdrop` from `web/components/ui/dialog.tsx`, which portals it into `document.body` and gives the backdrop its tint, so a screen passes only the classes it changes.
 
 Toasts use UI SDK's `Toast` through one manager in `web/components/toaster.tsx`, since the page has no Fluid or shadcn toast; they stack at the bottom right in the `popover` look.
 Below the phone width, which `usePhoneWidth` in `web/use-phone-width.ts` reads, only the newest shows, at the top under the header, and a swipe up or right puts it away.

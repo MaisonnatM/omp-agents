@@ -1,4 +1,4 @@
-import { Dialog, DialogBackdrop, DialogContent, DialogDescription, DialogTitle } from "@ui-sdk/react/dialog";
+import { Dialog, DialogBackdrop, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { IconArrowRotateClockwise, IconCheckmark1, IconFormCircle, IconCrossMedium, IconTrashCan } from "central-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
@@ -140,8 +140,8 @@ interface ConfirmDialogProps {
 }
 function ConfirmDialog({ open, onOpenChange, chosen, sandboxes, label, onConfirm }: ConfirmDialogProps) {
 	return (
-		<Dialog open={open} container={document.body} onOpenChange={next => onOpenChange(next)}>
-			<DialogBackdrop className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
+		<Dialog open={open} onOpenChange={next => onOpenChange(next)}>
+			<DialogBackdrop />
 			<DialogContent className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-lg border border-border bg-background p-5 text-foreground shadow-md">
 				<DialogTitle className="text-base font-medium">Clean up these files?</DialogTitle>
 				<DialogDescription className="mt-1 text-sm text-muted-foreground">

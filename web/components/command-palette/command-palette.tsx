@@ -1,5 +1,5 @@
 import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandInput, CommandItem, CommandList } from "@ui-sdk/react/command";
-import { Dialog, DialogBackdrop, DialogContent, DialogTitle } from "@ui-sdk/react/dialog";
+import { Dialog, DialogBackdrop, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowRotateCounterClockwise, IconArrowUp, IconCmd, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPin, IconPlusSmall, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -365,7 +365,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 				dispatch({ type: "close" });
 			}}
 		>
-			<DialogBackdrop className="fixed inset-0 z-40 bg-black/20 dark:bg-black/50" />
+			<DialogBackdrop className="bg-black/20 dark:bg-black/50" />
 			<DialogContent
 				initialFocus={() => inputRef.current}
 				className="fixed top-[15vh] left-1/2 z-50 flex w-[min(46rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-[0_0_0_1px_rgb(0_0_0/0.02),0_8px_16px_-4px_rgb(0_0_0/0.12),0_24px_48px_-12px_rgb(0_0_0/0.25)] outline-hidden"
@@ -373,6 +373,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 				<DialogTitle className="sr-only">Command menu</DialogTitle>
 				<Command
 					filter={false}
+					loop
 					value={selected?.id ?? null}
 					onValueChange={itemId => dispatch({ type: "select", itemId: itemId ?? "" })}
 					query={frame.query}

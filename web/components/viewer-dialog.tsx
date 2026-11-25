@@ -1,4 +1,4 @@
-import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@ui-sdk/react/dialog";
+import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { IconCrossMedium } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type ReactNode, useRef } from "react";
@@ -25,8 +25,8 @@ export function ViewerDialog({ title, description, icon: Icon, actions, bodyLabe
 	const body = useRef<HTMLDivElement>(null);
 	const frame = "rounded-md border border-border";
 	return (
-		<Dialog open container={document.body} onOpenChange={next => !next && onClose()}>
-			<DialogBackdrop className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
+		<Dialog open onOpenChange={next => !next && onClose()}>
+			<DialogBackdrop />
 			<DialogContent
 				// The body takes focus, so the arrow keys scroll it and no header tooltip opens.
 				initialFocus={() => body.current}

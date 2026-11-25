@@ -1,4 +1,4 @@
-import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from "@ui-sdk/react/dialog";
+import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { IconArrowLeft, IconArrowRight, IconCheckmark1, IconCrossMedium, IconExclamationCircle, IconPlusSmall } from "central-icons";
 import { useCallback, useEffect, useId } from "react";
 import { Button } from "@/components/ui/button";
@@ -217,8 +217,8 @@ export function GetStarted({ route, vacantHome, firstSession, rosterError, onClo
 
 	return (
 		<>
-			<Dialog open={open} container={document.body} onOpenChange={next => !next && close()}>
-				<DialogBackdrop className="fixed inset-0 z-40 bg-black/40 data-ending-style:animate-out data-ending-style:fade-out-0 data-open:animate-in data-open:fade-in-0 dark:bg-black/80" />
+			<Dialog open={open} onOpenChange={next => !next && close()}>
+				<DialogBackdrop className="data-ending-style:animate-out data-ending-style:fade-out-0 data-open:animate-in data-open:fade-in-0" />
 				<DialogContent
 					initialFocus="none"
 					className="fixed top-1/2 left-1/2 z-50 flex h-[min(42rem,calc(100vh-2rem))] w-[min(56rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden data-ending-style:animate-out data-ending-style:fade-out-0 data-ending-style:zoom-out-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 motion-reduce:animate-none"
