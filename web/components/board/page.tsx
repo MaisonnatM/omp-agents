@@ -553,6 +553,9 @@ function ThreadMessages({ state, task, sessions }: { state: BoardState; task: Bo
 	);
 }
 
+/** The thread's `@` menu offers sessions only, so a reply can point its session at another. */
+const THREAD_MENTIONS = ["session"] as const;
+
 /** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here, and the prompts a session's last reply suggests list under it. */
 function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
@@ -565,7 +568,7 @@ function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { t
 	return (
 		<div {...activityControl("board.reply")} className="shrink-0">
 			<NewSession
-				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply", suggestions }}
+				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply", suggestions, mentions: THREAD_MENTIONS }}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
 				launch={null}
