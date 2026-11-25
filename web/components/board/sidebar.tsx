@@ -1,12 +1,13 @@
-/** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it, then the Bots group with every Bot nested under All Bots. */
-import { IconFolder1, IconFolderOpen, IconRobot } from "central-icons";
+/** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it, then the Bots under the Bots tab's own groups (Pinned, each section, Other Bots), each opening the gallery of every Bot. */
+import { IconFolder1, IconFolderOpen, IconPin, IconUserGroup } from "central-icons";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { type BoardState, type BoardTask, statusOf } from "../../../templates/omp/agent/extensions/board/log";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { activityControl } from "../../activity";
 import { folderName } from "../../labels";
-import { type BotRow, botAsking } from "../../bots-model";
+import { type BotGroup, type BotRow, botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups } from "../../bots-model";
+import type { IconComponent } from "@/lib/icon-context";
 import { hashForBots, hashForPage } from "../../routing";
 import { BotAvatar } from "../bots/bot-avatar";
 import { CountPill } from "../count-pill";
@@ -48,6 +49,8 @@ function boardSessions(tasks: readonly BoardTask[]): string[] {
 	}
 	return [...ids];
 }
+
+const GROUP_ICONS: Record<BotGroup["kind"], IconComponent> = { pinned: IconPin, section: IconFolder1, rest: IconUserGroup };
 
 const go = (hash: string) => () => {
 	location.hash = hash;
@@ -115,23 +118,23 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 			<SidebarGroup>
 				<SidebarGroupLabel>Bots</SidebarGroupLabel>
 				<SidebarMenu aria-label="Board bots" className="gap-px">
-					<SidebarMenuItem>
-						<SidebarMenuButton {...activityControl("board.bots")} icon={IconRobot} isActive={route.bots} aria-current={route.bots ? "page" : undefined} onClick={go(hashForBoardBots())}>
-							<span className="min-w-0 flex-1 truncate">All Bots</span>
-						</SidebarMenuButton>
-						{bots !== null && bots.length > 0 && (
-							<SidebarMenu aria-label="Every Bot" className="my-1 ml-[15px] w-auto gap-px border-l border-border pl-1">
-								{bots.map(row => (
+					{bots === null ? null : botGroups(bots).map(group => (
+						<SidebarMenuItem key={botGroupKey(group)}>
+							<SidebarMenuButton {...activityControl("board.bots")} icon={GROUP_ICONS[group.kind]} onClick={go(hashForBoardBots())}>
+								<span className="min-w-0 flex-1 truncate">{botGroupLabel(group)}</span>
+							</SidebarMenuButton>
+							<SidebarMenu aria-label={botGroupListName(group)} className="my-1 ml-[15px] w-auto gap-px border-l border-border pl-1">
+								{group.rows.map(row => (
 									<SidebarMenuItem key={row.bot.id}>
 										<SidebarMenuButton size="short" title={row.bot.cwd} onClick={go(hashForBots(row.bot.id))}>
-											<BotAvatar look={row.bot} size="row" working={row.host?.status === "working"} asking={botAsking(row.host) !== null} />
+											<BotAvatar look={row.bot} size="inline" working={row.host?.status === "working"} asking={botAsking(row.host) !== null} />
 											<span className="min-w-0 flex-1 truncate">{row.bot.name}</span>
 										</SidebarMenuButton>
 									</SidebarMenuItem>
 								))}
 							</SidebarMenu>
-						)}
-					</SidebarMenuItem>
+						</SidebarMenuItem>
+					))}
 				</SidebarMenu>
 			</SidebarGroup>
 		</SidebarContent>
