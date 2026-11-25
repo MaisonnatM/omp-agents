@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { BotLook, BotShape } from "../../../src/shared/bots";
 import { cn } from "@/lib/utils";
 
-const SIZE = { header: "size-6", row: "size-9", sheet: "size-10", hero: "size-16" } as const;
+const SIZE = { inline: "size-4", header: "size-6", row: "size-9", sheet: "size-10", hero: "size-16" } as const;
 
 /** Each shape's body in a 32-unit box, and the height its eyes sit at. A stroke the body's own color rounds a polygon's corners. */
 const BODY: Record<BotShape, { eyes: number; body: ReactNode }> = {
