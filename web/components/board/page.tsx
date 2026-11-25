@@ -449,6 +449,7 @@ function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onC
 	const replies = said(task);
 	const seenMap = useSeen();
 	const status = statusOf(state, task);
+	const working = status.kind === "ready" || status.kind === "claimed";
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const [editing, setEditing] = useState(false);
 	const toolbar = (
@@ -471,15 +472,19 @@ function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onC
 	return (
 		<MessageRow by={task.by} at={task.at} sessions={sessions} state={state} workspace={task.workspace} grouped={grouped} highlighted={open} toolbar={toolbar}>
 			<TaskBody task={task} editor={editing ? <MessageEditor text={task.text || task.title} onSave={text => onChange({ op: "edit", by: { kind: "user" }, task: task.id, text })} onClose={() => setEditing(false)} /> : undefined} />
-			{replies.length > 0 && <ThreadSummary replies={replies} unread={open ? 0 : unreadOf(task, seenMap[task.id])} sessions={sessions} href={href} />}
-			{(status.kind === "ready" || status.kind === "claimed") && <WorkingLine sessionId={session} sessions={sessions} href={href} />}
+			{replies.length > 0 ? (
+				<ThreadSummary replies={replies} unread={open ? 0 : unreadOf(task, seenMap[task.id])} working={working ? { sessionId: session } : null} sessions={sessions} href={href} />
+			) : (
+				working && <WorkingLine sessionId={session} sessions={sessions} href={href} />
+			)}
 		</MessageRow>
 	);
 }
 
-/** Who replied, how many replies, and when the last came, which opens the thread, as under a Slack message. */
-function ThreadSummary({ replies, unread, sessions, href }: { replies: Extract<BoardReply, { by: BoardAuthor }>[]; unread: number; sessions: KnownSessions; href: string }) {
-	const authors = [...new Map(replies.map(reply => [authorKey(reply.by), reply.by])).values()].slice(0, 5);
+/** Who replied, how many replies, and when the last came, or while a session works on it a shimmering "Working on it…" in that place, which opens the thread, as under a Slack message. */
+function ThreadSummary({ replies, unread, working, sessions, href }: { replies: Extract<BoardReply, { by: BoardAuthor }>[]; unread: number; working: { sessionId: string | null } | null; sessions: KnownSessions; href: string }) {
+	const worker: BoardAuthor[] = working?.sessionId ? [{ kind: "session", sessionId: working.sessionId }] : [];
+	const authors = [...new Map([...worker, ...replies.map(reply => reply.by)].map(by => [authorKey(by), by])).values()].slice(0, 5);
 	const last = replies.at(-1);
 	return (
 		<a
@@ -500,10 +505,16 @@ function ThreadSummary({ replies, unread, sessions, href }: { replies: Extract<B
 					{unread}
 				</span>
 			)}
-			{last && (
-				<span className="text-[13px] text-muted-foreground group-hover/summary:hidden">
-					Last reply <Age at={last.at} className="tabular-nums" /> ago
+			{working ? (
+				<span className="truncate text-[13px] group-hover/summary:hidden">
+					<span className="shimmer-text">{working.sessionId ? "Working on it…" : "Starting a session…"}</span>
 				</span>
+			) : (
+				last && (
+					<span className="text-[13px] text-muted-foreground group-hover/summary:hidden">
+						Last reply <Age at={last.at} className="tabular-nums" /> ago
+					</span>
+				)
 			)}
 			<span className="hidden flex-1 text-[13px] text-muted-foreground group-hover/summary:inline">View thread</span>
 		</a>
