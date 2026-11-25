@@ -8,6 +8,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header } from "../page-header";
+import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -218,11 +219,20 @@ function StatusBadge({ status, sessions }: { status: BoardStatus; sessions: Know
 	}
 }
 
+/** A Board task's or reply's text as Markdown, with single line breaks kept, as a Bot's message shows. */
+function BoardText({ text }: { text: string }) {
+	return (
+		<div className="max-w-conversation min-w-0 text-sm leading-relaxed">
+			<MessageMarkdown text={text} preset={BOT_MESSAGE_PRESET} />
+		</div>
+	);
+}
+
 /** The message's text, its Board task number, status, and labels. */
 function TaskBody({ state, task, sessions }: { state: BoardState; task: BoardTask; sessions: KnownSessions }) {
 	return (
 		<>
-			<p className="max-w-conversation text-sm leading-relaxed whitespace-pre-wrap text-pretty">{task.text || task.title}</p>
+			<BoardText text={task.text || task.title} />
 			<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
 				<span className="text-xs text-muted-foreground tabular-nums">#{task.id}</span>
 				<StatusBadge status={statusOf(state, task)} sessions={sessions} />
@@ -410,7 +420,7 @@ function Thread({ state, task, sessions, channel, closeHref, disabled, onChange 
 									return (
 										<li key={index}>
 											<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped}>
-												<p className="max-w-conversation text-sm leading-relaxed whitespace-pre-wrap text-pretty">{entry.text}</p>
+												<BoardText text={entry.text} />
 											</MessageRow>
 										</li>
 									);
