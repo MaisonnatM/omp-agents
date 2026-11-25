@@ -192,14 +192,18 @@ export class SessionProcessWatch {
 
 		const previous = this.#seen;
 		this.#seen = new Map();
-		const detached = await this.#detached(table, [...sessions.map(session => session.pid), ...[...previous.values()].flatMap(seen => (seen.omp ? [seen.omp.pid] : []))]);
+		const ompPids = [...sessions.map(session => session.pid), ...[...previous.values()].flatMap(seen => (seen.omp ? [seen.omp.pid] : []))];
+		const detached = await this.#detached(table, ompPids);
+		// A detached tree is one job of one session, keyed by its root's process group, even when two sessions' files name it.
+		const claimed = new Set<ProcessRow[]>();
 		const found: Sample = new Map();
 		for (const session of sessions) {
 			const files = new Set([...(previous.get(session.instanceId)?.files ?? []), ...(session.file === null ? [] : [session.file])]);
 			const groups = sessionGroups(table, session.pid);
 			const byGroup = new Map<number, ProcessRow[]>(groups?.jobs ?? []);
 			for (const { file, rows } of detached) {
-				if (![...files].some(own => startedIn(file, own))) continue;
+				if (claimed.has(rows) || ![...files].some(own => startedIn(file, own))) continue;
+				claimed.add(rows);
 				const pgid = rows[0].pgid;
 				byGroup.set(pgid, [...(byGroup.get(pgid) ?? []), ...rows]);
 			}
@@ -284,22 +288,21 @@ export class SessionProcessWatch {
 	async #detached(table: ProcessTable, ompPids: number[]): Promise<{ file: string; rows: ProcessRow[] }[]> {
 		const roots = [...table.values()].filter(row => row.ppid === 1 && !row.command.includes(OMP_WORKER_PREFIX));
 		const unread = roots.filter(row => !this.#adoptedFiles.has(`${row.pid} ${row.started}`)).map(row => row.pid);
-		const read = unread.length > 0 ? await this.#deps.readSessionFiles(unread) : new Map<number, string>();
+		if (unread.length > 0) {
+			// A failed read leaves the processes unread, so the next sample reads them again.
+			const read = await this.#deps.readSessionFiles(unread);
+			if (read) for (const row of roots) if (unread.includes(row.pid)) this.#adoptedFiles.set(`${row.pid} ${row.started}`, read.get(row.pid) ?? null);
+		}
+		const keys = new Set(roots.map(row => `${row.pid} ${row.started}`));
+		for (const key of this.#adoptedFiles.keys()) if (!keys.has(key)) this.#adoptedFiles.delete(key);
 		const skip = new Set([...ompPids, process.pid]);
-		const known = new Map<string, string | null>();
 		const trees: { file: string; rows: ProcessRow[] }[] = [];
 		for (const row of roots) {
-			const key = `${row.pid} ${row.started}`;
-			const cached = this.#adoptedFiles.get(key);
-			// A failed read leaves the process unread, so the next sample reads it again.
-			const file = cached !== undefined ? cached : read === null ? undefined : (read.get(row.pid) ?? null);
-			if (file === undefined) continue;
-			known.set(key, file);
-			if (file === null) continue;
+			const file = this.#adoptedFiles.get(`${row.pid} ${row.started}`);
+			if (!file) continue;
 			const rows = [row, ...[...descendants(table, row.pid).keys()].flatMap(pid => table.get(pid) ?? [])];
 			if (!rows.some(each => skip.has(each.pid))) trees.push({ file, rows });
 		}
-		this.#adoptedFiles = known;
 		return trees;
 	}
 

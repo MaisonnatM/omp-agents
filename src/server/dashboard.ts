@@ -425,7 +425,7 @@ export class Dashboard {
 				return sessions.rows(factsOf).map(row => ({
 					instanceId: row.instanceId,
 					sessionId: row.sessionId,
-					file: sessions.get(row.instanceId)?.transcriptPath(null, files.pathOf) ?? null,
+					file: sessions.transcriptPath(row.instanceId, null, files.pathOf),
 					pid: row.pid,
 					cwd: row.cwd,
 					status: row.status,
