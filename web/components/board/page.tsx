@@ -4,9 +4,10 @@
  * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
 import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
-import { type KeyboardEvent, type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
+import { Header } from "../page-header";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,11 +44,8 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 	const thread = route.thread === null ? null : (tasks.find(task => task.id === route.thread) ?? null);
 	return (
 		<div className="flex h-full min-h-0 flex-1">
-			<main className="flex min-w-0 flex-1 flex-col">
-				<header className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-5">
-					<IconHashtag aria-hidden className="size-4 text-muted-foreground" />
-					<h1 className="truncate text-[15px] font-bold">{name}</h1>
-				</header>
+			<section aria-label="Board" className="flex min-w-[360px] flex-1 flex-col">
+				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name} />
 				<MessageScrollerProvider autoScroll>
 					<MessageScroller className="flex-1">
 						<MessageScrollerViewport>
@@ -70,7 +68,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 					</MessageScroller>
 				</MessageScrollerProvider>
 				{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
-			</main>
+			</section>
 			{thread && <Thread key={thread.id} state={state} task={thread} sessions={core.sessions} channel={name} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
 		</div>
 	);
@@ -154,7 +152,7 @@ function AuthorName({ by, sessions }: { by: BoardAuthor; sessions: KnownSessions
 	if (by.kind === "user") return <span className="text-[15px] font-bold">You</span>;
 	return (
 		<span className="flex min-w-0 items-center gap-1">
-			<a {...activityControl("board.session.open")} href={hashForSession(by.sessionId)} className="truncate text-[15px] font-bold hover:underline">
+			<a {...activityControl("board.session.open")} href={hashForSession(by.sessionId)} title={sessionLabel(by.sessionId, sessions).name} className="truncate text-sm font-bold hover:underline">
 				{sessionLabel(by.sessionId, sessions).name}
 			</a>
 			<span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">Session</span>
@@ -186,7 +184,7 @@ function MessageRow({ by, at, sessions, grouped, highlighted = false, toolbar, c
 				)}
 				{children}
 			</div>
-			{toolbar && <div className="invisible absolute -top-4 right-5 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 shadow-sm group-focus-within/message:visible group-hover/message:visible">{toolbar}</div>}
+			{toolbar && <div className="invisible absolute -top-4 right-5 z-10 flex items-center gap-0.5 rounded-[7px] border border-border bg-background p-0.5 shadow-sm group-focus-within/message:visible group-hover/message:visible">{toolbar}</div>}
 		</div>
 	);
 }
@@ -224,7 +222,7 @@ function StatusBadge({ status, sessions }: { status: BoardStatus; sessions: Know
 function TaskBody({ state, task, sessions }: { state: BoardState; task: BoardTask; sessions: KnownSessions }) {
 	return (
 		<>
-			<p className="text-[15px] leading-relaxed whitespace-pre-wrap text-pretty">{task.text || task.title}</p>
+			<p className="max-w-conversation text-sm leading-relaxed whitespace-pre-wrap text-pretty">{task.text || task.title}</p>
 			<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
 				<span className="text-xs text-muted-foreground tabular-nums">#{task.id}</span>
 				<StatusBadge status={statusOf(state, task)} sessions={sessions} />
@@ -275,7 +273,7 @@ function ThreadSummary({ replies, sessions, href }: { replies: Extract<BoardRepl
 		<a
 			{...activityControl("board.task.open")}
 			href={href}
-			className="group/summary -ml-1 mt-1 flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background"
+			className="group/summary mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background"
 		>
 			<span className="flex gap-0.5">
 				{authors.map(by => (
@@ -287,7 +285,7 @@ function ThreadSummary({ replies, sessions, href }: { replies: Extract<BoardRepl
 			</span>
 			{last && (
 				<span className="text-[13px] text-muted-foreground group-hover/summary:hidden">
-					Last reply <Age at={last.at} className="tabular-nums" />
+					Last reply <Age at={last.at} className="tabular-nums" /> ago
 				</span>
 			)}
 			<span className="hidden flex-1 text-[13px] text-muted-foreground group-hover/summary:inline">View thread</span>
@@ -359,17 +357,22 @@ function Thread({ state, task, sessions, channel, closeHref, disabled, onChange 
 		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: reply });
 		setText("");
 	};
-	const close = (event: KeyboardEvent<HTMLElement>) => {
-		if (event.key !== "Escape" || event.defaultPrevented) return;
-		event.preventDefault();
-		location.hash = closeHref;
-	};
+	// Escape closes the thread wherever focus is, unless a menu or dialog is open and takes it first.
+	useEffect(() => {
+		const close = (event: globalThis.KeyboardEvent) => {
+			if (event.key !== "Escape" || event.defaultPrevented || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+			event.preventDefault();
+			location.hash = closeHref;
+		};
+		document.addEventListener("keydown", close);
+		return () => document.removeEventListener("keydown", close);
+	}, [closeHref]);
 	// A grey line ends a run of messages, so the reply after it shows its avatar and name again.
 	let previous: { at: number; by: BoardAuthor } | null = task;
 	return (
-		<aside aria-label={`Thread #${task.id}`} onKeyDown={close} className="flex w-[420px] shrink-0 flex-col border-l border-border">
-			<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
-				<h2 className="text-[15px] font-bold">Thread</h2>
+		<aside aria-label={`Thread #${task.id}`} className="flex w-[clamp(320px,40%,420px)] shrink-0 flex-col border-l border-border">
+			<header className="flex min-h-(--page-header-height) shrink-0 items-center gap-2 border-b border-border px-5">
+				<h2 className="text-sm font-semibold">Thread</h2>
 				<span className="flex min-w-0 flex-1 items-center gap-0.5 text-[13px] text-muted-foreground">
 					<IconHashtag aria-hidden className="size-3.5 shrink-0" />
 					<span className="truncate">{channel}</span>
@@ -407,7 +410,7 @@ function Thread({ state, task, sessions, channel, closeHref, disabled, onChange 
 									return (
 										<li key={index}>
 											<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped}>
-												<p className="text-[15px] leading-relaxed whitespace-pre-wrap text-pretty">{entry.text}</p>
+												<p className="max-w-conversation text-sm leading-relaxed whitespace-pre-wrap text-pretty">{entry.text}</p>
 											</MessageRow>
 										</li>
 									);

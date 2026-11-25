@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The Board's header now matches the other pages, its message box spans the channel, messages use the app's text size, the thread pane narrows on small windows, and Escape closes the thread wherever the cursor is.
 - In the Board tab of the sidebar, a Workspace's sessions now sit a little apart from the Workspace above them.
 - The Board now looks and works like a Slack channel: pictures and names on each message, messages grouped by author and split by day, a reply line under each message, a hover toolbar with **Reply in thread**, and a Slack-style thread pane that Escape closes.
 - The Board's message box is now the New session composer: pick the model, thinking level, and skill the session starts on, with `/` suggestions and dictation; the **Needs** picker is gone, and the thread's reply box uses the session composer.
@@ -199,20 +200,3 @@ The dashboard shows the same lines in Settings › What's new.
 - Settings › MCP servers offers Linear in its catalog, and every installed server now shows a logo: Linear's and Marked's marks, and the site's own icon for other servers.
 - Checklists in pull request descriptions no longer show a bullet beside each checkbox.
 - A dashboard that an omp session starts, such as an agent's test run on another port, no longer runs your routines or messages your Bots; only the dashboard you opened does, so two dashboards stop fighting over the same Bot conversation.
-
-## 2026-11-18
-
-- The Artifacts tab takes the look of Claude's artifacts: one thin bar on top with the artifact's name, Preview and Source, and the actions, and the artifact filling the rest of the tab.
-- With two or more artifacts, click the name at the top of the Artifacts tab to pick another from a menu.
-- A bar at the bottom of the Artifacts tab steps to the older or newer version with its arrows, and Version 2 of 3 opens a menu of every version with its note.
-- A Markdown artifact reads as a document: a centered column with larger headings and more space between lines.
-- Each artifact in a conversation shows as a card with an icon, its title, and its kind, version, and note; click anywhere on it to open it.
-- Agents can now run a helper on Fable 5.2 or Grok 4.7, so an arena can compare them with the other models.
-- Changed files appear at once with a quick fade, instead of sliding in one after another.
-- The Files section of Overview has no Review button anymore; click a file, or press Cmd+Shift+G, to open the changes.
-- The Files, Images, and Sources headers in Overview are shorter.
-- The window's top row is shorter: the header tabs keep the same small gap above and below them that the page keeps from the window's edges, and the sidebar toggle, back and forward, + and the macOS window buttons all line up with the tabs.
-- The grid and sun behind New session are blue again, as they were before the new look turned them grey.
-- Tool calls in a conversation are back to one line each with the tool's icon, name, and summary, under a "Ran N tools" line that says how many failed, instead of the small cards.
-- A reply's work shows as one Working group: the thinking, the tool calls, and the messages the agent writes between them fold into it, and only its last message stays below. On a Bot's page those messages still show as messages.
-- The Working group says how long the reply worked, "Worked for 2 min 13 s", counting up while it runs, and an artifact the reply saves now shows its card under that group instead of splitting it in two.

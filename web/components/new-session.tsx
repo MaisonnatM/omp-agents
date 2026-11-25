@@ -205,7 +205,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	// The Board keeps no attachments or schedule, since its log holds text only.
 	const composer = (
 		<ComposerEditor value={editorRef}>
-			<div className="mx-auto w-full max-w-conversation px-3 pb-3">
+			{/* On the Board the composer spans the channel, as Slack's does. */}
+			<div className={board ? "w-full px-5 pb-3" : "mx-auto w-full max-w-conversation px-3 pb-3"}>
 				<div className="relative">
 					{completion.popup}
 					<InputMessage
