@@ -249,7 +249,14 @@ function WorkingLine({ sessionId, sessions, href }: { sessionId: string | null; 
 					<IconAiBotHead className="size-4" />
 				</span>
 			)}
-			<span className="shimmer-text text-[13px]">{sessionId ? `${sessionLabel(sessionId, sessions).name} is on it…` : "Starting a session…"}</span>
+			{sessionId ? (
+				<span className="flex min-w-0 items-baseline gap-1.5 text-[13px]">
+					<span className="shimmer-text shrink-0">Working on it…</span>
+					<span className="truncate text-muted-foreground">{sessionLabel(sessionId, sessions).name}</span>
+				</span>
+			) : (
+				<span className="shimmer-text text-[13px]">Starting a session…</span>
+			)}
 		</a>
 	);
 }
@@ -429,7 +436,7 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 		scrollsItself: true,
 		content: (
 			<>
-				<ThreadMessages task={task} sessions={sessions} />
+				<ThreadMessages state={state} task={task} sessions={sessions} />
 				<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
 			</>
 		),
@@ -488,7 +495,9 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 }
 
 /** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. */
-function ThreadMessages({ task, sessions }: { task: BoardTask; sessions: KnownSessions }) {
+function ThreadMessages({ state, task, sessions }: { state: BoardState; task: BoardTask; sessions: KnownSessions }) {
+	const status = statusOf(state, task);
+	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const replies = said(task);
 	const count = replies.length;
 	let previous: { at: number; by: BoardAuthor } = task;
@@ -517,6 +526,11 @@ function ThreadMessages({ task, sessions }: { task: BoardTask; sessions: KnownSe
 								);
 							})}
 						</ol>
+						{(status.kind === "ready" || status.kind === "claimed") && (
+							<div className="px-5 pt-1">
+								<WorkingLine sessionId={session} sessions={sessions} href={session ? hashForSession(session) : ""} />
+							</div>
+						)}
 					</MessageScrollerContent>
 				</MessageScrollerViewport>
 				<MessageScrollerButton />
