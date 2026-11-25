@@ -119,7 +119,7 @@ export default function boardExtension(pi: ExtensionAPI) {
 		action: z.enum(["post", "reply", "claim", "renew", "done", "list", "read"]).describe("what to do"),
 		task: z.number().int().positive().optional().describe("reply, claim, renew, done, read: the Board task's number, without the #"),
 		title: z.string().max(MAX_TITLE).optional().describe("post: one line saying what the Board task asks for"),
-		text: z.string().max(MAX_TEXT).optional().describe("post: the details; reply: the reply; done: what was done, which the thread keeps. Markdown, shown rendered: a short lead line, then bullets or a numbered list, one point per item, with `code` for paths and commands; never one long paragraph. A reply or done text may end on a `Suggestions:` line and one to three numbered prompts, the user's likeliest next replies, which the Board thread offers in its reply box"),
+		text: z.string().max(MAX_TEXT).optional().describe("post: the details; reply: the reply; done: the outcome the thread shows the user. Markdown, shown rendered: a short lead line, then bullets or a numbered list, one point per item, with `code` for paths and commands; never one long paragraph, never a Suggestions block"),
 		labels: z.record(z.string().max(40), z.string().max(80)).optional().describe("post: key=value labels, such as area=web"),
 		needs: z.array(z.number().int().positive()).max(20).optional().describe("post: the Board tasks that must be done before this one is ready"),
 		workspace: z.string().optional().describe("post, list: the Workspace's directory; defaults to this session's; list takes all for every Workspace"),
@@ -130,7 +130,7 @@ export default function boardExtension(pi: ExtensionAPI) {
 		description: [
 			"The omp-agents dashboard's Board: Board tasks for sessions in a Workspace, each with a Board thread.",
 			"The dashboard starts a new session on each ready Board task; a session it starts claims it first, which holds a 15-minute lease.",
-			"Renew the lease while you work, reply on the thread to ask or answer, and mark it done with what you did, which makes the Board tasks that need it ready.",
+			"Renew the lease while you work, reply on the thread only to ask, and when the work is done land it (or open a draft PR where the repository has no .omp/land.json), mark it done with the outcome, which makes the Board tasks that need it ready, then end the session.",
 			"A reply reaches the session that holds the claim, and wakes it if it stopped.",
 		].join(" "),
 		parameters: input,

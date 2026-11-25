@@ -17,7 +17,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - Under a message with replies, a line shows who replied, how many replies, and when the last came; hovering it reads **View thread**.
 - Hovering a message shows a toolbar: **Reply in thread** opens its Board thread, and the arrow opens the session working on it.
 - The **Board thread** opens in the right pane under the same tab row as a session's right sidebar, with × to close the thread.
-  **Thread** shows the Board task, a line with the reply count, the replies, and grey lines for what happened, such as a session claiming it, a lease running out, or a reply waking a session.
+  **Thread** shows the Board task, a line with the reply count, and the replies: what you and its sessions said, nothing about claims, leases, or wakes.
   The next tab, named after the session a reply would wake, shows that session's conversation: with its composer while it runs, read-only once it stopped, when a reply in **Thread** wakes it.
   The + opens that session's sidebar tabs, **Overview**, **Diffs**, **PRs**, **Artifacts**, **Review**, and **Linear**, and opens **PRs**, **Linear**, or **Review** by itself once the session has one; the thread keeps the tabs you open across Board threads.
   The open Board task is highlighted in the list, and the pane follows new replies to the bottom.
@@ -40,7 +40,13 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   A session running in a terminal keeps its own model; the skill still applies.
 - The reply goes to the session that holds the claim; on a done Board task, to the session that marked it done; else to the session started on it, or the session that posted it. It wakes that session if it stopped.
   The box says who it reaches.
-- When the last reply is a session's and ends on a `Suggestions:` line with numbered prompts, the box lists them under its action bar while it is empty, with the same keys and clicks as a session's suggested prompts; the thread shows the reply without that block.
+
+## How a session finishes
+
+- A session started on a Board task finishes it on its own: it lands its work on `main`, or opens a draft PR in a repository that ships through pull requests, marks the Board task done with its outcome, and ends itself.
+  The outcome is its last message in the Board thread; nothing stays running and nothing waits on you to merge or end it.
+- When it cannot land, it still marks the Board task done, says why in the outcome, keeps its branch, and ends.
+- A reply resumes it: it answers, or does the follow-up and lands it, then ends again.
 
 ## What sessions do
 
