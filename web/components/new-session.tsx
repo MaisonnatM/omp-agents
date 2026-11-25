@@ -63,8 +63,8 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/** Only the composer, docked under the Board's messages: sending posts a Board task, so it attaches no files and schedules nothing. */
-	board?: boolean;
+	/** Only the composer, docked in the Board: sending posts a Board task or a reply with what `placeholder` and `sendLabel` say, so it attaches no files, schedules nothing, and picks no directory. */
+	board?: { placeholder: string; sendLabel: string };
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -90,7 +90,7 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, projectId, onDropProject, scheduled, draftKey, board = false }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, projectId, onDropProject, scheduled, draftKey, board }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const pickFiles = useRef<(accept?: string) => void>(null);
@@ -187,7 +187,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	// A private draft lists what ending it deletes and what stays under the composer.
 	const panel = scheduled || !isPrivate ? null : <PrivateFacts />;
 	const { backdrop, picker: backdropPicker } = useNewSessionBackdrop(cn(HEADER_PILL, "cursor-pointer bg-transparent text-muted-foreground hover:bg-hover hover:text-foreground"));
-	const pickers = (
+	const pickers = board ? null : (
 		<>
 			<DirectoryPicker
 				cwd={cwd}
@@ -224,7 +224,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 								setDraft("");
 							} else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
 						}}
-						placeholder={scheduled ? "Message this session…" : board ? `Message ${folderName(cwd) ?? cwd}: a session starts on it` : "Describe the work; omp starts when you send it"}
+						placeholder={scheduled ? "Message this session…" : board ? board.placeholder : "Describe the work; omp starts when you send it"}
 						files={attachments.files}
 						onFilesChange={attachments.onFilesChange}
 						accept={ATTACH_ACCEPT}
@@ -245,7 +245,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						disabled={starting || !connected}
 						locked={dictation.locked}
 						beforeEditor={<DictationRow dictation={dictation} />}
-						sendLabel={scheduled ? "Save" : board ? "Post and start a session" : starting ? "Starting session" : "Start session"}
+						sendLabel={scheduled ? "Save" : board ? board.sendLabel : starting ? "Starting session" : "Start session"}
 						sending={starting || save.pending}
 						editorProps={{
 							...completion.editorProps,

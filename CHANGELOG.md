@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- A reply in a Board thread now reaches a session even after its Board task is done: it wakes the session that finished it. The reply box is now the full New session composer, so you pick the model, thinking level, and skill the woken session runs on, and the Board's message box drops its workspace picker; the sidebar switches Workspaces.
 - On the Board, your messages and replies now show your Slack profile picture when Slack is connected in Settings › Integrations.
 - Board messages and replies now show as formatted text, with lists, code, and links, and sessions are told to write their Board replies as a short lead line and a list instead of one long paragraph.
 - The Board thread's pane can be resized: drag its left edge, and the page remembers the width. Its reply box is now the session composer, with suggestions when you type a slash or an at sign, dictation, and an unsent reply kept per thread.

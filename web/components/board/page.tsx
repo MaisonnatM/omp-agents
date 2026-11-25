@@ -4,7 +4,7 @@
  * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
 import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
-import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header } from "../page-header";
@@ -12,22 +12,16 @@ import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { InputMessage } from "@/components/ui/input-message";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson } from "../../api";
 import { activityControl } from "../../activity";
-import { boardDraftKey, boardThreadDraftKey, useComposerDraft } from "../../composer-drafts";
-import { useShortcuts } from "../../shortcuts";
+import { boardDraftKey, boardThreadDraftKey } from "../../composer-drafts";
 import { useStoredState } from "../../stored-state";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
-import { useCompletion } from "../completion-popup";
-import { ComposerEditor } from "../composer";
-import { DictationButton, DictationRow, useDictation } from "../composer-dictation";
 import { Separator, useDragSeparator } from "../drag-separator";
-import type { PromptEditorHandle } from "../prompt-editor";
 import { useDashboardActions } from "../dashboard-context";
 import type { CoreData } from "../module-views";
 import { NewSession } from "../new-session";
@@ -345,7 +339,7 @@ function Composer({ workspace, core, disabled, onChange }: { workspace: Workspac
 	return (
 		<div {...activityControl("board.post")} className="shrink-0">
 			<NewSession
-				board
+				board={{ placeholder: `Message ${folder(workspace.cwdDisplay)}: a session starts on it`, sendLabel: "Post and start a session" }}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
 				launch={null}
@@ -489,65 +483,31 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 	);
 }
 
-/** The thread's reply box, the session composer without its pickers: `/` and `@` suggestions, dictation, and a draft kept per Board task. */
+/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session it is for on the model, thinking level, and skill picked here. */
 function ThreadComposer({ task, core, workspace, disabled, onChange }: { task: BoardTask; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
-	const editorRef = useRef<PromptEditorHandle>(null);
-	const draftKey = boardThreadDraftKey(task.id);
-	const [draft, setDraft] = useComposerDraft(draftKey, "");
 	const target = wakeTarget(task, { kind: "user" });
-	const completion = useCompletion({
-		editorRef,
-		draft,
-		setDraft,
-		completions: core.newSessionCompletions,
-		onComplete: (reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd: workspace.cwd }, text, cursor }),
-		composer: { sessionId: target, changed: [] },
-	});
-	const dictation = useDictation({ composer: disabled ? null : { draftKey, cwd: workspace.cwd }, text: draft, editorRef, send, connected: !disabled });
-	const onComposerKey = useShortcuts({
-		dictate: dictation.toggle,
-		focusComposer: () => {
-			const editor = editorRef.current;
-			if (!editor?.editable()) return false;
-			editor.focus();
-		},
-	});
-	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-		if (completion.onMenuKeyDown(event)) return;
-		dictation.onKeyDown(event);
-		onComposerKey(event);
-		// Escape leaves the reply box first, as in a session's composer; a second one closes the thread.
-		if (!event.defaultPrevented && event.key === "Escape") {
-			event.currentTarget.blur();
-			event.preventDefault();
-		}
-	};
-	const reply = (value: string) => {
-		const text = value.trim();
-		if (!text || disabled) return;
-		completion.close();
-		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text });
-		setDraft("");
+	const name = target ? sessionLabel(target, core.sessions).name : null;
+	const reply = ({ prompt, model, thinking, skill }: { prompt: string; model: BoardLaunch["model"]; thinking: string | null; skill: string | null }) => {
+		if (!prompt || disabled) return;
+		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: prompt, launch: { model, thinking, skill } });
 	};
 	return (
-		<ComposerEditor value={editorRef}>
-			<div {...activityControl("board.reply")} className="relative shrink-0 px-3 pb-3">
-				{completion.popup}
-				<InputMessage
-					editorRef={editorRef}
-					value={draft}
-					onValueChange={completion.onValueChange}
-					onSend={reply}
-					placeholder={target ? `Reply to ${sessionLabel(target, core.sessions).name}…` : "Reply…"}
-					rightSlot={() => <DictationButton dictation={dictation} />}
-					disabled={disabled}
-					locked={dictation.locked}
-					beforeEditor={<DictationRow dictation={dictation} />}
-					sendLabel={target ? "Send reply; it wakes the session if it stopped" : "Send reply"}
-					editorProps={{ ...completion.editorProps, onKeyDown }}
-				/>
-			</div>
-		</ComposerEditor>
+		<div {...activityControl("board.reply")} className="shrink-0">
+			<NewSession
+				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply" }}
+				cwd={workspace.cwd}
+				workspaces={core.workspaces}
+				launch={null}
+				connected={!disabled}
+				completions={core.newSessionCompletions}
+				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd: workspace.cwd }, text, cursor })}
+				onPickCwd={() => {}}
+				onStart={reply}
+				todo={null}
+				projectId={null}
+				draftKey={boardThreadDraftKey(task.id)}
+			/>
+		</div>
 	);
 }

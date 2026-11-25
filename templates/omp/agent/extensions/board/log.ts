@@ -27,7 +27,7 @@ export interface BoardLaunch {
  */
 export type BoardChange =
 	| { op: "post"; by: BoardAuthor; workspace: string; title: string; text?: string; labels?: Record<string, string>; needs?: number[]; launch?: BoardLaunch }
-	| { op: "reply"; by: BoardAuthor; task: number; text: string }
+	| { op: "reply"; by: BoardAuthor; task: number; text: string; launch?: BoardLaunch }
 	| { op: "claim"; sessionId: string; task: number }
 	| { op: "renew"; sessionId: string; task: number }
 	| { op: "done"; sessionId: string; task: number; text?: string }
@@ -63,7 +63,8 @@ export type BoardNote =
 	| { kind: "woke"; sessionId: string }
 	| { kind: "done"; sessionId: string };
 
-export type BoardReply = { at: number; by: BoardAuthor; text: string } | { at: number; note: BoardNote };
+/** A reply keeps the model, thinking level, and skill picked for the session it wakes, which a session's own reply leaves out. */
+export type BoardReply = { at: number; by: BoardAuthor; text: string; launch?: BoardLaunch } | { at: number; note: BoardNote };
 
 export interface BoardTask {
 	id: number;
@@ -112,12 +113,13 @@ export const lapsed = (state: BoardState, now: number): BoardTask[] =>
 	state.tasks.filter(task => task.doneAt === null && (task.claim ? task.claim.until <= now : task.start !== null && task.start.at + LEASE_MS <= now));
 
 /**
- * The session a reply on `task` by `by` wakes: the claimer, else the thread's author when a session wrote it; never
- * the replier itself, and nobody once the Board task is done.
+ * The session a reply on `task` by `by` wakes: the claimer; on a done Board task, the session that marked it done;
+ * else the session started on it, else the thread's author when a session wrote it; never the replier itself.
  */
 export function wakeTarget(task: BoardTask, by: BoardAuthor): string | null {
-	if (task.doneAt !== null) return null;
-	const target = task.claim?.sessionId ?? (task.by.kind === "session" ? task.by.sessionId : null);
+	let finisher: string | null = null;
+	for (const entry of task.replies) if ("note" in entry && entry.note.kind === "done") finisher = entry.note.sessionId;
+	const target = task.claim?.sessionId ?? (task.doneAt !== null ? finisher : null) ?? task.start?.sessionId ?? (task.by.kind === "session" ? task.by.sessionId : null);
 	return target !== null && !(by.kind === "session" && by.sessionId === target) ? target : null;
 }
 
@@ -181,7 +183,7 @@ export function fold(state: BoardState, event: BoardEvent): BoardState {
 	const note = (task: BoardTask, note: BoardNote): BoardTask => ({ ...task, replies: [...task.replies, { at, note }] });
 	switch (event.op) {
 		case "reply":
-			return { ...state, tasks: edit(event.task, task => ({ ...task, replies: [...task.replies, { at, by: event.by, text: event.text.trim() }] })) };
+			return { ...state, tasks: edit(event.task, task => ({ ...task, replies: [...task.replies, { at, by: event.by, text: event.text.trim(), ...(event.launch ? { launch: event.launch } : {}) }] })) };
 		case "claim":
 			return { ...state, tasks: edit(event.task, task => note({ ...task, claim: { sessionId: event.sessionId, at, until: at + LEASE_MS } }, { kind: "claimed", sessionId: event.sessionId })) };
 		case "renew":
@@ -278,7 +280,8 @@ export function parseChange(value: unknown, server = true): BoardChange | null {
 		}
 		case "reply": {
 			const by = parseAuthor(value.by);
-			return by && isId(value.task) && isText(value.text, MAX_TEXT) ? { op: "reply", by, task: value.task, text: value.text } : null;
+			const launch = parseLaunch(value.launch);
+			return by && launch !== null && isId(value.task) && isText(value.text, MAX_TEXT) ? { op: "reply", by, task: value.task, text: value.text, ...(launch ? { launch } : {}) } : null;
 		}
 		case "claim":
 		case "renew":
