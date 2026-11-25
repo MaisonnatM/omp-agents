@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- `/ship` now runs the no-comments pass at the end of Implement, before the checks and the draft PR, so reviews start from a diff without stray comments.
 - A long question from a session now reads as a bold first line over plain text that keeps its line breaks and lists, instead of one wall of bold text.
 - A session asking several questions now offers Next beside Back once a question is answered, so you can move both ways between them.
 - Fixed: a dev server or test browser that a session started in the background, such as with nohup, now counts as that session's process, so it stops once the session sits idle or ends instead of running on and filling the Mac's memory.
