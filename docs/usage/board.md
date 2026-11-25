@@ -17,6 +17,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - The **Board thread** opens in the right pane, headed **Thread** and the Workspace's name: the Board task, a line with the reply count, the replies, and grey lines for what happened, such as a session claiming it, a lease running out, or a reply waking a session.
   The open Board task is highlighted in the list, and the pane follows new replies to the bottom.
   The cross or Escape closes it.
+  Drag its left edge to widen or narrow it, or use the arrow keys on that edge; a double-click puts it back to its usual width, and the page remembers the width.
 
 ## Post a Board task
 
@@ -30,6 +31,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 ## Reply
 
 - Type in the box at the foot of the Board thread and press Enter or **Send**.
+  It is the session composer without its pickers: `/` and `@` suggest, the microphone dictates, and each Board thread keeps its unsent reply.
 - The reply goes to the session that holds the claim, or, when nobody holds one, to the session that posted the Board task, and wakes it if it stopped.
   The box says who it reaches.
 

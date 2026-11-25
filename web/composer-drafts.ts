@@ -22,6 +22,9 @@ export const botDraftKey = (id: BotId): string => `bot/${id}`;
 /** The draft of the Board's composer in Workspace `cwd`. */
 export const boardDraftKey = (cwd: string): string => `board/${cwd}`;
 
+/** The draft of the reply box in Board task `task`'s Board thread. */
+export const boardThreadDraftKey = (task: number): string => `board/thread/${task}`;
+
 /** Puts `text` in the composer of `key` for its next mount; `""` forgets it. */
 export const putDraft = (key: string, text: string): void => drafts.set(key, text === "" ? null : text);
 
