@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- A long question from a session now reads as a bold first line over plain text that keeps its line breaks and lists, instead of one wall of bold text.
+- A session asking several questions now offers Next beside Back once a question is answered, so you can move both ways between them.
 - Behind the scenes: menus, dialogs, tabs, tooltips, and the command palette now run on one interface library, UI SDK, in place of three, so they behave the same way everywhere.
 - The New session page has a Background menu in its header: pick Retro grid, Aurora, Fire, Eclipse, Black hole, Horizon, Galaxy, or Globe; the dashboard remembers your pick.
 - A session waiting on CI no longer lists its pull requests under its row; its row shows a clock with how many still wait on checks and a red cross with how many fail.

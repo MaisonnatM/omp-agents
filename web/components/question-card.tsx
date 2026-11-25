@@ -96,9 +96,15 @@ export function QuestionCard({ question, checked, defaultText = "", header, foot
 			<motion.div animate={{ height: contentHeight }} initial={false} transition={spring.slow} className="overflow-hidden">
 				<div ref={contentRef} className={cn(padX, question.kind === "text" ? "pb-1" : compact ? "pb-2 sm:pb-2.5" : "pb-2.5 sm:pb-3")}>
 					<div className="flex flex-col gap-2">
+						{/* A long question reads as a bold first line over plain body text that keeps its line breaks and list items. */}
 						<h3 id={titleId} className="text-[16px] text-foreground leading-snug" style={{ fontVariationSettings: fontWeights.semibold }}>
-							{question.title}
+							{question.title.split("\n", 1)[0]}
 						</h3>
+						{question.title.includes("\n") && (
+							<p className="max-h-[50vh] overflow-y-auto text-[14px] text-foreground/85 leading-relaxed whitespace-pre-wrap">
+								{question.title.slice(question.title.indexOf("\n") + 1).trim()}
+							</p>
+						)}
 						{question.description && (
 							<p className="text-[13px] text-muted-foreground leading-snug whitespace-pre-wrap">{question.description}</p>
 						)}
