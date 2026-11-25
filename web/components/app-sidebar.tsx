@@ -3,7 +3,7 @@ import { memo, type ReactNode, useMemo } from "react";
 import type { View } from "../../src/shared/sessions";
 import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";
-import { SidebarContent } from "@/components/ui/sidebar";
+import { SidebarContent, SidebarGroup, SidebarMenu } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { type BotRow, botsNeedingYou } from "../bots-model";
@@ -23,7 +23,7 @@ import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Roster } from "./roster";
-import { type NavCount, SidebarNav } from "./sidebar-nav";
+import { type NavCount, NotificationsRow, SettingsRow, SidebarNav } from "./sidebar-nav";
 
 const NO_VIEWS: View[] = [];
 
@@ -118,7 +118,17 @@ export const AppSidebar = memo(function AppSidebar({
 				</SegmentedTabs>
 			)}
 			{onBoard ? (
-				<BoardSidebar route={page} state={board} workspaces={workspaces} picked={workspace} sessions={known} bots={botList} />
+				<>
+					<SidebarGroup className="shrink-0 py-1">
+						<nav aria-label="Pages">
+							<SidebarMenu className="gap-px">
+								<NotificationsRow unread={unreadNotices} active={false} />
+								<SettingsRow route={settings} active={false} />
+							</SidebarMenu>
+						</nav>
+					</SidebarGroup>
+					<BoardSidebar route={page} state={board} workspaces={workspaces} picked={workspace} sessions={known} bots={botList} />
+				</>
 			) : (
 				<>
 					<SidebarNav

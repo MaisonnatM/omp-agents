@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The Board sidebar now has **Notifications**, with its unread count, and **Settings** rows above the Workspaces, as the Sessions sidebar does.
 - The Board sidebar's Bot groups now look and fold like the workspace groups in Sessions, smaller than before, and the Workspaces and Bots headers each fold their whole list.
 - A Board task that already has a thread now shows "Working on it…" inside its thread summary, in place of "Last reply", with the working session's face first, as Slack does, instead of a second row under it.
 - The Board sidebar's Bot groups, Pinned, each section, and Other Bots, now fold open and shut when you click them, instead of opening the gallery of every Bot.

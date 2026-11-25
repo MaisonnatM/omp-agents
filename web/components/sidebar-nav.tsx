@@ -54,24 +54,7 @@ export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNew
 							</SidebarMenuButton>
 						</Tooltip>
 					</SidebarMenuItem>
-					<SidebarMenuItem>
-						<Tooltip content="Notifications" side="right">
-							<SidebarMenuButton
-								size="short"
-								asChild
-								icon={PAGE_ICON.notifications}
-								isActive={current === "notifications"}
-								aria-label={unreadNotices > 0 ? `Notifications, ${unreadNotices} unread` : undefined}
-							>
-								<a href={hashForNotifications()}>Notifications</a>
-							</SidebarMenuButton>
-						</Tooltip>
-						{unreadNotices > 0 && (
-							<SidebarMenuBadge aria-hidden>
-								<CountPill count={unreadNotices} />
-							</SidebarMenuBadge>
-						)}
-					</SidebarMenuItem>
+					<NotificationsRow unread={unreadNotices} active={current === "notifications"} />
 					{tabs.map(tab => {
 						const { label, icon } = TAB_ROWS[tab];
 						const counted = counts[tab];
@@ -94,17 +77,42 @@ export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNew
 							</Fragment>
 						);
 					})}
-					<SidebarMenuItem>
-						<Tooltip content="Settings" shortcut={shortcutLabels("settings")} side="right">
-							<SidebarMenuButton size="short" asChild icon={PAGE_ICON.settings} isActive={current === "settings"}>
-								<a href={hashForPage({ kind: "settings", ...settingsRoute })}>Settings</a>
-							</SidebarMenuButton>
-						</Tooltip>
-					</SidebarMenuItem>
+					<SettingsRow route={settingsRoute} active={current === "settings"} />
 					{/* Settings' list, and the list of a page whose tab the user hid in Preferences, which has no row of its own. */}
 					{current !== null && !tabs.some(tab => tab === current) && sub}
 				</SidebarMenu>
 			</nav>
 		</SidebarGroup>
+	);
+}
+
+/** The Notifications row, with its unread count after its label. */
+export function NotificationsRow({ unread, active }: { unread: number; active: boolean }) {
+	return (
+		<SidebarMenuItem>
+			<Tooltip content="Notifications" side="right">
+				<SidebarMenuButton size="short" asChild icon={PAGE_ICON.notifications} isActive={active} aria-label={unread > 0 ? `Notifications, ${unread} unread` : undefined}>
+					<a href={hashForNotifications()}>Notifications</a>
+				</SidebarMenuButton>
+			</Tooltip>
+			{unread > 0 && (
+				<SidebarMenuBadge aria-hidden>
+					<CountPill count={unread} />
+				</SidebarMenuBadge>
+			)}
+		</SidebarMenuItem>
+	);
+}
+
+/** The Settings row, opening `route`'s section. */
+export function SettingsRow({ route, active }: { route: SettingsRoute; active: boolean }) {
+	return (
+		<SidebarMenuItem>
+			<Tooltip content="Settings" shortcut={shortcutLabels("settings")} side="right">
+				<SidebarMenuButton size="short" asChild icon={PAGE_ICON.settings} isActive={active}>
+					<a href={hashForPage({ kind: "settings", ...route })}>Settings</a>
+				</SidebarMenuButton>
+			</Tooltip>
+		</SidebarMenuItem>
 	);
 }
