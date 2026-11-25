@@ -6,7 +6,7 @@ import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { RosterHost, View } from "../src/shared/sessions";
 import { needsYou } from "./attention";
 import { statusLabel } from "./components/status-dot";
-import { plainMarkdown } from "./labels";
+import { plainMarkdown } from "../src/shared/plain-markdown";
 import type { BotRoutineRoute, Page } from "./routing";
 
 /** The running session of the Bot's conversation, `null` while none runs. */

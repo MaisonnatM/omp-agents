@@ -46,4 +46,6 @@ A post goes to the Workspace of the session's directory, the main checkout of a 
 
 `BoardPage` in `web/components/board/page.tsx` draws the Workspaces from the core data with a count of ready Board tasks and the sessions the Board names, the open Workspace's Board tasks with their status, and the open Board thread.
 Its address is `#board?workspace=<dir>`, and `#board/<n>?workspace=<dir>` opens Board task `n`'s Board thread.
+`q=<words>` shows the search results, with `in=thread` or `in=all` widening or narrowing them from the open Workspace, and `reply=<index>` highlights that reply of the open Board thread.
+`searchBoard` in `web/components/board/search.ts` runs the search on the page's copy of the Board, so the server answers no search request.
 The page sends `post` and `reply` as the user; the server parses them with `BOARD_MODULE.store.parse`, which accepts nothing else from the page.
