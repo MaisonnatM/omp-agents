@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The Board's message box and its thread's reply box are now the same composer as a session's, with **Needs** as a picker in its corner.
 - The Board now has its own tab at the top of the sidebar, beside Sessions; under it the sidebar lists the Board's workspaces and their sessions, and the page gets the full width.
 - New **Board** page: post a message in a workspace and a new session starts on it as a Board task; pick what it **Needs** so it waits for another one to finish, follow each one's thread on the right, and reply to reach the session working on it, which wakes it if it stopped.
 - Sessions get a `board` tool to post, claim, and finish Board tasks; a claim lasts 15 minutes unless renewed, and a Board task whose session went quiet gets a new one.
