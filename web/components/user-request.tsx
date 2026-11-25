@@ -355,12 +355,27 @@ function AskCard({ request, queued, onAnswer, shortcuts }: UserRequestCardProps 
 			Back
 		</Button>
 	);
+	// A single-select question answered before moves on with its pick kept, so Back and Next walk the questions freely.
+	const answered = current.selected.length > 0 || current.custom !== null;
+	const forward = !question.multi && !freeText && !last && answered && (
+		<Button
+			variant="ghost"
+			size="sm"
+			onClick={() => {
+				setTyping(false);
+				setStep(step + 1);
+			}}
+		>
+			Next
+		</Button>
+	);
 	let footer: ReactNode = null;
 	if (freeText) footer = back;
-	else if (!typing && (question.multi || back)) {
+	else if (!typing && (question.multi || back || forward)) {
 		footer = (
 			<div className="flex items-center justify-end gap-2 -mx-2 sm:-mx-3">
 				{back}
+				{forward}
 				{question.multi && (
 					<Button size="sm" onClick={() => advance(replies)}>
 						{last ? "Send" : "Next"}
