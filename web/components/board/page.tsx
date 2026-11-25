@@ -4,7 +4,7 @@
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconUser } from "central-icons";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconRobot, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { type PastSession, type PromptImage, type RosterHost, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -40,6 +40,8 @@ import { boardTabsOn, WorkspaceTab } from "./tabs";
 import { boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, THREAD_TABS } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
+import { botRows } from "../../bots-model";
+import { BotsGallery } from "../bots/bots-gallery";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -54,6 +56,17 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 	const [off] = useModulesOff();
 	const searchField = useRef<BoardSearchFieldHandle>(null);
 	if (state === null) return <p className="px-6 py-6 text-sm text-muted-foreground">Loading the Board…</p>;
+	if (route.bots)
+		return (
+			<section aria-label="Bots" className="flex min-h-0 min-w-[360px] flex-1 flex-col">
+				<Header leading={<IconRobot aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title="Bots" />
+				<HeaderTitleShown.Provider value={false}>
+					<div className="flex min-h-0 flex-1">
+						<BotsGallery rows={core.bots && botRows(core.bots, core.sessions.hosts, core.botLasts)} routines={core.routines} />
+					</div>
+				</HeaderTitleShown.Provider>
+			</section>
+		);
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
 	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";

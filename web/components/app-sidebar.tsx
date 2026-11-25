@@ -118,7 +118,7 @@ export const AppSidebar = memo(function AppSidebar({
 				</SegmentedTabs>
 			)}
 			{onBoard ? (
-				<BoardSidebar route={page} state={board} workspaces={workspaces} picked={workspace} sessions={known} />
+				<BoardSidebar route={page} state={board} workspaces={workspaces} picked={workspace} sessions={known} bots={botList} />
 			) : (
 				<>
 					<SidebarNav
