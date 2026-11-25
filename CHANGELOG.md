@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The Board now jumps to the bottom when you post a message or reply in a thread, even if you had scrolled up, and keeps following new messages from there; a thread opened on a picked reply holds still until you reply.
 - The tab row under a Workspace's name on the Board is gone; the Board shows its tasks, and the Board thread keeps its own tabs.
 - Fixed: the rule under the Board's tabs no longer flickers a pixel up and down when you click a tab.
 - A Board task still in work now reads "Working on it…" followed by its session's name, instead of "<session> is on it…", and its open thread shows the same line under the replies.
