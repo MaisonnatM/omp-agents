@@ -7,11 +7,10 @@
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { hashForSession, type PastSession, type RosterHost, type View } from "../../../src/shared/sessions";
-import { splitSuggestions } from "../../../src/shared/transcript";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
-import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from "@/components/ui/message-scroller";
@@ -406,26 +405,6 @@ function Composer({ workspace, core, disabled, onChange }: { workspace: Workspac
 	);
 }
 
-/** The thread's grey line for a note, or null for routine lease steps the thread does not show. */
-function noteText(note: BoardNote, sessions: KnownSessions): string | null {
-	const name = (id: string | null): string => (id === null ? "The session" : sessionLabel(id, sessions).name);
-	switch (note.kind) {
-		case "started":
-		case "claimed":
-		case "renewed":
-		case "done":
-			return null;
-		case "start-failed":
-			return `No session could start on it: ${note.error}`;
-		case "expired":
-			return `${name(note.sessionId)}'s lease ran out, so a new session starts on it.`;
-		case "unclaimed":
-			return `${name(note.sessionId)} never claimed it, so a new session starts on it.`;
-		case "woke":
-			return `${name(note.sessionId)} had stopped. The reply woke it.`;
-	}
-}
-
 const THREAD_WIDTH = 400;
 const MIN_THREAD = 320;
 const MAX_THREAD = 900;
@@ -435,7 +414,7 @@ const STEP = 16;
 
 const clampThread = (width: number, room: number): number => Math.round(Math.max(MIN_THREAD, Math.min(MAX_THREAD, room - MIN_CHANNEL, width)));
 
-/** The Board thread as Slack's thread pane, at the width you drag its left edge to, under the session details sidebar's tab row: **Thread**, the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; then the conversation and sidebar tabs of the session its replies wake. Escape closes it. */
+/** The Board thread as Slack's thread pane, at the width you drag its left edge to, under the session details sidebar's tab row: **Thread**, the Board task, a line with the reply count, the replies, and the reply box; then the conversation and sidebar tabs of the session its replies wake. Escape closes it. */
 function Thread({ state, task, reply, core, workspace, channel, closeHref, onSearch, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; core: CoreData; workspace: Workspace; channel: string; closeHref: string; onSearch: () => void; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const sessions = core.sessions;
 	// The thread and its reply box address the same session; a thread with none, or one not listed yet, shows only **Thread**.
@@ -485,7 +464,7 @@ function Thread({ state, task, reply, core, workspace, channel, closeHref, onSea
 		scrollsItself: true,
 		content: (
 			<>
-				<ThreadMessages state={state} task={task} reply={reply} sessions={sessions} />
+				<ThreadMessages task={task} reply={reply} sessions={sessions} />
 				<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
 			</>
 		),
@@ -550,11 +529,11 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 	return <DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={row?.cwd ?? null} tabs={tabs} trailing={close} />;
 }
 
-/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies and the Board's grey lines. */
-function ThreadMessages({ state, task, reply, sessions }: { state: BoardState; task: BoardTask; reply: number | null; sessions: KnownSessions }) {
-	const count = said(task).length;
-	// A grey line ends a run of messages, so the reply after it shows its avatar and name again.
-	let previous: { at: number; by: BoardAuthor } | null = task;
+/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. */
+function ThreadMessages({ task, reply, sessions }: { task: BoardTask; reply: number | null; sessions: KnownSessions }) {
+	const replies = said(task);
+	const count = replies.length;
+	let previous: { at: number; by: BoardAuthor } = task;
 	return (
 		<MessageScrollerProvider autoScroll={reply === null}>
 			<MessageScroller className="flex-1">
@@ -568,20 +547,10 @@ function ThreadMessages({ state, task, reply, sessions }: { state: BoardState; t
 							<span className="h-px flex-1 bg-border" />
 						</div>
 						<ol className="flex flex-col">
-							{task.replies.map((entry, index) => {
-								if ("note" in entry) {
-									const text = noteText(entry.note, sessions);
-									if (text === null) return null;
-									previous = null;
-									return (
-										<li key={index} className="flex gap-2 px-5 py-0.5 text-[13px] text-muted-foreground">
-											<span className="w-9 shrink-0 pt-px text-right text-[11px] tabular-nums">{shortClock(entry.at)}</span>
-											<span className="min-w-0 flex-1 italic">{text}</span>
-										</li>
-									);
-								}
-								const grouped = previous !== null && continues(previous, entry);
+							{replies.map(entry => {
+								const grouped = continues(previous, entry);
 								previous = entry;
+								const index = task.replies.indexOf(entry);
 								return (
 									<li key={index}>
 										<MessageScrollerItem messageId={`reply-${index}`}>
@@ -614,11 +583,9 @@ function ScrollToReply({ reply }: { reply: number }) {
 /** The thread's `@` menu offers sessions only, so a reply can point its session at another. */
 const THREAD_MENTIONS = ["session"] as const;
 
-/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here, and the prompts a session's last reply suggests list under it. */
+/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here. */
 function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
-	const last = said(task).at(-1);
-	const suggestions = last?.by.kind === "session" ? splitSuggestions(last.text).suggestions : [];
 	const reply = ({ prompt, model, thinking, skill }: { prompt: string; model: BoardLaunch["model"]; thinking: string | null; skill: string | null }) => {
 		if (!prompt || disabled) return;
 		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: prompt, launch: { model, thinking, skill } });
@@ -626,7 +593,7 @@ function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { t
 	return (
 		<div {...activityControl("board.reply")} className="shrink-0">
 			<NewSession
-				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply", suggestions, mentions: THREAD_MENTIONS }}
+				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply", mentions: THREAD_MENTIONS }}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
 				launch={null}

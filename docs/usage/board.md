@@ -11,13 +11,13 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - The page reads like a Slack channel: a `#` header with the Workspace's name, then its Board tasks as messages, oldest first and newest at the foot, split by day.
   Each message shows its author's picture, name, and time, its text, its `#` number, its status, and its `key=value` labels; a session's name carries a **Session** tag and opens that session.
   A later message from the same author within five minutes drops the picture and name, and shows its time on hover.
-- Tabs under the Workspace's name switch what the page shows, as a Slack channel's do: **Messages**, the Board tasks, then **Bots**, the Bots working in the Workspace, **Pull requests**, those of its sessions' repositories, **Memory**, its repository's project memory, **Projects**, the projects with a session in it, and **Settings**, the Settings sections of the Workspace group, from Models to Worktrees, kept to this Workspace with no workspace picker.
+- Tabs under the Workspace's name switch what the page shows, as a Slack channel's do: **Messages**, the Board tasks, then **Bots**, the Bots working in the Workspace, **Pull requests**, the open pull requests of its repositories, read for this Workspace whatever the sidebar picker shows, **Memory**, its repository's project memory, **Projects**, the projects made in this Workspace from that tab, plus those made on the Projects page with a session in it, and **Settings**, the Settings sections of the Workspace group, from Models to Worktrees, kept to this Workspace with no workspace picker.
   Each tab has its own address, such as `#board/bots?workspace=<cwd>`, and so does each settings section, such as `#board/settings/worktrees?workspace=<cwd>`; the Board thread opens only on **Messages**.
 - A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **claimed by** a session with the minutes left on its lease, or **done**.
 - Under a message with replies, a line shows who replied, how many replies, and when the last came; hovering it reads **View thread**.
 - Hovering a message shows a toolbar: **Reply in thread** opens its Board thread, and the arrow opens the session working on it.
 - The **Board thread** opens in the right pane under the same tab row as a session's right sidebar, with × to close the thread.
-  **Thread** shows the Board task, a line with the reply count, the replies, and grey lines for what happened, such as a session claiming it, a lease running out, or a reply waking a session.
+  **Thread** shows the Board task, a line with the reply count, and the replies: what you and its sessions said, nothing about claims, leases, or wakes.
   The next tab, named after the session a reply would wake, shows that session's conversation: with its composer while it runs, read-only once it stopped, when a reply in **Thread** wakes it.
   The + opens that session's sidebar tabs, **Overview**, **Diffs**, **PRs**, **Artifacts**, **Review**, and **Linear**, and opens **PRs**, **Linear**, or **Review** by itself once the session has one; the thread keeps the tabs you open across Board threads.
   The open Board task is highlighted in the list, and the pane follows new replies to the bottom.
@@ -51,7 +51,13 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   A session running in a terminal keeps its own model; the skill still applies.
 - The reply goes to the session that holds the claim; on a done Board task, to the session that marked it done; else to the session started on it, or the session that posted it. It wakes that session if it stopped.
   The box says who it reaches.
-- When the last reply is a session's and ends on a `Suggestions:` line with numbered prompts, the box lists them under its action bar while it is empty, with the same keys and clicks as a session's suggested prompts; the thread shows the reply without that block.
+
+## How a session finishes
+
+- A session started on a Board task finishes it on its own: it lands its work on `main`, or opens a draft PR in a repository that ships through pull requests, marks the Board task done with its outcome, and ends itself.
+  The outcome is its last message in the Board thread; nothing stays running and nothing waits on you to merge or end it.
+- When it cannot land, it still marks the Board task done, says why in the outcome, keeps its branch, and ends.
+- A reply resumes it: it answers, or does the follow-up and lands it, then ends again.
 
 ## What sessions do
 

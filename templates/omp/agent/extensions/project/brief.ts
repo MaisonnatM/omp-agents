@@ -26,11 +26,12 @@ export interface Project {
 	log: LogEntry[];
 	sessionIds: string[];
 	archivedAt?: string;
+	workspace?: string;
 }
 
 /** A change a session leaves in the project inbox: any change the Projects page makes, on any project. */
 export type ProjectChange =
-	| { op: "create"; id: string; name: string; goal: string; at: string }
+	| { op: "create"; id: string; name: string; goal: string; at: string; workspace?: string }
 	| { op: "rename"; projectId: string; name: string }
 	| { op: "set-goal"; projectId: string; goal: string }
 	| { op: "archive"; projectId: string; at: string }

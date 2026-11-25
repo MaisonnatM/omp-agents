@@ -22,7 +22,6 @@ import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
 import { AppMark } from "./app-mark";
 import { useCompletion } from "./completion-popup";
-import { useSuggestions } from "./composer-suggestions";
 import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
@@ -65,8 +64,8 @@ interface NewSessionProps {
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
-	/** Only the composer, docked in the Board: sending posts a Board task or a reply with what `placeholder` and `sendLabel` say, so it attaches no files, schedules nothing, and picks no directory; `suggestions` list under its action bar while the draft is empty, and `mentions` narrows its `@` menu to those categories. */
-	board?: { placeholder: string; sendLabel: string; suggestions?: string[]; mentions?: readonly CategoryId[] };
+	/** Only the composer, docked in the Board: sending posts a Board task or a reply with what `placeholder` and `sendLabel` say, so it attaches no files, schedules nothing, and picks no directory; `mentions` narrows its `@` menu to those categories. */
+	board?: { placeholder: string; sendLabel: string; mentions?: readonly CategoryId[] };
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -166,20 +165,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			editor.focus();
 		},
 	});
-	const suggestions = useSuggestions({
-		prompts: board?.suggestions && typeable ? board.suggestions : NO_SUGGESTIONS,
-		draft,
-		onSend: text => onStart({ ...opOf(text), images: [] }),
-		onFill: text => {
-			completion.onValueChange(text);
-			requestAnimationFrame(() => editorRef.current?.select(Number.POSITIVE_INFINITY));
-		},
-	});
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		if (completion.onMenuKeyDown(event)) return;
 		dictation.onKeyDown(event);
 		onComposerKey(event);
-		if (!event.defaultPrevented) suggestions.onKeyDown(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
 			event.currentTarget.blur();
 			event.preventDefault();
@@ -259,12 +248,9 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						beforeEditor={<DictationRow dictation={dictation} />}
 						sendLabel={scheduled ? "Save" : board ? board.sendLabel : starting ? "Starting session" : "Start session"}
 						sending={starting || save.pending}
-						afterActions={suggestions.list}
 						editorProps={{
 							...completion.editorProps,
-							"aria-activedescendant": completion.editorProps["aria-activedescendant"] ?? suggestions.activeId,
 							onKeyDown,
-							onBlur: suggestions.onBlur,
 							onPaste: scheduled || board ? undefined : attachments.onPaste,
 						}}
 					/>
@@ -319,8 +305,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		</div>
 	);
 }
-
-const NO_SUGGESTIONS: string[] = [];
 
 /** Whether the pinned skill applies: `missing` when the directory has no such skill. */
 type SkillState = "on" | "off" | "missing";

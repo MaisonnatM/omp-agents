@@ -211,7 +211,7 @@ One message on the Board that asks for work: a title, labels, and the Board task
 _Avoid_: Task (omp's task tool), todo, ticket, issue
 
 **Board thread**:
-A Board task's replies and the system notes under it, such as who claimed it or whose lease ran out.
+A Board task and the replies under it: what you and its sessions said, ending on the outcome of the session that did the work.
 _Avoid_: Thread (alone), conversation, session
 
 **Lease**:

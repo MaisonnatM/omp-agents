@@ -33,6 +33,8 @@ export interface Project {
 	/** The sessions in the project, in the order they joined; a session is in one project at most. */
 	sessionIds: string[];
 	createdAt: string;
+	/** The Workspace it was made in, from a Board's Projects tab, which then lists it; absent for one made on the Projects page. */
+	workspace?: string;
 	/** When the project was archived, which drops it from the roster and from the briefs; absent while it is open. */
 	archivedAt?: string;
 }
@@ -49,7 +51,7 @@ export const EMPTY_PROJECTS: ProjectList = { projects: [] };
  * twice, as a retried inbox file or a page's replay, lands once.
  */
 export type ProjectChange =
-	| { op: "create"; id: string; name: string; goal: string; at: string }
+	| { op: "create"; id: string; name: string; goal: string; at: string; workspace?: string }
 	| { op: "rename"; projectId: string; name: string }
 	| { op: "set-goal"; projectId: string; goal: string }
 	| { op: "archive"; projectId: string; at: string }
@@ -90,6 +92,7 @@ const isProject: Guard<Project> = fields<Project>({
 	sessionIds: arrayOf(isNonEmpty),
 	createdAt: isNonEmpty,
 	archivedAt: optional(isNonEmpty),
+	workspace: optional(isNonEmpty),
 });
 
 /** What `project-list.json` holds, or `null` for anything else. */
@@ -97,7 +100,7 @@ export const parseProjectList = decoder<ProjectList>(fields<ProjectList>({ proje
 
 /** Each op's fields and the guard of each, which both checks a change and names the fields it keeps. */
 const CHANGE_SHAPES: { [Op in ProjectChange["op"]]: Shape<Omit<Extract<ProjectChange, { op: Op }>, "op">> } = {
-	create: { id: isNonEmpty, name: isName, goal: isGoal, at: isNonEmpty },
+	create: { id: isNonEmpty, name: isName, goal: isGoal, at: isNonEmpty, workspace: optional(isNonEmpty) },
 	rename: { projectId: isNonEmpty, name: isName },
 	"set-goal": { projectId: isNonEmpty, goal: isGoal },
 	archive: { projectId: isNonEmpty, at: isNonEmpty },
@@ -186,7 +189,7 @@ export function applyProjectChange(list: ProjectList, change: ProjectChange): Pa
 	switch (change.op) {
 		case "create": {
 			if (list.projects.some(project => project.id === change.id)) return { ok: list };
-			const project: Project = { id: change.id, name: change.name, goal: change.goal, steps: [], decisions: [], log: [], sessionIds: [], createdAt: change.at };
+			const project: Project = { id: change.id, name: change.name, goal: change.goal, steps: [], decisions: [], log: [], sessionIds: [], createdAt: change.at, ...(change.workspace ? { workspace: change.workspace } : {}) };
 			return { ok: { projects: [...list.projects, project] } };
 		}
 		case "rename":
