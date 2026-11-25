@@ -42,14 +42,14 @@ export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: rea
 	);
 }
 
-/** The sessions, Bots, and projects of Workspace `cwd`; a session belongs by its Workspace, a Bot by its directory. */
+/** The sessions, Bots, and projects of Workspace `cwd`; a session belongs by its Workspace, a Bot by its directory, a project by the Workspace it was made in, or, made on the Projects page, by a session of it that ran here. */
 function workspaceSlice(core: CoreData, cwd: string | null) {
 	const here = <Row extends { cwd: string; workspace: Parameters<typeof workspaceCwd>[0]["workspace"] }>(rows: Row[]): Row[] => rows.filter(row => workspaceCwd(row) === cwd);
 	const hosts = here(core.sessions.hosts);
 	const past = here(core.sessions.past);
 	const ran = new Set([...hosts, ...past].map(row => row.sessionId));
 	const bots = core.bots && core.bots.filter(bot => bot.cwd === cwd);
-	const projects = core.projects && { projects: core.projects.projects.filter(project => project.sessionIds.some(id => ran.has(id))) };
+	const projects = core.projects && { projects: core.projects.projects.filter(project => (project.workspace === undefined ? project.sessionIds.some(id => ran.has(id)) : project.workspace === cwd)) };
 	return { hosts, past, bots, projects };
 }
 
@@ -65,7 +65,17 @@ export function WorkspaceTab({ view, workspace, core, disabled }: { view: Exclud
 		case "memory":
 			return <ProjectMemoryTab repo={workspace} pinned />;
 		case "projects":
-			return <ProjectsPage route={{ open: null }} core={core} state={slice.projects} empty="No projects in this Workspace yet" disabled={disabled} onChange={change => changeModule("projects", change)} />;
+			return (
+				<ProjectsPage
+					route={{ open: null }}
+					core={core}
+					state={slice.projects}
+					empty="No projects in this Workspace yet"
+					workspace={workspace ?? undefined}
+					disabled={disabled}
+					onChange={change => changeModule("projects", change)}
+				/>
+			);
 		case "settings":
 			return <WorkspaceSettings workspace={workspace} workspaces={core.workspaces} section={view.section} />;
 	}

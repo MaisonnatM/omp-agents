@@ -6,6 +6,7 @@ See [Give a multi-session effort a project brief and a roster group](../decision
 
 ## The file
 
+A project made from a Board's **Projects** tab carries that Workspace's directory in `workspace`, which `workspaceSlice` in `web/components/board/tabs.tsx` matches; a project without one, made on the Projects page or by `project_update`, shows in a Workspace's tab while one of its sessions ran there.
 `ProjectList` in `src/shared/projects.ts` holds every project, archived ones included, each with its steps, decisions, log, and the ids of its sessions.
 Steps are one flat list in plan order; a sub-step names its step in `parentId`, `add-step` places it after its step's last sub-step, and refuses a parent that is missing or is a sub-step itself, so a plan nests two levels at most.
 `remove-step` removes a step's sub-steps with it, and `stepNumbers` numbers them `2.1` and on, for the page and, in the kit's copy, for the brief and `project_update`'s `step` and `parent` params.
