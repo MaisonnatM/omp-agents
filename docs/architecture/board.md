@@ -32,6 +32,7 @@ The dashboard calls the run's `changed` after every change to the module and whe
 
 - It starts a session on each Board task `unstartedReady` lists, prompted by `startPrompt` to claim it, and records the `start`. The prompt leads with the Board task's title and text and wraps the claim steps in a `<board-task>` block, because omp's titler names the session from that prompt and titles plain claim steps "Claim Board task N".
 - It wakes `wakeTarget` for each new reply with `wakePrompt`, which carries `DASHBOARD_PROMPT_PREFIX`, and records `woke` when the session had stopped; the core's `wake` switches a session this dashboard started to the reply's model and thinking level, and starts the prompt with the reply's `/skill:`.
+- Both prompts end on `finish`: land the work, or open a draft PR where the repository has no `.omp/land.json`, mark the Board task done with the outcome, then call `end_session`, so no Board session waits on the user; see [Board sessions land and end themselves](../decisions/2026-11-25-board-sessions-land-and-end-themselves.md).
 - Every 30 seconds its sweep records an `expire` for each Board task `lapsed` lists, which makes it ready again and so starts a new session.
 
 ## The agent side

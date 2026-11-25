@@ -12,6 +12,18 @@ import { repeat } from "./loops";
 export const SWEEP_MS = 30_000;
 
 /**
+ * How a Board session finishes, so none waits on the user to merge or end it: it lands or opens a draft PR, marks the
+ * Board task done with its outcome alone, then ends itself. A reply resumes it and it finishes the same way again.
+ */
+const finish = (id: number): string =>
+	[
+		"When the work is done, finish it yourself; nobody merges or ends this session for you:",
+		"1. If you changed files, ship them: in a repository that commits .omp/land.json, commit and call the land tool; elsewhere push the branch and open a draft PR. If landing fails and you cannot fix it, keep the branch and say why in the outcome.",
+		`2. Mark Board task #${id} done with the board tool. Its text is the outcome the user reads in the thread: a short lead line, then a few bullets on what changed, where, and what landed or the PR link. No Suggestions block and no steps left for the user.`,
+		"3. Call end_session.",
+	].join("\n");
+
+/**
  * What a session started on Board task `task` reads first. omp titles the session from this prompt, so the task leads
  * and the Board's steps sit in a `<board-task>` block the titler skips; as plain lines they name every session
  * "Claim Board task 5" instead of its work.
@@ -23,16 +35,16 @@ export const startPrompt = (task: BoardTask): string =>
 		"",
 		`<board-task id="${task.id}">`,
 		`This session was started to do Board task #${task.id}. First claim it with the board tool (action claim, task ${task.id}), which also shows its Board thread.`,
-		"The claim holds a 15-minute lease: renew it while you work.",
-		"Reply on the thread to ask or report, and when you finish, mark it done with a line on what you did.",
+		"The claim holds a 15-minute lease: renew it while you work. Reply on the thread only to ask what you cannot settle yourself.",
+		finish(task.id),
 		"</board-task>",
 	].join("\n");
 
 const authorName = (by: BoardAuthor): string => (by.kind === "user" ? "The user" : `Session ${by.sessionId}`);
 
-/** What the session a reply is for reads. */
+/** What the session a reply is for reads: it answers or does the follow-up, then finishes as a started session does. */
 export const wakePrompt = (task: BoardTask, by: BoardAuthor, text: string): string =>
-	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nAnswer on its thread with the board tool (action reply, task ${task.id}).`;
+	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nWhen it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}); when it asks for more work, do it.\n${finish(task.id)}`;
 
 export class BoardRunner implements ModuleRun {
 	readonly #state: () => BoardState;
