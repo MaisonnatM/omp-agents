@@ -3,8 +3,9 @@
  * split by day, each with its thread summary and a hover toolbar, over the composer that posts one; the open Board
  * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
-import { type ReactNode, useEffect } from "react";
+import { IconArrowUpRight, IconBrain, IconBubble3, IconBubbleText, IconCrossMedium, IconFlag1, IconHashtag, IconPullRequest, IconRobot, IconUser } from "central-icons";
+import * as TabsPrimitive from "@ui-sdk/react/tabs";
+import { type ComponentType, type ReactNode, useEffect } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
@@ -32,7 +33,6 @@ import { ProjectMemoryTab } from "../memory/project-memory";
 import { BotsGallery } from "../bots/bots-gallery";
 import { ProjectsPage } from "../projects/page";
 import { PullRequestsPage } from "../pull-requests/pull-requests-page";
-import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import { BOARD_TABS, type BoardRoute, type BoardTab } from "./module";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
@@ -96,27 +96,43 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 	);
 }
 
-/** The row of tabs under the Workspace's name, as under a Slack channel's; each opens its own address. */
+/** Each tab's icon, the one the app shows for the same thing elsewhere. */
+const TAB_ICONS: Record<BoardTab, ComponentType<{ className?: string; "aria-hidden"?: boolean }>> = {
+	messages: IconBubbleText,
+	bots: IconRobot,
+	"pull-requests": IconPullRequest,
+	memory: IconBrain,
+	projects: IconFlag1,
+};
+
+/** The row of tabs under the Workspace's name, underlined as under a Slack channel's; each opens its own address. */
 function ChannelTabs({ tab, workspace }: { tab: BoardTab; workspace: string | null }) {
 	return (
-		<div className="flex shrink-0 items-center border-b border-border px-5 py-1.5">
-			<SegmentedTabs
-				value={tab}
-				onValueChange={next => {
-					const picked = BOARD_TABS.find(each => each.id === next);
-					if (picked) location.hash = hashForPage({ kind: "board", workspace, tab: picked.id, thread: null });
-				}}
-				activation="manual"
-			>
-				<SegmentedTabsList aria-label="Board tabs">
-					{BOARD_TABS.map(each => (
-						<SegmentedTab key={each.id} value={each.id} {...activityControl("board.tab")}>
+		<TabsPrimitive.Tabs
+			value={tab}
+			onValueChange={next => {
+				const picked = BOARD_TABS.find(each => each.id === next);
+				if (picked) location.hash = hashForPage({ kind: "board", workspace, tab: picked.id, thread: null });
+			}}
+			activation="manual"
+		>
+			<TabsPrimitive.TabsList aria-label="Board tabs" className="flex shrink-0 gap-4 border-b border-border px-5">
+				{BOARD_TABS.map(each => {
+					const Icon = TAB_ICONS[each.id];
+					return (
+						<TabsPrimitive.TabsTab
+							key={each.id}
+							value={each.id}
+							className="-mb-px inline-flex h-9 shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent text-sm font-medium text-muted-foreground transition-colors hover:text-foreground aria-selected:border-foreground aria-selected:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+							{...activityControl("board.tab")}
+						>
+							<Icon aria-hidden className="size-4 shrink-0" />
 							{each.label}
-						</SegmentedTab>
-					))}
-				</SegmentedTabsList>
-			</SegmentedTabs>
-		</div>
+						</TabsPrimitive.TabsTab>
+					);
+				})}
+			</TabsPrimitive.TabsList>
+		</TabsPrimitive.Tabs>
 	);
 }
 
