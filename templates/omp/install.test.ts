@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { blobId, INSTALLED_RECORD, type InstalledRecord, overlayFiles, planKitFiles, planMcpServers, planSettings, readInstalledRecord, settingsOf, writeMcpServers } from "./install";
 
@@ -228,9 +228,21 @@ describe("MCP servers", () => {
 
 		writeFileSync(path, JSON.stringify({ mcpServers: { "chrome-devtools": { type: "stdio", command: "my-chrome" } } }));
 		const again = planMcpServers(agentDir, none);
-		expect(again.map(step => step.action)).toEqual(["same"]);
+		expect(again.map(step => step.action)).toEqual(["keep"]);
 		writeMcpServers(path, again);
 		expect(JSON.parse(readFileSync(path, "utf8")).mcpServers["chrome-devtools"].command).toBe("my-chrome");
+	});
+
+	test("lets chrome-devtools reach worktrees under ~/code and /tmp, and updates the entry an earlier kit wrote", () => {
+		const agentDir = scratch();
+		const path = join(agentDir, "mcp.json");
+		const earlier = { type: "stdio", command: "npx", args: ["-y", "chrome-devtools-mcp@latest", "--headless", "--isolated"] };
+		writeFileSync(path, JSON.stringify({ mcpServers: { "chrome-devtools": earlier } }));
+		const steps = planMcpServers(agentDir, none);
+		expect(steps.map(step => step.action)).toEqual(["update"]);
+		writeMcpServers(path, steps);
+		expect(JSON.parse(readFileSync(path, "utf8")).mcpServers["chrome-devtools"].args).toEqual([...earlier.args, `--workspace=${join(homedir(), "code")}`, "--workspace=/tmp"]);
+		expect(planMcpServers(agentDir, none).map(step => step.action)).toEqual(["same"]);
 	});
 
 	test("adds obscura only once its binary is on PATH", () => {
