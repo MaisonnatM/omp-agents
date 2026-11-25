@@ -96,6 +96,7 @@ export function App() {
 	const botList = useMemo(() => (state.bots === null ? null : botRows(state.bots, state.hosts, state.botLasts)), [state.bots, state.hosts, state.botLasts]);
 	const latestBot = botList?.[0]?.bot.id ?? null;
 	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
+	const known = useMemo(() => ({ hosts: state.hosts, past: state.past }), [state.hosts, state.past]);
 	const maximized = layout.maximized && !page;
 	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
@@ -266,6 +267,8 @@ export function App() {
 										row={row}
 										onTab={showTab}
 										tabs={tabs}
+										board={state.modules.board}
+										known={known}
 										botList={botList}
 										list={placement?.at === "sidebar" ? pageList : null}
 										settings={settings}
