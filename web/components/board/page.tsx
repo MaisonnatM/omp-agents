@@ -507,7 +507,8 @@ function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onC
 /** Who replied, how many replies, and when the last came, or while a session works on it how it stands in that place, which opens the thread, as under a Slack message. */
 function ThreadSummary({ replies, unread, work, sessions, href }: { replies: Extract<BoardReply, { by: BoardAuthor }>[]; unread: number; work: Work | null; sessions: KnownSessions; href: string }) {
 	const worker: BoardAuthor[] = work && work.kind !== "starting" ? [{ kind: "session", sessionId: work.sessionId }] : [];
-	const authors = [...new Map([...worker, ...replies.map(reply => reply.by)].map(by => [authorKey(by), by])).values()].slice(0, 5);
+	// Every session draws the same omp mark, so all sessions count as one avatar.
+	const authors = [...new Map([...worker, ...replies.map(reply => reply.by)].map(by => [by.kind === "session" ? "session" : authorKey(by), by])).values()].slice(0, 5);
 	const last = replies.at(-1);
 	return (
 		<a
