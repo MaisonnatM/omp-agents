@@ -3,9 +3,10 @@
  * split by day, each with its thread summary and a hover toolbar, over the composer that posts one; the open Board
  * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
-import { type ReactNode, useEffect } from "react";
-import { hashForSession } from "../../../src/shared/sessions";
+import * as TabsPrimitive from "@ui-sdk/react/tabs";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { hashForSession, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
@@ -15,18 +16,23 @@ import { Button } from "@/components/ui/button";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { IconComponent } from "@/lib/icon-context";
 import { getJson } from "../../api";
+import { useShowConversation } from "../../pane-store";
+import { UNREAD } from "../../reads";
 import { activityControl } from "../../activity";
 import { boardDraftKey, boardThreadDraftKey } from "../../composer-drafts";
 import { useStoredState } from "../../stored-state";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
+import { ClosableTab } from "../closable-tab";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { useDashboardActions } from "../dashboard-context";
 import type { CoreData } from "../module-views";
 import { NewSession } from "../new-session";
+import { ViewConversation } from "../pane";
 import { type KnownSessions, sessionLabel } from "../todo/links";
-import type { BoardRoute } from "./module";
+import type { BoardControlId, BoardRoute } from "./module";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
 
 interface BoardPageProps {
@@ -389,10 +395,14 @@ const STEP = 16;
 
 const clampThread = (width: number, room: number): number => Math.round(Math.max(MIN_THREAD, Math.min(MAX_THREAD, room - MIN_CHANNEL, width)));
 
-/** The Board thread as Slack's thread pane, at the width you drag its left edge to: the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; Escape closes it. */
+type ThreadTabValue = "thread" | "session";
+
+/** The Board thread as Slack's thread pane, at the width you drag its left edge to, under a row of tabs as the session details sidebar draws them: **Thread**, the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; and **Session**, the conversation of the session its replies wake. Escape closes it. */
 function Thread({ state, task, core, workspace, channel, closeHref, disabled, onChange }: { state: BoardState; task: BoardTask; core: CoreData; workspace: Workspace; channel: string; closeHref: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const sessions = core.sessions;
 	const count = said(task).length;
+	const [tab, setTab] = useState<ThreadTabValue>("thread");
+	const target = wakeTarget(task, { kind: "user" });
 	const [width, setWidth] = useStoredState("omp-agents.board-thread-width", raw => {
 		const stored = Number(raw);
 		return stored >= MIN_THREAD && stored <= MAX_THREAD ? stored : THREAD_WIDTH;
@@ -428,16 +438,19 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 	return (
 		<aside aria-label={`Thread #${task.id}`} style={{ width }} className="relative flex max-w-[calc(100%-360px)] shrink-0 flex-col border-l border-border">
 			<Separator {...resize} axis="vertical" label="Resize the thread" min={MIN_THREAD} max={MAX_THREAD} now={width} className="inset-y-0 -left-1.5 w-3 cursor-col-resize select-none" />
-			<header className="flex min-h-(--page-header-height) shrink-0 items-center gap-2 border-b border-border px-5">
-				<h2 className="text-sm font-semibold">Thread</h2>
-				<span className="flex min-w-0 flex-1 items-center gap-0.5 text-[13px] text-muted-foreground">
-					<IconHashtag aria-hidden className="size-3.5 shrink-0" />
-					<span className="truncate">{channel}</span>
-				</span>
-				<Button {...activityControl("board.thread.close")} variant="ghost" size="icon-xs" aria-label="Close thread" render={<a href={closeHref} />}>
-					<IconCrossMedium />
-				</Button>
-			</header>
+			<TabsPrimitive.Tabs value={tab} onValueChange={value => setTab(value === "session" ? "session" : "thread")} className="flex min-h-0 flex-1 flex-col">
+				{/* Content-box, so the hairline sits under the full header height, level with the Board header's. */}
+				<header className="box-content flex h-(--page-header-height) shrink-0 items-center gap-1 border-b border-border px-2">
+					<h2 className="sr-only">Thread #{task.id} in #{channel}</h2>
+					<TabsPrimitive.TabsList aria-label={`Thread #${task.id}`} className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
+						<ThreadTab value="thread" icon={IconBubble3} name="Thread" active={tab === "thread"} control="board.thread.tab.thread" />
+						{target && <ThreadTab value="session" icon={IconAiBotHead} name={sessionLabel(target, sessions).name} active={tab === "session"} control="board.thread.tab.session" />}
+					</TabsPrimitive.TabsList>
+					<Button {...activityControl("board.thread.close")} variant="ghost" size="icon-xs" aria-label="Close thread" render={<a href={closeHref} />}>
+						<IconCrossMedium />
+					</Button>
+				</header>
+				<TabsPrimitive.TabsPanel value="thread" className="flex min-h-0 flex-1 flex-col outline-none">
 			<MessageScrollerProvider autoScroll>
 				<MessageScroller className="flex-1">
 					<MessageScrollerViewport>
@@ -479,7 +492,50 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 				</MessageScroller>
 			</MessageScrollerProvider>
 			<ThreadComposer task={task} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
+				</TabsPrimitive.TabsPanel>
+				{target && (
+					<TabsPrimitive.TabsPanel value="session" className="relative flex min-h-0 flex-1 flex-col outline-none">
+						<SessionTab sessionId={target} core={core} />
+					</TabsPrimitive.TabsPanel>
+				)}
+			</TabsPrimitive.Tabs>
 		</aside>
+	);
+}
+
+/** One of the thread's tabs, drawn as the session details sidebar draws its first tab, which stays open. */
+function ThreadTab({ value, icon: Icon, name, active, control }: { value: ThreadTabValue; icon: IconComponent; name: string; active: boolean; control: BoardControlId }) {
+	return (
+		<ClosableTab name={name} active={active} onClose={null} closeControl="details.tab.close" activePadding="pr-2.5" className={cn("min-w-0", value === "thread" ? "shrink-0" : "shrink", active && "bg-active text-foreground")}>
+			{body => (
+				<TabsPrimitive.TabsTab value={value} {...activityControl(control)} className={body}>
+					<Icon aria-hidden="true" className="size-3.5 shrink-0" />
+					<span className="truncate">{name}</span>
+				</TabsPrimitive.TabsTab>
+			)}
+		</ClosableTab>
+	);
+}
+
+/** The **Session** tab: the conversation of the session the Board task's replies wake, live or saved, with its own composer. */
+function SessionTab({ sessionId, core }: { sessionId: string; core: CoreData }) {
+	const host = core.sessions.hosts.find(each => each.sessionId === sessionId) ?? null;
+	const past = core.sessions.past.find(each => each.sessionId === sessionId) ?? null;
+	const instanceId = host?.instanceId ?? null;
+	const view = useMemo<View | null>(() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : past ? { kind: "past", sessionId } : null), [instanceId, past, sessionId]);
+	useShowConversation(view);
+	if (view === null) return <p className="px-5 py-6 text-sm text-muted-foreground">This session is not on this computer.</p>;
+	return (
+		<ViewConversation
+			view={view}
+			focused={false}
+			host={host}
+			lastHost={instanceId !== null ? (core.lastHosts.get(instanceId) ?? null) : null}
+			session={past}
+			models={(instanceId !== null && core.models.get(instanceId)) || UNREAD}
+			workspaces={core.workspaces}
+			header={false}
+		/>
 	);
 }
 
