@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- On the Board, your messages and replies now show your Slack profile picture when Slack is connected in Settings › Integrations.
 - Board messages and replies now show as formatted text, with lists, code, and links, and sessions are told to write their Board replies as a short lead line and a list instead of one long paragraph.
 - The Board thread's pane can be resized: drag its left edge, and the page remembers the width. Its reply box is now the session composer, with suggestions when you type a slash or an at sign, dictation, and an unsent reply kept per thread.
 - The Board's header now matches the other pages, its message box spans the channel, messages use the app's text size, the thread pane narrows on small windows, and Escape closes the thread wherever the cursor is.
