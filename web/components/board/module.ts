@@ -67,7 +67,8 @@ export type BoardControlId =
 	| "board.search.clear"
 	| "board.search.result"
 	| "board.search.all"
-	| "board.thread.search";
+	| "board.thread.search"
+	| "board.thread.suggestion";
 
 export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, BoardChange, never, BoardControlId> = {
 	id: "board",
@@ -135,6 +136,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		{ id: "board.search.result", label: "Board search result, which opens its thread", area: "Board" },
 		{ id: "board.search.all", label: "Board search all workspaces button", area: "Board" },
 		{ id: "board.thread.search", label: "Board thread search button", area: "Board" },
+		{ id: "board.thread.suggestion", label: "Board thread suggested next step, which replies with it", area: "Board" },
 	],
 	store: {
 		apply(state, change) {

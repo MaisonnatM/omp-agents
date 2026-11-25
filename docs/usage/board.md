@@ -49,15 +49,16 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - Type in the box at the foot of the Board thread and press Enter or **Send**.
   It is the same composer as the page's: pick the model, thinking level, and skill the woken session runs on, `/` and `@` suggest, the microphone dictates, and each Board thread keeps its unsent reply.
   A session running in a terminal keeps its own model; the skill still applies.
-- The reply goes to the session that holds the claim; on a done Board task, to the session that marked it done; else to the session started on it, or the session that posted it. It wakes that session if it stopped.
+- The reply goes to the session that holds the claim, else to the session started on it, or the session that posted it. It wakes that session if it stopped.
   The box says who it reaches.
+- On a done Board task, your reply reopens it and a new session starts on it, on the model, thinking level, and skill picked in the box.
+  The new session reads the whole Board thread and the names of the sessions before it, so it carries on from their branch.
 
 ## How a session finishes
 
-- A session started on a Board task finishes it on its own: it lands its work on `main`, or opens a draft PR in a repository that ships through pull requests, marks the Board task done with its outcome, and ends itself.
-  The outcome is its last message in the Board thread; nothing stays running and nothing waits on you to merge or end it.
-- When it cannot land, it still marks the Board task done, says why in the outcome, keeps its branch, and ends.
-- A reply resumes it: it answers, or does the follow-up and lands it, then ends again.
+- A session started on a Board task finishes it on its own: it commits its work on its branch, or opens a draft PR in a repository that ships through pull requests, and never merges unasked.
+- It marks the Board task done with a message that says what it did, names its branch or pull request, and ends on suggested next steps, such as **Merge on main**; then it ends itself, so nothing stays running.
+- The suggested next steps show as buttons under that message. A click sends it as your reply, which starts a new session that does it, such as landing the branch on `main`; typing your own reply does the same.
 
 ## What sessions do
 

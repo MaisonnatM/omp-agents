@@ -6,6 +6,8 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-25
 
 - Clicking a session on the Board, in its sidebar, on a message's author, on "Working on it…", or with **Open its session**, now opens that session's conversation in its Board thread instead of leaving the Board for Sessions.
+- Board sessions no longer merge their own work. Each ends by telling you in its Board thread what it did and suggesting next steps, such as Merge on main, then stops.
+- Click a suggested next step under a finished Board task, or type a reply, and a new session takes it from there with the whole thread.
 - A Board task's thread summary now shows a small blue pill with the number of replies you haven't read yet, as in Slack; opening the thread clears it.
 - The Board now jumps to the bottom when you post a message or reply in a thread, even if you had scrolled up, and keeps following new messages from there; a thread opened on a picked reply holds still until you reply.
 - The Board's **Bots** group now lists the Bots under your own groups, Pinned, each section, and Other Bots, instead of one All Bots row, with smaller faces.

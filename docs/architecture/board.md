@@ -20,8 +20,9 @@ It imports nothing, so the starter kit can ship it.
   `parseChange` refuses them from the page and the tool.
 
 `statusOf` says whether a Board task is done, claimed, waiting on another, or ready.
-`unstartedReady` lists the ready Board tasks no session was started on since they last became ready, `lapsed` the ones whose lease ran out or whose started session never claimed them within a lease, and `wakeTarget` who a reply wakes: the claimer, on a done Board task the session that marked it done, else the session started on it, else a session that posted it, never the replier.
+`unstartedReady` lists the ready Board tasks no session was started on since they last became ready, `lapsed` the ones whose lease ran out or whose started session never claimed them within a lease, and `wakeTarget` who a reply wakes: the claimer, else the session started on it, else a session that posted it, never the replier, and nobody on a done Board task.
 A reply from the page carries the `launch` picked in its composer, which the reply keeps.
+The user's reply on a done Board task reopens it in the fold: `doneAt` and `start` clear and the task takes the reply's `launch`, so `unstartedReady` lists it again; `startedOn` names the sessions started on it in earlier rounds.
 
 ## The runner
 
@@ -31,8 +32,9 @@ The dashboard calls the run's `changed` after every change to the module and whe
 `BoardRunner` in `src/server/board-runner.ts` does the rest while its server is the owner:
 
 - It starts a session on each Board task `unstartedReady` lists, prompted by `startPrompt` to claim it, and records the `start`. The prompt leads with the Board task's title and text and wraps the claim steps in a `<board-task>` block, because omp's titler names the session from that prompt and titles plain claim steps "Claim Board task N".
+  On a reopened Board task the block also holds the earlier sessions' ids and the Board thread, which ends on the reply that reopened it; that reply wakes nobody.
 - It wakes `wakeTarget` for each new reply with `wakePrompt`, which carries `DASHBOARD_PROMPT_PREFIX`, and records `woke` when the session had stopped; the core's `wake` switches a session this dashboard started to the reply's model and thinking level, and starts the prompt with the reply's `/skill:`.
-- Both prompts end on `finish`: land the work, or open a draft PR where the repository has no `.omp/land.json`, mark the Board task done with the outcome, then call `end_session`, so no Board session waits on the user; see [Board sessions land and end themselves](../decisions/2026-11-25-board-sessions-land-and-end-themselves.md).
+- Both prompts end on `finish`: commit the work on its branch, or open a draft PR where the repository has no `.omp/land.json`, and land only when the user's last reply asks; mark the Board task done with a message ending on a `Suggestions:` block; then call `end_session`. The page draws those suggestions as buttons under the last reply of a done Board task, each of which sends itself as the user's reply. See [Board sessions end on suggestions, and a reply starts a new session](../decisions/2026-11-25-board-sessions-end-on-suggestions-and-a-reply-starts-a-new-session.md).
 - Every 30 seconds its sweep records an `expire` for each Board task `lapsed` lists, which makes it ready again and so starts a new session.
 
 ## The agent side
