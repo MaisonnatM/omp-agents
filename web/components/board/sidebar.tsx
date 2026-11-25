@@ -1,5 +1,5 @@
-/** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it, then the Bots under the Bots tab's own groups (Pinned, each section, Other Bots), each opening the gallery of every Bot. */
-import { IconChevronDownSmall, IconFolder1, IconFolderOpen, IconPin, IconUserGroup } from "central-icons";
+/** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it, then the Bots under the Bots tab's own groups (Pinned, each section, Other Bots), each a collapsible group like the Sessions workspaces. */
+import { IconFolder1, IconFolderOpen, IconPin, IconUserGroup } from "central-icons";
 import { useState } from "react";
 import { revealDetailsTab } from "../../details-tabs";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -135,44 +135,39 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 					})}
 				</SidebarMenu>
 			</SidebarGroup>
-			<SidebarGroup>
+			<SidebarGroup className="pb-0">
 				<SidebarGroupLabel>Bots</SidebarGroupLabel>
-				<SidebarMenu aria-label="Board bots" className="gap-px">
-					{bots === null ? null : botGroups(bots).map(group => {
-						const key = botGroupKey(group);
-						const isCollapsed = collapsed.has(key);
-						return (
-							<SidebarMenuItem key={key}>
-								<SidebarMenuButton
-									{...activityControl("board.bots")}
-									icon={GROUP_ICONS[group.kind]}
-									aria-expanded={!isCollapsed}
-									onClick={() => setCollapsed(prev => {
-										const next = new Set(prev);
-										if (!next.delete(key)) next.add(key);
-										return next;
-									})}
-								>
-									<span className="min-w-0 flex-1 truncate">{botGroupLabel(group)}</span>
-									<IconChevronDownSmall className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${isCollapsed ? "-rotate-90" : ""}`} aria-hidden />
-								</SidebarMenuButton>
-								{!isCollapsed && (
-									<SidebarMenu aria-label={botGroupListName(group)} className="my-1 ml-[15px] w-auto gap-px border-l border-border pl-1">
-										{group.rows.map(row => (
-											<SidebarMenuItem key={row.bot.id}>
-												<SidebarMenuButton size="short" title={row.bot.cwd} onClick={go(hashForBots(row.bot.id))}>
-													<BotAvatar look={row.bot} size="inline" working={row.host?.status === "working"} asking={botAsking(row.host) !== null} />
-													<span className="min-w-0 flex-1 truncate">{row.bot.name}</span>
-												</SidebarMenuButton>
-											</SidebarMenuItem>
-										))}
-									</SidebarMenu>
-								)}
-							</SidebarMenuItem>
-						);
-					})}
-				</SidebarMenu>
 			</SidebarGroup>
+			{bots !== null && botGroups(bots).map(group => {
+				const key = botGroupKey(group);
+				return (
+					<SidebarGroup
+						key={key}
+						className="py-0"
+						collapsible
+						open={!collapsed.has(key)}
+						onOpenChange={() => setCollapsed(prev => {
+							const next = new Set(prev);
+							if (!next.delete(key)) next.add(key);
+							return next;
+						})}
+					>
+						<SidebarGroupLabel icon={GROUP_ICONS[group.kind]} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
+							{botGroupLabel(group)}
+						</SidebarGroupLabel>
+						<SidebarMenu aria-label={botGroupListName(group)} className="ml-[15px] w-auto gap-px border-l border-border pl-1">
+							{group.rows.map(row => (
+								<SidebarMenuItem key={row.bot.id}>
+									<SidebarMenuButton size="short" title={row.bot.cwd} onClick={go(hashForBots(row.bot.id))}>
+										<BotAvatar look={row.bot} size="inline" working={row.host?.status === "working"} asking={botAsking(row.host) !== null} />
+										<span className="min-w-0 flex-1 truncate">{row.bot.name}</span>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							))}
+						</SidebarMenu>
+					</SidebarGroup>
+				);
+			})}
 		</SidebarContent>
 	);
 }
