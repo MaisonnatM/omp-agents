@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- In a Board thread's reply box, typing an at sign now lists your sessions straight away, so a reply can point its session at another one; the other at-sign suggestions stay out of the thread for now.
 - A session's Board reply can now suggest what to answer next: the Board thread's reply box lists those prompts, and a click, a number key, or Enter sends one.
 - A session the Board starts is now named after its Board task's work, such as "Fix sidebar badge count", instead of "Claim Board task 5 on omp-agents".
 - The Board thread's pane now has tabs, as a session's right sidebar does: **Thread** for the Board task and its replies, and a tab named after the session working on it that shows that session's conversation, with its composer while it runs. Its header line now sits level with the Board's.
