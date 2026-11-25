@@ -58,6 +58,8 @@ export const CONTROLS = [
 	{ id: "transcript.scroll-to-bottom", label: "Scroll-to-bottom arrow", area: "Transcript" },
 	{ id: "transcript.artifact-open", label: "Artifact card Open", area: "Transcript" },
 	{ id: "transcript.subagents", label: "Overview's Subagents section, folded or unfolded", area: "Right sidebar" },
+	{ id: "overview.jobs.fold", label: "Overview Jobs section, folded or unfolded", area: "Right sidebar" },
+	{ id: "overview.job", label: "Overview job, its output unfolded or folded", area: "Right sidebar" },
 	{ id: "find-bar.step", label: "Find bar's previous or next match, in a conversation or a pull request", area: "Transcript" },
 	{ id: "find-bar.close", label: "Find bar closed, in a conversation or a pull request", area: "Transcript" },
 	{ id: "media-viewer.open", label: "Image opened large", area: "Transcript" },

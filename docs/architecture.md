@@ -17,6 +17,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
   - [Session keepers](architecture/dashboard-sessions.md#session-keepers)
 - [Session processes](architecture/session-processes.md)
   - [The idle stop](architecture/session-processes.md#the-idle-stop)
+- [Background jobs](architecture/background-jobs.md)
 - [Pasted secrets](architecture/pasted-secrets.md)
 - [Socket requests](architecture/socket-requests.md)
 - [Project trust](architecture/project-trust.md)

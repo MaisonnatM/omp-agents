@@ -73,6 +73,7 @@ function setup(initial: PastSession[]) {
 		bots: { msg: () => ({ t: "bots", bots: bots.value, memories: {}, lasts: {} }), apply: change => bots.apply(change, "2026-01-01T00:00:00.000Z") },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
+		jobs: { msg: () => ({ t: "jobs", jobs: {} }) },
 	}, { sport, projects: new ProjectsFile(join(dir, "project-list.json")) }, kind => broadcasts.pushList(kind));
 	const broadcasts = new Broadcasts({
 		roster: () => roster,
@@ -209,7 +210,7 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("bots", { op: "remove", id: "missing" as BotId }, peer)).toBe(false);
 		expect(lists.applyModule("sport", [{ op: "remove-log", id: "missing" }], peer)).toBe(false);
 		expect(lists.applyModule("projects", { op: "leave", sessionId: "missing" }, peer)).toBe(false);
-		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges"));
+		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges" && msg.t !== "jobs"));
 		expect(published).toEqual([]);
 	});
 

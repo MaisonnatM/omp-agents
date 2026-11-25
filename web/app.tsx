@@ -60,6 +60,7 @@ import { useSessionLists } from "./use-session-lists";
 import { useSettingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
 import { useWorkspaceScope } from "./use-workspace-scope";
+import { JobsContext } from "./jobs-context";
 
 const NO_PROJECTS: readonly Project[] = [];
 
@@ -247,6 +248,7 @@ export function App() {
 	return (
 		<DashboardActionsContext.Provider value={actions}>
 			<DashboardStatusContext.Provider value={status}>
+				<JobsContext.Provider value={state.jobs}>
 				<ScheduledSends.Provider value={state.scheduled}>
 					<UserTodosContext.Provider value={state.userTodos}>
 					<OpenProjectsContext.Provider value={projects}>
@@ -407,6 +409,7 @@ export function App() {
 					</OpenProjectsContext.Provider>
 					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>
+				</JobsContext.Provider>
 			</DashboardStatusContext.Provider>
 		</DashboardActionsContext.Provider>
 	);
