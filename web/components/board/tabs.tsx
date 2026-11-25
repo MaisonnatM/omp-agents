@@ -2,7 +2,6 @@
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { useMemo } from "react";
 import type { WebModuleId } from "../../modules";
-import { activityControl } from "../../activity";
 import { botRows } from "../../bots-model";
 import { pullRequestsScope, pullRequestsStore } from "../../reads";
 import { hashForPage, WORKSPACE_SECTIONS, workspaceSection } from "../../routing";
