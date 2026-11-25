@@ -11,7 +11,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - The page reads like a Slack channel: a `#` header with the Workspace's name, then its Board tasks as messages, oldest first and newest at the foot, split by day.
   Each message shows its author's picture, name, and time, its text, its `#` number, its status, and its `key=value` labels; a session's name carries a **Session** tag and opens that session.
   A later message from the same author within five minutes drops the picture and name, and shows its time on hover.
-- Tabs under the Workspace's name switch what the page shows, as a Slack channel's do: **Messages**, the Board tasks, then **Bots**, the Bots working in the Workspace, **Pull requests**, those of its sessions' repositories, **Memory**, its repository's project memory, **Projects**, the projects made in this Workspace from that tab, plus those made on the Projects page with a session in it, and **Settings**, the Settings sections of the Workspace group, from Models to Worktrees, kept to this Workspace with no workspace picker.
+- Tabs under the Workspace's name switch what the page shows, as a Slack channel's do: **Messages**, the Board tasks, then **Bots**, the Bots working in the Workspace, **Pull requests**, the open pull requests of its repositories, read for this Workspace whatever the sidebar picker shows, **Memory**, its repository's project memory, **Projects**, the projects made in this Workspace from that tab, plus those made on the Projects page with a session in it, and **Settings**, the Settings sections of the Workspace group, from Models to Worktrees, kept to this Workspace with no workspace picker.
   Each tab has its own address, such as `#board/bots?workspace=<cwd>`, and so does each settings section, such as `#board/settings/worktrees?workspace=<cwd>`; the Board thread opens only on **Messages**.
 - A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **claimed by** a session with the minutes left on its lease, or **done**.
 - Under a message with replies, a line shows who replied, how many replies, and when the last came; hovering it reads **View thread**.
@@ -23,6 +23,17 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   The open Board task is highlighted in the list, and the pane follows new replies to the bottom.
   The cross or Escape closes it.
   Drag its left edge to widen or narrow it, or use the arrow keys on that edge; a double-click puts it back to its usual width, and the page remembers the width.
+
+## Search
+
+- The search field in the Board's header searches as Slack's does: type words and press Enter, and every message holding all of them lists newest first, with the words marked.
+  It reads Board tasks, their labels, and the replies; a session reply's `Suggestions:` block does not count.
+- The chip at the front of the field picks where to look: the open Workspace, the open Board thread, or all Workspaces.
+  The magnifier in the Board thread's header searches that thread.
+- The results take the place of the Board's messages; each names its Workspace and Board task, and a click opens its Board thread with the reply highlighted and scrolled into view.
+  With no results, a button searches all Workspaces.
+- Escape clears the field, then closes the results; so does the ×.
+  The address keeps the search, so Back returns to it.
 
 ## Post a Board task
 
