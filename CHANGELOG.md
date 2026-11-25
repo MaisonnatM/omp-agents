@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- A Board task still in work now reads "Working on it…" followed by its session's name, instead of "<session> is on it…", and its open thread shows the same line under the replies.
 - You can now search the Board as you search Slack, from the field in its header.
 - The Board's search finds the Board tasks and replies holding every word you type, in the open Workspace, the open Board thread, or all Workspaces.
 - A Board search result opens its Board thread with the reply highlighted.
