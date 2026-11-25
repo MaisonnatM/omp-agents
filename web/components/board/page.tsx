@@ -5,15 +5,17 @@
 import { IconCrossMedium } from "central-icons";
 import { useState } from "react";
 import type { Workspace } from "../../../src/shared/workspaces";
-import { type BoardAuthor, type BoardChange, type BoardNote, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { boardDraftKey } from "../../composer-drafts";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
+import { useDashboardActions } from "../dashboard-context";
+import { NewSession } from "../new-session";
 import type { CoreData } from "../module-views";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute } from "./module";
@@ -49,7 +51,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 						</li>
 					))}
 				</ol>
-				{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} state={state} tasks={tasks} disabled={disabled} onChange={onChange} />}
+				{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
 			</main>
 			{thread && <Thread state={state} task={thread} sessions={core.sessions} workspace={openWorkspace} closeHref={hashForBoard(open)} disabled={disabled} onChange={onChange} />}
 		</div>
@@ -120,48 +122,30 @@ function TaskMessage({ state, task, sessions, open, href }: { state: BoardState;
 	);
 }
 
-const NOTHING = "nothing";
-
-function Composer({ workspace, state, tasks, disabled, onChange }: { workspace: Workspace; state: BoardState; tasks: BoardTask[]; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
-	const [text, setText] = useState("");
-	const [needs, setNeeds] = useState(NOTHING);
-	const open = tasks.filter(task => task.doneAt === null);
-	const send = (value: string) => {
-		const message = value.trim();
-		if (!message || disabled) return;
-		const [first = ""] = message.split("\n");
+/** The New session composer, in the open Workspace: sending posts a Board task, and the session that starts on it runs on the model, thinking level, and skill picked here. */
+function Composer({ workspace, core, disabled, onChange }: { workspace: Workspace; core: CoreData; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+	const { send } = useDashboardActions();
+	const post = ({ prompt, model, thinking, skill }: { prompt: string; model: BoardLaunch["model"]; thinking: string | null; skill: string | null }) => {
+		if (!prompt) return;
+		const [first = ""] = prompt.split("\n");
 		const title = first.length > MAX_TITLE ? `${first.slice(0, MAX_TITLE - 1)}…` : first;
-		const needed = needs === NOTHING ? [] : [Number(needs)];
-		void onChange({ op: "post", by: { kind: "user" }, workspace: workspace.cwd, title, ...(message !== title ? { text: message } : {}), ...(needed.length ? { needs: needed } : {}) });
-		setText("");
-		setNeeds(NOTHING);
+		void onChange({ op: "post", by: { kind: "user" }, workspace: workspace.cwd, title, ...(prompt !== title ? { text: prompt } : {}), launch: { model, thinking, skill } });
 	};
-	const waits = needs !== NOTHING && state.tasks.find(task => task.id === Number(needs))?.doneAt === null;
 	return (
-		<div className="mx-auto w-full max-w-conversation shrink-0 px-3 pb-3">
-			<InputMessage
-				{...activityControl("board.post")}
-				value={text}
-				onValueChange={setText}
-				onSend={send}
-				placeholder={`Message ${folder(workspace.cwdDisplay)}: what should a session do?`}
-				disabled={disabled}
-				sendLabel={waits ? "Send: a session starts once that one is done" : "Send: a session starts on it"}
-				leftSlot={
-					<Select value={needs} onValueChange={next => next && setNeeds(next)}>
-						<SelectTrigger {...activityControl("board.needs")} aria-label="Needs" className="max-w-64 min-w-0 text-xs [&>span]:truncate">
-							<SelectValue>{({ value }) => (value === NOTHING ? "Needs nothing" : `Needs #${value} ${open.find(task => String(task.id) === value)?.title ?? ""}`)}</SelectValue>
-						</SelectTrigger>
-						<SelectContent side="top" alignItemWithTrigger={false}>
-							<SelectItem value={NOTHING}>nothing</SelectItem>
-							{open.map(task => (
-								<SelectItem key={task.id} value={String(task.id)}>
-									#{task.id} {task.title}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				}
+		<div {...activityControl("board.post")} className="shrink-0">
+			<NewSession
+				board
+				cwd={workspace.cwd}
+				workspaces={core.workspaces}
+				launch={null}
+				connected={!disabled}
+				completions={core.newSessionCompletions}
+				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd: workspace.cwd }, text, cursor })}
+				onPickCwd={cwd => (location.hash = hashForBoard(cwd))}
+				onStart={post}
+				todo={null}
+				projectId={null}
+				draftKey={boardDraftKey(workspace.cwd)}
 			/>
 		</div>
 	);

@@ -19,6 +19,9 @@ export const newDraftKey = (todoId: string | null): string => (todoId === null ?
 /** The draft of a Bot's composer while no omp runs its conversation. */
 export const botDraftKey = (id: BotId): string => `bot/${id}`;
 
+/** The draft of the Board's composer in Workspace `cwd`. */
+export const boardDraftKey = (cwd: string): string => `board/${cwd}`;
+
 /** Puts `text` in the composer of `key` for its next mount; `""` forgets it. */
 export const putDraft = (key: string, text: string): void => drafts.set(key, text === "" ? null : text);
 

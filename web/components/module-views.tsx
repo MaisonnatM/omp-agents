@@ -10,6 +10,7 @@ import type { RosterHost } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
+import type { Completions } from "../pane-store";
 import type { SectionTarget } from "../section";
 import { BoardPage } from "./board/page";
 import { useDashboardActions } from "./dashboard-context";
@@ -41,6 +42,8 @@ export interface CoreData {
 	sessions: KnownSessions;
 	/** The page section a sidebar link last chose, to unfold, scroll to, and focus. */
 	section: SectionTarget | null;
+	/** The server's last answer to the new-session draft's `complete`, which the Board's composer shares. */
+	newSessionCompletions: Completions | null;
 }
 
 /** A module's list in the page column: the route its page shows, and the page section a link there last chose, which `onSection` sets. */

@@ -52,17 +52,19 @@ interface NewSessionProps {
 	 */
 	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId" | "projectId">) => void;
 	/** Start the same session at `when` instead, with no page open; resolves once the server saved it. */
-	onSchedule: (op: ScheduledOp, when: ScheduleWhen) => Promise<void>;
+	onSchedule?: (op: ScheduledOp, when: ScheduleWhen) => Promise<void>;
 	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
 	todo: { text: string; prompt: string } | null;
 	/** The project the session joins once it starts; `null` for none. */
 	projectId: string | null;
 	/** Start the session in no project instead. */
-	onDropProject: () => void;
+	onDropProject?: () => void;
 	/** A scheduled start opened to edit: the draft starts as it, sending saves it, **Start now** calls `onStart`, and `onSchedule` moves its time. */
 	scheduled?: ScheduledDraft;
 	/** Where this browser keeps the unsent text; `null` keeps none. */
 	draftKey: string | null;
+	/** Only the composer, docked under the Board's messages: sending posts a Board task, so it attaches no files and schedules nothing. */
+	board?: boolean;
 }
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
@@ -88,7 +90,7 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, projectId, onDropProject, scheduled, draftKey }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, projectId, onDropProject, scheduled, draftKey, board = false }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const pickFiles = useRef<(accept?: string) => void>(null);
@@ -133,7 +135,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		if (typeable && document.activeElement === document.body) editorRef.current?.focus();
 	}, [typeable]);
 	const privacy = linked ? null : <PrivatePill on={isPrivate} onToggle={() => setPrivate(on => !on)} disabled={starting} />;
-	const projectPill = project === null ? null : <ProjectPill name={project} onDrop={onDropProject} disabled={starting} />;
+	const projectPill = project === null || !onDropProject ? null : <ProjectPill name={project} onDrop={onDropProject} disabled={starting} />;
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const { send } = useDashboardActions();
 	// A composer that keeps no draft, as a scheduled start's, has nowhere to put text that lands after it closes.
@@ -175,7 +177,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const opOf = (prompt: string): ScheduledOp => ({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : draftSkill, private: isPrivate });
 	const schedule = useAction(async (when: ScheduleWhen) => {
 		const prompt = draft.trim();
-		await onSchedule(opOf(prompt), when);
+		await onSchedule?.(opOf(prompt), when);
 		if (!scheduled) setDraft(current => (current.trim() === prompt ? "" : current));
 	}, "Could not schedule the session");
 	const save = useAction(async (prompt: string) => scheduled?.onSave(opOf(prompt)), "Could not save the scheduled session");
@@ -200,6 +202,65 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			{scheduled && checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 		</>
 	);
+	// The Board keeps no attachments or schedule, since its log holds text only.
+	const composer = (
+		<ComposerEditor value={editorRef}>
+			<div className="mx-auto w-full max-w-conversation px-3 pb-3">
+				<div className="relative">
+					{completion.popup}
+					<InputMessage
+						className={cn(isPrivate && "outline-2 outline-foreground")}
+						editorRef={editorRef}
+						filePickerRef={pickFiles}
+						value={draft}
+						onValueChange={completion.onValueChange}
+						onSend={text => {
+							if (directCommand) return;
+							completion.close();
+							if (scheduled) save.run(text.trim());
+							else if (board) {
+								onStart({ ...opOf(text.trim()), images: [] });
+								setDraft("");
+							} else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
+						}}
+						placeholder={scheduled ? "Message this session…" : board ? `Message ${folderName(cwd) ?? cwd}: a session starts on it` : "Describe the work; omp starts when you send it"}
+						files={attachments.files}
+						onFilesChange={attachments.onFilesChange}
+						accept={ATTACH_ACCEPT}
+						leftSlot={
+							<>
+								{pickers}
+								<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
+								{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
+							</>
+						}
+						rightSlot={({ openFilePicker }) => (
+							<>
+								{!board && <ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />}
+								{!scheduled && !board && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
+								<DictationButton dictation={dictation} />
+							</>
+						)}
+						disabled={starting || !connected}
+						locked={dictation.locked}
+						beforeEditor={<DictationRow dictation={dictation} />}
+						sendLabel={scheduled ? "Save" : board ? "Post and start a session" : starting ? "Starting session" : "Start session"}
+						sending={starting || save.pending}
+						editorProps={{
+							...completion.editorProps,
+							onKeyDown,
+							onPaste: scheduled || board ? undefined : attachments.onPaste,
+						}}
+					/>
+				</div>
+				{directCommand && !completion.popup && <ComposerNote text={directCommand} />}
+				{attachments.note && <ComposerNote text={attachments.note} />}
+				{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
+				{panel}
+			</div>
+		</ComposerEditor>
+	);
+	if (board) return composer;
 	return (
 		<div className="relative isolate flex h-full min-h-0 flex-1 flex-col">
 			{scheduled ? (
@@ -238,58 +299,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			)}
 			{/* The composer docks at the page's bottom, with the project picker left of the model; only a scheduled start shows the branch. */}
 			{/* The pickers sit inside the composer, so a pick hands the focus back to its text box. */}
-			<ComposerEditor value={editorRef}>
-				<div className="mx-auto w-full max-w-conversation px-3 pb-3">
-					<div className="relative">
-						{completion.popup}
-						<InputMessage
-							className={cn(isPrivate && "outline-2 outline-foreground")}
-							editorRef={editorRef}
-							filePickerRef={pickFiles}
-							value={draft}
-							onValueChange={completion.onValueChange}
-							onSend={text => {
-								if (directCommand) return;
-								completion.close();
-								if (scheduled) save.run(text.trim());
-								else void attachments.read(text, async (prompt, images) => onStart({ ...opOf(prompt), images }));
-							}}
-							placeholder={scheduled ? "Message this session…" : "Describe the work; omp starts when you send it"}
-							files={attachments.files}
-							onFilesChange={attachments.onFilesChange}
-							accept={ATTACH_ACCEPT}
-							leftSlot={
-								<>
-									{pickers}
-									<ModelPicker {...models.picker} disabled={starting || !connected} control="composer.model" />
-									{draftSkill !== null && !ownCommand && <SkillToggle name={draftSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
-								</>
-							}
-							rightSlot={({ openFilePicker }) => (
-								<>
-									<ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />
-									{!scheduled && <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
-									<DictationButton dictation={dictation} />
-								</>
-							)}
-							disabled={starting || !connected}
-							locked={dictation.locked}
-							beforeEditor={<DictationRow dictation={dictation} />}
-							sendLabel={scheduled ? "Save" : starting ? "Starting session" : "Start session"}
-							sending={starting || save.pending}
-							editorProps={{
-								...completion.editorProps,
-								onKeyDown,
-								onPaste: scheduled ? undefined : attachments.onPaste,
-							}}
-						/>
-					</div>
-					{directCommand && !completion.popup && <ComposerNote text={directCommand} />}
-					{attachments.note && <ComposerNote text={attachments.note} />}
-					{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
-					{panel}
-				</div>
-			</ComposerEditor>
+			{composer}
 		</div>
 	);
 }

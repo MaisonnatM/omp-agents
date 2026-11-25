@@ -517,8 +517,8 @@ export class Dashboard {
 			onChange: () => broadcasts.pushList("scheduled"),
 		}));
 		this.#moduleRuns = moduleRuns(modules, applyModuleNow, {
-			async start(cwd, prompt) {
-				const result = await startSession(newSessionRequest(cwd, prompt));
+			async start(cwd, prompt, launch) {
+				const result = await startSession(newSessionRequest(cwd, prompt, launch));
 				if (!result.ok) return { error: result.error };
 				const sessionId = sessions.get(result.instanceId)?.sessionId;
 				return sessionId ? { sessionId } : { error: "The session exited as it started." };

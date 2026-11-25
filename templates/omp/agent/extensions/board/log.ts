@@ -13,13 +13,20 @@ export const MAX_LABELS = 12;
 /** Who wrote a Board task or a reply: the user on the Board page, or a top-level session through the `board` tool. */
 export type BoardAuthor = { kind: "user" } | { kind: "session"; sessionId: string };
 
+/** How the session started on a Board task runs, as the page's composer picked it: its model, thinking level, and skill; `null` for omp's default. */
+export interface BoardLaunch {
+	model: { provider: string; id: string } | null;
+	thinking: string | null;
+	skill: string | null;
+}
+
 /**
  * What the page and the `board` tool ask for. The server stamps each with the time, and a post with its number,
  * then appends it to the log. `start`, `woke`, and `expire` come only from the server itself: auto-start, the wake
  * path, and the lease sweep.
  */
 export type BoardChange =
-	| { op: "post"; by: BoardAuthor; workspace: string; title: string; text?: string; labels?: Record<string, string>; needs?: number[] }
+	| { op: "post"; by: BoardAuthor; workspace: string; title: string; text?: string; labels?: Record<string, string>; needs?: number[]; launch?: BoardLaunch }
 	| { op: "reply"; by: BoardAuthor; task: number; text: string }
 	| { op: "claim"; sessionId: string; task: number }
 	| { op: "renew"; sessionId: string; task: number }
@@ -69,6 +76,8 @@ export interface BoardTask {
 	labels: Record<string, string>;
 	/** The Board tasks that must be done before this one is ready. */
 	needs: number[];
+	/** How its session starts, `null` for omp's defaults. */
+	launch: BoardLaunch | null;
 	claim: BoardClaim | null;
 	start: BoardStart | null;
 	doneAt: number | null;
@@ -160,6 +169,7 @@ export function fold(state: BoardState, event: BoardEvent): BoardState {
 			text: event.text?.trim() ?? "",
 			labels: event.labels ?? {},
 			needs: event.needs ?? [],
+			launch: event.launch ?? null,
 			claim: null,
 			start: null,
 			doneAt: null,
@@ -240,6 +250,20 @@ function parseLabels(value: unknown): Record<string, string> | null {
 	return Object.fromEntries(entries) as Record<string, string>;
 }
 
+/** A text of a launch: `null` when absent, `false` when it is no such text. */
+const launchText = (value: unknown): string | null | false => (value === null || value === undefined ? null : isText(value, 200) && value ? value : false);
+
+/** The launch `value` holds: `undefined` for none, `null` for anything but a launch. */
+function parseLaunch(value: unknown): BoardLaunch | undefined | null {
+	if (value === undefined) return undefined;
+	if (!isRecord(value)) return null;
+	const { model } = value;
+	const thinking = launchText(value.thinking);
+	const skill = launchText(value.skill);
+	const picked = model === null || model === undefined ? null : isRecord(model) && isText(model.provider, 200) && isText(model.id, 200) && model.provider && model.id ? { provider: model.provider, id: model.id } : false;
+	return thinking === false || skill === false || picked === false ? null : { model: picked, thinking, skill };
+}
+
 /** The change `value` holds, or `null` when it holds none; `server` admits the changes only the server makes. */
 export function parseChange(value: unknown, server = true): BoardChange | null {
 	if (!isRecord(value)) return null;
@@ -248,8 +272,9 @@ export function parseChange(value: unknown, server = true): BoardChange | null {
 			const by = parseAuthor(value.by);
 			const labels = parseLabels(value.labels);
 			const needs = value.needs === undefined ? [] : Array.isArray(value.needs) && value.needs.length <= 20 && value.needs.every(isId) ? (value.needs as number[]) : null;
-			if (!by || !labels || !needs || !isText(value.workspace, 4096) || !isText(value.title, MAX_TITLE) || (value.text !== undefined && !isText(value.text, MAX_TEXT))) return null;
-			return { op: "post", by, workspace: value.workspace, title: value.title, ...(typeof value.text === "string" && value.text.trim() ? { text: value.text } : {}), ...(Object.keys(labels).length ? { labels } : {}), ...(needs.length ? { needs } : {}) };
+			const launch = parseLaunch(value.launch);
+			if (!by || !labels || !needs || launch === null || !isText(value.workspace, 4096) || !isText(value.title, MAX_TITLE) || (value.text !== undefined && !isText(value.text, MAX_TEXT))) return null;
+			return { op: "post", by, workspace: value.workspace, title: value.title, ...(typeof value.text === "string" && value.text.trim() ? { text: value.text } : {}), ...(Object.keys(labels).length ? { labels } : {}), ...(needs.length ? { needs } : {}), ...(launch ? { launch } : {}) };
 		}
 		case "reply": {
 			const by = parseAuthor(value.by);
