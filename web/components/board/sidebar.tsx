@@ -67,8 +67,9 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 					{workspaces.map(workspace => {
 						const inIt = state.tasks.filter(task => task.workspace === workspace.cwd);
 						const ready = inIt.filter(task => statusOf(state, task).kind === "ready").length;
-						const rows = boardSessions(inIt).map(id => ({ id, ...sessionLabel(id, sessions) }));
-						const ids = [...rows.filter(row => row.host), ...rows.filter(row => !row.host)];
+						const ids = boardSessions(inIt)
+							.map(id => ({ id, ...sessionLabel(id, sessions) }))
+							.filter(row => row.host);
 						const current = workspace.cwd === open?.cwd;
 						return (
 							<SidebarMenuItem key={workspace.cwd}>
@@ -90,16 +91,13 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 								</SidebarMenuButton>
 								{ids.length > 0 && (
 									<SidebarMenu aria-label={`Board sessions in ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="my-1 ml-[15px] w-auto gap-px border-l border-border pl-1">
-										{ids.map(({ id, name, host }) => {
-											return (
-												<SidebarMenuItem key={id}>
-													<SidebarMenuButton {...activityControl("board.session.open")} size="short" dot={host ? "filled" : "ring"} className={host ? undefined : "text-muted-foreground"} onClick={go(hashForSession(id))}>
-														<span className="min-w-0 flex-1 truncate">{name}</span>
-														{!host && <span className="text-xs">stopped</span>}
-													</SidebarMenuButton>
-												</SidebarMenuItem>
-											);
-										})}
+										{ids.map(({ id, name }) => (
+											<SidebarMenuItem key={id}>
+												<SidebarMenuButton {...activityControl("board.session.open")} size="short" dot="filled" onClick={go(hashForSession(id))}>
+													<span className="min-w-0 flex-1 truncate">{name}</span>
+												</SidebarMenuButton>
+											</SidebarMenuItem>
+										))}
 									</SidebarMenu>
 								)}
 							</SidebarMenuItem>
