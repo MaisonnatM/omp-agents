@@ -30,7 +30,7 @@ export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: rea
 			}}
 			activation="manual"
 		>
-			<TabsPrimitive.TabsList aria-label="Board tabs" className="flex gap-4 overflow-x-auto px-6 [scrollbar-width:none] max-phone:px-3">
+			<TabsPrimitive.TabsList aria-label="Board tabs" className="flex gap-4 overflow-x-auto border-b border-border px-6 [scrollbar-width:none] max-phone:px-3">
 				{tabs.map(({ id, label, icon: Icon }) => (
 					<TabsPrimitive.TabsTab key={id} value={id} className={TAB} {...activityControl("board.tab")}>
 						<Icon aria-hidden className="size-4 shrink-0" />

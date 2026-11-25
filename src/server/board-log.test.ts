@@ -39,7 +39,6 @@ describe("the Board's projection", () => {
 		expect(statusOf(state, task(state, 1))).toEqual({ kind: "done" });
 		expect(statusOf(state, task(state, 2))).toEqual({ kind: "ready" });
 		expect(unstartedReady(state).map(each => each.id)).toEqual([2]);
-		expect(task(state, 2).replies).toEqual([{ at: 4, note: { kind: "ready", task: 1 } }]);
 		expect(task(state, 1).replies.at(-1)).toEqual({ at: 4, by: session("a"), text: "Shipped." });
 	});
 

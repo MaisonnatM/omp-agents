@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- A rule now separates the Board's tabs from the content below them, as in Slack.
+- A Board message still in work now shows a shimmering "<session> is on it…" line under it, styled like the reply line, instead of the ready and claimed badges. Board messages no longer show their #number or what they wait on.
+- A Board thread no longer gets a "#5 is done, so this Board task is ready" line when the Board task it waited on finishes; its ready badge already says so.
 - The Board thread's tab row is now a session's right sidebar: besides **Thread** and the session's conversation, its + opens that session's **Overview**, **Diffs**, **PRs**, **Artifacts**, **Review**, and **Linear** tabs, and a tab you open stays open across threads. A session's right sidebar header line now sits level with the page header beside it.
 - The Board now has tabs under the Workspace's name, as a Slack channel does: **Messages**, the Board tasks, then **Bots**, **Pull requests**, **Memory**, **Projects**, and **Settings**, each showing only what belongs to that Workspace; Settings lists just the sections that read one workspace, such as Models, Files, and Worktrees.
 - In a Board thread's reply box, typing an at sign now lists your sessions straight away, so a reply can point its session at another one; the other at-sign suggestions stay out of the thread for now.
