@@ -56,7 +56,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 	return (
 		<div className="flex h-full min-h-0 flex-1">
 			<section aria-label="Board" className="flex min-w-[360px] flex-1 flex-col">
-				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name} />
+				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name} ruled={false} />
 				<ChannelTabs tab={route.tab} workspace={open} />
 				{route.tab === "messages" ? (
 					<>

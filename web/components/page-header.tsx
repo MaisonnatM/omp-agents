@@ -14,6 +14,8 @@ interface HeaderProps {
 	children?: ReactNode;
 	/** At the header's end, as the top-right pane puts the right sidebar's toggle. */
 	end?: ReactNode;
+	/** Whether a rule closes the header; off when a row under it, such as the Board's tabs, draws its own. */
+	ruled?: boolean;
 }
 
 /** Whether a header's title shows; a page drawn inside another page's tab, which names it, hides it from sight and keeps its meta and controls. */
@@ -25,10 +27,10 @@ export const HeaderTitleShown = createContext(true);
  * they wrap to a right-aligned row of their own under it, as on a phone.
  * The trailing controls take no width until they show, so a title shares its row with them only while they do.
  */
-export function Header({ title, meta, status, alert = false, leading, trailing, children, end }: HeaderProps) {
+export function Header({ title, meta, status, alert = false, leading, trailing, children, end, ruled = true }: HeaderProps) {
 	const titleShown = useContext(HeaderTitleShown);
 	return (
-		<header className="@container/header shrink-0 border-b border-border">
+		<header className={cn("@container/header shrink-0", ruled && "border-b border-border")}>
 			<div className="flex min-h-(--page-header-height) flex-wrap items-center gap-x-4 px-6 max-phone:px-3">
 				<div className="group/reveal flex min-h-(--page-header-height) max-w-max min-w-0 grow basis-64 items-center gap-2">
 					{leading}
