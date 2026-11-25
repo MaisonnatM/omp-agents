@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-25
 
 - Fixed: the browser tool sessions use for screenshots could not save a picture or read a script inside a worktree or in /tmp when the session had started in the main checkout. Run the starter kit's install again to pick this up.
+- In the Board's left sidebar, each Workspace now lists its running sessions first, above the stopped ones.
 - A Board thread no longer shows grey lines for a session starting on, claiming, renewing, or finishing its Board task; lines for a failed start, a lapsed lease, or a woken session stay.
 - A session the Board starts now finishes on its own: it lands its work on `main` (or opens a draft PR where the repository ships through pull requests), posts its outcome in the Board thread, and ends itself, so you no longer merge or end Board sessions by hand. A reply resumes it, and it finishes the same way again.
 - A Board thread now shows only what was said: no grey lines at all, and no suggested prompts under its reply box.
