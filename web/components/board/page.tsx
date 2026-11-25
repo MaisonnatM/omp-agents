@@ -3,15 +3,15 @@
  * task's Board thread at the right; the sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
 import { IconCrossMedium } from "central-icons";
-import { type KeyboardEvent, useState } from "react";
+import { useState } from "react";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { type BoardAuthor, type BoardChange, type BoardNote, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InputMessage } from "@/components/ui/input-message";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import type { ModuleControlId } from "../../modules";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
 import type { CoreData } from "../module-views";
@@ -120,36 +120,14 @@ function TaskMessage({ state, task, sessions, open, href }: { state: BoardState;
 	);
 }
 
-/** A field that sends on Enter and keeps Shift+Enter for a new line. */
-function MessageField({ control, label, placeholder, value, disabled, onValue, onSend }: { control: ModuleControlId; label: string; placeholder: string; value: string; disabled: boolean; onValue: (value: string) => void; onSend: () => void }) {
-	const keys = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-		if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-		event.preventDefault();
-		onSend();
-	};
-	return (
-		<textarea
-			{...activityControl(control)}
-			aria-label={label}
-			placeholder={placeholder}
-			value={value}
-			rows={2}
-			disabled={disabled}
-			onChange={event => onValue(event.target.value)}
-			onKeyDown={keys}
-			className="min-h-14 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-		/>
-	);
-}
-
 const NOTHING = "nothing";
 
 function Composer({ workspace, state, tasks, disabled, onChange }: { workspace: Workspace; state: BoardState; tasks: BoardTask[]; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const [text, setText] = useState("");
 	const [needs, setNeeds] = useState(NOTHING);
 	const open = tasks.filter(task => task.doneAt === null);
-	const send = () => {
-		const message = text.trim();
+	const send = (value: string) => {
+		const message = value.trim();
 		if (!message || disabled) return;
 		const [first = ""] = message.split("\n");
 		const title = first.length > MAX_TITLE ? `${first.slice(0, MAX_TITLE - 1)}…` : first;
@@ -160,28 +138,31 @@ function Composer({ workspace, state, tasks, disabled, onChange }: { workspace: 
 	};
 	const waits = needs !== NOTHING && state.tasks.find(task => task.id === Number(needs))?.doneAt === null;
 	return (
-		<div className="flex shrink-0 flex-col gap-2 border-t border-border px-6 py-3">
-			<MessageField control="board.post" label="Message" placeholder={`Message ${folder(workspace.cwdDisplay)}: what should a session do?`} value={text} disabled={disabled} onValue={setText} onSend={send} />
-			<div className="flex items-center gap-2">
-				<span className="text-xs text-muted-foreground">Needs</span>
-				<Select value={needs} onValueChange={next => next && setNeeds(next)}>
-					<SelectTrigger {...activityControl("board.needs")} aria-label="Needs" className="max-w-64 min-w-0 text-xs [&>span]:truncate">
-						<SelectValue>{({ value }) => (value === NOTHING ? "nothing" : `#${value} ${open.find(task => String(task.id) === value)?.title ?? ""}`)}</SelectValue>
-					</SelectTrigger>
-					<SelectContent side="top" alignItemWithTrigger={false}>
-						<SelectItem value={NOTHING}>nothing</SelectItem>
-						{open.map(task => (
-							<SelectItem key={task.id} value={String(task.id)}>
-								#{task.id} {task.title}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-				<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{waits ? "A session starts once that one is done." : "Sending starts a session on it."}</span>
-				<Button {...activityControl("board.post")} size="compact" variant="primary" disabled={disabled || !text.trim()} onClick={send}>
-					Send
-				</Button>
-			</div>
+		<div className="mx-auto w-full max-w-conversation shrink-0 px-3 pb-3">
+			<InputMessage
+				{...activityControl("board.post")}
+				value={text}
+				onValueChange={setText}
+				onSend={send}
+				placeholder={`Message ${folder(workspace.cwdDisplay)}: what should a session do?`}
+				disabled={disabled}
+				sendLabel={waits ? "Send: a session starts once that one is done" : "Send: a session starts on it"}
+				leftSlot={
+					<Select value={needs} onValueChange={next => next && setNeeds(next)}>
+						<SelectTrigger {...activityControl("board.needs")} aria-label="Needs" className="max-w-64 min-w-0 text-xs [&>span]:truncate">
+							<SelectValue>{({ value }) => (value === NOTHING ? "Needs nothing" : `Needs #${value} ${open.find(task => String(task.id) === value)?.title ?? ""}`)}</SelectValue>
+						</SelectTrigger>
+						<SelectContent side="top" alignItemWithTrigger={false}>
+							<SelectItem value={NOTHING}>nothing</SelectItem>
+							{open.map(task => (
+								<SelectItem key={task.id} value={String(task.id)}>
+									#{task.id} {task.title}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				}
+			/>
 		</div>
 	);
 }
@@ -214,8 +195,8 @@ function Thread({ state, task, sessions, workspace, closeHref, disabled, onChang
 	const [text, setText] = useState("");
 	const said = task.replies.filter(entry => "by" in entry).length;
 	const target = wakeTarget(task, { kind: "user" });
-	const send = () => {
-		const reply = text.trim();
+	const send = (value: string) => {
+		const reply = value.trim();
 		if (!reply || disabled) return;
 		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: reply });
 		setText("");
@@ -269,19 +250,16 @@ function Thread({ state, task, sessions, workspace, closeHref, disabled, onChang
 					)}
 				</ol>
 			</div>
-			<div className="flex shrink-0 flex-col gap-2 border-t border-border px-4 py-3">
-				<MessageField
-					control="board.reply"
-					label="Reply"
-					placeholder={target ? `Reply. It reaches ${sessionLabel(target, sessions).name}, and wakes it if it stopped.` : "Reply on this Board thread."}
+			<div className="shrink-0 px-3 pb-3">
+				<InputMessage
+					{...activityControl("board.reply")}
 					value={text}
-					disabled={disabled}
-					onValue={setText}
+					onValueChange={setText}
 					onSend={send}
+					placeholder={target ? `Reply. It reaches ${sessionLabel(target, sessions).name}, and wakes it if it stopped.` : "Reply on this Board thread."}
+					disabled={disabled}
+					sendLabel="Send reply"
 				/>
-				<Button {...activityControl("board.reply")} size="compact" variant="primary" className="self-end" disabled={disabled || !text.trim()} onClick={send}>
-					Send
-				</Button>
 			</div>
 		</aside>
 	);
