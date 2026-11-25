@@ -1,6 +1,6 @@
 import { IconCrossMedium, IconFlag1, IconLock, IconSparklesTwo, IconUnlocked } from "central-icons";
 import { type KeyboardEvent, useContext, useEffect, useRef, useState } from "react";
-import { RetroGrid } from "@/components/dithercn/retro-grid";
+import { useNewSessionBackdrop } from "@/components/new-session-backdrop";
 import type { BranchChoice } from "../../src/shared/git";
 import type { NewSessionRequest } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -184,8 +184,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const error = scheduled ? scheduled.error : launch?.phase === "failed" ? launch.error : null;
 	// A private draft lists what ending it deletes and what stays under the composer.
 	const panel = scheduled || !isPrivate ? null : <PrivateFacts />;
-	// The grid fills the page's lower half and fades out under the title, its sun on the horizon.
-	const backdrop = <RetroGrid aria-hidden horizon={0.62} sun={0.42} className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[40%] opacity-70 [mask-image:linear-gradient(to_bottom,transparent,black_35%)]" />;
+	const { backdrop, picker: backdropPicker } = useNewSessionBackdrop(cn(HEADER_PILL, "cursor-pointer bg-transparent text-muted-foreground hover:bg-hover hover:text-foreground"));
 	const pickers = (
 		<>
 			<DirectoryPicker
@@ -218,6 +217,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				<Header title="New session" status={starting ? "Starting omp…" : undefined}>
 					{projectPill}
 					{privacy}
+					{backdropPicker}
 				</Header>
 			)}
 			{error !== null && (
