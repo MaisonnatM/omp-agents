@@ -6,7 +6,7 @@
 import type { LineFold } from "./line-reader";
 import type { SessionFormat } from "./session-format";
 import { formatOf, SESSION_FORMATS } from "./session-formats";
-import { searchWords } from "./shared/every-word";
+import { searchWords, snippetOf } from "./shared/every-word";
 import type { ConversationHit } from "./shared/sessions";
 import { messageItemsOf } from "./transcript";
 
@@ -35,19 +35,6 @@ class ConversationFold implements LineFold {
 			for (const item of messageItemsOf(entry)) if (item.kind === "user" || item.kind === "assistant") this.messages.set(item.id, { id: item.id, role: item.kind, text: item.text, lower: item.text.toLowerCase() });
 		}
 	}
-}
-
-const SNIPPET_LEAD = 16;
-const SNIPPET_LENGTH = 160;
-
-/** `text` on one line, cut to a snippet that starts on a word a little before the first word of `query`. */
-export function snippetOf(text: string, query: string): string {
-	const flat = text.replace(/\s+/g, " ").trim();
-	const at = Math.max(0, flat.toLowerCase().indexOf(searchWords(query)[0] ?? ""));
-	let start = Math.max(0, at - SNIPPET_LEAD);
-	if (start > 0 && flat[start - 1] !== " ") start = Math.min(at, flat.indexOf(" ", start) + 1);
-	const end = Math.min(flat.length, start + SNIPPET_LENGTH);
-	return `${start > 0 ? "…" : ""}${flat.slice(start, end)}${end < flat.length ? "…" : ""}`;
 }
 
 /** The prompts and replies of each listed session's own file, not its subagents', as far as its reader folded them. */
