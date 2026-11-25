@@ -70,7 +70,7 @@ function WorkspacePullRequests({ workspace, hosts, past }: { workspace: string |
 	);
 }
 
-const settingsHash = (workspace: string | null, section: string) => hashForPage({ kind: "board", workspace, view: { tab: "settings", section }, search: null, reply: null });
+const settingsHash = (workspace: string | null, section: string) => hashForPage({ kind: "board", workspace, view: { tab: "settings", section }, search: null, reply: null, bots: false });
 
 /** Settings kept to the Workspace, with no workspace picker: its sections down the left, the one the address names at the right. */
 function WorkspaceSettings({ workspace, workspaces, section: named }: { workspace: string | null; workspaces: CoreData["workspaces"]; section: string | null }) {

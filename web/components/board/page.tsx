@@ -4,8 +4,8 @@
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconUser } from "central-icons";
-import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconRobot, IconUser } from "central-icons";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { hashForSession, type PastSession, type PromptImage, type RosterHost, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
@@ -41,6 +41,8 @@ import { boardTabsOn, WorkspaceTab } from "./tabs";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
+import { botRows } from "../../bots-model";
+import { BotsGallery } from "../bots/bots-gallery";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -55,6 +57,17 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 	const [off] = useModulesOff();
 	const searchField = useRef<BoardSearchFieldHandle>(null);
 	if (state === null) return <p className="px-6 py-6 text-sm text-muted-foreground">Loading the Board…</p>;
+	if (route.bots)
+		return (
+			<section aria-label="Bots" className="flex min-h-0 min-w-[360px] flex-1 flex-col">
+				<Header leading={<IconRobot aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title="Bots" />
+				<HeaderTitleShown.Provider value={false}>
+					<div className="flex min-h-0 flex-1">
+						<BotsGallery rows={core.bots && botRows(core.bots, core.sessions.hosts, core.botLasts)} routines={core.routines} />
+					</div>
+				</HeaderTitleShown.Provider>
+			</section>
+		);
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
 	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";
@@ -82,6 +95,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 					<SearchResults state={state} route={route} workspace={openWorkspace} core={core} />
 				) : view.tab === "messages" ? (
 					<>
+						{/* The composer sits inside the scroller's provider so a post jumps to the end, as Slack does for your own message. */}
 						<MessageScrollerProvider autoScroll>
 							<MessageScroller className="flex-1">
 								<MessageScrollerViewport>
@@ -102,8 +116,8 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 								</MessageScrollerViewport>
 								<MessageScrollerButton />
 							</MessageScroller>
+							{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
 						</MessageScrollerProvider>
-						{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
 					</>
 				) : (
 					<HeaderTitleShown.Provider value={false}>
@@ -396,8 +410,10 @@ async function withImages(prompt: string, images: PromptImage[]): Promise<string
 /** The New session composer, in the open Workspace: sending posts a Board task, and the session that starts on it runs on the model, thinking level, and skill picked here. */
 function Composer({ workspace, core, disabled, onChange }: { workspace: Workspace; core: CoreData; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
+	const { scrollToEnd } = useMessageScroller();
 	const post = async ({ prompt, images, model, thinking, skill }: ComposerSend) => {
 		if (!prompt && images.length === 0) return;
+		scrollToEnd();
 		const [first = ""] = prompt.split("\n");
 		const title = !first ? "Image" : first.length > MAX_TITLE ? `${first.slice(0, MAX_TITLE - 1)}…` : first;
 		const text = await withImages(prompt, images);
@@ -442,6 +458,9 @@ function Thread({ state, task, reply, core, workspace, channel, closeHref, onSea
 	const past = target ? (sessions.past.find(each => each.sessionId === target) ?? null) : null;
 	const instanceId = host?.instanceId ?? null;
 	const view = useMemo<View | null>(() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : past && target ? { kind: "past", sessionId: target } : null), [instanceId, past, target]);
+	// Opened on a picked reply, the thread holds still; your own reply there makes it follow the end again.
+	const [sentOn, setSentOn] = useState<number | null>(null);
+	const follow = reply === null || sentOn === reply;
 	const [width, setWidth] = useStoredState("omp-agents.board-thread-width", raw => {
 		const stored = Number(raw);
 		return stored >= MIN_THREAD && stored <= MAX_THREAD ? stored : THREAD_WIDTH;
@@ -481,10 +500,9 @@ function Thread({ state, task, reply, core, workspace, channel, closeHref, onSea
 		count: 0,
 		scrollsItself: true,
 		content: (
-			<>
-				<ThreadMessages state={state} task={task} reply={reply} sessions={sessions} disabled={disabled} onChange={onChange} />
-				<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
-			</>
+			<ThreadMessages state={state} task={task} reply={reply} follow={follow} sessions={sessions} disabled={disabled} onChange={onChange}>
+				<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} onSend={() => setSentOn(reply)} />
+			</ThreadMessages>
 		),
 	};
 	const close = (
@@ -548,7 +566,7 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 }
 
 /** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. Under a done Board task's last reply sit its session's suggested prompts; each sends itself as the user's reply, which starts a new session on the thread. */
-function ThreadMessages({ state, task, reply, sessions, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChange, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; children: ReactNode }) {
 	const status = statusOf(state, task);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const replies = said(task);
@@ -557,7 +575,7 @@ function ThreadMessages({ state, task, reply, sessions, disabled, onChange }: { 
 	const suggestions = task.doneAt !== null && last?.by.kind === "session" ? splitSuggestions(last.text).suggestions : [];
 	let previous: { at: number; by: BoardAuthor } = task;
 	return (
-		<MessageScrollerProvider autoScroll={reply === null}>
+		<MessageScrollerProvider autoScroll={follow}>
 			<MessageScroller className="flex-1">
 				<MessageScrollerViewport>
 					<MessageScrollerContent className="gap-0 py-2">
@@ -603,6 +621,7 @@ function ThreadMessages({ state, task, reply, sessions, disabled, onChange }: { 
 				<MessageScrollerButton />
 			</MessageScroller>
 			{reply !== null && <ScrollToReply reply={reply} />}
+			{children}
 		</MessageScrollerProvider>
 	);
 }
@@ -620,10 +639,13 @@ function ScrollToReply({ reply }: { reply: number }) {
 const THREAD_MENTIONS = ["session"] as const;
 
 /** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name`, or on a done Board task starts a new one, on the model, thinking level, and skill picked here. */
-function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+function ThreadComposer({ task, name, core, workspace, disabled, onChange, onSend }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onSend: () => void }) {
 	const { send } = useDashboardActions();
+	const { scrollToEnd } = useMessageScroller();
 	const reply = async ({ prompt, images, model, thinking, skill }: ComposerSend) => {
 		if ((!prompt && images.length === 0) || disabled) return;
+		onSend();
+		scrollToEnd();
 		await onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: await withImages(prompt, images), launch: { model, thinking, skill } });
 	};
 	return (
