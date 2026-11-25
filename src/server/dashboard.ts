@@ -72,7 +72,7 @@ import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
 import { startDevServer } from "./dev-server";
 import { readProcessTable } from "../process-census";
-import { readAppOf, readCwds, readListeningPorts, SessionProcessWatch, stopProcesses } from "./session-processes";
+import { readAppOf, readCwds, readListeningPorts, readSessionFiles, SessionProcessWatch, stopProcesses } from "./session-processes";
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
 import { RoutineRunner } from "./routine-runner";
@@ -417,6 +417,7 @@ export class Dashboard {
 			readTable: readProcessTable,
 			readPorts: readListeningPorts,
 			readCwds,
+			readSessionFiles,
 			appOf: readAppOf,
 			stopProcesses,
 			sessions: () => {
@@ -424,6 +425,7 @@ export class Dashboard {
 				return sessions.rows(factsOf).map(row => ({
 					instanceId: row.instanceId,
 					sessionId: row.sessionId,
+					file: sessions.get(row.instanceId)?.transcriptPath(null, files.pathOf) ?? null,
 					pid: row.pid,
 					cwd: row.cwd,
 					status: row.status,

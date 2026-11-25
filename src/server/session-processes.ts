@@ -7,7 +7,24 @@
  */
 import type { UnitSnapshot } from "../omp/module-types/processes";
 import { run } from "../proc";
-import { cwdsArgv, cwdsIn, descendants, LISTENERS_ARGV, listeningPortsIn, parseCwds, parseListeners, type Processes, type ProcessRow, type ProcessTable, sessionGroups, terminate } from "../process-census";
+import {
+	cwdsArgv,
+	cwdsIn,
+	descendants,
+	environmentsArgv,
+	LISTENERS_ARGV,
+	listeningPortsIn,
+	OMP_WORKER_PREFIX,
+	parseCwds,
+	parseListeners,
+	parseSessionFiles,
+	type Processes,
+	type ProcessRow,
+	type ProcessTable,
+	sessionFilesIn,
+	sessionGroups,
+	terminate,
+} from "../process-census";
 import { SerialLane } from "../serial-lane";
 import type { LiveSessionProcesses, ProcessSettings, SessionProcess, SessionProcesses } from "../shared/processes";
 import type { HostStatus } from "../shared/sessions";
@@ -24,6 +41,8 @@ export interface WatchedSession {
 	instanceId: string;
 	/** omp's session id, which a service names as its owner. */
 	sessionId: string;
+	/** omp's session file, which omp's bash tool names in each command's environment; `null` before omp wrote one. */
+	file: string | null;
 	/** omp's pid. */
 	pid: number;
 	cwd: string;
@@ -41,6 +60,8 @@ export interface SessionProcessWatchDeps {
 	readPorts(): Promise<Map<number, number[]> | null>;
 	/** The working directory of each of `pids` that still runs. */
 	readCwds(pids: readonly number[]): Promise<Map<number, string>>;
+	/** The omp session file in the environment of each of `pids` that an omp bash tool started; `null` when the read failed. */
+	readSessionFiles(pids: readonly number[]): Promise<Map<number, string> | null>;
 	/** What app `dir` holds, the same for each checkout of it, such as `front/` of one repository; `null` outside git. */
 	appOf(dir: string): Promise<string | null>;
 	/** The services omp's daemon runs now, without the ones that ended or that it does not supervise. */
@@ -84,6 +105,8 @@ type Sample = Map<string, Found>;
 interface Seen {
 	/** Every omp session id it ran, since `/new` keeps the instance and changes the id its services name as owner. */
 	owners: Set<string>;
+	/** Every session file it had, for the same reason. */
+	files: Set<string>;
 	/** omp, by pid and start time; `null` when `ps` did not list it. */
 	omp: { pid: number; started: string } | null;
 	/** Every process of its jobs, as last seen. */
@@ -104,6 +127,8 @@ export class SessionProcessWatch {
 	#seen = new Map<string, Seen>();
 	/** {@link SessionProcessWatchDeps.appOf} by directory, which a running server keeps. */
 	readonly #apps = new Map<string, Promise<string | null>>();
+	/** The session file each process launchd or init adopted names, `null` for none, by pid and start time, as the last sample read them. */
+	#adoptedFiles = new Map<string, string | null>();
 	/** The last sample and when it was taken, which {@link list} reuses while it is under {@link LIST_REUSE_MS} old. */
 	#last: { at: number; sample: Sample } | null = null;
 
@@ -167,13 +192,22 @@ export class SessionProcessWatch {
 
 		const previous = this.#seen;
 		this.#seen = new Map();
+		const detached = await this.#detached(table, [...sessions.map(session => session.pid), ...[...previous.values()].flatMap(seen => (seen.omp ? [seen.omp.pid] : []))]);
 		const found: Sample = new Map();
 		for (const session of sessions) {
+			const files = new Set([...(previous.get(session.instanceId)?.files ?? []), ...(session.file === null ? [] : [session.file])]);
 			const groups = sessionGroups(table, session.pid);
-			const jobs = groups ? [...groups.jobs].map(([pgid, rows]) => jobItem(session, pgid, rows, portsOf(rows))) : [];
+			const byGroup = new Map<number, ProcessRow[]>(groups?.jobs ?? []);
+			for (const { file, rows } of detached) {
+				if (![...files].some(own => startedIn(file, own))) continue;
+				const pgid = rows[0].pgid;
+				byGroup.set(pgid, [...(byGroup.get(pgid) ?? []), ...rows]);
+			}
+			const jobs = [...byGroup].map(([pgid, rows]) => jobItem(session, pgid, rows, portsOf(rows)));
 			const ompRow = table.get(session.pid);
 			this.#seen.set(session.instanceId, {
 				owners: new Set([...(previous.get(session.instanceId)?.owners ?? []), session.sessionId]),
+				files,
 				omp: ompRow ? { pid: ompRow.pid, started: ompRow.started } : null,
 				jobs: new Map(jobs.flatMap(job => (job.target.kind === "job" ? [...job.target.members] : []))),
 			});
@@ -242,6 +276,34 @@ export class SessionProcessWatch {
 	}
 
 	/**
+	 * Each process tree whose root launchd or init adopted and whose environment names an omp session file, with that file:
+	 * a server a command started with `nohup … &` outlives the command, so it runs under no omp. A tree that holds one of
+	 * `ompPids` or this server is a keeper's or the dashboard's own, never a job. A process's file is read once, when a sample
+	 * first finds it adopted.
+	 */
+	async #detached(table: ProcessTable, ompPids: number[]): Promise<{ file: string; rows: ProcessRow[] }[]> {
+		const roots = [...table.values()].filter(row => row.ppid === 1 && !row.command.includes(OMP_WORKER_PREFIX));
+		const unread = roots.filter(row => !this.#adoptedFiles.has(`${row.pid} ${row.started}`)).map(row => row.pid);
+		const read = unread.length > 0 ? await this.#deps.readSessionFiles(unread) : new Map<number, string>();
+		const skip = new Set([...ompPids, process.pid]);
+		const known = new Map<string, string | null>();
+		const trees: { file: string; rows: ProcessRow[] }[] = [];
+		for (const row of roots) {
+			const key = `${row.pid} ${row.started}`;
+			const cached = this.#adoptedFiles.get(key);
+			// A failed read leaves the process unread, so the next sample reads it again.
+			const file = cached !== undefined ? cached : read === null ? undefined : (read.get(row.pid) ?? null);
+			if (file === undefined) continue;
+			known.set(key, file);
+			if (file === null) continue;
+			const rows = [row, ...[...descendants(table, row.pid).keys()].flatMap(pid => table.get(pid) ?? [])];
+			if (!rows.some(each => skip.has(each.pid))) trees.push({ file, rows });
+		}
+		this.#adoptedFiles = known;
+		return trees;
+	}
+
+	/**
 	 * Sets each session's `otherPorts`: every port in `listeners` but its own servers' and those another checkout of the
 	 * same app listens on, such as your own server on the app's usual port, so only those count as the session's app.
 	 */
@@ -285,6 +347,9 @@ export class SessionProcessWatch {
 		return target.kind === "job" ? this.#deps.stopProcesses(new Map(target.members)) : this.#deps.stopService(target.unit);
 	}
 }
+
+/** Whether a command that names session file `file` ran in session `own` or in one of its subagents, whose files omp keeps in a directory named after `own`. */
+const startedIn = (file: string, own: string): boolean => file === own || file.startsWith(`${own.replace(/\.jsonl$/, "")}/`);
 
 /** Job `pgid` of `session`, named by its top process: the group's leader, else the first under omp. */
 function jobItem(session: WatchedSession, pgid: number, rows: ProcessRow[], ports: number[]): Item {
@@ -347,6 +412,25 @@ export async function readCwds(pids: readonly number[]): Promise<Map<number, str
 	} catch {
 		return new Map();
 	}
+}
+
+/** The omp session file in the environment of each of `pids` that an omp bash tool started, read without blocking the server; `null` when the read failed. */
+export async function readSessionFiles(pids: readonly number[]): Promise<Map<number, string> | null> {
+	if (process.platform === "linux") {
+		try {
+			return sessionFilesIn("/proc", pids);
+		} catch {
+			return null;
+		}
+	}
+	try {
+		const ps = await run(environmentsArgv(pids), { timeoutMs: 10_000 });
+		// ps exits 1 when one of the pids has exited since.
+		if (ps.code === 0 || ps.code === 1) return parseSessionFiles(ps.stdout, process.env.XPC_SERVICE_NAME);
+	} catch {
+		// `ps` timed out.
+	}
+	return null;
 }
 
 /** The repository `dir` is in and where in it, so every checkout of one app answers the same; `null` outside git. */
