@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The Board's **Pull requests** tab now lists only the pull requests of that Workspace's repositories, whatever Workspace the sidebar picker shows, so every Board tab keeps to its Workspace.
 - Fixed: the browser tool sessions use for screenshots could not save a picture or read a script inside a worktree or in /tmp when the session had started in the main checkout. Run the starter kit's install again to pick this up.
 - In the Board's left sidebar, each Workspace now lists its running sessions first, above the stopped ones.
 - A Board thread no longer shows grey lines for a session starting on, claiming, renewing, or finishing its Board task; lines for a failed start, a lapsed lease, or a woken session stay.
