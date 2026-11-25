@@ -1,7 +1,7 @@
 /**
  * What the Board does on its own while this server runs the unattended work: it starts a new session on each ready
- * Board task, a reopened one included, wakes the session a reply is for, and returns each lapsed claim to ready. See
- * docs/architecture/board.md.
+ * Board task, a reopened one included, wakes the session a reply is for, stops and re-prompts that session when the
+ * user edits one of their messages, and returns each lapsed claim to ready. See docs/architecture/board.md.
  */
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardState, type BoardTask, lapsed, startedOn, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
 import { errorText } from "../json";
@@ -63,14 +63,27 @@ export const startPrompt = (task: BoardTask): string =>
 export const wakePrompt = (task: BoardTask, by: BoardAuthor, text: string): string =>
 	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nWhen it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}); when it asks for more work, do it.\n${finish(task.id)}`;
 
+/** What the session reads after the user edited one of their messages, which stopped its turn: the message's new text replaces the old. */
+export const editPrompt = (task: BoardTask, text: string): string =>
+	`${DASHBOARD_PROMPT_PREFIX} The user edited their message on Board task #${task.id} (${task.title}), which stopped your turn. It now reads:\n\n${text}\n\nThis replaces what that message said before: drop the work only the old text asked for, and carry on from this one. When it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}).\n${finish(task.id)}`;
+
+/** When the user last edited `task` or one of its replies; 0 when they never did. */
+const lastEdit = (task: BoardTask): number => Math.max(task.editedAt ?? 0, ...task.replies.map(entry => ("by" in entry ? (entry.editedAt ?? 0) : 0)));
+
+/** The texts of `task` and its replies edited after `since`, oldest message first. */
+const editedAfter = (task: BoardTask, since: number): string[] => [
+	...((task.editedAt ?? 0) > since ? [task.text || task.title] : []),
+	...task.replies.flatMap(entry => ("by" in entry && (entry.editedAt ?? 0) > since ? [entry.text] : [])),
+];
+
 export class BoardRunner implements ModuleRun {
 	readonly #state: () => BoardState;
 	readonly #apply: (change: BoardChange) => boolean;
 	readonly #core: ModuleRunCore;
 	/** The Board tasks a start is under way for, so a change meanwhile starts no second session. */
 	readonly #starting = new Set<number>();
-	/** How many replies each Board task had when this runner last looked, so it wakes only for new ones; `null` until it first looks. */
-	#seen: Map<number, number> | null = null;
+	/** How many replies each Board task had, and when it was last edited, when this runner last looked, so it acts only on what is new; `null` until it first looks. */
+	#seen: Map<number, { replies: number; edited: number }> | null = null;
 	#stopSweep: (() => void) | null = null;
 
 	constructor(state: () => BoardState, apply: (change: BoardChange) => boolean, core: ModuleRunCore) {
@@ -88,23 +101,28 @@ export class BoardRunner implements ModuleRun {
 		this.#stopSweep?.();
 	}
 
-	/** Starts what became ready and wakes who a new reply is for; called after every change to the Board. */
+	/** Starts what became ready, wakes who a new reply is for, and re-prompts who an edit is for; called after every change to the Board. */
 	changed(): void {
 		const state = this.#state();
 		const seen = this.#seen;
-		this.#seen = new Map(state.tasks.map(task => [task.id, task.replies.length]));
+		this.#seen = new Map(state.tasks.map(task => [task.id, { replies: task.replies.length, edited: lastEdit(task) }]));
 		if (!this.#core.owner()) return;
 		const ready = unstartedReady(state);
-		// A reply on a Board task about to start, such as the one that reopened it, reaches its new session through the start prompt's thread.
+		// A reply or edit on a Board task about to start, such as the reply that reopened it, reaches its new session through the start prompt.
 		const starting = new Set(ready.map(task => task.id));
 		if (seen)
-			for (const task of state.tasks)
-				if (!starting.has(task.id))
-					for (const entry of task.replies.slice(seen.get(task.id) ?? 0))
-						if ("by" in entry) {
-							const target = wakeTarget(task, entry.by);
-							if (target !== null) void this.#wake(task, target, entry.by, entry.text, entry.launch);
-						}
+			for (const task of state.tasks) {
+				if (starting.has(task.id)) continue;
+				const before = seen.get(task.id);
+				for (const entry of task.replies.slice(before?.replies ?? 0))
+					if ("by" in entry) {
+						const target = wakeTarget(task, entry.by);
+						if (target !== null) void this.#wake(task, target, wakePrompt(task, entry.by, entry.text), entry.launch);
+					}
+				// An edit stops the turn that worked from the message's old text, and sends the new one.
+				const target = before && lastEdit(task) > before.edited ? wakeTarget(task, { kind: "user" }) : null;
+				if (target !== null) for (const text of editedAfter(task, before?.edited ?? 0)) void this.#wake(task, target, editPrompt(task, text), undefined, true);
+			}
 		for (const task of ready) if (!this.#starting.has(task.id)) void this.#start(task);
 	}
 
@@ -124,9 +142,9 @@ export class BoardRunner implements ModuleRun {
 		}
 	}
 
-	async #wake(task: BoardTask, sessionId: string, by: BoardAuthor, text: string, launch?: BoardLaunch): Promise<void> {
+	async #wake(task: BoardTask, sessionId: string, prompt: string, launch?: BoardLaunch, interrupt = false): Promise<void> {
 		try {
-			const { resumed } = await this.#core.wake(sessionId, wakePrompt(task, by, text), launch);
+			const { resumed } = await this.#core.wake(sessionId, prompt, launch, interrupt);
 			if (resumed) this.#change({ op: "woke", task: task.id, sessionId });
 		} catch (error) {
 			console.error(`omp-agents: could not wake ${sessionId} for Board task #${task.id}: ${errorText(error)}`);

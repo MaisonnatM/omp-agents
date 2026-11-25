@@ -15,16 +15,16 @@ export const BOARD_INBOX = join(configDir, "board-changes");
 /** The images the page's composers attach, which a Board task or reply names by path; under the data directory, so the page shows them. */
 const BOARD_IMAGES = join(dataDir, "board-images");
 
-/** What the page may change: post a Board task, or reply on one, as the user. */
+/** What the page may change, as the user: post a Board task, reply on one, or edit one of their messages. */
 const pageChange = (value: unknown): BoardChange | null => {
 	const change = parseChange(value, false);
-	return change && (change.op === "post" || change.op === "reply") && change.by.kind === "user" ? change : null;
+	return change && (change.op === "post" || change.op === "reply" || change.op === "edit") && change.by.kind === "user" ? change : null;
 };
 
-/** What a session's `board` tool may change: anything but the server's own changes, as itself. */
+/** What a session's `board` tool may change: anything but the server's own changes and the user's, as itself. */
 const toolChange = (value: unknown): BoardChange | null => {
 	const change = parseChange(value, false);
-	return change && !((change.op === "post" || change.op === "reply") && change.by.kind === "user") ? change : null;
+	return change && change.op !== "edit" && !((change.op === "post" || change.op === "reply") && change.by.kind === "user") ? change : null;
 };
 
 export const BOARD_MODULE: StoredModule<"board", BoardState, BoardChange> = {

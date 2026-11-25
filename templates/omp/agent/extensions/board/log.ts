@@ -28,6 +28,7 @@ export interface BoardLaunch {
 export type BoardChange =
 	| { op: "post"; by: BoardAuthor; workspace: string; title: string; text?: string; labels?: Record<string, string>; needs?: number[]; launch?: BoardLaunch }
 	| { op: "reply"; by: BoardAuthor; task: number; text: string; launch?: BoardLaunch }
+	| { op: "edit"; by: BoardAuthor; task: number; reply?: number; text: string }
 	| { op: "claim"; sessionId: string; task: number }
 	| { op: "renew"; sessionId: string; task: number }
 	| { op: "done"; sessionId: string; task: number; text?: string }
@@ -63,7 +64,7 @@ export type BoardNote =
 	| { kind: "done"; sessionId: string };
 
 /** A reply keeps the model, thinking level, and skill picked for the session it wakes, which a session's own reply leaves out. */
-export type BoardReply = { at: number; by: BoardAuthor; text: string; launch?: BoardLaunch } | { at: number; note: BoardNote };
+export type BoardReply = { at: number; by: BoardAuthor; text: string; launch?: BoardLaunch; editedAt?: number } | { at: number; note: BoardNote };
 
 export interface BoardTask {
 	id: number;
@@ -73,6 +74,8 @@ export interface BoardTask {
 	at: number;
 	title: string;
 	text: string;
+	/** When its author last edited its text. */
+	editedAt?: number;
 	labels: Record<string, string>;
 	/** The Board tasks that must be done before this one is ready. */
 	needs: number[];
@@ -142,6 +145,11 @@ export function refusal(state: BoardState, change: BoardChange, now: number): st
 	switch (change.op) {
 		case "reply":
 			return change.text.trim() ? null : "A reply needs text.";
+		case "edit": {
+			if (!change.text.trim()) return "An edit needs text.";
+			const message = change.reply === undefined ? task : task.replies[change.reply];
+			return message && "by" in message && message.by.kind === "user" && change.by.kind === "user" ? null : "Only the user's own messages can be edited.";
+		}
 		case "claim":
 			if (status.kind === "done") return `Board task #${task.id} is done.`;
 			if (status.kind === "waiting") return `Board task #${task.id} waits on #${status.on}, which is not done.`;
@@ -193,6 +201,19 @@ export function fold(state: BoardState, event: BoardEvent): BoardState {
 					return task.doneAt !== null && event.by.kind === "user" ? { ...replied, doneAt: null, start: null, launch: event.launch ?? task.launch } : replied;
 				}),
 			};
+		case "edit": {
+			const text = event.text.trim();
+			const { reply } = event;
+			return {
+				...state,
+				tasks: edit(event.task, task => {
+					if (reply !== undefined) return { ...task, replies: task.replies.map((entry, index) => (index === reply && "by" in entry ? { ...entry, text, editedAt: at } : entry)) };
+					// An edited Board task takes its first line as its title, as the page's composer posts one.
+					const title = oneLine(text.split("\n")[0] ?? "").slice(0, MAX_TITLE) || task.title;
+					return { ...task, title, text, editedAt: at };
+				}),
+			};
+		}
 		case "claim":
 			return { ...state, tasks: edit(event.task, task => note({ ...task, claim: { sessionId: event.sessionId, at, until: at + LEASE_MS } }, { kind: "claimed", sessionId: event.sessionId })) };
 		case "renew":
@@ -289,6 +310,11 @@ export function parseChange(value: unknown, server = true): BoardChange | null {
 			const by = parseAuthor(value.by);
 			const launch = parseLaunch(value.launch);
 			return by && launch !== null && isId(value.task) && isText(value.text, MAX_TEXT) ? { op: "reply", by, task: value.task, text: value.text, ...(launch ? { launch } : {}) } : null;
+		}
+		case "edit": {
+			const by = parseAuthor(value.by);
+			const reply = value.reply === undefined ? undefined : Number.isSafeInteger(value.reply) && (value.reply as number) >= 0 ? (value.reply as number) : null;
+			return by && reply !== null && isId(value.task) && isText(value.text, MAX_TEXT) ? { op: "edit", by, task: value.task, ...(reply === undefined ? {} : { reply }), text: value.text } : null;
 		}
 		case "claim":
 		case "renew":

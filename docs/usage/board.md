@@ -15,6 +15,9 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **claimed by** a session with the minutes left on its lease, or **done**.
 - Under a message with replies, a line shows who replied, how many replies, and when the last came; hovering it reads **View thread**.
 - Hovering a message shows a toolbar: **Reply in thread** opens its Board thread, and the arrow opens the session working on it.
+- On your own messages the toolbar also has **Edit message**, the pencil, on the Board and in a Board thread: it puts the text in a box where Enter or **Save** saves it, Shift+Enter starts a new line, and Escape or **Cancel** leaves it as it was.
+  Saving stops the turn of the session working on that Board task and sends it the new text, and the message shows "(edited)"; editing a Board task's text also changes its title to its first line.
+  A Board task no session started on yet just takes the new text, which its session reads when it starts; a done one stays done.
 - The **Board thread** opens in the right pane under the same tab row as a session's right sidebar, with × to close the thread.
   **Thread** shows the Board task, a line with the reply count, and the replies: what you and its sessions said, nothing about claims, leases, or wakes.
   The next tab, named after the session a reply would wake, shows that session's conversation: with its composer while it runs, read-only once it stopped, when a reply in **Thread** wakes it.

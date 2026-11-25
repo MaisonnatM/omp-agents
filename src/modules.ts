@@ -39,8 +39,12 @@ export interface ModuleStore<Value, Change> {
 export interface ModuleRunCore {
 	/** Starts a new session in `cwd` on `prompt`, as the page's New session does, on the model, thinking level, and skill `launch` names, else omp's defaults. */
 	start(cwd: string, prompt: string, launch?: { model: ModelOption | null; thinking: string | null; skill: string | null }): Promise<{ sessionId: string } | { error: string }>;
-	/** Sends `text` to session `sessionId` as a follow-up, resuming it first when it stopped, on the model, thinking level, and skill `launch` names; `resumed` says whether it had stopped. */
-	wake(sessionId: string, text: string, launch?: { model: ModelOption | null; thinking: string | null; skill: string | null }): Promise<{ resumed: boolean }>;
+	/**
+	 * Sends `text` to session `sessionId` as a follow-up, resuming it first when it stopped, on the model, thinking level,
+	 * and skill `launch` names; `interrupt` first stops a running turn, and queues the user's own waiting messages after
+	 * `text`. `resumed` says whether it had stopped.
+	 */
+	wake(sessionId: string, text: string, launch?: { model: ModelOption | null; thinking: string | null; skill: string | null }, interrupt?: boolean): Promise<{ resumed: boolean }>;
 	/** Whether this server runs the unattended work, the one that may start and wake sessions. */
 	owner(): boolean;
 	now(): number;

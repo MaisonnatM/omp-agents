@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- You can now edit your own messages on the Board and in a Board thread: hover one, click the pencil (**Edit message**), change it, and press Enter or **Save**. The session working on it stops what it was doing and picks up the new text; the message shows "(edited)".
 - Clicking a session on the Board, in its sidebar, on a message's author, on "Working on it…", or with **Open its session**, now opens that session's conversation in its Board thread instead of leaving the Board for Sessions.
 - Board sessions no longer merge their own work. Each ends by telling you in its Board thread what it did and suggesting next steps, such as Merge on main, then stops.
 - Click a suggested next step under a finished Board task, or type a reply, and a new session takes it from there with the whole thread.

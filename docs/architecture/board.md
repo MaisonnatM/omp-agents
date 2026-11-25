@@ -15,6 +15,7 @@ It imports nothing, so the starter kit can ship it.
 
 - `post` adds a Board task in a Workspace with a title, text, labels, and the Board tasks it `needs`.
 - `reply` adds a reply to its Board thread.
+- `edit` replaces the text of the user's own Board task, whose title becomes its first line, or of their reply at index `reply` in `replies`, and sets its `editedAt`; only the page sends it, as the user.
 - `claim` and `renew` give a session a lease of `LEASE_MS`, 15 minutes; `done` ends it.
 - `start`, `woke`, and `expire` come from the server alone: a session started on a Board task, or failed to; a reply woke a stopped session; a lease ran out.
   `parseChange` refuses them from the page and the tool.
@@ -34,6 +35,7 @@ The dashboard calls the run's `changed` after every change to the module and whe
 - It starts a session on each Board task `unstartedReady` lists, prompted by `startPrompt` to claim it, and records the `start`. The prompt leads with the Board task's title and text and wraps the claim steps in a `<board-task>` block, because omp's titler names the session from that prompt and titles plain claim steps "Claim Board task N".
   On a reopened Board task the block also holds the earlier sessions' ids and the Board thread, which ends on the reply that reopened it; that reply wakes nobody.
 - It wakes `wakeTarget` for each new reply with `wakePrompt`, which carries `DASHBOARD_PROMPT_PREFIX`, and records `woke` when the session had stopped; the core's `wake` switches a session this dashboard started to the reply's model and thinking level, and starts the prompt with the reply's `/skill:`.
+- It re-prompts `wakeTarget` with `editPrompt` when the user edits a message, which it notices by `editedAt` passing what it last saw; the core's `wake` with `interrupt` first stops the session's turn through `LiveSession.interrupt` and queues the user's withdrawn messages after the prompt.
 - Both prompts end on `finish`: commit the work on its branch, or open a draft PR where the repository has no `.omp/land.json`, and land only when the user's last reply asks; mark the Board task done with a message ending on a `Suggestions:` block; then call `end_session`. The page draws those suggestions as buttons under the last reply of a done Board task, each of which sends itself as the user's reply. See [Board sessions end on suggestions, and a reply starts a new session](../decisions/2026-11-25-board-sessions-end-on-suggestions-and-a-reply-starts-a-new-session.md).
 - Every 30 seconds its sweep records an `expire` for each Board task `lapsed` lists, which makes it ready again and so starts a new session.
 
