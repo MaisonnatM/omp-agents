@@ -3,9 +3,8 @@
  * split by day, each with its thread summary and a hover toolbar, over the composer that posts one; the open Board
  * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import { hashForSession, type PastSession, type RosterHost, type View } from "../../../src/shared/sessions";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -17,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { IconComponent } from "@/lib/icon-context";
 import { getJson } from "../../api";
 import { useShowConversation } from "../../pane-store";
 import { UNREAD } from "../../reads";
@@ -26,7 +24,6 @@ import { boardDraftKey, boardThreadDraftKey } from "../../composer-drafts";
 import { useStoredState } from "../../stored-state";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
-import { ClosableTab } from "../closable-tab";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { useDashboardActions } from "../dashboard-context";
 import type { CoreData } from "../module-views";
@@ -37,7 +34,7 @@ import { type DetailsTab, DetailsSidebarFrame } from "../details-sidebar-frame";
 import { sessionOverviewTab, sessionWorkTabs, useOpenTabOnNew, useSessionWork, workTabOpeners } from "../session-details";
 import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../todo/links";
-import type { BoardControlId, BoardRoute } from "./module";
+import type { BoardRoute } from "./module";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
 
 interface BoardPageProps {
