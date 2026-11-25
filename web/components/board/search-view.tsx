@@ -64,13 +64,13 @@ export function BoardSearchField({ current, channel, thread, searchHref, ref }: 
 		}
 	};
 	return (
-		<div role="search" className="flex h-7 w-80 max-w-full items-center gap-1 rounded-md border border-border pr-2 text-sm focus-within:ring-2 focus-within:ring-ring">
+		<div role="search" className="flex h-7 w-80 max-w-full items-center gap-1 rounded-md bg-muted/60 pr-2 text-sm focus-within:ring-2 focus-within:ring-ring">
 			<DropdownMenu>
 				<DropdownMenuTrigger
 					{...activityControl("board.search.scope")}
 					render={<Button variant="ghost" size="compact" leadingIcon={IconMagnifyingGlass} trailingIcon={IconChevronDownSmall} aria-label={`Search scope: ${where}`} className="h-full max-w-40 min-w-0 shrink-0 text-muted-foreground" />}
 				>
-					<span className="truncate">in {where}</span>
+					{scope !== "workspace" && <span className="truncate">in {where}</span>}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="start" className="max-w-72">
 					<MenuRadioGroup aria-label="Search in" value={scope} onValueChange={(value: string) => scopeTo(scopeOf(value, thread))}>
@@ -171,7 +171,7 @@ export function SearchResults({ state, route, workspace, core }: { state: BoardS
 					<ol aria-label="Search results" className="flex flex-col gap-2 px-5">
 						{hits.map(hit => (
 							<li key={`${hit.task.id}:${hit.reply ?? "task"}`}>
-								<SearchResult hit={hit} query={query} words={words} sessions={core.sessions} workspace={workspaceName(hit.task.workspace)} />
+								<SearchResult hit={hit} query={query} words={words} sessions={core.sessions} workspace={scope === "all" ? workspaceName(hit.task.workspace) : null} />
 							</li>
 						))}
 					</ol>
@@ -182,7 +182,7 @@ export function SearchResults({ state, route, workspace, core }: { state: BoardS
 }
 
 /** One result card, as Slack's: the workspace and the Board task it sits in with its day, then the author, time, and the text with the query's words marked; a click opens it in its thread. */
-function SearchResult({ hit, query, words, sessions, workspace }: { hit: BoardHit; query: string; words: readonly string[]; sessions: KnownSessions; workspace: string }) {
+function SearchResult({ hit, query, words, sessions, workspace }: { hit: BoardHit; query: string; words: readonly string[]; sessions: KnownSessions; workspace: string | null }) {
 	const { task, reply, by, at } = hit;
 	return (
 		<a
@@ -191,9 +191,13 @@ function SearchResult({ hit, query, words, sessions, workspace }: { hit: BoardHi
 			className="flex flex-col gap-1.5 rounded-lg border border-border bg-background px-3 py-2.5 outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring"
 		>
 			<span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-				<IconHashtag aria-hidden className="size-3 shrink-0" />
-				<span className="shrink-0 font-semibold text-foreground">{workspace}</span>
-				<span aria-hidden>·</span>
+				{workspace !== null && (
+					<>
+						<IconHashtag aria-hidden className="size-3 shrink-0" />
+						<span className="shrink-0 font-semibold text-foreground">{workspace}</span>
+						<span aria-hidden>·</span>
+					</>
+				)}
 				<span className="min-w-0 truncate">{reply === null ? `#${task.id}` : `Reply in thread #${task.id}: ${task.title}`}</span>
 				<span className="ml-auto shrink-0 pl-2">{dayLabel(at)}</span>
 			</span>
