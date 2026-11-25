@@ -6,7 +6,7 @@
  */
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconPencil, IconRobot, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { type PastSession, type PromptImage, type RosterHost, type View } from "../../../src/shared/sessions";
+import { type PastSession, type PromptImage, type RosterHost, type Stop, stopOf, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
 import { AppMark } from "../app-mark";
@@ -282,10 +282,47 @@ function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted =
 	);
 }
 
-/** A row under a Board task still in work, in the thread summary's style: who works on it, with shimmering text, as a Slack bot shows it is thinking; it opens that session's conversation in the thread. */
-function WorkingLine({ sessionId, sessions, href }: { sessionId: string | null; sessions: KnownSessions; href: string }) {
+/** Where a Board task in work stands: no session yet, its session working, or its session stopped for you, as `stopOf` says. */
+type Work = { kind: "starting" } | { kind: "working"; sessionId: string } | { kind: "waiting"; sessionId: string; stop: Stop };
+
+/** Board task `task`'s {@link Work}, `null` once it is done or waits on another Board task. */
+function workOf(state: BoardState, task: BoardTask, sessions: KnownSessions): Work | null {
+	const status = statusOf(state, task);
+	if (status.kind !== "ready" && status.kind !== "claimed") return null;
+	const sessionId = task.claim?.sessionId ?? task.start?.sessionId ?? null;
+	if (sessionId === null) return { kind: "starting" };
+	const host = sessions.hosts.find(each => each.sessionId === sessionId);
+	const stop = host ? stopOf(host) : null;
+	return stop ? { kind: "waiting", sessionId, stop } : { kind: "working", sessionId };
+}
+
+/** A question waits in the session's conversation; a turn it ended waits for your reply in the thread. */
+const answersInConversation = (work: Work): boolean => work.kind === "waiting" && work.stop.kind !== "turn-ended";
+
+/** What a Board task in work shows: shimmering while a session starts or works, else in amber what its session waits on you for, then `detail`. */
+function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
+	const [label, rest] =
+		work.kind === "starting"
+			? ["Starting a session…", null]
+			: work.kind === "working"
+				? ["Working on it…", detail]
+				: work.stop.kind === "ask"
+					? ["Asks you", work.stop.request.title]
+					: [work.stop.kind === "input" ? "Waiting for your input" : "Waiting for your reply", detail];
 	return (
-		<a {...activityControl("board.task.open")} href={href} onClick={sessionId ? revealSessionTab : undefined} className="mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background">
+		<span className="flex min-w-0 items-baseline gap-1.5 text-[13px]">
+			<span className={cn("shrink-0", work.kind === "waiting" ? "font-semibold text-amber-600 dark:text-amber-400" : "shimmer-text")}>{label}</span>
+			{rest && <span className="truncate text-muted-foreground">{rest}</span>}
+		</span>
+	);
+}
+
+/** A row under a Board task still in work, in the thread summary's style: who works on it and how it stands, as a Slack bot shows it is thinking; it opens that session's conversation in the thread, or the thread itself while the session waits for your reply there. */
+function WorkingLine({ work, sessions, href }: { work: Work; sessions: KnownSessions; href: string }) {
+	const sessionId = work.kind === "starting" ? null : work.sessionId;
+	const reveal = work.kind === "working" || answersInConversation(work);
+	return (
+		<a {...activityControl("board.task.open")} href={href} onClick={reveal ? revealSessionTab : undefined} className="mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background">
 			{sessionId ? (
 				<Avatar by={{ kind: "session", sessionId }} sessions={sessions} size="summary" />
 			) : (
@@ -293,14 +330,7 @@ function WorkingLine({ sessionId, sessions, href }: { sessionId: string | null; 
 					<IconAiBotHead className="size-4" />
 				</span>
 			)}
-			{sessionId ? (
-				<span className="flex min-w-0 items-baseline gap-1.5 text-[13px]">
-					<span className="shimmer-text shrink-0">Working on it…</span>
-					<span className="truncate text-muted-foreground">{sessionLabel(sessionId, sessions).name}</span>
-				</span>
-			) : (
-				<span className="shimmer-text text-[13px]">Starting a session…</span>
-			)}
+			<WorkLabel work={work} detail={sessionId && sessionLabel(sessionId, sessions).name} />
 		</a>
 	);
 }
@@ -442,8 +472,7 @@ const unreadOf = (task: BoardTask, seenCount: number | undefined): number => sai
 function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onChange }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const replies = said(task);
 	const seenMap = useSeen();
-	const status = statusOf(state, task);
-	const working = status.kind === "ready" || status.kind === "claimed";
+	const work = workOf(state, task, sessions);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const [editing, setEditing] = useState(false);
 	const toolbar = (
@@ -467,23 +496,24 @@ function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onC
 		<MessageRow by={task.by} at={task.at} sessions={sessions} state={state} workspace={task.workspace} grouped={grouped} highlighted={open} toolbar={toolbar}>
 			<TaskBody task={task} editor={editing ? <MessageEditor text={task.text || task.title} onSave={text => onChange({ op: "edit", by: { kind: "user" }, task: task.id, text })} onClose={() => setEditing(false)} /> : undefined} />
 			{replies.length > 0 ? (
-				<ThreadSummary replies={replies} unread={open ? 0 : unreadOf(task, seenMap[task.id])} working={working ? { sessionId: session } : null} sessions={sessions} href={href} />
+				<ThreadSummary replies={replies} unread={open ? 0 : unreadOf(task, seenMap[task.id])} work={work} sessions={sessions} href={href} />
 			) : (
-				working && <WorkingLine sessionId={session} sessions={sessions} href={href} />
+				work && <WorkingLine work={work} sessions={sessions} href={href} />
 			)}
 		</MessageRow>
 	);
 }
 
-/** Who replied, how many replies, and when the last came, or while a session works on it a shimmering "Working on it…" in that place, which opens the thread, as under a Slack message. */
-function ThreadSummary({ replies, unread, working, sessions, href }: { replies: Extract<BoardReply, { by: BoardAuthor }>[]; unread: number; working: { sessionId: string | null } | null; sessions: KnownSessions; href: string }) {
-	const worker: BoardAuthor[] = working?.sessionId ? [{ kind: "session", sessionId: working.sessionId }] : [];
+/** Who replied, how many replies, and when the last came, or while a session works on it how it stands in that place, which opens the thread, as under a Slack message. */
+function ThreadSummary({ replies, unread, work, sessions, href }: { replies: Extract<BoardReply, { by: BoardAuthor }>[]; unread: number; work: Work | null; sessions: KnownSessions; href: string }) {
+	const worker: BoardAuthor[] = work && work.kind !== "starting" ? [{ kind: "session", sessionId: work.sessionId }] : [];
 	const authors = [...new Map([...worker, ...replies.map(reply => reply.by)].map(by => [authorKey(by), by])).values()].slice(0, 5);
 	const last = replies.at(-1);
 	return (
 		<a
 			{...activityControl("board.task.open")}
 			href={href}
+			onClick={work && answersInConversation(work) ? revealSessionTab : undefined}
 			className="group/summary mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background"
 		>
 			<span className="flex gap-0.5">
@@ -499,9 +529,9 @@ function ThreadSummary({ replies, unread, working, sessions, href }: { replies: 
 					{unread}
 				</span>
 			)}
-			{working ? (
-				<span className="truncate text-[13px] group-hover/summary:hidden">
-					<span className="shimmer-text">{working.sessionId ? "Working on it…" : "Starting a session…"}</span>
+			{work ? (
+				<span className="min-w-0 group-hover/summary:hidden">
+					<WorkLabel work={work} detail={null} />
 				</span>
 			) : (
 				last && (
@@ -685,8 +715,7 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 
 /** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. Under a done Board task's last reply sit its session's suggested prompts; each sends itself as the user's reply, which starts a new session on the thread. */
 function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChange, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; children: ReactNode }) {
-	const status = statusOf(state, task);
-	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
+	const work = workOf(state, task, sessions);
 	const replies = said(task);
 	const count = replies.length;
 	const last = replies.at(-1);
@@ -751,9 +780,9 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 								);
 							})}
 						</ol>
-						{(status.kind === "ready" || status.kind === "claimed") && (
+						{work && (
 							<div className="px-5 pt-1">
-								<WorkingLine sessionId={session} sessions={sessions} href={hashForBoard(task.workspace, task.id)} />
+								<WorkingLine work={work} sessions={sessions} href={hashForBoard(task.workspace, task.id)} />
 							</div>
 						)}
 					</MessageScrollerContent>
