@@ -78,7 +78,7 @@ export class BoardRunner implements ModuleRun {
 	async #start(task: BoardTask): Promise<void> {
 		this.#starting.add(task.id);
 		try {
-			const started = await this.#core.start(task.workspace, startPrompt(task));
+			const started = await this.#core.start(task.workspace, startPrompt(task), task.launch ?? undefined);
 			this.#change("sessionId" in started ? { op: "start", task: task.id, sessionId: started.sessionId } : { op: "start", task: task.id, sessionId: null, error: started.error });
 		} finally {
 			this.#starting.delete(task.id);

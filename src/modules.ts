@@ -8,6 +8,7 @@ import type { InboxOptions, JsonInboxDir } from "./server/json-inbox";
 import type { RouteKit, Routes } from "./server/route-kit";
 import type { SessionJoin } from "./server/start";
 import { MODULES_OFF_KEY, parseModulesOff } from "./shared/modules-off";
+import type { ModelOption } from "./shared/models";
 import type { PagePreferences } from "./shared/preferences";
 import { PROJECTS_MODULE } from "./projects-module";
 import { SPORT_MODULE } from "./sport-module";
@@ -36,8 +37,8 @@ export interface ModuleStore<Value, Change> {
 
 /** What a module's own work reaches of the core. */
 export interface ModuleRunCore {
-	/** Starts a new session in `cwd` on `prompt`, as the page's New session does. */
-	start(cwd: string, prompt: string): Promise<{ sessionId: string } | { error: string }>;
+	/** Starts a new session in `cwd` on `prompt`, as the page's New session does, on the model, thinking level, and skill `launch` names, else omp's defaults. */
+	start(cwd: string, prompt: string, launch?: { model: ModelOption | null; thinking: string | null; skill: string | null }): Promise<{ sessionId: string } | { error: string }>;
 	/** Sends `text` to session `sessionId` as a follow-up, resuming it first when it stopped; `resumed` says whether it had. */
 	wake(sessionId: string, text: string): Promise<{ resumed: boolean }>;
 	/** Whether this server runs the unattended work, the one that may start and wake sessions. */

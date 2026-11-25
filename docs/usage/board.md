@@ -15,9 +15,11 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 
 ## Post a Board task
 
-- Type in the box at the foot of the middle pane and press Enter or **Send**; Shift+Enter starts a new line.
+- Type in the composer at the foot of the page and press Enter; Shift+Enter starts a new line.
+  It is the New session composer: pick the model, thinking level, and skill the session runs on, `/` and `@` suggest, and the microphone dictates; it attaches no files and schedules nothing.
   The first line is the title, and the rest is the detail.
-- **Needs** picks a Board task that must be done first; your Board task then waits on it, and its session starts once it is done.
+- Its Workspace picker switches the Board to another Workspace.
+- A session's `board` tool can make a Board task wait on another one, which starts its session only once that one is done.
 - A session starts in the Workspace for every ready Board task, and claims it with its `board` tool.
 
 ## Reply
