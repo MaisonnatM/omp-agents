@@ -15,11 +15,12 @@ export const BOARD_TABS = [
 
 export type BoardTab = (typeof BOARD_TABS)[number]["id"];
 
-/** The Board page: Workspace `workspace`'s tab `tab`, the first Workspace's for `null`; on Messages, Board task `thread`'s Board thread open beside them. */
+/** The Board page: Workspace `workspace`'s tab `tab`, the first Workspace's for `null`; on Messages, Board task `thread`'s Board thread open beside them; on Settings, the section `section` names, the first for `null` or an unknown one. */
 export interface BoardRoute {
 	workspace: string | null;
 	tab: BoardTab;
 	thread: number | null;
+	section?: string | null;
 }
 
 export type BoardControlId = "board.workspace" | "board.tab" | "board.task.open" | "board.post" | "board.reply" | "board.thread.close" | "board.session.open";
@@ -31,14 +32,15 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	offNote: "While the Board is off, sessions it starts or wakes keep running, and the board tool still works.",
 	listsItself: true,
 	home: { workspace: null, tab: "messages", thread: null },
-	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace, `#board/<tab>?workspace=<cwd>` another tab. */
+	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace, `#board/<tab>?workspace=<cwd>` another tab, and `#board/settings/<section>?workspace=<cwd>` one of its settings. */
 	address: {
 		parse: (rest, query) => {
 			const thread = rest !== null && /^\d+$/.test(rest) ? Number(rest) : null;
-			const tab = BOARD_TABS.find(each => each.id === rest)?.id ?? "messages";
-			return { workspace: query.get("workspace"), tab, thread };
+			const [head, section = null] = rest?.split("/") ?? [];
+			const tab = BOARD_TABS.find(each => each.id === head)?.id ?? "messages";
+			return { workspace: query.get("workspace"), tab, thread, ...(tab === "settings" && section ? { section } : {}) };
 		},
-		rest: route => (route.thread !== null ? String(route.thread) : route.tab === "messages" ? null : route.tab),
+		rest: route => (route.thread !== null ? String(route.thread) : route.tab === "messages" ? null : route.tab === "settings" && route.section ? `settings/${route.section}` : route.tab),
 		query: route => (route.workspace === null ? null : new URLSearchParams({ workspace: route.workspace }).toString()),
 	},
 	title: route => (route.thread !== null ? `Board · #${route.thread}` : route.tab === "messages" ? "Board" : `Board · ${BOARD_TABS.find(each => each.id === route.tab)!.label}`),

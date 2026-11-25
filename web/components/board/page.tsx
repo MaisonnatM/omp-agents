@@ -5,7 +5,7 @@
  */
 import { IconArrowUpRight, IconBrain, IconBubble3, IconBubbleText, IconCrossMedium, IconFlag1, IconHashtag, IconPullRequest, IconRobot, IconSettingsGear1, IconUser } from "central-icons";
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
-import { type ComponentType, type ReactNode, useEffect, useState } from "react";
+import { type ComponentType, type ReactNode, useEffect } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
@@ -87,7 +87,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 				) : (
 					<HeaderTitleShown.Provider value={false}>
 						<div className="flex min-h-0 flex-1">
-							<WorkspaceTab tab={route.tab} workspace={open} core={core} disabled={disabled} />
+							<WorkspaceTab tab={route.tab} section={route.section ?? null} workspace={open} core={core} disabled={disabled} />
 						</div>
 					</HeaderTitleShown.Provider>
 				)}
@@ -139,7 +139,7 @@ function ChannelTabs({ tab, workspace }: { tab: BoardTab; workspace: string | nu
 }
 
 /** A tab other than Messages: the page it names, kept to the sessions, Bots, repository, and projects of the Workspace. */
-function WorkspaceTab({ tab, workspace, core, disabled }: { tab: Exclude<BoardTab, "messages">; workspace: string | null; core: CoreData; disabled: boolean }) {
+function WorkspaceTab({ tab, section, workspace, core, disabled }: { tab: Exclude<BoardTab, "messages">; section: string | null; workspace: string | null; core: CoreData; disabled: boolean }) {
 	const { changeModule } = useDashboardActions();
 	const { hosts, past } = core.sessions;
 	const here = <Row extends Parameters<typeof workspaceCwd>[0]>(rows: Row[]): Row[] => rows.filter(row => workspaceCwd(row) === workspace);
@@ -156,18 +156,25 @@ function WorkspaceTab({ tab, workspace, core, disabled }: { tab: Exclude<BoardTa
 			return <ProjectsPage route={{ open: null }} core={core} state={projects} disabled={disabled} onChange={change => changeModule("projects", change)} />;
 		}
 		case "settings":
-			return <WorkspaceSettings workspace={workspace} workspaces={core.workspaces} />;
+			return <WorkspaceSettings workspace={workspace} workspaces={core.workspaces} section={section} />;
 	}
 }
 
 /** The Settings sections that read one workspace, as Settings lists them. */
 const WORKSPACE_SECTIONS = SETTINGS_SECTIONS.filter(section => section.group === "workspace");
 
-/** Settings kept to the Workspace, with no workspace picker: its sections down the left, the open one at the right. */
-function WorkspaceSettings({ workspace, workspaces }: { workspace: string | null; workspaces: CoreData["workspaces"] }) {
-	const [section, setSection] = useState<SettingsSection>("models");
+/** Settings kept to the Workspace, with no workspace picker: its sections down the left, the open one, which the address names, at the right. */
+function WorkspaceSettings({ workspace, workspaces, section: named }: { workspace: string | null; workspaces: CoreData["workspaces"]; section: string | null }) {
+	const section: SettingsSection = WORKSPACE_SECTIONS.find(({ value }) => value === named)?.value ?? "models";
 	return (
-		<TabsPrimitive.Tabs value={section} onValueChange={next => setSection(next as SettingsSection)} orientation="vertical" className="flex min-h-0 flex-1">
+		<TabsPrimitive.Tabs
+			value={section}
+			onValueChange={next => {
+				location.hash = hashForPage({ kind: "board", workspace, tab: "settings", thread: null, section: String(next) });
+			}}
+			orientation="vertical"
+			className="flex min-h-0 flex-1"
+		>
 			<TabsPrimitive.TabsList aria-label="Workspace settings" className="flex w-48 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border p-2">
 				{WORKSPACE_SECTIONS.map(({ value, label, icon: Icon }) => (
 					<TabsPrimitive.TabsTab
