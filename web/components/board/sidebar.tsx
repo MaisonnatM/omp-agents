@@ -86,7 +86,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 									)}
 								</SidebarMenuButton>
 								{ids.length > 0 && (
-									<SidebarMenu aria-label={`Board sessions in ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="ml-[15px] w-auto gap-px border-l border-border pl-1">
+									<SidebarMenu aria-label={`Board sessions in ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="my-1 ml-[15px] w-auto gap-px border-l border-border pl-1">
 										{ids.map(id => {
 											const { name, host } = sessionLabel(id, sessions);
 											return (
