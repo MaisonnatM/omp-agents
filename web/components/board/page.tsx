@@ -6,7 +6,7 @@
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { hashForSession, type View } from "../../../src/shared/sessions";
+import { hashForSession, type PastSession, type RosterHost, type View } from "../../../src/shared/sessions";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header } from "../page-header";
@@ -32,6 +32,10 @@ import { useDashboardActions } from "../dashboard-context";
 import type { CoreData } from "../module-views";
 import { NewSession } from "../new-session";
 import { ViewConversation } from "../pane";
+import type { ChangesSession } from "../overview-changes";
+import { type DetailsTab, DetailsSidebarFrame } from "../details-sidebar-frame";
+import { sessionOverviewTab, sessionWorkTabs, useOpenTabOnNew, useSessionWork, workTabOpeners } from "../session-details";
+import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardControlId, BoardRoute } from "./module";
 import { boardWorkspaces, hashForBoard } from "./sidebar";
@@ -396,16 +400,16 @@ const STEP = 16;
 
 const clampThread = (width: number, room: number): number => Math.round(Math.max(MIN_THREAD, Math.min(MAX_THREAD, room - MIN_CHANNEL, width)));
 
-type ThreadTabValue = "thread" | "session";
-
-/** The Board thread as Slack's thread pane, at the width you drag its left edge to, under a row of tabs as the session details sidebar draws them: **Thread**, the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; and **Session**, the conversation of the session its replies wake. Escape closes it. */
+/** The Board thread as Slack's thread pane, at the width you drag its left edge to, under the session details sidebar's tab row: **Thread**, the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; then the conversation and sidebar tabs of the session its replies wake. Escape closes it. */
 function Thread({ state, task, core, workspace, channel, closeHref, disabled, onChange }: { state: BoardState; task: BoardTask; core: CoreData; workspace: Workspace; channel: string; closeHref: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const sessions = core.sessions;
-	const [tab, setTab] = useState<ThreadTabValue>("thread");
-	// The thread and its reply box address the same session; a thread with none shows only **Thread**.
+	// The thread and its reply box address the same session; a thread with none, or one not listed yet, shows only **Thread**.
 	const target = wakeTarget(task, { kind: "user" });
 	const name = target ? sessionLabel(target, sessions).name : null;
-	const shown: ThreadTabValue = target ? tab : "thread";
+	const host = target ? (sessions.hosts.find(each => each.sessionId === target) ?? null) : null;
+	const past = target ? (sessions.past.find(each => each.sessionId === target) ?? null) : null;
+	const instanceId = host?.instanceId ?? null;
+	const view = useMemo<View | null>(() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : past && target ? { kind: "past", sessionId: target } : null), [instanceId, past, target]);
 	const [width, setWidth] = useStoredState("omp-agents.board-thread-width", raw => {
 		const stored = Number(raw);
 		return stored >= MIN_THREAD && stored <= MAX_THREAD ? stored : THREAD_WIDTH;
@@ -436,58 +440,72 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 		document.addEventListener("keydown", close);
 		return () => document.removeEventListener("keydown", close);
 	}, [closeHref]);
+	const label = `Thread #${task.id} in #${channel}`;
+	const thread: DetailsTab<"thread"> = {
+		value: "thread",
+		icon: IconBubble3,
+		name: "Thread",
+		control: "board.thread.tab.thread",
+		count: 0,
+		scrollsItself: true,
+		content: (
+			<>
+				<ThreadMessages state={state} task={task} sessions={sessions} />
+				<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
+			</>
+		),
+	};
+	const close = (
+		<Button {...activityControl("board.thread.close")} variant="ghost" size="icon-xs" aria-label="Close thread" render={<a href={closeHref} />}>
+			<IconCrossMedium />
+		</Button>
+	);
 	return (
 		<aside aria-label={`Thread #${task.id}`} style={{ width }} className="relative flex max-w-[calc(100%-360px)] shrink-0 flex-col border-l border-border">
 			<Separator {...resize} axis="vertical" label="Resize the thread" min={MIN_THREAD} max={MAX_THREAD} now={width} className="inset-y-0 -left-1.5 w-3 cursor-col-resize select-none" />
-			<TabsPrimitive.Tabs value={shown} onValueChange={value => setTab(value === "session" ? "session" : "thread")} className="flex min-h-0 flex-1 flex-col">
-				{/* Content-box, so the hairline sits under the full header height, level with the Board header's. */}
-				<header className="box-content flex h-(--page-header-height) shrink-0 items-center gap-1 border-b border-border px-2">
-					<h2 className="sr-only">Thread #{task.id} in #{channel}</h2>
-					<TabsPrimitive.TabsList aria-label="Thread views" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
-						<ThreadTab value="thread" icon={IconBubble3} name="Thread" active={shown === "thread"} control="board.thread.tab.thread" />
-						{target && name && <ThreadTab value="session" icon={IconAiBotHead} name={name} active={shown === "session"} control="board.thread.tab.session" />}
-					</TabsPrimitive.TabsList>
-					<Button {...activityControl("board.thread.close")} variant="ghost" size="icon-xs" aria-label="Close thread" render={<a href={closeHref} />}>
-						<IconCrossMedium />
-					</Button>
-				</header>
-				<TabsPrimitive.TabsPanel value="thread" className="flex min-h-0 flex-1 flex-col outline-none">
-					<ThreadMessages state={state} task={task} sessions={sessions} />
-					<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
-				</TabsPrimitive.TabsPanel>
-				{target && (
-					<TabsPrimitive.TabsPanel value="session" className="relative flex min-h-0 flex-1 flex-col outline-none">
-						<SessionTab sessionId={target} core={core} />
-					</TabsPrimitive.TabsPanel>
-				)}
-			</TabsPrimitive.Tabs>
+			{target && name && view ? (
+				<SessionThreadTabs label={label} thread={thread} close={close} sessionId={target} name={name} view={view} host={host} past={past} core={core} />
+			) : (
+				<DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={null} tabs={[thread]} trailing={close} />
+			)}
 		</aside>
 	);
 }
 
-/** One of the thread's tabs, drawn as the session details sidebar draws its first tab, which stays open; the row scrolls when they overflow. */
-function ThreadTab({ value, icon: Icon, name, active, control }: { value: ThreadTabValue; icon: IconComponent; name: string; active: boolean; control: BoardControlId }) {
-	return (
-		<ClosableTab name={name} active={active} onClose={null} closeControl="details.tab.close" activePadding="pr-2.5" className={cn("min-w-0 shrink-0", active && "bg-active text-foreground")}>
-			{body => (
-				<TabsPrimitive.TabsTab value={value} {...activityControl(control)} title={name} className={body}>
-					<Icon aria-hidden="true" className="size-3.5 shrink-0" />
-					<span className="truncate">{name}</span>
-				</TabsPrimitive.TabsTab>
-			)}
-		</ClosableTab>
-	);
-}
+/** The Board thread's open tabs, kept across threads. */
+const THREAD_TABS = "omp-agents.board-thread-tabs";
 
-/** The **Session** tab: the conversation of the session the Board task's replies wake, live with its composer, or saved and read-only, where the Thread tab's reply wakes it. */
-function SessionTab({ sessionId, core }: { sessionId: string; core: CoreData }) {
-	const host = core.sessions.hosts.find(each => each.sessionId === sessionId) ?? null;
-	const past = core.sessions.past.find(each => each.sessionId === sessionId) ?? null;
-	const instanceId = host?.instanceId ?? null;
-	const view = useMemo<View | null>(() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : past ? { kind: "past", sessionId } : null), [instanceId, past, sessionId]);
+/** Opens the woken session's PRs, Linear, and Review tabs in the thread once it shows one, as the session details sidebar does. */
+const THREAD_OPENERS = workTabOpeners(THREAD_TABS);
+
+/** Opens the woken session's conversation tab the first time each session shows in a thread while the page is open. */
+const conversationShown = newIdsOnOpen();
+
+/** The thread's tabs once it has a session to wake: **Thread**, that session's conversation, then the session details sidebar's **Overview**, **Diffs**, **PRs**, **Artifacts**, **Review**, and **Linear** for it, opened from +. */
+function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, past, core }: { label: string; thread: DetailsTab<"thread">; close: ReactNode; sessionId: string; name: string; view: View; host: RosterHost | null; past: PastSession | null; core: CoreData }) {
+	const row = host ?? past;
+	const working = host?.status === "working";
+	// Loaded while the thread shows, not only on its conversation tab: the Artifacts and Review tabs read it too.
 	useShowConversation(view);
-	if (view === null) return <p className="px-5 py-6 text-sm text-muted-foreground">This session's conversation isn't listed yet.</p>;
-	return <ViewConversation view={view} focused={false} host={host} lastHost={null} session={past} models={(instanceId !== null && core.models.get(instanceId)) || UNREAD} workspaces={core.workspaces} header={false} />;
+	const work = useSessionWork({ view, sessionId, working, hosts: core.sessions.hosts, row }, THREAD_OPENERS);
+	const ids = useMemo(() => [sessionId], [sessionId]);
+	useOpenTabOnNew(conversationShown, THREAD_TABS, sessionId, ids, "session");
+	const session = useMemo<ChangesSession>(() => ({ sessionId, cwd: row?.cwd ?? null, facts: row }), [sessionId, row]);
+	const tabs: DetailsTab<string>[] = [
+		thread,
+		{
+			value: "session",
+			icon: IconAiBotHead,
+			name,
+			control: "board.thread.tab.session",
+			count: 0,
+			scrollsItself: true,
+			content: <ViewConversation view={view} focused={false} host={host} lastHost={null} session={past} models={(view.kind === "live" && core.models.get(view.instanceId)) || UNREAD} workspaces={core.workspaces} header={false} />,
+		},
+		sessionOverviewTab(view, working, null, session),
+		...sessionWorkTabs(work),
+	];
+	return <DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={row?.cwd ?? null} tabs={tabs} trailing={close} />;
 }
 
 /** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies and the Board's grey lines. */

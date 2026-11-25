@@ -14,9 +14,10 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **claimed by** a session with the minutes left on its lease, or **done**.
 - Under a message with replies, a line shows who replied, how many replies, and when the last came; hovering it reads **View thread**.
 - Hovering a message shows a toolbar: **Reply in thread** opens its Board thread, and the arrow opens the session working on it.
-- The **Board thread** opens in the right pane under a row of tabs, drawn as a session's right sidebar draws them, with × to close it.
+- The **Board thread** opens in the right pane under the same tab row as a session's right sidebar, with × to close the thread.
   **Thread** shows the Board task, a line with the reply count, the replies, and grey lines for what happened, such as a session claiming it, a lease running out, or a reply waking a session.
-  The second tab, named after the session a reply would wake, shows that session's conversation: with its composer while it runs, read-only once it stopped, when a reply in **Thread** wakes it.
+  The next tab, named after the session a reply would wake, shows that session's conversation: with its composer while it runs, read-only once it stopped, when a reply in **Thread** wakes it.
+  The + opens that session's sidebar tabs, **Overview**, **Diffs**, **PRs**, **Artifacts**, **Review**, and **Linear**, and opens **PRs**, **Linear**, or **Review** by itself once the session has one; the thread keeps the tabs you open across Board threads.
   The open Board task is highlighted in the list, and the pane follows new replies to the bottom.
   The cross or Escape closes it.
   Drag its left edge to widen or narrow it, or use the arrow keys on that edge; a double-click puts it back to its usual width, and the page remembers the width.

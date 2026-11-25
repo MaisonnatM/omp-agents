@@ -216,43 +216,61 @@ interface SessionDetailsProps extends Pick<SessionWork, "view" | "sessionId" | "
 
 const SUBAGENT_TAB = "subagent";
 
-/** The Linear issues the session on screen linked, named anew each time a session is shown, so opening one with an issue opens the **Linear** tab. */
-const linkedBefore = newIdsOnOpen();
+/** Whether session `scope` names an id not seen for it yet, remembering them. */
+export type SeenIds = (scope: string, ids: readonly string[]) => boolean;
 
-/** The pull requests the session on screen worked on, kept as {@link linkedBefore} is, so opening one with a pull request opens the **PRs** tab. */
-const submittedBefore = newIdsOnOpen();
+/**
+ * Which pull requests, Linear issues, and screen changes each session showed while the page is open, for one sidebar
+ * kept under `storageKey`, so a new one opens its tab there once, behind the tab on screen; a closed tab stays closed until another.
+ */
+export interface WorkTabOpeners {
+	storageKey: string;
+	/** Named anew each time a session is shown, so opening one with an issue opens the **Linear** tab. */
+	linked: SeenIds;
+	/** Kept as `linked` is, so opening one with a pull request opens the **PRs** tab. */
+	submitted: SeenIds;
+	/** By {@link changeKey}, so a closed **Review** tab stays closed until a new change. */
+	listed: SeenIds;
+}
+
+export const workTabOpeners = (storageKey: string): WorkTabOpeners => ({ storageKey, linked: newIdsOnOpen(), submitted: newIdsOnOpen(), listed: newIdsByScope() });
+
+const SESSION_OPENERS = workTabOpeners(TAB_KEY);
 
 const pullRequestKey = ({ owner, repo, number }: LinkedPullRequest): string => `${owner}/${repo}#${number}`;
 
-/** The screen changes each session listed while the page is open, by {@link changeKey}, so a closed **Review** tab stays closed until a new one. */
-const listedBefore = newIdsByScope();
-
-/**
- * Adds tab `tab` behind the tab on screen once the session `scope` names an id `seen` had not seen for it, as when its
- * conversation first loads or a reply links a new issue or lists a new change; a closed tab stays closed until another.
- */
-function useOpenTabOnNew(seen: ReturnType<typeof newIdsByScope>, scope: string, ids: readonly string[], tab: string): void {
+/** Adds tab `tab` to the sidebar kept under `storageKey` once the session `scope` names an id `seen` had not seen for it. */
+export function useOpenTabOnNew(seen: SeenIds, storageKey: string, scope: string, ids: readonly string[], tab: string): void {
 	useEffect(() => {
-		if (seen(scope, ids)) addDetailsTab(TAB_KEY, tab);
-	}, [seen, scope, ids, tab]);
+		if (seen(scope, ids)) addDetailsTab(storageKey, tab);
+	}, [seen, storageKey, scope, ids, tab]);
 }
 
 const changesOf = itemsSelector((items): BeforeAfter[] => latestBeforeAfter(items));
 
-/** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, its artifacts when it has any, the screen changes to review, and its Linear issue. */
-export function SessionDetails({ view, sessionId, working, cwd, hosts, host, lastHost, row, models, workspaces }: SessionDetailsProps) {
+/** What the session behind `view` worked on, saved, and linked, for {@link sessionWorkTabs}; a new pull request, issue, or change opens its tab through `openers`. */
+export function useSessionWork({ view, sessionId, working, hosts, row }: Pick<SessionWork, "view" | "sessionId" | "working" | "hosts"> & { row: RosterHost | PastSession | null }, openers: WorkTabOpeners): SessionWork {
 	const scope = view.kind === "past" ? view.sessionId : (hosts.find(each => each.instanceId === view.instanceId)?.sessionId ?? view.instanceId);
 	const artifacts = useArtifacts(view);
-	const [picked, setPicked] = useState<LiveView | null>(null);
 	const promptIssues = useLinkedIssues(view);
 	const shipIssue = row?.ship?.issue?.toUpperCase() ?? null;
 	const savedIssues = row?.issues;
 	// The issue a /ship run works on, those the session saved through Linear, then those the user's prompts link.
 	const linearIssues = useMemo(() => [...new Set([...(shipIssue ? [shipIssue] : []), ...(savedIssues ?? []), ...promptIssues])], [shipIssue, savedIssues, promptIssues]);
-	useOpenTabOnNew(linkedBefore, scope, linearIssues, "linear");
+	useOpenTabOnNew(openers.linked, openers.storageKey, scope, linearIssues, "linear");
 	const changes = usePaneSelect(view, changesOf, sameChanges);
 	const changeKeys = useMemo(() => changes.map(changeKey), [changes]);
-	useOpenTabOnNew(listedBefore, scope, changeKeys, "review");
+	useOpenTabOnNew(openers.listed, openers.storageKey, scope, changeKeys, "review");
+	const pullRequests = useMemo(() => row?.pullRequests ?? [], [row?.pullRequests]);
+	const pullRequestKeys = useMemo(() => pullRequests.map(pullRequestKey), [pullRequests]);
+	useOpenTabOnNew(openers.submitted, openers.storageKey, scope, pullRequestKeys, "pull-requests");
+	return { scope, working, pullRequests, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts, linearIssues, changes };
+}
+
+/** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, its artifacts when it has any, the screen changes to review, and its Linear issue. */
+export function SessionDetails({ view, sessionId, working, cwd, hosts, host, lastHost, row, models, workspaces }: SessionDetailsProps) {
+	const work = useSessionWork({ view, sessionId, working, hosts, row }, SESSION_OPENERS);
+	const [picked, setPicked] = useState<LiveView | null>(null);
 	const opened = useSubagentLinks(view, host);
 	// A plain click on a subagent shows it in the **Subagent** tab; a split or a new window still opens it as a pane.
 	const links = useMemo<SubagentLinksValue | null>(
@@ -267,21 +285,9 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 			},
 		[opened],
 	);
-	const pullRequests = useMemo(() => row?.pullRequests ?? [], [row?.pullRequests]);
-	const pullRequestKeys = useMemo(() => pullRequests.map(pullRequestKey), [pullRequests]);
-	useOpenTabOnNew(submittedBefore, scope, pullRequestKeys, "pull-requests");
-	// The row's directory, unlike `cwd`, outlives an ended live session, whose changed files still resolve against it.
 	const session = useMemo<ChangesSession>(() => ({ sessionId, cwd: row?.cwd ?? null, facts: row }), [sessionId, row]);
 	const tabs = [
-		{
-			value: "overview",
-			icon: IconBulletList,
-			name: "Overview",
-			control: "session-details.tab.overview",
-			shortcut: "detailsOverview",
-			count: 0,
-			content: <SessionOverview view={view} working={working} links={links} session={session} />,
-		} as const,
+		sessionOverviewTab(view, working, links, session),
 		...(picked
 			? [
 					{
@@ -295,7 +301,20 @@ export function SessionDetails({ view, sessionId, working, cwd, hosts, host, las
 					} as const,
 				]
 			: []),
-		...sessionWorkTabs({ scope, working, pullRequests, hosts, live: view.kind === "live" ? view : null, view, sessionId, artifacts, linearIssues, changes }),
+		...sessionWorkTabs(work),
 	];
 	return <DetailsSidebarFrame label="Session details" storageKey={TAB_KEY} defaultTab="overview" cwd={cwd} tabs={tabs} menuSections={query => sessionMenuSections(links, query)} />;
+}
+
+/** The **Overview** tab: the session's to-dos, changes, and subagents, which `links` opens, or `null` to list them without links. */
+export function sessionOverviewTab(view: View, working: boolean, links: SubagentLinksValue | null, session: ChangesSession): DetailsTab<"overview"> {
+	return {
+		value: "overview",
+		icon: IconBulletList,
+		name: "Overview",
+		control: "session-details.tab.overview",
+		shortcut: "detailsOverview",
+		count: 0,
+		content: <SessionOverview view={view} working={working} links={links} session={session} />,
+	};
 }

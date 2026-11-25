@@ -4,6 +4,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import { IconMagnifyingGlass, IconPlusSmall } from "central-icons";
 import { type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";
+import type { ModuleControlId } from "../modules";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuRadioGroup, MenuRadioItem, MenuShortcut } from "@/components/ui/menu";
@@ -30,7 +31,7 @@ export interface DetailsTab<T extends string> {
 	icon: IconComponent;
 	name: string;
 	/** The Activity control opening or picking the tab records. */
-	control: ControlId;
+	control: ControlId | ModuleControlId;
 	/** The keys that open or show it while the sidebar shows, listed in the + menu, as Capy's ⇧⌘L opens its Browser. */
 	shortcut?: ShortcutId;
 	/** Shown as a pill after its name, which screen readers hear with it; zero shows none. */
@@ -55,6 +56,8 @@ interface DetailsSidebarFrameProps<T extends string> {
 	tabs: readonly DetailsTab<T>[];
 	/** What the + menu lists after the tabs for the search `query`, such as a session's subagents and terminals, each section after a separator; `null` when nothing matches. */
 	menuSections?: (query: string) => ReactNode;
+	/** What the header shows at its far end, after the + menu, such as the Board thread's close button. */
+	trailing?: ReactNode;
 }
 
 /** Whether any of `texts` holds `query`, ignoring case; an empty query matches everything. */
@@ -192,7 +195,7 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tab
 	);
 }
 
-export function DetailsSidebarFrame<T extends string>({ label, storageKey, defaultTab, cwd, tabs, menuSections }: DetailsSidebarFrameProps<T>) {
+export function DetailsSidebarFrame<T extends string>({ label, storageKey, defaultTab, cwd, tabs, menuSections, trailing }: DetailsSidebarFrameProps<T>) {
 	const [stored, setStored] = useStoredState(storageKey, decodeDetailsTabs, encodeDetailsTabs);
 	// Resolved each render: a stored tab that shows only once its items arrive, such as Pull requests, comes back then.
 	const first = tabs.find(each => each.value === defaultTab);
@@ -238,7 +241,8 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 	return (
 		<FileBaseContext.Provider value={fileBase}>
 			<TabsPrimitive.Tabs value={active} onValueChange={pick} className="flex min-h-0 flex-1 flex-col">
-				<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-1 border-b border-border px-2 py-0">
+				{/* Content-box, so the hairline sits under the full header height, level with the page header's beside it. */}
+				<SidebarHeader className="box-content h-(--page-header-height) flex-row items-center gap-1 border-b border-border px-2 py-0">
 					<h2 className="sr-only">{label}</h2>
 					<TabsPrimitive.TabsList ref={list} aria-label={label} onScroll={edges.onScroll} style={edges.style} className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
 						{shown.map(each => (
@@ -246,6 +250,7 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 						))}
 					</TabsPrimitive.TabsList>
 					<OpenTabMenu tabs={tabs} active={active} onPick={pick} sections={menuSections} />
+					{trailing && <div className="ml-auto flex shrink-0 items-center">{trailing}</div>}
 				</SidebarHeader>
 				{shown.map(each => {
 					// Once shown, a kept panel stays mounted, hidden while another tab shows.
