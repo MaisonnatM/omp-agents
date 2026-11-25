@@ -1,8 +1,9 @@
 /** The Board module's server half: the event log, and the inbox the starter kit's `board` tool leaves changes in. See docs/architecture/board.md. */
 import { join } from "node:path";
 import type { StoredModule } from "./modules";
-import { configDir } from "./paths";
+import { configDir, dataDir } from "./paths";
 import { BoardLog } from "./server/board-log";
+import { boardImageRoutes } from "./server/board-images";
 import { BoardRunner } from "./server/board-runner";
 import { JsonInboxDir } from "./server/json-inbox";
 import { type BoardChange, type BoardState, parseChange } from "../templates/omp/agent/extensions/board/log";
@@ -11,6 +12,8 @@ import { type BoardChange, type BoardState, parseChange } from "../templates/omp
 export const BOARD_FILE = join(configDir, "board-events.jsonl");
 /** Where the `board` tool leaves its changes, one JSON file each, so the server stays the only writer of {@link BOARD_FILE}; not `board-inbox/`, which the Projects module deletes beside an older `board.json`. */
 export const BOARD_INBOX = join(configDir, "board-changes");
+/** The images the page's composers attach, which a Board task or reply names by path; under the data directory, so the page shows them. */
+const BOARD_IMAGES = join(dataDir, "board-images");
 
 /** What the page may change: post a Board task, or reply on one, as the user. */
 const pageChange = (value: unknown): BoardChange | null => {
@@ -43,4 +46,5 @@ export const BOARD_MODULE: StoredModule<"board", BoardState, BoardChange> = {
 			),
 		run: (state, apply, core) => new BoardRunner(state, apply, core),
 	},
+	routes: kit => boardImageRoutes(kit, BOARD_IMAGES),
 };

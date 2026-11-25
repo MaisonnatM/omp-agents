@@ -5,7 +5,7 @@
  */
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo } from "react";
-import { hashForSession, type PastSession, type RosterHost, type View } from "../../../src/shared/sessions";
+import { hashForSession, type PastSession, type PromptImage, type RosterHost, type View } from "../../../src/shared/sessions";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { getJson } from "../../api";
+import { getJson, putJson } from "../../api";
 import { useShowConversation } from "../../pane-store";
 import { UNREAD } from "../../reads";
 import { activityControl } from "../../activity";
@@ -341,14 +341,25 @@ function ThreadSummary({ replies, sessions, href }: { replies: Extract<BoardRepl
 	);
 }
 
+/** What a composer sends: its text with its text files, the images it attached, and how the session runs. */
+type ComposerSend = { prompt: string; images: PromptImage[]; model: BoardLaunch["model"]; thinking: string | null; skill: string | null };
+
+/** `prompt` with its images saved by the server and shown under it by path, since the Board's log keeps text only. */
+async function withImages(prompt: string, images: PromptImage[]): Promise<string> {
+	if (images.length === 0) return prompt;
+	const { paths } = await putJson<{ paths: string[] }>("/api/board/images", { images });
+	return [prompt, ...paths.map(path => `![image](<${path}>)`)].filter(Boolean).join("\n\n");
+}
+
 /** The New session composer, in the open Workspace: sending posts a Board task, and the session that starts on it runs on the model, thinking level, and skill picked here. */
 function Composer({ workspace, core, disabled, onChange }: { workspace: Workspace; core: CoreData; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
-	const post = ({ prompt, model, thinking, skill }: { prompt: string; model: BoardLaunch["model"]; thinking: string | null; skill: string | null }) => {
-		if (!prompt) return;
+	const post = async ({ prompt, images, model, thinking, skill }: ComposerSend) => {
+		if (!prompt && images.length === 0) return;
 		const [first = ""] = prompt.split("\n");
-		const title = first.length > MAX_TITLE ? `${first.slice(0, MAX_TITLE - 1)}…` : first;
-		void onChange({ op: "post", by: { kind: "user" }, workspace: workspace.cwd, title, ...(prompt !== title ? { text: prompt } : {}), launch: { model, thinking, skill } });
+		const title = !first ? "Image" : first.length > MAX_TITLE ? `${first.slice(0, MAX_TITLE - 1)}…` : first;
+		const text = await withImages(prompt, images);
+		await onChange({ op: "post", by: { kind: "user" }, workspace: workspace.cwd, title, ...(text !== title ? { text } : {}), launch: { model, thinking, skill } });
 	};
 	return (
 		<div {...activityControl("board.post")} className="shrink-0">
@@ -531,9 +542,9 @@ const THREAD_MENTIONS = ["session"] as const;
 /** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here. */
 function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
-	const reply = ({ prompt, model, thinking, skill }: { prompt: string; model: BoardLaunch["model"]; thinking: string | null; skill: string | null }) => {
-		if (!prompt || disabled) return;
-		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: prompt, launch: { model, thinking, skill } });
+	const reply = async ({ prompt, images, model, thinking, skill }: ComposerSend) => {
+		if ((!prompt && images.length === 0) || disabled) return;
+		await onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: await withImages(prompt, images), launch: { model, thinking, skill } });
 	};
 	return (
 		<div {...activityControl("board.reply")} className="shrink-0">

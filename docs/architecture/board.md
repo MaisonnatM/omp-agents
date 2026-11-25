@@ -47,3 +47,4 @@ A post goes to the Workspace of the session's directory, the main checkout of a 
 `BoardPage` in `web/components/board/page.tsx` draws the Workspaces from the core data with a count of ready Board tasks and the sessions the Board names, the open Workspace's Board tasks with their status, and the open Board thread.
 Its address is `#board?workspace=<dir>`, and `#board/<n>?workspace=<dir>` opens Board task `n`'s Board thread.
 The page sends `post` and `reply` as the user; the server parses them with `BOARD_MODULE.store.parse`, which accepts nothing else from the page.
+The log keeps text only, so the composers' images go first to `PUT /api/board/images` in `src/server/board-images.ts`, which saves each under `board-images/` in the data directory by its hash and answers their paths; the text names each as `![image](<path>)`, which the page shows through `GET /api/media` and the session reads.

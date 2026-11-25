@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The Board's composers now take files: the paperclip, a drop, or a paste attaches images and documents to a Board task or a reply. Images show in the message and reach the session; before, they vanished when you sent.
 - Fixed: the browser tool sessions use for screenshots could not save a picture or read a script inside a worktree or in /tmp when the session had started in the main checkout. Run the starter kit's install again to pick this up.
 - In the Board's left sidebar, each Workspace now lists its running sessions first, above the stopped ones.
 - A Board thread no longer shows grey lines for a session starting on, claiming, renewing, or finishing its Board task; lines for a failed start, a lapsed lease, or a woken session stay.
