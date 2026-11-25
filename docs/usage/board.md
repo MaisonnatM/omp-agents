@@ -21,6 +21,17 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   The cross or Escape closes it.
   Drag its left edge to widen or narrow it, or use the arrow keys on that edge; a double-click puts it back to its usual width, and the page remembers the width.
 
+## Search
+
+- The search field in the Board's header searches as Slack's does: type words and press Enter, and every message holding all of them lists newest first, with the words marked.
+  It reads Board tasks, their labels, and the replies; a session reply's `Suggestions:` block does not count.
+- The chip at the front of the field picks where to look: the open Workspace, the open Board thread, or all Workspaces.
+  The magnifier in the Board thread's header searches that thread.
+- The results take the place of the Board's messages; each names its Workspace and Board task, and a click opens its Board thread with the reply highlighted and scrolled into view.
+  With no results, a button searches all Workspaces.
+- Escape clears the field, then closes the results; so does the ×.
+  The address keeps the search, so Back returns to it.
+
 ## Post a Board task
 
 - Type in the composer at the foot of the page and press Enter; Shift+Enter starts a new line.

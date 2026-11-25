@@ -2,14 +2,32 @@
 import { IconBubble2 } from "central-icons";
 import { applyChange, type BoardChange, type BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import type { StoredPageModule } from "../../modules";
+import type { BoardScope, BoardSearch } from "./search";
 
-/** The Board page: Workspace `workspace`'s Board tasks, the first Workspace's for `null`, with Board task `thread`'s Board thread open beside them. */
+/** The Board page: Workspace `workspace`'s Board tasks, the first Workspace's for `null`, with Board task `thread`'s Board thread open beside them, `search`'s results in place of the Board tasks, and reply `reply` of the thread highlighted. */
 export interface BoardRoute {
 	workspace: string | null;
 	thread: number | null;
+	search: BoardSearch | null;
+	reply: number | null;
 }
 
-export type BoardControlId = "board.workspace" | "board.task.open" | "board.post" | "board.reply" | "board.thread.close" | "board.thread.tab.thread" | "board.thread.tab.session" | "board.session.open";
+const SCOPES: readonly BoardScope[] = ["thread", "workspace", "all"];
+
+export type BoardControlId =
+	| "board.workspace"
+	| "board.task.open"
+	| "board.post"
+	| "board.reply"
+	| "board.thread.close"
+	| "board.thread.tab.thread"
+	| "board.thread.tab.session"
+	| "board.session.open"
+	| "board.search"
+	| "board.search.scope"
+	| "board.search.clear"
+	| "board.search.result"
+	| "board.thread.search";
 
 export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, BoardChange, never, BoardControlId> = {
 	id: "board",
@@ -17,22 +35,40 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	about: "Board tasks you and your sessions post for each other in a workspace; a session starts on each one once it is ready.",
 	offNote: "While the Board is off, sessions it starts or wakes keep running, and the board tool still works.",
 	listsItself: true,
-	home: { workspace: null, thread: null },
-	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace. */
+	home: { workspace: null, thread: null, search: null, reply: null },
+	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace; `q` searches it, in the `in` scope, and `reply` highlights a reply of the thread. */
 	address: {
 		parse: (rest, query) => {
 			const thread = rest !== null && /^\d+$/.test(rest) ? Number(rest) : null;
-			return { workspace: query.get("workspace"), thread };
+			const q = query.get("q")?.trim() ?? "";
+			const scope = SCOPES.find(each => each === query.get("in")) ?? "workspace";
+			const reply = query.get("reply");
+			return {
+				workspace: query.get("workspace"),
+				thread,
+				search: q ? { query: q, scope: scope === "thread" && thread === null ? "workspace" : scope } : null,
+				reply: thread !== null && reply !== null && /^\d+$/.test(reply) ? Number(reply) : null,
+			};
 		},
 		rest: route => (route.thread === null ? null : String(route.thread)),
-		query: route => (route.workspace === null ? null : new URLSearchParams({ workspace: route.workspace }).toString()),
+		query: route => {
+			const params = new URLSearchParams();
+			if (route.workspace !== null) params.set("workspace", route.workspace);
+			if (route.search) {
+				params.set("q", route.search.query);
+				if (route.search.scope !== "workspace") params.set("in", route.search.scope);
+			}
+			if (route.reply !== null) params.set("reply", String(route.reply));
+			return params.size === 0 ? null : params.toString();
+		},
 	},
-	title: route => (route.thread === null ? "Board" : `Board · #${route.thread}`),
+	title: route => (route.search ? `Board · Search “${route.search.query}”` : route.thread === null ? "Board" : `Board · #${route.thread}`),
 	views: [
 		{ key: "board", label: "Board" },
 		{ key: "board/thread", label: "A Board thread" },
+		{ key: "board/search", label: "Board search results" },
 	],
-	view: route => (route.thread === null ? "board" : "board/thread"),
+	view: route => (route.search ? "board/search" : route.thread === null ? "board" : "board/thread"),
 	shortcuts: {
 		category: "Board",
 		goTo: { label: "Go to the Board", command: "Go to Board", keys: [] },
@@ -47,6 +83,11 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		{ id: "board.thread.tab.thread", label: "Board thread Thread tab", area: "Board" },
 		{ id: "board.thread.tab.session", label: "Board thread Session tab", area: "Board" },
 		{ id: "board.session.open", label: "Board session link, in the sidebar or a thread", area: "Board" },
+		{ id: "board.search", label: "Board search field, Enter to search", area: "Board" },
+		{ id: "board.search.scope", label: "Board search scope menu: thread, workspace, or all workspaces", area: "Board" },
+		{ id: "board.search.clear", label: "Board search results close button", area: "Board" },
+		{ id: "board.search.result", label: "Board search result, which opens its message", area: "Board" },
+		{ id: "board.thread.search", label: "Board thread Search in thread button", area: "Board" },
 	],
 	store: {
 		apply(state, change) {

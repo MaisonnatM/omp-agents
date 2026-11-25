@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- You can now search the Board as you search Slack: the field in its header finds the Board tasks and replies holding every word you type, in the open Workspace, the open Board thread, or all Workspaces, and a result opens its Board thread with the reply highlighted.
 - A session's Board reply can now suggest what to answer next: the Board thread's reply box lists those prompts, and a click, a number key, or Enter sends one.
 - A session the Board starts is now named after its Board task's work, such as "Fix sidebar badge count", instead of "Claim Board task 5 on omp-agents".
 - The Board thread's pane now has tabs, as a session's right sidebar does: **Thread** for the Board task and its replies, and a tab named after the session working on it that shows that session's conversation, with its composer while it runs. Its header line now sits level with the Board's.
