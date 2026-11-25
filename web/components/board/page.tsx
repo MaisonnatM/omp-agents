@@ -3,9 +3,9 @@
  * split by day, each with its thread summary and a hover toolbar, over the composer that posts one; the open Board
  * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconArrowUpRight, IconBrain, IconBubble3, IconBubbleText, IconCrossMedium, IconFlag1, IconHashtag, IconPullRequest, IconRobot, IconUser } from "central-icons";
+import { IconArrowUpRight, IconBrain, IconBubble3, IconBubbleText, IconCrossMedium, IconFlag1, IconHashtag, IconPullRequest, IconRobot, IconSettingsGear1, IconUser } from "central-icons";
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
-import { type ComponentType, type ReactNode, useEffect } from "react";
+import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
@@ -18,7 +18,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson } from "../../api";
 import { botRows } from "../../bots-model";
-import { hashForPage } from "../../routing";
+import { hashForPage, SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
 import { workspaceCwd } from "../../sessions";
 import { activityControl } from "../../activity";
 import { boardDraftKey, boardThreadDraftKey } from "../../composer-drafts";
@@ -32,6 +32,7 @@ import { NewSession } from "../new-session";
 import { ProjectMemoryTab } from "../memory/project-memory";
 import { BotsGallery } from "../bots/bots-gallery";
 import { ProjectsPage } from "../projects/page";
+import { SettingsPage } from "../settings/settings-page";
 import { PullRequestsPage } from "../pull-requests/pull-requests-page";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import { BOARD_TABS, type BoardRoute, type BoardTab } from "./module";
@@ -103,6 +104,7 @@ const TAB_ICONS: Record<BoardTab, ComponentType<{ className?: string; "aria-hidd
 	"pull-requests": IconPullRequest,
 	memory: IconBrain,
 	projects: IconFlag1,
+	settings: IconSettingsGear1,
 };
 
 /** The row of tabs under the Workspace's name, underlined as under a Slack channel's; each opens its own address. */
@@ -153,7 +155,34 @@ function WorkspaceTab({ tab, workspace, core, disabled }: { tab: Exclude<BoardTa
 			const projects = core.projects && { projects: core.projects.projects.filter(project => project.sessionIds.some(id => ran.has(id))) };
 			return <ProjectsPage route={{ open: null }} core={core} state={projects} disabled={disabled} onChange={change => changeModule("projects", change)} />;
 		}
+		case "settings":
+			return <WorkspaceSettings workspace={workspace} workspaces={core.workspaces} />;
 	}
+}
+
+/** The Settings sections that read one workspace, as Settings lists them. */
+const WORKSPACE_SECTIONS = SETTINGS_SECTIONS.filter(section => section.group === "workspace");
+
+/** Settings kept to the Workspace, with no workspace picker: its sections down the left, the open one at the right. */
+function WorkspaceSettings({ workspace, workspaces }: { workspace: string | null; workspaces: CoreData["workspaces"] }) {
+	const [section, setSection] = useState<SettingsSection>("models");
+	return (
+		<TabsPrimitive.Tabs value={section} onValueChange={next => setSection(next as SettingsSection)} orientation="vertical" className="flex min-h-0 flex-1">
+			<TabsPrimitive.TabsList aria-label="Workspace settings" className="flex w-48 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border p-2">
+				{WORKSPACE_SECTIONS.map(({ value, label, icon: Icon }) => (
+					<TabsPrimitive.TabsTab
+						key={value}
+						value={value}
+						className="flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-selected:bg-accent aria-selected:font-medium aria-selected:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+					>
+						<Icon aria-hidden className="size-4 shrink-0" />
+						{label}
+					</TabsPrimitive.TabsTab>
+				))}
+			</TabsPrimitive.TabsList>
+			<SettingsPage key={workspace ?? ""} section={section} cwd={workspace} workspaces={workspaces} />
+		</TabsPrimitive.Tabs>
+	);
 }
 
 const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;

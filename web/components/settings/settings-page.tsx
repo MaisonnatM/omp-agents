@@ -91,25 +91,31 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 	};
 }
 
-/** One section of the settings: omp's usage, the dashboard's own choices, or omp's routing and files for one workspace or for the user only, each editable in place. */
+/**
+ * One section of the settings: omp's usage, the dashboard's own choices, or omp's routing and files for one workspace or for the user only, each editable in place.
+ * Without `onPickWorkspace`, as in a Board's Settings tab, `cwd` stays fixed and only the workspace's sections mount.
+ */
 export function SettingsPage({
 	section,
 	cwd,
 	onPickWorkspace,
 	workspaces,
 	workspaceList,
-	trustedProjects,
+	trustedProjects = [],
 }: {
 	section: SettingsSection;
 	/** The sidebar's workspace, `null` for all workspaces, which reads your user files only. */
 	cwd: string | null;
-	onPickWorkspace: (cwd: string | null) => void;
+	/** Picks the workspace from the header; absent when the page belongs to one workspace. */
+	onPickWorkspace?: (cwd: string | null) => void;
 	/** The workspaces the header's picker offers and Settings › Workspaces lists. */
 	workspaces: Workspace[];
-	workspaceList: WorkspaceList<Workspace>;
+	/** Settings › Workspaces's list; absent when the page belongs to one workspace. */
+	workspaceList?: WorkspaceList<Workspace>;
 	/** The projects whose agent code the user trusted, for Settings › Workspaces. */
-	trustedProjects: TrustedProject[];
+	trustedProjects?: TrustedProject[];
 }) {
+	const scoped = onPickWorkspace === undefined;
 	const { settings, editing } = useSettingsEditing(cwd);
 	const [openFile, setOpenFile] = useState<string | null>(null);
 	// Every section shares one scroller, so a newly opened one would start at the last one's offset.
@@ -134,7 +140,7 @@ export function SettingsPage({
 		integrations: <IntegrationsTab active={section === "integrations"} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
-		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} trustedProjects={trustedProjects} />,
+		workspaces: workspaceList && <WorkspacesTab workspaces={workspaces} list={workspaceList} trustedProjects={trustedProjects} />,
 		sync: <SyncTab active={section === "sync"} />,
 		phone: <PhoneAccessTab active={section === "phone"} />,
 		storage: <StorageTab cwd={cwd} active={section === "storage"} onSaved={settings.reload} />,
@@ -145,7 +151,7 @@ export function SettingsPage({
 		modules: <ModulesTab />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
-	const body = SETTINGS_SECTIONS.filter(({ value }) => value !== "extensions" && !(isPhonePage() && value === "phone")).map(({ value, label }) => (
+	const body = SETTINGS_SECTIONS.filter(({ value, group }) => value !== "extensions" && !(isPhonePage() && value === "phone") && !(scoped && group !== "workspace")).map(({ value, label }) => (
 		<section key={value} aria-label={label} hidden={section !== value} tabIndex={0} className={PANEL}>
 			{panels[value]}
 		</section>
@@ -156,7 +162,7 @@ export function SettingsPage({
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			{shown.group === "workspace" ? (
 				<Header title={shown.label} meta={cwd === null ? shown.meta.none : shown.meta.workspace}>
-					<WorkspacePicker cwd={cwd} workspaces={workspaces} onPick={onPickWorkspace} />
+					{onPickWorkspace && <WorkspacePicker cwd={cwd} workspaces={workspaces} onPick={onPickWorkspace} />}
 				</Header>
 			) : (
 				<Header title={shown.label} />

@@ -10,6 +10,7 @@ export const BOARD_TABS = [
 	{ id: "pull-requests", label: "Pull requests" },
 	{ id: "memory", label: "Memory" },
 	{ id: "projects", label: "Projects" },
+	{ id: "settings", label: "Settings" },
 ] as const;
 
 export type BoardTab = (typeof BOARD_TABS)[number]["id"];
@@ -48,6 +49,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		{ key: "board/pull-requests", label: "The Board's Pull requests tab" },
 		{ key: "board/memory", label: "The Board's Memory tab" },
 		{ key: "board/projects", label: "The Board's Projects tab" },
+		{ key: "board/settings", label: "The Board's Settings tab" },
 	],
 	view: route => (route.thread !== null ? "board/thread" : route.tab === "messages" ? "board" : `board/${route.tab}`),
 	shortcuts: {
