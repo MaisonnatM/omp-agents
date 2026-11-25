@@ -5,7 +5,8 @@
  * matches what the last install wrote, as `starter-kit-installed.json` records, or a version the kit shipped before, as
  * the kit's git history holds; one you edited keeps your version unless you pass `--force`. `--maintainer` copies
  * `maintainer/` on top, and a file there replaces the `agent/` file with the same relative path; later installs
- * remember it. `mcp.json` gains each kit MCP server you lack; one you already list keeps your entry. A file an earlier
+ * remember it. `mcp.json` gains each kit MCP server you lack; one you already list keeps your entry, unless it is one
+ * an earlier kit wrote, which is brought up to date. A file an earlier
  * kit shipped and this one no longer does is removed when you never edited it, and kept when you did, even with
  * `--force`. `--files` only brings the files up to date, never adds back one you deleted, and needs no omp; the
  * dashboard's Update runs it.
@@ -162,12 +163,19 @@ export const STARTER_KIT_MARKETPLACE = { name: "cursor-plugins", source: "cursor
 const PLUGINS = ["pstack@cursor-plugins"];
 /**
  * `chrome-devtools` drives headless Chrome on a throwaway profile, which the kit's `design-critic` and screenshot checks
- * use. `obscura` is a lightweight headless browser that loads a page several times faster and in a tenth of Chrome's
- * memory, for reading, scraping, and driving pages whose pixels do not matter; it lays pages out with its own engine, so
- * it never replaces Chrome for screenshots. It is added only when its binary, `brew install obscura`, is on `PATH`.
+ * use. It reads and writes files only inside its MCP roots, and omp offers just the folder a session started in, so its
+ * `--workspace` roots add `~/code`, which holds every checkout and the `-wt` worktrees beside them, and `/tmp`, which the
+ * server's own default temp root misses on macOS. `obscura` is a lightweight headless browser that loads a page several
+ * times faster and in a tenth of Chrome's memory, for reading, scraping, and driving pages whose pixels do not matter;
+ * it lays pages out with its own engine, so it never replaces Chrome for screenshots. It is added only when its binary,
+ * `brew install obscura`, is on `PATH`. `shipped` lists the entries earlier kits wrote, which an install brings up to date.
  */
-const MCP_SERVERS: Record<string, { config: Json; needs?: string }> = {
-	"chrome-devtools": { config: { type: "stdio", command: "npx", args: ["-y", "chrome-devtools-mcp@latest", "--headless", "--isolated"] } },
+const CHROME_DEVTOOLS_ARGS = ["-y", "chrome-devtools-mcp@latest", "--headless", "--isolated"];
+const MCP_SERVERS: Record<string, { config: Json; shipped?: Json[]; needs?: string }> = {
+	"chrome-devtools": {
+		config: { type: "stdio", command: "npx", args: [...CHROME_DEVTOOLS_ARGS, `--workspace=${join(homedir(), "code")}`, "--workspace=/tmp"] },
+		shipped: [{ type: "stdio", command: "npx", args: CHROME_DEVTOOLS_ARGS }],
+	},
 	obscura: { config: { type: "stdio", command: "obscura", args: ["mcp"] }, needs: "obscura" },
 };
 
@@ -180,20 +188,26 @@ function readMcpServers(path: string): Json {
 	return parsed.mcpServers ?? {};
 }
 
+function mcpAction(mine: unknown, config: Json, shipped: readonly Json[]): Action {
+	if (mine === undefined) return "create";
+	if (deepEquals(mine, config)) return "same";
+	return shipped.some(old => deepEquals(mine, old)) ? "update" : "keep";
+}
+
 /** `which` finds a server's binary; a server whose binary is missing is left out. */
 export function planMcpServers(agentDir: string, which: (bin: string) => string | null = Bun.which): McpStep[] {
 	const mine = readMcpServers(join(agentDir, "mcp.json"));
 	return Object.entries(MCP_SERVERS)
 		.filter(([, { needs }]) => needs === undefined || which(needs) !== null)
-		.map(([name, { config }]) => ({ name, config, action: mine[name] === undefined ? "create" : "same" }));
+		.map(([name, { config, shipped = [] }]) => ({ name, config, action: mcpAction(mine[name], config, shipped) }));
 }
 
-/** Adds only the servers you lack, keeping every other key of `mcp.json`. */
+/** Writes the servers you lack and the ones an earlier kit wrote, keeping every other key of `mcp.json`. */
 export function writeMcpServers(path: string, steps: readonly McpStep[]): void {
-	const added = steps.filter(step => step.action === "create");
-	if (added.length === 0) return;
+	const written = steps.filter(step => writes(step.action));
+	if (written.length === 0) return;
 	const parsed: Json = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {};
-	parsed.mcpServers = { ...readMcpServers(path), ...Object.fromEntries(added.map(step => [step.name, step.config])) };
+	parsed.mcpServers = { ...readMcpServers(path), ...Object.fromEntries(written.map(step => [step.name, step.config])) };
 	mkdirSync(dirname(path), { recursive: true });
 	writeFileSync(path, `${JSON.stringify(parsed, null, 2)}\n`);
 }
