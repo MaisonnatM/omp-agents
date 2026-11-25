@@ -60,7 +60,7 @@ const parse = (query: string, rest: string | null = null): BoardRoute => BOARD_P
 
 test("the Board's address round-trips its search, its scope, and the reply it highlights", () => {
 	const route = parse("workspace=%2Fa&q=login+fix&in=thread&reply=2", "1");
-	expect(route).toEqual({ workspace: "/a", view: { tab: "messages", thread: 1 }, search: { query: "login fix", scope: "thread" }, reply: 2 });
+	expect(route).toEqual({ workspace: "/a", view: { tab: "messages", thread: 1 }, search: { query: "login fix", scope: "thread" }, reply: 2, bots: false });
 	expect(BOARD_PAGE.address.query(route)).toBe("workspace=%2Fa&q=login+fix&in=thread&reply=2");
 	expect(BOARD_PAGE.address.query(parse("q=login&in=workspace"))).toBe("q=login");
 	expect(parse("q=login&in=all").search).toEqual({ query: "login", scope: "all" });
@@ -70,6 +70,6 @@ test("the Board's address searches the Workspace for a thread scope without a th
 	expect(parse("q=login&in=thread").search).toEqual({ query: "login", scope: "workspace" });
 	expect(parse("q=login&in=nowhere", "1").search).toEqual({ query: "login", scope: "workspace" });
 	expect(parse("reply=2").reply).toBeNull();
-	expect(parse("q=+&reply=x", "1")).toEqual({ workspace: null, view: { tab: "messages", thread: 1 }, search: null, reply: null });
+	expect(parse("q=+&reply=x", "1")).toEqual({ workspace: null, view: { tab: "messages", thread: 1 }, search: null, reply: null, bots: false });
 	expect(parse("q=login", "settings").search).toBeNull();
 });

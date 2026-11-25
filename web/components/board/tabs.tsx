@@ -28,7 +28,7 @@ export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: rea
 			value={tab}
 			onValueChange={next => {
 				const picked = tabs.find(each => each.id === next);
-				if (picked) location.hash = hashForPage({ kind: "board", workspace, view: picked.id === "messages" ? { tab: "messages", thread: null } : picked.id === "settings" ? { tab: "settings", section: null } : { tab: picked.id }, search: null, reply: null });
+				if (picked) location.hash = hashForPage({ kind: "board", workspace, view: picked.id === "messages" ? { tab: "messages", thread: null } : picked.id === "settings" ? { tab: "settings", section: null } : { tab: picked.id }, search: null, reply: null, bots: false });
 			}}
 			activation="manual"
 		>
@@ -96,7 +96,7 @@ function WorkspacePullRequests({ workspace, hosts, past }: { workspace: string |
 	);
 }
 
-const settingsHash = (workspace: string | null, section: string) => hashForPage({ kind: "board", workspace, view: { tab: "settings", section }, search: null, reply: null });
+const settingsHash = (workspace: string | null, section: string) => hashForPage({ kind: "board", workspace, view: { tab: "settings", section }, search: null, reply: null, bots: false });
 
 /** Settings kept to the Workspace, with no workspace picker: its sections down the left, the one the address names at the right. */
 function WorkspaceSettings({ workspace, workspaces, section: named }: { workspace: string | null; workspaces: CoreData["workspaces"]; section: string | null }) {
