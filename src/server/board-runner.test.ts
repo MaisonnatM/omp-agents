@@ -9,7 +9,7 @@ function harness({ owner = true, stopped = new Set<string>() } = {}) {
 	let now = 1000;
 	let next = 0;
 	const starts: { cwd: string; prompt: string }[] = [];
-	const wakes: { sessionId: string; text: string }[] = [];
+	const wakes: { sessionId: string; text: string; interrupt: boolean }[] = [];
 	let runner: BoardRunner;
 	const apply = (change: BoardChange): boolean => {
 		const applied = applyChange(state, change, now);
@@ -23,8 +23,8 @@ function harness({ owner = true, stopped = new Set<string>() } = {}) {
 			starts.push({ cwd, prompt });
 			return { sessionId: `s${++next}` };
 		},
-		async wake(sessionId, text) {
-			wakes.push({ sessionId, text });
+		async wake(sessionId, text, _launch, interrupt = false) {
+			wakes.push({ sessionId, text, interrupt });
 			return { resumed: stopped.has(sessionId) };
 		},
 		owner: () => owner,
@@ -81,6 +81,44 @@ describe("BoardRunner", () => {
 		expect(board.wakes.map(wake => wake.sessionId)).toEqual(["s1"]);
 		expect(board.wakes[0]?.text).toContain("Use the v2 API");
 		expect(board.state().tasks[0]?.replies.at(-1)).toMatchObject({ note: { kind: "woke", sessionId: "s1" } });
+	});
+
+	test("editing your message stops the turn of the session working from it and sends it the new text; one about to start reads it in its start prompt", async () => {
+		const board = harness();
+		board.runner.changed();
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "Use v1" });
+		await settle();
+		board.apply({ op: "claim", sessionId: "s1", task: 1 });
+		board.apply({ op: "reply", by: { kind: "user" }, task: 1, text: "Keep the old name" });
+		await settle();
+		board.tick(1000);
+		// `replies` holds the thread's notes too, so the reply's index is its place among them.
+		const reply = board.state().tasks[0]!.replies.findIndex(entry => "by" in entry);
+		board.apply({ op: "edit", by: { kind: "user" }, task: 1, reply, text: "Rename it to Board" });
+		await settle();
+		board.tick(1000);
+		expect(board.wakes.at(-1)).toMatchObject({ sessionId: "s1", interrupt: true });
+		expect(board.wakes.at(-1)?.text).toContain("Rename it to Board");
+		board.apply({ op: "edit", by: { kind: "user" }, task: 1, text: "Use v2\nwith the new API" });
+		await settle();
+		expect(board.wakes.at(-1)?.text).toContain("Use v2\nwith the new API");
+		expect(board.state().tasks[0]).toMatchObject({ title: "Use v2", editedAt: expect.any(Number) });
+		expect(board.wakes.filter(wake => wake.interrupt)).toHaveLength(2);
+
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "Second", needs: [1] });
+		board.apply({ op: "edit", by: { kind: "user" }, task: 2, text: "Second, edited" });
+		board.apply({ op: "done", sessionId: "s1", task: 1 });
+		await settle();
+		expect(board.wakes.filter(wake => wake.interrupt)).toHaveLength(2);
+		expect(board.starts.at(-1)?.prompt).toContain("Second, edited");
+	});
+
+	test("only the user's own messages can be edited", () => {
+		const board = harness();
+		board.apply({ op: "post", by: { kind: "session", sessionId: "s9" }, workspace: "/w", title: "From a session" });
+		board.apply({ op: "reply", by: { kind: "session", sessionId: "s9" }, task: 1, text: "Its reply" });
+		expect(() => board.apply({ op: "edit", by: { kind: "user" }, task: 1, text: "Mine now" })).toThrow("Only the user's own messages can be edited.");
+		expect(() => board.apply({ op: "edit", by: { kind: "user" }, task: 1, reply: 0, text: "Mine now" })).toThrow("Only the user's own messages can be edited.");
 	});
 
 	test("a reply on a done Board task starts a new session that reads the thread, and wakes the one that finished nobody", async () => {

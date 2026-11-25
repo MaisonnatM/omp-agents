@@ -523,14 +523,17 @@ export class Dashboard {
 				const sessionId = sessions.get(result.instanceId)?.sessionId;
 				return sessionId ? { sessionId } : { error: "The session exited as it started." };
 			},
-			async wake(sessionId, text, launch) {
+			async wake(sessionId, text, launch, interrupt = false) {
 				const live = sessions.bySessionId(sessionId);
 				const session = live ?? (await reach(sessionId));
+				// The turn stops, and the user's own messages it held wait until `text` has run; a stopped session has no turn to stop.
+				const withdrawn = interrupt && live ? await live.interrupt() : [];
 				// Only a session this dashboard started switches models; one running in a terminal keeps its own.
 				const owned = sessions.started(session.instanceId);
 				if (launch?.model) await owned?.setModel(launch.model, launch.thinking);
 				else if (launch?.thinking) await owned?.setThinking(launch.thinking);
 				await session.prompt(null, launch?.skill ? `/skill:${launch.skill} ${text}` : text, [], "followUp");
+				for (const message of withdrawn) await session.prompt(null, message.text, message.images, "followUp");
 				return { resumed: !live };
 			},
 			owner: () => ownerLock.held,

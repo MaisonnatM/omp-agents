@@ -4,7 +4,7 @@
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconRobot, IconUser } from "central-icons";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconPencil, IconRobot, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { type PastSession, type PromptImage, type RosterHost, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -18,6 +18,7 @@ import { MessageScroller, MessageScrollerButton, MessageScrollerContent, Message
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../../api";
+import { errorText } from "../../../src/json";
 import { useShowConversation } from "../../pane-store";
 import { UNREAD } from "../../reads";
 import { activityControl } from "../../activity";
@@ -107,7 +108,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 												return (
 													<li key={task.id}>
 														{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
-														<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === thread?.id} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} />
+														<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === thread?.id} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} disabled={disabled} onChange={onChange} />
 													</li>
 												);
 											})}
@@ -310,21 +311,26 @@ function WorkingLine({ sessionId, sessions, href }: { sessionId: string | null; 
 	);
 }
 
-/** A Board task's or reply's text as Markdown, with single line breaks kept, as a Bot's message shows. */
-function BoardText({ text }: { text: string }) {
+/** A Board task's or reply's text as Markdown, with single line breaks kept, as a Bot's message shows; `(edited)` after it once its author edited it, as Slack marks one. */
+function BoardText({ text, editedAt }: { text: string; editedAt?: number }) {
 	return (
 		<div className="max-w-conversation min-w-0 text-sm leading-relaxed">
 			<MessageMarkdown text={text} preset={BOT_MESSAGE_PRESET} />
+			{editedAt !== undefined && (
+				<span title={`Edited ${new Date(editedAt).toLocaleString()}`} className="text-xs text-muted-foreground">
+					(edited)
+				</span>
+			)}
 		</div>
 	);
 }
 
-/** The message's text and its labels. */
-function TaskBody({ task }: { task: BoardTask }) {
+/** The message's text, or `editor` in its place while you edit it, and its labels. */
+function TaskBody({ task, editor }: { task: BoardTask; editor?: ReactNode }) {
 	const labels = Object.entries(task.labels);
 	return (
 		<>
-			<BoardText text={task.text || task.title} />
+			{editor ?? <BoardText text={task.text || task.title} editedAt={task.editedAt} />}
 			{labels.length > 0 && (
 				<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
 					{labels.map(([key, value]) => (
@@ -335,6 +341,81 @@ function TaskBody({ task }: { task: BoardTask }) {
 				</span>
 			)}
 		</>
+	);
+}
+
+/** The pencil in your own message's toolbar, which puts its text in a box to edit. */
+function EditButton({ disabled, onEdit }: { disabled: boolean; onEdit: () => void }) {
+	return (
+		<Tooltip content="Edit message">
+			<Button {...activityControl("board.message.edit")} variant="ghost" size="icon-xs" aria-label="Edit message" disabled={disabled} onClick={onEdit}>
+				<IconPencil />
+			</Button>
+		</Tooltip>
+	);
+}
+
+/** Your message's text in a box, as Slack edits one: Enter or **Save** saves it, which stops the turn of the session working from it and sends it the new text; Shift+Enter starts a new line; Escape or **Cancel** leaves it as it was. */
+function MessageEditor({ text, onSave, onClose }: { text: string; onSave: (text: string) => Promise<void>; onClose: () => void }) {
+	const [draft, setDraft] = useState(text);
+	const [pending, setPending] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const ref = useRef<HTMLTextAreaElement>(null);
+	useEffect(() => {
+		const box = ref.current;
+		box?.focus();
+		box?.setSelectionRange(box.value.length, box.value.length);
+	}, []);
+	const save = async () => {
+		const next = draft.trim();
+		if (!next || next === text.trim()) return onClose();
+		setPending(true);
+		try {
+			await onSave(next);
+			onClose();
+		} catch (failure) {
+			setError(errorText(failure));
+			setPending(false);
+		}
+	};
+	return (
+		<div className="flex max-w-conversation min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-background p-2 focus-within:border-ring">
+			<textarea
+				ref={ref}
+				aria-label="Edit message"
+				aria-busy={pending || undefined}
+				readOnly={pending}
+				value={draft}
+				rows={1}
+				onChange={event => setDraft(event.target.value)}
+				onKeyDown={event => {
+					if (event.nativeEvent.isComposing) return;
+					// Escape is taken here, so the Board thread around the box stays open.
+					if (event.key === "Escape") {
+						event.preventDefault();
+						if (!pending) onClose();
+					} else if (event.key === "Enter" && !event.shiftKey) {
+						event.preventDefault();
+						if (!pending) void save();
+					}
+				}}
+				className="block w-full resize-none bg-transparent text-sm leading-relaxed [field-sizing:content] outline-none"
+			/>
+			{error && (
+				<p role="alert" className="text-xs text-destructive">
+					{error}
+				</p>
+			)}
+			<div className="flex items-center gap-1.5">
+				<span className="mr-auto text-xs text-muted-foreground">Saving stops its session's turn and resends it</span>
+				<Button variant="outline" size="compact" disabled={pending} onClick={onClose}>
+					Cancel
+				</Button>
+				<Button variant="primary" size="compact" disabled={pending} onClick={() => void save()}>
+					Save
+				</Button>
+			</div>
+		</div>
 	);
 }
 
@@ -364,13 +445,15 @@ const useSeen = (): Record<string, number> =>
 /** Replies past the ones seen that someone else wrote: the unread count, as Slack's thread pill. */
 const unreadOf = (task: BoardTask, seenCount: number | undefined): number => said(task).slice(seenCount ?? 0).filter(reply => reply.by.kind !== "user").length;
 
-function TaskMessage({ state, task, sessions, open, grouped, href }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string }) {
+function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onChange }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const replies = said(task);
 	const seenMap = useSeen();
 	const status = statusOf(state, task);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
+	const [editing, setEditing] = useState(false);
 	const toolbar = (
 		<>
+			{task.by.kind === "user" && !editing && <EditButton disabled={disabled} onEdit={() => setEditing(true)} />}
 			<Tooltip content="Reply in thread">
 				<Button {...activityControl("board.task.open")} variant="ghost" size="icon-xs" aria-label={`Reply in thread #${task.id}`} render={<a href={href} />}>
 					<IconBubble3 />
@@ -387,7 +470,7 @@ function TaskMessage({ state, task, sessions, open, grouped, href }: { state: Bo
 	);
 	return (
 		<MessageRow by={task.by} at={task.at} sessions={sessions} state={state} workspace={task.workspace} grouped={grouped} highlighted={open} toolbar={toolbar}>
-			<TaskBody task={task} />
+			<TaskBody task={task} editor={editing ? <MessageEditor text={task.text || task.title} onSave={text => onChange({ op: "edit", by: { kind: "user" }, task: task.id, text })} onClose={() => setEditing(false)} /> : undefined} />
 			{replies.length > 0 && <ThreadSummary replies={replies} unread={open ? 0 : unreadOf(task, seenMap[task.id])} sessions={sessions} href={href} />}
 			{(status.kind === "ready" || status.kind === "claimed") && <WorkingLine sessionId={session} sessions={sessions} href={href} />}
 		</MessageRow>
@@ -604,13 +687,26 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 	const last = replies.at(-1);
 	const suggestions = task.doneAt !== null && last?.by.kind === "session" ? splitSuggestions(last.text).suggestions : [];
 	let previous: { at: number; by: BoardAuthor } = task;
+	// The message being edited: the Board task, or a reply by its index in `task.replies`.
+	const [editing, setEditing] = useState<"task" | number | null>(null);
+	const editor = (text: string, reply?: number) => (
+		<MessageEditor text={text} onSave={next => onChange({ op: "edit", by: { kind: "user" }, task: task.id, ...(reply === undefined ? {} : { reply }), text: next })} onClose={() => setEditing(null)} />
+	);
 	return (
 		<MessageScrollerProvider autoScroll={follow}>
 			<MessageScroller className="flex-1">
 				<MessageScrollerViewport>
 					<MessageScrollerContent className="gap-0 py-2">
-						<MessageRow by={task.by} at={task.at} sessions={sessions} state={state} workspace={task.workspace} grouped={false}>
-							<TaskBody task={task} />
+						<MessageRow
+							by={task.by}
+							at={task.at}
+							sessions={sessions}
+							state={state}
+							workspace={task.workspace}
+							grouped={false}
+							toolbar={task.by.kind === "user" && editing !== "task" ? <EditButton disabled={disabled} onEdit={() => setEditing("task")} /> : undefined}
+						>
+							<TaskBody task={task} editor={editing === "task" ? editor(task.text || task.title) : undefined} />
 						</MessageRow>
 						<div className="flex items-center gap-3 px-5 py-2 text-[13px] text-muted-foreground">
 							<span className="shrink-0">{count === 0 ? "No replies yet" : `${count} ${count === 1 ? "reply" : "replies"}`}</span>
@@ -624,8 +720,17 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 								return (
 									<li key={index}>
 										<MessageScrollerItem messageId={`reply-${index}`}>
-											<MessageRow by={entry.by} at={entry.at} sessions={sessions} state={state} workspace={task.workspace} grouped={grouped} highlighted={index === reply}>
-												<BoardText text={replyText(entry.by, entry.text)} />
+											<MessageRow
+												by={entry.by}
+												at={entry.at}
+												sessions={sessions}
+												state={state}
+												workspace={task.workspace}
+												grouped={grouped}
+												highlighted={index === reply}
+												toolbar={entry.by.kind === "user" && editing !== index ? <EditButton disabled={disabled} onEdit={() => setEditing(index)} /> : undefined}
+											>
+												{editing === index ? editor(entry.text, index) : <BoardText text={replyText(entry.by, entry.text)} editedAt={entry.editedAt} />}
 												{entry === last && suggestions.length > 0 && (
 													<div {...activityControl("board.thread.suggestion")} role="group" aria-label="Suggested next steps" className="flex flex-wrap gap-1.5 pt-1.5">
 														{suggestions.map(prompt => (
