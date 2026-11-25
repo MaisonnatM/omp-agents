@@ -91,6 +91,33 @@ export function parseCwds(text: string): Map<number, string> {
 	return cwds;
 }
 
+/** `ps` printing each of `pids` with its environment after its command, in the form {@link parseSessionFiles} reads; macOS only. */
+export const environmentsArgv = (pids: readonly number[]): string[] => ["ps", "-E", "-ww", "-o", "pid=,command=", "-p", pids.join(",")];
+
+const SESSION_FILE = / PI_SESSION_FILE=(\S+)/;
+const LAUNCHD_SERVICE = / XPC_SERVICE_NAME=(\S+)/;
+
+/**
+ * The omp session file of each process an omp bash tool started, from {@link environmentsArgv}'s output: omp's bash tool sets
+ * `PI_SESSION_FILE` in each command's environment, and whatever the command starts inherits it. An app that `open` started
+ * from such a command inherits it too, but launchd gives the app its own `XPC_SERVICE_NAME`, `application.<bundle id>.…`,
+ * where a command keeps the one of the terminal or dashboard it runs under, `ownService`; such an app, like Docker Desktop,
+ * is yours, so it is left out.
+ */
+export function parseSessionFiles(text: string, ownService: string | undefined): Map<number, string> {
+	const files = new Map<number, string>();
+	for (const line of text.split("\n")) {
+		const match = /^\s*(\d+)\s(.*)$/.exec(line);
+		if (!match) continue;
+		const file = SESSION_FILE.exec(match[2])?.[1];
+		if (!file) continue;
+		const service = LAUNCHD_SERVICE.exec(match[2])?.[1];
+		if (service?.startsWith("application.") && service !== ownService) continue;
+		files.set(Number(match[1]), file);
+	}
+	return files;
+}
+
 /** TCP listen state in `/proc/net/tcp`. */
 const PROC_LISTEN = "0A";
 
@@ -161,6 +188,22 @@ export function cwdsIn(procRoot: string, pids: readonly number[]): Map<number, s
 		}
 	}
 	return cwds;
+}
+
+/** The omp session file in each of `pids`' environment under `procRoot`, for the pids that have one, as {@link parseSessionFiles} reads it on macOS. */
+export function sessionFilesIn(procRoot: string, pids: readonly number[]): Map<number, string> {
+	const files = new Map<number, string>();
+	for (const pid of pids) {
+		let environ: string;
+		try {
+			environ = readFileSync(join(procRoot, String(pid), "environ"), "utf8");
+		} catch {
+			continue;
+		}
+		const entry = environ.split("\0").find(each => each.startsWith("PI_SESSION_FILE="));
+		if (entry) files.set(pid, entry.slice("PI_SESSION_FILE=".length));
+	}
+	return files;
 }
 
 /** Absolute paths open as file descriptors under `procRoot`. */

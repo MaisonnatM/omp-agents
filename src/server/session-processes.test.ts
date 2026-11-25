@@ -22,8 +22,8 @@ const SCOPE = { kind: "project", dir: "/repo" } as const;
 const BROWSER_UNIT: UnitSnapshot = { id: "u1", kind: "proc", scope: SCOPE, key: "browser", generation: "g1", state: "running", pids: [300], startedAt: T0, supervised: true };
 const API_UNIT: UnitSnapshot = { id: "u2", kind: "proc", scope: SCOPE, key: "api", generation: "g2", state: "running", pids: [], startedAt: T0, owner: "sa", command: "bun api.ts", supervised: true };
 
-const A: WatchedSession = { instanceId: "a", sessionId: "sa", pid: 100, cwd: "/repo", status: "idle", waitsOnWork: false, stopsWhenIdle: true };
-const B: WatchedSession = { instanceId: "b", sessionId: "sb", pid: 200, cwd: "/repo/wt", status: "working", waitsOnWork: false, stopsWhenIdle: true };
+const A: WatchedSession = { instanceId: "a", sessionId: "sa", file: "/sessions/a.jsonl", pid: 100, cwd: "/repo", status: "idle", waitsOnWork: false, stopsWhenIdle: true };
+const B: WatchedSession = { instanceId: "b", sessionId: "sb", file: "/sessions/b.jsonl", pid: 200, cwd: "/repo/wt", status: "working", waitsOnWork: false, stopsWhenIdle: true };
 
 /** A watch over a computer whose processes, services, sessions, and clock the test sets; a stop takes what it stopped off the computer. */
 function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
@@ -56,10 +56,13 @@ function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
 		]),
 	};
 	const stopped: string[] = [];
+	/** The session file in each process's environment, by pid. */
+	const sessionFiles = new Map<number, string>();
 	const watch = new SessionProcessWatch({
 		readTable: async () => parsePs(state.ps.join("\n")),
 		readPorts: async () => state.listeners,
 		readCwds: async pids => new Map([...state.cwds].filter(([pid]) => pids.includes(pid))),
+		readSessionFiles: async pids => new Map([...sessionFiles].filter(([pid]) => pids.includes(pid))),
 		appOf: async dir => (dir === "/repo" ? "/repo/.git\n" : dir.startsWith("/repo/") ? `/repo/.git\n${dir.split("/").at(-1)}/` : null),
 		readServices: async () => state.services,
 		projectDir: async cwd => (cwd.startsWith("/repo") ? "/repo" : cwd),
@@ -88,7 +91,7 @@ function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
 	};
 	/** Session `instanceId`'s processes, as the whole list has them. */
 	const processesOf = async (instanceId: string) => (await watch.list()).find(each => each.instanceId === instanceId)?.processes;
-	return { state, stopped, watch, tickAt, processesOf };
+	return { state, stopped, sessionFiles, watch, tickAt, processesOf };
 }
 
 describe("SessionProcessWatch", () => {
@@ -194,6 +197,27 @@ describe("SessionProcessWatch", () => {
 		expect(stopped).toEqual(["session a"]);
 		await tickAt(200 + 24 * 60);
 		expect(stopped).toEqual(["session a"]);
+	});
+
+	test("a server a session's command left running in the background lists and stops as that session's job, and a keeper's tree does not", async () => {
+		const { state, stopped, sessionFiles, tickAt, processesOf } = computer([]);
+		const server = "  120     1   115  40960   3.0 Fri Oct  3 09:00:00 2026     node server.js";
+		const worker = "  121   120   115  40960   1.0 Fri Oct  3 09:00:00 2026     node worker.js";
+		const keeper = "  150     1   150   2048   0.0 Fri Oct  3 09:00:00 2026     bun keeper.ts";
+		const keptOmp = "  200   150   200  51200   4.0 Fri Oct  3 09:00:00 2026     omp";
+		state.ps = [OMP_A, MCP_A, DEV, VITE, keeper, keptOmp, BROWSER, server, worker];
+		sessionFiles.set(120, "/sessions/a/Explorer.jsonl");
+		sessionFiles.set(150, "/sessions/a.jsonl");
+		await tickAt(0);
+		expect((await processesOf("a"))?.map(item => [item.label, item.processCount, item.stopsAt])).toEqual([
+			["node server.js", 2, minutes(30)],
+			["bun run dev", 2, minutes(30)],
+		]);
+		expect(await processesOf("b")).toEqual([]);
+		state.sessions = [B];
+		state.ps = state.ps.filter(line => line !== OMP_A && line !== MCP_A);
+		await tickAt(5);
+		expect(stopped).toEqual(["job 110,111,120,121"]);
 	});
 
 	test("a session that works, asks a question, or waits on a subagent never ends", async () => {

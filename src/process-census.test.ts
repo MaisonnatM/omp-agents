@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cwdsIn, descendants, listeningPortsIn, openPathsIn, ProcessCensus, parseListeners, parsePs, sessionGroups, stopTree } from "./process-census";
+import { cwdsIn, descendants, listeningPortsIn, openPathsIn, ProcessCensus, parseListeners, parsePs, parseSessionFiles, sessionFilesIn, sessionGroups, stopTree } from "./process-census";
 
 /** omp (100) with an MCP server in its process group, two jobs, and a shared worker it spawned, which has a child of its own. */
 const PS = `
@@ -121,4 +121,19 @@ test("a Linux proc tree names the listening port, the working directory, and an 
 	expect(listeningPortsIn(dir).get(42)).toEqual([8080]);
 	expect(cwdsIn(dir, [42, 7]).get(42)).toBe("/srv/app");
 	expect(openPathsIn(dir)).toEqual(["/cache/archive-v0/abc/tool"]);
+});
+
+test("a process's environment names the session file of an omp command, but not of an app launchd started for open", () => {
+	const ps = [
+		"  120 node server.js PATH=/bin PI_SESSION_FILE=/s/a.jsonl XPC_SERVICE_NAME=0",
+		"  130 /Applications/Docker.app/Contents/MacOS/com.docker.backend PI_SESSION_FILE=/s/a.jsonl XPC_SERVICE_NAME=application.com.docker.docker.1.2",
+		"  140 node dev.js PI_SESSION_FILE=/s/b.jsonl XPC_SERVICE_NAME=application.dev.omp-agents.3.4",
+		"  150 /usr/sbin/cfprefsd agent",
+	].join("\n");
+	expect(parseSessionFiles(ps, "application.dev.omp-agents.3.4")).toEqual(new Map([[120, "/s/a.jsonl"], [140, "/s/b.jsonl"]]));
+	const dir = mkdtempSync(join(process.env.TMPDIR ?? "/tmp", "proc-census-"));
+	dirs.push(dir);
+	mkdirSync(join(dir, "42"));
+	writeFileSync(join(dir, "42", "environ"), "PATH=/bin\0PI_SESSION_FILE=/s/a/Explorer.jsonl\0");
+	expect(sessionFilesIn(dir, [42, 7])).toEqual(new Map([[42, "/s/a/Explorer.jsonl"]]));
 });

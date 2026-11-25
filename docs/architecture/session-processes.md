@@ -17,6 +17,13 @@ A service whose unit names an owner belongs to the session with that omp session
 A service with no owner, such as the shared browser, is shared: it serves every live session whose directory resolves, through omp's `canonicalProjectDir`, to the unit's project.
 A Docker container that a session started detached is not listed: Docker Desktop records no client process, and compose's working directory label names the main checkout even for a run from a worktree, so nothing ties a container to a session.
 A foreground `docker compose up` or `docker run` is a process group under omp, so it lists and stops as any job.
+A command that starts a server in the background, such as with `nohup … &`, and exits leaves the server to launchd, or to init on Linux, so it runs under no omp; only a parent pid of 1 counts as adopted, so a Linux `systemd --user` subreaper's orphans are not found.
+omp's bash tool sets `PI_SESSION_FILE` in each command's environment, and every process the command starts inherits it.
+So the watch reads that variable once from each process launchd or init adopted, through `readSessionFiles` (`ps -E` on macOS, `/proc/<pid>/environ` on Linux), and lists the process and everything under it as a job of the live session whose file it names, or whose subagent's file, in the directory named after the session's file, it names.
+Such a job joins the session's job of the same process group, if one runs, and the idle stop and [the cleanup of a session that leaves the roster](#sessions-that-leave-the-roster) stop it as any job.
+A tree that holds a session's omp or this server, such as a keeper or a dashboard a session started, is never a job.
+An app that `open` started inherits the variable too, but launchd gives it its own `XPC_SERVICE_NAME`, `application.<bundle id>.…`, so `parseSessionFiles` leaves out a process whose service name starts with `application.` and differs from the server's: Docker Desktop that a session opened stays yours.
+A background server whose session ended while no dashboard ran is no live session's, so it keeps running; the decision [A session owns the servers it detached](../decisions/2026-11-25-a-session-owns-the-servers-it-detached.md) says why.
 
 ## Sampling
 
