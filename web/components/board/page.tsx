@@ -139,25 +139,25 @@ function hueOf(id: string): string {
 	return HUES[Math.abs(hash) % HUES.length] ?? "bg-sky-600";
 }
 
-/** Your Slack profile picture, asked once per page load; `null` when Slack is not connected or the ask failed. */
-let yourPicture: Promise<string | null> | null = null;
+/** Your Slack profile picture, asked once per page load to refresh the stored one, which shows meanwhile; `undefined` when the ask failed. */
+let yourPicture: Promise<string | null | undefined> | null = null;
 
 /** Your square picture: your Slack profile picture, else a person. */
 function YourAvatar({ size, box }: { size: "message" | "summary"; box: string }) {
-	const [url, setUrl] = useState<string | null>(null);
+	const [url, setUrl] = useStoredState<string | null>("omp-agents.slack-picture", raw => raw || null, value => value ?? "");
 	useEffect(() => {
 		yourPicture ??= getJson<{ avatarUrl: string | null }>("/api/integrations/slack/me").then(
 			answer => answer.avatarUrl,
-			() => null,
+			() => undefined,
 		);
 		let live = true;
 		void yourPicture.then(found => {
-			if (live) setUrl(found);
+			if (live && found !== undefined && found !== url) setUrl(found);
 		});
 		return () => {
 			live = false;
 		};
-	}, []);
+	}, [url, setUrl]);
 	if (url) return <img aria-hidden src={url} alt="" referrerPolicy="no-referrer" className={cn("shrink-0 object-cover", box)} />;
 	return (
 		<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-foreground text-background", box)}>
