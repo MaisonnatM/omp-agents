@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- A Board task whose session stopped for you now says so in the Board's message list, in amber, in place of "Working on it…": "Asks you" with its question, "Waiting for your input", or "Waiting for your reply". Clicking a question opens the session's conversation, where you answer it.
 - Board messages from a session now show omp's mark as the picture and "omp agent" as the name, with the session's title beside it, instead of the title's first letter on a color as if the session were a person.
 - The Board sidebar's Bot groups now look and fold like the workspace groups in Sessions, smaller than before, and the Workspaces and Bots headers each fold their whole list.
 - A Board task that already has a thread now shows "Working on it…" inside its thread summary, in place of "Last reply", with the working session's face first, as Slack does, instead of a second row under it.
