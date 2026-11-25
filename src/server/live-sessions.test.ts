@@ -135,6 +135,17 @@ describe("LiveSessions", () => {
 		expect(turnWaits()).toBe(false);
 	});
 
+	test("rows hands back the same row object while nothing in it changed, and a new one once a field changes", () => {
+		const sessions = registry(unreadIn(), "i1");
+		const first = sessions.rows(() => facts)[0];
+		expect(sessions.rows(() => facts)[0]).toBe(first);
+		sessions.heard("i1", { type: "tool_execution_start", toolCallId: "c1", toolName: "wait" });
+		const changed = sessions.rows(() => facts)[0];
+		expect(changed).not.toBe(first);
+		expect(changed?.turnWaits).toBe(true);
+		expect(sessions.rows(() => facts)[0]).toBe(changed);
+	});
+
 	test("a row carries the turn its session ended unseen, with its reply's first line, until a look, the next turn, or the session leaving reads it", () => {
 		const sessions = registry(unreadIn(), "i1");
 		const unread = () => sessions.rows(() => facts)[0]?.unread;

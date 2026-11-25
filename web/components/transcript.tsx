@@ -1,7 +1,7 @@
 /** `Transcript`, a session's messages, thinking, and tool calls as rendered in a pane. */
 import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise, IconArrowsRepeat, IconBrain, IconBubbleAlert, IconBubbleQuestion, IconBug, IconChainLink1, IconChip, IconCircleCheck, IconCircleX, IconCode, IconCodeBrackets, IconConsole, IconEyeOpen, IconFileEdit, IconFileText, IconFlag1, IconFolderOpen, IconGlobe, IconGraduateCap, IconHistory, IconHourglass, IconImac, IconImages1, IconLightBulb, IconNote1, IconPageAdd, IconPageTextSearch, IconPlugin1, IconPullRequest, IconPageSearch, IconShieldCheck, IconShip, IconSparklesTwo, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { createContext, Fragment, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { taskText } from "../../src/shared/routine-message";
 import type { PromptFile } from "../../src/shared/prompt-files";
@@ -25,6 +25,7 @@ import { activityControl } from "../activity";
 import { openArtifact, type ShownArtifact, useShownArtifact } from "../artifact-requests";
 import { type Artifact, savedArtifact, versionNumber } from "../artifacts-model";
 import { durationWords } from "../routines-model";
+import { useSecond } from "../use-minute";
 import { mediaSrc } from "../api";
 import { hashForView, sameView } from "../routing";
 import type { StartOf } from "../starts";
@@ -154,17 +155,59 @@ function ToolImages({ id, srcs, tool }: { id: string; srcs: string[]; tool: stri
 	);
 }
 
-/** Ticks every second while `live`, so a running group's time counts up; `Date.now()` once otherwise. */
-function useNow(live: boolean): number {
-	const [now, setNow] = useState(Date.now);
-	useEffect(() => {
-		if (!live) return;
-		setNow(Date.now());
-		const timer = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(timer);
-	}, [live]);
-	return now;
+/** A running group's title, its time counting up each second from `from`; only it listens to the second's timer, so the group's lines skip each tick. */
+function WorkingTitle({ from }: { from: number | null }) {
+	// The shared clock's time is as old as its last tick when nothing else listens; the mount time holds until it ticks.
+	const [mounted] = useState(Date.now);
+	const now = Math.max(useSecond(), mounted);
+	const took = from !== null && now >= from ? durationWords(now - from) : null;
+	return <TraceTitle>{took ? `Working for ${took}` : "Working"}</TraceTitle>;
 }
+
+/** One line of an activity group: a narration, a thought, or a tool call. Memoized on its item, which a token leaves as it is unless the token is its own. */
+const ActivityEntry = memo(function ActivityEntry({ entry }: { entry: GroupItem }) {
+	if (entry.kind === "assistant") {
+		return (
+			<div className="py-1 text-sm" data-item="narration">
+				<MessageMarkdown text={entry.text} />
+			</div>
+		);
+	}
+	if (entry.kind === "thinking") {
+		return (
+			<TraceCollapsible defaultOpen>
+				<TraceCollapsibleTrigger>
+					<TraceLine status={entry.streaming ? "running" : undefined}>
+						<TraceIcon>
+							<IconBrain />
+						</TraceIcon>
+						<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
+					</TraceLine>
+				</TraceCollapsibleTrigger>
+				<TraceCollapsibleContent className="text-[13px]">
+					<div data-thinking={entry.streaming ? "live" : "done"}>
+						<MessageMarkdown text={entry.text} />
+					</div>
+				</TraceCollapsibleContent>
+			</TraceCollapsible>
+		);
+	}
+	const Icon = Object.hasOwn(TOOL_ICON, entry.name) ? TOOL_ICON[entry.name]! : entry.name.startsWith("mcp__") ? IconPlugin1 : IconToolbox;
+	return (
+		<>
+			<TraceLine status={entry.status === "ok" ? undefined : entry.status}>
+				<TraceIcon>
+					<Icon />
+				</TraceIcon>
+				<TraceTitle>
+					{entry.name}
+					{entry.summary && <span className="text-muted-foreground/70"> {entry.summary}</span>}
+				</TraceTitle>
+			</TraceLine>
+			{entry.images && <ToolImages id={entry.id} srcs={entry.images} tool={entry.name} />}
+		</>
+	);
+});
 
 /**
  * A turn's work: its tool calls, thinking, and the messages between them, under a line that says how long it worked.
@@ -183,15 +226,9 @@ export const ActivityGroup = memo(function ActivityGroup({ entries, from, to }: 
 	// Open while running, else as `expanded` says; a manual toggle wins until `expanded` flips.
 	const [toggle, setToggle] = useState<{ open: boolean; expanded: boolean } | null>(null);
 	const open = toggle?.expanded === expanded ? toggle.open : running || expanded || pinned;
-	const now = useNow(running);
-	const end = running ? now : (to ?? Math.max(...entries.map(entry => entry.at ?? 0)));
+	const end = to ?? Math.max(...entries.map(entry => entry.at ?? 0));
 	const took = from !== null && end >= from ? durationWords(end - from) : null;
 	const ran = tools.length ? `${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}` : "";
-	const header = running
-		? took ? `Working for ${took}` : "Working"
-		: took
-			? `Worked for ${took}${ran && ` · ${ran}`}`
-			: ran ? `Ran ${ran}` : "Thought";
 	const visible = entries.filter(entry =>
 		entry.kind === "thinking" ? !hideThinking : entry.kind === "tool" ? !hideTools : entry.text.trim() !== "",
 	);
@@ -200,54 +237,18 @@ export const ActivityGroup = memo(function ActivityGroup({ entries, from, to }: 
 			<TraceCollapsibleTrigger {...activityControl("transcript.activity-group")}>
 				<TraceLine status={running ? "running" : undefined}>
 					<TraceIcon>{running ? <LoaderIcon className="animate-spin" /> : tools.length ? <IconCircleCheck /> : <IconBrain />}</TraceIcon>
-					<TraceTitle>{header}</TraceTitle>
+					{running ? (
+						<WorkingTitle from={from} />
+					) : (
+						<TraceTitle>{took ? `Worked for ${took}${ran && ` · ${ran}`}` : ran ? `Ran ${ran}` : "Thought"}</TraceTitle>
+					)}
 				</TraceLine>
 			</TraceCollapsibleTrigger>
 			<TraceCollapsibleContent>
 				<Trace>
-					{visible.map(entry => {
-						if (entry.kind === "assistant") {
-							return (
-								<div key={entry.id} className="py-1 text-sm" data-item="narration">
-									<MessageMarkdown text={entry.text} />
-								</div>
-							);
-						}
-						if (entry.kind === "thinking") {
-							return (
-								<TraceCollapsible key={entry.id} defaultOpen>
-									<TraceCollapsibleTrigger>
-										<TraceLine status={entry.streaming ? "running" : undefined}>
-											<TraceIcon>
-												<IconBrain />
-											</TraceIcon>
-											<TraceTitle>{entry.streaming ? "Thinking" : "Thought"}</TraceTitle>
-										</TraceLine>
-									</TraceCollapsibleTrigger>
-									<TraceCollapsibleContent className="text-[13px]">
-										<div data-thinking={entry.streaming ? "live" : "done"}>
-											<MessageMarkdown text={entry.text} />
-										</div>
-									</TraceCollapsibleContent>
-								</TraceCollapsible>
-							);
-						}
-						const Icon = Object.hasOwn(TOOL_ICON, entry.name) ? TOOL_ICON[entry.name]! : entry.name.startsWith("mcp__") ? IconPlugin1 : IconToolbox;
-						return (
-							<Fragment key={entry.id}>
-								<TraceLine status={entry.status === "ok" ? undefined : entry.status}>
-									<TraceIcon>
-										<Icon />
-									</TraceIcon>
-									<TraceTitle>
-										{entry.name}
-										{entry.summary && <span className="text-muted-foreground/70"> {entry.summary}</span>}
-									</TraceTitle>
-								</TraceLine>
-								{entry.images && <ToolImages id={entry.id} srcs={entry.images} tool={entry.name} />}
-							</Fragment>
-						);
-					})}
+					{visible.map(entry => (
+						<ActivityEntry key={entry.id} entry={entry} />
+					))}
 				</Trace>
 			</TraceCollapsibleContent>
 		</TraceCollapsible>

@@ -56,7 +56,10 @@ Its own queue, history recall, and suggested prompts are removed, since those sl
 `ChatMessage` gets `files`, a slot above the bubble where `MessageRow` puts `PromptFileChips`, the files a sent prompt carried as text, and `images`, the addresses of the images it carried.
 
 Markdown uses `react-markdown` and `remark-gfm` (`web/components/message-markdown.tsx`).
+Agent text renders in the blocks `markdownBlocks` cuts it into at blank lines outside fences, each memoized on its text, so a streamed token parses only the last block again; the cut is only where the blocks render as the whole text does, and the media strip of the whole text ends the last block.
+A prompt and text from GitHub render whole.
 A fenced code block renders as a `CodeBlock`, colored line by line by `highlightLines` in `web/code-highlight.ts`, the `lowlight` grammars the changes view uses, rather than shadcn's `shiki` hook, so the page bundles one highlighter.
+It keeps its last 200 results by grammar and text, so code that renders again reads its lines back.
 The grammars are a chunk of their own, which the first code the page shows loads through `loadedOnce` in `web/loaded-once.ts`; until it lands, code shows uncolored, and each highlighting component renders again in color once it does.
 In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL or a path to an image or video on this computer, which `LocalMedia` in `web/components/local-media.tsx` shows through `GET /api/media`.
 In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text, image, or video file into a link, and that link, like a `file://` one, renders as a `FileLink` from `web/components/file-link.tsx`, which opens the file dialog through the dashboard context.

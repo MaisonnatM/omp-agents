@@ -23,3 +23,13 @@ describe("applyDelta", () => {
 		expect(applyDelta([row("a", 1)], true, [row("b", 1)], key, [])).toEqual([row("b", 1)]);
 	});
 });
+
+test("a list built from deltas keeps placing each key where it is", () => {
+	const a = row("a", 1);
+	let list = applyDelta<{ id: string; v: number }>([], true, [a, row("b", 1)], key, []);
+	for (let v = 2; v < 5; v++) list = applyDelta(list, false, [row("b", v), row(`n${v}`, v)], key, []);
+	const before = list;
+	list = applyDelta(list, false, [row("a", 9)], key, ["n2"]);
+	expect(applyDelta(before, false, [row("n3", 0)], key, [])).toEqual([a, row("b", 4), row("n2", 2), row("n3", 0), row("n4", 4)]);
+	expect(applyDelta(list, false, [row("n4", 0), row("z", 0)], key, [])).toEqual([row("a", 9), row("b", 4), row("n3", 3), row("n4", 0), row("z", 0)]);
+});

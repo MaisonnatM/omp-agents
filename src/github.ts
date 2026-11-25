@@ -16,6 +16,8 @@ import { githubStatus } from "./source-control";
 
 const GH_TIMEOUT_MS = 20_000;
 const access = new GitHubAccess();
+/** At most 4 `gh api` calls run at once, so a burst of list, details, and stack reads does not fork a `gh` per read. */
+const ghSlot = limit(4);
 
 async function resetOf(budget: GitHubBudget): Promise<number | undefined> {
 	return quotaReset(await runJson(["gh", "api", "rate_limit"], { timeoutMs: GH_TIMEOUT_MS }), budget);
@@ -66,7 +68,7 @@ async function answered(request: Promise<unknown>): Promise<unknown> {
 export function ghGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
 	const fields = Object.entries(vars).flatMap(([name, value]) => [typeof value === "number" ? "-F" : "-f", `${name}=${value}`]);
 	const argv = ["gh", "api", "graphql", ...(paginate ? ["--paginate", "--slurp"] : []), "-f", `query=${query}`, ...fields];
-	return answered(access.request("graphql", () => runJson(argv, { timeoutMs: GH_TIMEOUT_MS }), () => resetOf("graphql")));
+	return answered(access.request("graphql", () => ghSlot(() => runJson(argv, { timeoutMs: GH_TIMEOUT_MS })), () => resetOf("graphql")));
 }
 
 /**
@@ -81,17 +83,18 @@ export async function ghPolledGraphql(query: string, vars: Record<string, string
 /** `gh api`'s answer for REST `path`; `paginate` reads every page, answering an array of the pages. */
 export function ghRest(path: string, paginate = false): Promise<unknown> {
 	const argv = ["gh", "api", ...(paginate ? ["--paginate", "--slurp"] : []), path];
-	return answered(access.request("rest", () => runJson(argv, { timeoutMs: GH_TIMEOUT_MS }), () => resetOf("rest")));
+	return answered(access.request("rest", () => ghSlot(() => runJson(argv, { timeoutMs: GH_TIMEOUT_MS })), () => resetOf("rest")));
 }
 
 /** `method` on REST `path` through `gh api`, each field a `-f` of its JSON body, a `name[]` field one item of an array; throws GitHub's refusal. */
 export async function ghRestWrite(method: "POST" | "PATCH" | "DELETE", path: string, fields: [name: string, value: string][] = []): Promise<void> {
-	await access.request("rest", () => runChecked(["gh", "api", "-X", method, path, ...fields.flatMap(([name, value]) => ["-f", `${name}=${value}`])], { timeoutMs: GH_TIMEOUT_MS }), () => resetOf("rest"));
+	const argv = ["gh", "api", "-X", method, path, ...fields.flatMap(([name, value]) => ["-f", `${name}=${value}`])];
+	await access.request("rest", () => ghSlot(() => runChecked(argv, { timeoutMs: GH_TIMEOUT_MS })), () => resetOf("rest"));
 }
 
 /** `gh api`'s answer to POST `body` on REST `path`, sent whole as JSON for a body that nests, such as a review's comments; GitHub's refusal comes back as its answer. */
 export function ghRestPost(path: string, body: unknown): Promise<unknown> {
-	return answered(access.request("rest", () => runJson(["gh", "api", "-X", "POST", path, "--input", "-"], { input: JSON.stringify(body), timeoutMs: GH_TIMEOUT_MS }), () => resetOf("rest")));
+	return answered(access.request("rest", () => ghSlot(() => runJson(["gh", "api", "-X", "POST", path, "--input", "-"], { input: JSON.stringify(body), timeoutMs: GH_TIMEOUT_MS })), () => resetOf("rest")));
 }
 
 /** GitHub's error messages in a `gh api graphql` answer, joined; empty when it reports none. */

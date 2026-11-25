@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
 import { keyedStore } from "../keyed-store";
 import { skillLabel } from "../labels";
-import { type PaneData, usePaneSelect } from "../pane-store";
+import { itemsSelector, usePaneSelect } from "../pane-store";
 import { hashForView } from "../routing";
 import type { OutlineTurn } from "../transcript-view";
 import { messageIn, scrollToMessage, viewportOf } from "./transcript-minimap";
@@ -38,7 +38,7 @@ const close = (view: View, refocus: boolean): void => {
 };
 
 /** How many prompts the user sent in a view's transcript; a number, so a streamed token leaves its reader as it is. */
-const promptCount = ({ items }: PaneData): number => items.reduce((count, item) => count + (item.kind === "user" ? 1 : 0), 0);
+const promptCount = itemsSelector((items): number => items.reduce((count, item) => count + (item.kind === "user" ? 1 : 0), 0));
 
 /** The composer's button that opens and closes the chat history; it shows from two prompts on. */
 export const PromptHistoryButton = memo(function PromptHistoryButton({ view }: { view: View }) {

@@ -4,7 +4,7 @@ import type { UserTodo, UserTodoList } from "../../src/user-todos-shared";
 import { loadGrammars } from "../code-highlight";
 import { DashboardActionsContext, type DashboardActions, UserTodosContext } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
-import { AGENT_PRESET, GITHUB_PRESET, loadRawHtml, MessageMarkdown, PROMPT_PRESET } from "./message-markdown";
+import { AGENT_PRESET, BOT_MESSAGE_PRESET, GITHUB_PRESET, loadRawHtml, markdownBlocks, type MarkdownPreset, MessageMarkdown, PROMPT_PRESET, SESSION_AGENT_PRESET } from "./message-markdown";
 
 // A static render reads the grammars and the raw HTML plugins as they stand, so they load first, as in a page that showed code and GitHub text before.
 await Promise.all([loadGrammars(), loadRawHtml()]);
@@ -180,4 +180,46 @@ test("a sent prompt draws its references as chips that open here, and code stays
 	for (const unknown of [null, { categories: [], todos: [], archive: [] }]) expect(prompt(unknown)).not.toContain("#todo");
 	expect(html).toContain("<code>@web/x.ts</code>");
 	expect(html).not.toContain("/skill:ship check");
+});
+
+test("a message cuts into blocks at blank lines outside fences, which join back into it", () => {
+	const fenced = "Intro\n\n```ts\nconst a = 1;\n\nconst b = 2;\n```\n\nAfter\n\n~~~\nx\n\n~~~~\n\nEnd";
+	const blocks = markdownBlocks(fenced);
+	expect(blocks).toEqual(["Intro\n\n", "```ts\nconst a = 1;\n\nconst b = 2;\n```\n\n", "After\n\n", "~~~\nx\n\n~~~~\n\n", "End"]);
+	expect(blocks.join("")).toBe(fenced);
+	// A list item or an indented line after a blank line may belong to the block above, so it stays in it.
+	expect(markdownBlocks("- a\n\n- b\n\n  more\n\nNext")).toEqual(["- a\n\n- b\n\n  more\n\n", "Next"]);
+	// An unclosed fence holds the rest, as a streaming reply's does until its fence closes.
+	expect(markdownBlocks("Run:\n\n```sh\nls\n\npwd")).toEqual(["Run:\n\n", "```sh\nls\n\npwd"]);
+	// Past an indented fence whose end a list item may have made, nothing is cut.
+	expect(markdownBlocks("Intro\n\nStep\n  ```js\n  a\n\nb\n\n```\nc\n\nd\n```")).toEqual(["Intro\n\n", "Step\n  ```js\n  a\n\nb\n\n```\nc\n\nd\n```"]);
+	// A definition any block may read, or HTML that may span blank lines, keeps the text whole.
+	for (const whole of ["See [docs][d].\n\n[d]: https://example.com", "Note[^1].\n\n[^1]: Here.", "<!--\n\nhidden\n-->\n\nShown"]) expect(markdownBlocks(whole)).toEqual([whole]);
+	const crlf = "One\r\n\r\nTwo\r\n";
+	expect(markdownBlocks(crlf)).toEqual(["One\r\n\r\n", "Two\r\n"]);
+});
+
+test("a message renders block by block exactly as it renders whole", () => {
+	const texts = [
+		"# Title\n\nA paragraph with `code` and a [link](https://example.com).\n\n- one\n- two\n\n1. first\n\n2. second\n\nAfter the list.",
+		"Intro\n\n```ts\nconst a = 1;\n\nconst b = 2;\n```\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n> quoted\n\n> again\n\n---\n\nEnd",
+		"Before `tmp/a.png`, after /tmp/demo.mp4.\n\n![b](shots/b.webp) and `shots/b.webp` and `tmp/a.png`\n\nLater /tmp/demo.mp4 and /tmp/e.png\n\n![e](/tmp/e.png)",
+		"<div>raw</div>\n\ntext <b>bold</b>\n\n    indented\n\n    code\n\nDone",
+		"```review-pages\n[]\n```\n\nShown\n\n```diff\n-a\n\n+b\n```",
+	];
+	const whole = (preset: MarkdownPreset): MarkdownPreset => ({ ...preset, blocks: false });
+	// `useId` names an icon's mask by its place in the tree, which a block wrapper moves.
+	const ids = (html: string): string => html.replace(/_R_[0-9a-z]+_/g, "_R_");
+	const render = (text: string, preset: MarkdownPreset) =>
+		renderToStaticMarkup(
+			<DashboardActionsContext.Provider value={{ openFile: () => {} } as unknown as DashboardActions}>
+				<FileBaseContext.Provider value={{ dir: "/repo", session: null }}>
+					<MessageMarkdown text={text} preset={preset} />
+				</FileBaseContext.Provider>
+			</DashboardActionsContext.Provider>,
+		);
+	for (const text of texts) {
+		expect(markdownBlocks(text).length).toBeGreaterThan(1);
+		for (const preset of [AGENT_PRESET, SESSION_AGENT_PRESET, BOT_MESSAGE_PRESET]) expect(ids(render(text, preset))).toBe(ids(render(text, whole(preset))));
+	}
 });

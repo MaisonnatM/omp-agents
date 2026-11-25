@@ -55,6 +55,8 @@ export class LiveSessions {
 	readonly #sessions = new Map<string, LiveSession>();
 	/** What the sessions started from a quick action work on, by instance id, for as long as they run. */
 	readonly #subjects = new Map<string, WorkItem>();
+	/** The roster row each session last listed, by instance id, which {@link rows} hands back while nothing in it changed, so broadcasts skip it by identity. */
+	readonly #rows = new Map<string, RosterHost>();
 	/** The turn each session ended since a page showed it in a focused window, by instance id; {@link #unreadFile} keeps them across restarts. */
 	readonly #unread = new Map<string, UnreadTurn>();
 	readonly #unreadFile: JsonFile<SavedUnread>;
@@ -322,6 +324,7 @@ export class LiveSessions {
 		this.releaseTask(instanceId);
 		if (!this.#sessions.delete(instanceId)) return;
 		this.#subjects.delete(instanceId);
+		this.#rows.delete(instanceId);
 		this.#readByTurn.delete(instanceId);
 		this.#turnWaits.forget(instanceId);
 		this.#jobs.forget(instanceId);
@@ -349,7 +352,7 @@ export class LiveSessions {
 		return [...this.#sessions.values()].map(session => {
 			const row = session.row();
 			const runs = this.#evalRuns.get(session.instanceId) ?? [];
-			return {
+			const next: RosterHost = {
 				...row,
 				agents: runs.length > 0 ? [...row.agents, ...runs.map(started => started.row)] : row.agents,
 				cwdDisplay: displayPath(session.cwd),
@@ -358,6 +361,10 @@ export class LiveSessions {
 				scheduledCheck: this.#scheduledCheck(session.sessionId),
 				...withSubject(factsOf(session.sessionId, session.cwd), this.#subjects.get(session.instanceId)),
 			};
+			const last = this.#rows.get(session.instanceId);
+			if (last && Bun.deepEquals(last, next)) return last;
+			this.#rows.set(session.instanceId, next);
+			return next;
 		});
 	}
 

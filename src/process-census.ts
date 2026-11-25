@@ -261,7 +261,11 @@ export async function readProcessTable(): Promise<ProcessTable | null> {
 /** The processes under `root` in `table`, without `root`, and without omp's shared workers and what they started. */
 export function descendants(table: ProcessTable, root: number): Processes {
 	const children = new Map<number, number[]>();
-	for (const { pid, ppid } of table.values()) children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+	for (const { pid, ppid } of table.values()) {
+		const siblings = children.get(ppid);
+		if (siblings) siblings.push(pid);
+		else children.set(ppid, [pid]);
+	}
 	const found: Processes = new Map();
 	const queue = [...(children.get(root) ?? [])];
 	for (let pid = queue.shift(); pid !== undefined; pid = queue.shift()) {
@@ -354,28 +358,57 @@ export class ProcessCensus {
 	readonly #every: NodeJS.Timeout;
 	#soon: NodeJS.Timeout | undefined;
 	#reaping: Promise<void> | null = null;
+	/** Whether a tool call ended since the last note began, so the root may have started something new. */
+	#toolEnded = true;
+	/** Whether a note without blocking is reading `ps` now. */
+	#reading = false;
 
 	constructor(root: number, times: CensusTimes) {
 		this.#root = root;
 		this.#times = times;
-		this.#every = setInterval(() => this.note(), times.everyMs);
+		this.#every = setInterval(() => {
+			// An idle root starts nothing new: sample only after a tool call ended, or to forget noted processes that are gone.
+			if (this.#toolEnded || this.#noted.size > 0) void this.#noteWithoutBlocking();
+		}, times.everyMs);
 	}
 
-	/** Notes the processes under the root now, and forgets the noted ones that are gone; nothing once {@link reap} took the noted set. */
-	note(): void {
-		if (this.#reaping) return;
-		const table = processTable();
-		if (!table) return;
+	/** Adds `table`'s processes under the root to the noted set, and forgets the noted ones it no longer lists. */
+	#record(table: ProcessTable): void {
 		forgetGone(this.#noted, table);
 		for (const [pid, started] of descendants(table, this.#root)) this.#noted.set(pid, started);
+	}
+
+	/**
+	 * Notes the processes under the root now, blocking until `ps` answers, and forgets the noted ones that are gone;
+	 * nothing once {@link reap} took the noted set. For the note that must land before the root exits.
+	 */
+	note(): void {
+		if (this.#reaping) return;
+		this.#toolEnded = false;
+		const table = processTable();
+		if (table) this.#record(table);
+	}
+
+	/** {@link note} without blocking the event loop; skipped while another such note reads `ps`, and dropped if {@link reap} began meanwhile. */
+	async #noteWithoutBlocking(): Promise<void> {
+		if (this.#reaping || this.#reading) return;
+		this.#reading = true;
+		this.#toolEnded = false;
+		try {
+			const table = await readProcessTable();
+			if (table && !this.#reaping) this.#record(table);
+		} finally {
+			this.#reading = false;
+		}
 	}
 
 	/** Notes them in a moment, as an async tool call starts its background job just after it returns. */
 	noteSoon(): void {
 		if (this.#reaping) return;
+		this.#toolEnded = true;
 		this.#soon ??= setTimeout(() => {
 			this.#soon = undefined;
-			this.note();
+			void this.#noteWithoutBlocking();
 		}, this.#times.soonMs);
 	}
 

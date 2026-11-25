@@ -126,9 +126,24 @@ const turnsOf = (pane: PaneData): Turn[] | null => pane.turns;
 const composerOf = ({ completions, withdrawn }: PaneData): ComposerData => ({ completions, withdrawn });
 const sameComposer = (a: ComposerData, b: ComposerData): boolean => a.completions === b.completions && a.withdrawn === b.withdrawn;
 const sameElements = <T>(a: readonly T[], b: readonly T[]): boolean => a.length === b.length && a.every((entry, index) => entry === b[index]);
-const savesOf = (pane: PaneData): ArtifactToolItem[] => pane.items.filter(savedArtifact);
+
+/**
+ * A selector of what `derive` reads from a pane's transcript, worked out once per `items` list however many components
+ * select it: a streamed token makes one new list, and every reader of the selector shares one pass over it.
+ */
+export function itemsSelector<S>(derive: (items: Item[]) => S): (pane: PaneData) => S {
+	const derived = new WeakMap<Item[], S>();
+	return ({ items }) => {
+		if (derived.has(items)) return derived.get(items) as S;
+		const value = derive(items);
+		derived.set(items, value);
+		return value;
+	};
+}
+
+const savesOf = itemsSelector((items): ArtifactToolItem[] => items.filter(savedArtifact));
 // Only the user's own prompts: an issue the agent's replies name, such as one it read or searched, is not the session's.
-const linkedIssuesOf = (pane: PaneData): string[] => linearIssueIdsIn(pane.items.flatMap(item => (item.kind === "user" && item.from === null ? [item.text] : [])));
+const linkedIssuesOf = itemsSelector((items): string[] => linearIssueIdsIn(items.flatMap(item => (item.kind === "user" && item.from === null ? [item.text] : []))));
 
 /** `view`'s transcript: the one field a streamed token changes, so only the components that draw it read it. */
 export const useTranscript = (view: View): Item[] => usePaneSelect(view, itemsOf);

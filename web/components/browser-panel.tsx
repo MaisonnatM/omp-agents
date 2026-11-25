@@ -21,7 +21,7 @@ import { expiringStrings } from "../expiring-strings";
 import { browserCandidates, type DevServer, devServers, FIT_PANEL, fitZoom, initialAddress, SCREEN_LABELS, screenChoiceOf, screenName, storedScreen } from "../browser-model";
 import { commandLabel } from "../labels";
 import { latestReviewPages, onReviewRequest, type ReviewPage, samePages, takeReview } from "../review-pages";
-import { type PaneData, usePaneSelect } from "../pane-store";
+import { itemsSelector, usePaneSelect } from "../pane-store";
 import { sessionProcessesStore, writeProcessStop, writeStartServer } from "../reads";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useAction } from "../use-action";
@@ -117,7 +117,7 @@ const APP_TAB = "app";
 /** With no tab strip, the session's page is not a tab panel. */
 const lonePanel = ({ role: _role, "aria-labelledby": _labelledBy, ...props }: Record<string, unknown>) => <div {...props} />;
 
-const reviewPagesOf = (pane: PaneData): ReviewPage[] => latestReviewPages(pane.items);
+const reviewPagesOf = itemsSelector((items): ReviewPage[] => latestReviewPages(items));
 
 /**
  * Live session `view`'s Browser: its own page, plus one tab per page a reply listed for review once the toolbar's

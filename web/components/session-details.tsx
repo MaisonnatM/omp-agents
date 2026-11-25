@@ -10,7 +10,7 @@ import { isPhonePage } from "../api";
 import type { Artifact } from "../artifacts-model";
 import { addDetailsTab, newIdsByScope, newIdsOnOpen, revealDetailsTab } from "../details-tabs";
 import { type BeforeAfter, changeKey, latestBeforeAfter, sameChanges } from "../before-after";
-import { type PaneData, useArtifacts, useLinkedIssues, usePaneSelect, useShowConversation } from "../pane-store";
+import { itemsSelector, useArtifacts, useLinkedIssues, usePaneSelect, useShowConversation } from "../pane-store";
 import type { ModelList } from "../reads";
 import { requestNewTerminal } from "../terminal-requests";
 import { ArtifactsPanel } from "./artifacts-panel";
@@ -237,7 +237,7 @@ function useOpenTabOnNew(seen: ReturnType<typeof newIdsByScope>, scope: string, 
 	}, [seen, scope, ids, tab]);
 }
 
-const changesOf = (pane: PaneData): BeforeAfter[] => latestBeforeAfter(pane.items);
+const changesOf = itemsSelector((items): BeforeAfter[] => latestBeforeAfter(items));
 
 /** The right sidebar's content for the focused view: its **Overview**, the subagent picked there, its session's pull requests, its running app, its artifacts when it has any, the screen changes to review, and its Linear issue. */
 export function SessionDetails({ view, sessionId, working, cwd, hosts, host, lastHost, row, models, workspaces }: SessionDetailsProps) {

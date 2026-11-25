@@ -1,5 +1,5 @@
 import type { Element, ElementContent } from "hast";
-import { type ComponentProps, memo, useContext, useRef, useState } from "react";
+import { type ComponentProps, Fragment, memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform, type ExtraProps, type Options, type UrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
@@ -314,6 +314,11 @@ export interface MarkdownPreset {
 	openImages: boolean;
 	/** Whether the link preview card may have the server read a link's page and icon; agent text may not, since a prompt-injected agent can write a secret into an address. */
 	linkPages: boolean;
+	/**
+	 * Whether the text renders in the blocks {@link markdownBlocks} cuts it into, so a streamed token parses only the last
+	 * one again. Text whose raw HTML renders, or whose references read where they sit in the whole text, renders whole.
+	 */
+	blocks: boolean;
 }
 
 /** `RAW_HTML`, or, should its chunk fail to load, no plugins, which leaves the raw HTML as escaped text. */
@@ -325,10 +330,10 @@ export const loadRawHtml = (): Promise<unknown> => rawHtmlPlugins.load();
  * Agent text: the path of a file opens it in the file dialog, a relative one against `FileBaseContext`; an image or
  * video on this computer shows in place when the text writes it as an image, and under the text when it only names it.
  */
-export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rawHtml: false, rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform, openImages: true, linkPages: false };
+export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rawHtml: false, rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform, openImages: true, linkPages: false, blocks: true };
 
-/** A user's prompt, read as agent text with its skill, command, file, pull request, todo, and session references as chips. */
-export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS };
+/** A user's prompt, read as agent text with its skill, command, file, pull request, todo, and session references as chips; a reference at the very start reads apart from one later, so it renders whole. */
+export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS, blocks: false };
 
 /** A settled message in a session's conversation: agent text whose `mermaid` and `chart` fences draw as visuals. */
 export const SESSION_AGENT_PRESET: MarkdownPreset = { ...AGENT_PRESET, components: SESSION_AGENT_COMPONENTS };
@@ -362,25 +367,136 @@ export const BOT_MESSAGE_PRESET: MarkdownPreset = { ...SESSION_AGENT_PRESET, rem
  * Text written on GitHub, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which follows
  * GitHub's; HTML comments drop out, as GitHub hides them. Images load from GitHub's hosts.
  */
-export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rawHtml: true, rehype: [], components: GITHUB_COMPONENTS, urlTransform, openImages: false, linkPages: true };
+export const GITHUB_PRESET: MarkdownPreset = { remark: [remarkGfm], rawHtml: true, rehype: [], components: GITHUB_COMPONENTS, urlTransform, openImages: false, linkPages: true, blocks: false };
+
+/** A fence's opening or closing line: its indent, its run of backticks or tildes, and the rest. */
+const FENCE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
+const BLANK = /^[ \t]*\r?$/;
+/** A line that, after a blank line, may still belong to the block above: an indented one, or a list item, which may make the list above loose. */
+const CONTINUES = /^(?:[ \t]|(?:[-+*]|\d{1,9}[.)])(?:[ \t]|\r?$))/;
+/** A line that may start an HTML block that runs across blank lines, CommonMark's kinds 1 to 5, after any container markers. */
+const LONG_HTML = /^[ \t>*+\-\d.)]*<(?:(?:pre|script|style|textarea)(?:[\s>]|$)|!--|\?|![A-Za-z]|!\[CDATA\[)/i;
+
+/**
+ * `text` cut at blank lines outside fences into blocks that render as the whole text does, each block keeping the blank
+ * lines after it, so the blocks join back into `text`. It cuts only where the next line starts a block of its own: not an
+ * indented line or a list item, and not inside a fence. Text with a link or footnote definition, which any block may
+ * read, or an HTML block that may span blank lines, stays whole; past a fence it cannot tell the end of, the rest stays one block.
+ */
+export function markdownBlocks(text: string): string[] {
+	const starts: number[] = [];
+	let fence: { char: string; length: number; indent: number } | null = null;
+	let cutting = true;
+	let content = false;
+	let blank = false;
+	let offset = 0;
+	for (const line of text.split("\n")) {
+		const at = offset;
+		offset += line.length + 1;
+		if (fence !== null) {
+			const close = FENCE.exec(line);
+			if (close && close[2]![0] === fence.char && close[2]!.length >= fence.length && BLANK.test(close[3]!)) {
+				fence = null;
+				blank = false;
+				continue;
+			}
+			if (BLANK.test(line) || line.length - line.replace(/^[ \t]+/, "").length >= fence.indent) continue;
+			// A line indented less than its fence ends the fence only when a list item held it, which the cut does not track.
+			fence = null;
+			cutting = false;
+		}
+		if (line.includes("]:") || LONG_HTML.test(line)) return [text];
+		if (BLANK.test(line)) {
+			blank = true;
+			continue;
+		}
+		if (cutting && blank && content && !CONTINUES.test(line)) starts.push(at);
+		blank = false;
+		content = true;
+		const open = cutting ? FENCE.exec(line) : null;
+		if (open && !(open[2]![0] === "`" && open[3]!.includes("`"))) fence = { char: open[2]![0]!, length: open[2]!.length, indent: open[1]!.length };
+	}
+	return [0, ...starts].map((start, index) => text.slice(start, starts[index] ?? text.length));
+}
+
+/** What one block shows of the media strip `remarkFilePaths` ends it with: the images and videos it names, and the images it shows in place. */
+interface BlockMedia {
+	named: string[];
+	shown: string[];
+}
+
+interface MediaNode {
+	type: string;
+	url?: string;
+	children?: MediaNode[];
+	data?: { hName?: string; hProperties?: Record<string, unknown> };
+}
+
+const imagesIn = (node: MediaNode): string[] => [...(node.type === "image" && node.url ? [node.url] : []), ...(node.children ?? []).flatMap(imagesIn)];
+
+/**
+ * Runs after `remarkFilePaths` on one block: takes the block's media strip off and records it, with the images the block
+ * shows, in `media` by the block's text. On the last block, `before` lists the blocks above it, and the strip of the
+ * whole text goes back at its end: the media every block names, in order and each once, but for those any block shows.
+ */
+const remarkBlockMedia =
+	({ media, before }: { media: Map<string, BlockMedia>; before: readonly string[] | null }) =>
+	(root: MediaNode, file: { value: unknown }) => {
+		const children = root.children ?? [];
+		const strip = children.at(-1)?.type === "mediaStrip" ? children.pop() : undefined;
+		const listed = strip?.data?.hProperties?.dataMedia;
+		const own: BlockMedia = { named: typeof listed === "string" ? (JSON.parse(listed) as string[]) : [], shown: imagesIn(root) };
+		media.set(String(file.value), own);
+		if (before === null) return;
+		const blocks = [...before.map(text => media.get(text)), own];
+		const shown = new Set(blocks.flatMap(block => block?.shown ?? []));
+		const named = [...new Set(blocks.flatMap(block => block?.named ?? []))].filter(path => !shown.has(path));
+		if (named.length > 0) children.push({ type: "mediaStrip", children: [], data: { hName: "figure", hProperties: { dataMedia: JSON.stringify(named) } } });
+	};
+
+type Remark = MarkdownPreset["remark"];
+
+/** One block of a message, rendering again only when its text or its plugins change, so a settled block skips a streamed token. */
+const MarkdownBlock = memo(function MarkdownBlock({ text, remark, rehype, components, urlTransform }: { text: string; remark: Remark; rehype: Plugins; components: Components; urlTransform: UrlTransform }) {
+	return (
+		<ReactMarkdown remarkPlugins={remark} rehypePlugins={rehype} components={components} urlTransform={urlTransform}>
+			{text}
+		</ReactMarkdown>
+	);
+});
 
 /**
  * Markdown text is untrusted. react-markdown escapes raw HTML and filters unsafe link schemes, and images load only
  * inline (`data:`) or from where the preset allows.
  *
- * Parsing and highlighting a long reply is the page's costliest render, so the same text never renders twice.
+ * Parsing and highlighting a long reply is the page's costliest render, so the same text never renders twice, and with
+ * the preset's `blocks` a streamed token parses only the last block again: each settled block keeps its render.
+ * Blocks are joined by the line break the whole text's parse puts between top-level elements, so the markup is the same.
  * Text whose raw HTML renders shows nothing until its plugins load, rather than its HTML as escaped text.
  */
 export const MessageMarkdown = memo(function MessageMarkdown({ text, preset = AGENT_PRESET }: { text: string; preset?: MarkdownPreset }) {
 	const rawHtml = useLoaded(rawHtmlPlugins, preset.rawHtml);
 	const root = useRef<HTMLDivElement>(null);
 	const images = useMarkdownImages(root);
+	const rehype = useMemo(() => (rawHtml && preset.rawHtml ? [...rawHtml, ...preset.rehype] : preset.rehype), [rawHtml, preset.rawHtml, preset.rehype]);
+	const blocks = preset.blocks ? markdownBlocks(text) : [text];
+	const strips = preset.blocks && preset.remark.includes(remarkFilePaths);
+	const media = useRef(new Map<string, BlockMedia>()).current;
+	const settled = useMemo<Remark>(() => (strips ? [...preset.remark, [remarkBlockMedia, { media, before: null }]] : preset.remark), [strips, preset.remark, media]);
+	const last: Remark = strips ? [...preset.remark, [remarkBlockMedia, { media, before: blocks.slice(0, -1) }]] : preset.remark;
+	useEffect(() => {
+		const kept = new Set(blocks);
+		for (const key of media.keys()) if (!kept.has(key)) media.delete(key);
+	});
 	if (preset.rawHtml && !rawHtml) return null;
 	const body = (
 		<div ref={root} data-link-preview={preset.linkPages ? undefined : "address"} className="message-markdown max-w-full whitespace-normal break-words">
-			<ReactMarkdown remarkPlugins={preset.remark} rehypePlugins={rawHtml && preset.rawHtml ? [...rawHtml, ...preset.rehype] : preset.rehype} components={preset.components} urlTransform={preset.urlTransform}>
-				{text}
-			</ReactMarkdown>
+			{blocks.map((block, index) => (
+				<Fragment key={index}>
+					{index > 0 && "\n"}
+					<MarkdownBlock text={block} remark={index === blocks.length - 1 ? last : settled} rehype={rehype} components={preset.components} urlTransform={preset.urlTransform} />
+				</Fragment>
+			))}
 		</div>
 	);
 	if (!preset.openImages) return body;
