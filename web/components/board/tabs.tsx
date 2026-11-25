@@ -1,11 +1,13 @@
 /** The tabs across a Workspace's Board, as across a Slack channel, and every tab but Messages: another page's content kept to the Workspace. */
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
+import { useMemo } from "react";
 import type { WebModuleId } from "../../modules";
 import { activityControl } from "../../activity";
 import { botRows } from "../../bots-model";
+import { pullRequestsScope, pullRequestsStore } from "../../reads";
 import { hashForPage, WORKSPACE_SECTIONS, workspaceSection } from "../../routing";
 import { workspaceCwd } from "../../sessions";
-import { useDashboardActions } from "../dashboard-context";
+import { DashboardStatusContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import type { CoreData } from "../module-views";
 import { BotsGallery } from "../bots/bots-gallery";
 import { ProjectMemoryTab } from "../memory/project-memory";
@@ -61,7 +63,7 @@ export function WorkspaceTab({ view, workspace, core, disabled }: { view: Exclud
 		case "bots":
 			return <BotsGallery rows={slice.bots && botRows(slice.bots, core.sessions.hosts, core.botLasts)} routines={core.routines} />;
 		case "pull-requests":
-			return <PullRequestsPage hosts={slice.hosts} past={slice.past} route={{ target: null }} />;
+			return <WorkspacePullRequests workspace={workspace} hosts={slice.hosts} past={slice.past} />;
 		case "memory":
 			return <ProjectMemoryTab repo={workspace} pinned />;
 		case "projects":
@@ -79,6 +81,19 @@ export function WorkspaceTab({ view, workspace, core, disabled }: { view: Exclud
 		case "settings":
 			return <WorkspaceSettings workspace={workspace} workspaces={core.workspaces} section={view.section} />;
 	}
+}
+
+/** The Pull requests page read for Workspace `workspace` rather than the sidebar's scope: it polls that Workspace's pull requests while it shows, and its rows, details, and changes read that entry. */
+function WorkspacePullRequests({ workspace, hosts, past }: { workspace: string | null; hosts: CoreData["sessions"]["hosts"]; past: CoreData["sessions"]["past"] }) {
+	const status = useDashboardStatus();
+	const scope = pullRequestsScope(workspace);
+	pullRequestsStore.usePolling(scope);
+	const scoped = useMemo(() => ({ ...status, pullRequestsScope: scope, scope: { workspace } }), [status, scope, workspace]);
+	return (
+		<DashboardStatusContext.Provider value={scoped}>
+			<PullRequestsPage hosts={hosts} past={past} route={{ target: null }} />
+		</DashboardStatusContext.Provider>
+	);
 }
 
 const settingsHash = (workspace: string | null, section: string) => hashForPage({ kind: "board", workspace, view: { tab: "settings", section } });
