@@ -46,10 +46,12 @@ The Routines Bot is created only when it is missing, through the lists so pages 
 It judges the runs claimed in the day before the last half hour (`HEALTH_WINDOW_MS`, `SETTLE_MS`), so a run still under way waits for the next look.
 
 - `errored`: the run has errors, its outcome is `failed`, its command did not exit 0, or its Bot's turn ended on a provider's error.
+  A command whose routine has `post: "failures"` hands its output to the Bot by exiting non-zero, so that exit, and the `exitedWith` error it records, is no error.
 - `no-reply`: its Bot's turn ended with no text reply and without `stay_quiet`.
 - `short`: it took less than `SHORT_SHARE`, a quarter, of the median of the routine's other runs, once at least `MIN_USUAL_RUNS` of them have a time; a command's time is its run's, and a message's is its Bot's turn.
 - `missed`: a slot's run was claimed `LATE_AFTER_MS`, an hour, or more after the slot the previous scheduled run gave, or stayed queued that long.
   A routine that `runsHere` and whose next slot is that overdue with no claim is listed at that slot too.
+  Lateness counts only the time the Mac was awake: `macSleeps` in `src/sleep-log.ts` reads the spans from a Sleep to the next full Wake out of `pmset -g log`, so a catch-up run at wake is not missed.
 
 `routineTurn` in `src/live-session.ts` finds a message run's turn in its Bot's session file: the messages between the prompt whose routine stamp names the routine and the run's key, and the next prompt, read as `turnUpdate` reads an `agent_end`'s.
 A run whose session file or prompt is not found has no turn, so it is judged on its outcome alone.

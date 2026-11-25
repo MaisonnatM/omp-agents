@@ -2,7 +2,7 @@
  * The routines' daily heartbeat: which recent runs exited early. A run errored, its Bot's turn ended with no reply, it
  * ended far shorter than the routine's usual run, or it missed its schedule.
  */
-import { nextDueAt, type Routine, type RoutineRun, type RunUsage, runsHere } from "./routines";
+import { exitedWith, nextDueAt, type Routine, type RoutineRun, type RunUsage, runsHere } from "./routines";
 import type { BotId } from "./shared/bots";
 import { DAY_MS } from "./shared/days";
 
@@ -46,6 +46,11 @@ export interface RunTurn {
 /** The turn of routine `routineId`'s run at `at` in conversation `sessionId`, or `null` when it is not found. */
 export type TurnOf = (sessionId: string, routineId: string, at: number) => RunTurn | null;
 
+/** How long the Mac slept between `from` and `to`. */
+export type SleptWithin = (from: number, to: number) => number;
+
+const neverSlept: SleptWithin = () => 0;
+
 /** How long `run` took: its command's run, or its Bot's turn; `null` while it has not ended or is not found. */
 function durationOf(run: RoutineRun, turn: RunTurn | null): number | null {
 	const { outcome } = run;
@@ -53,11 +58,16 @@ function durationOf(run: RoutineRun, turn: RunTurn | null): number | null {
 	return turn?.ms ?? null;
 }
 
-/** Whether `run` failed in itself: an error, a command that did not exit 0, or a Bot turn a provider's error ended. */
-function errored(run: RoutineRun, turn: RunTurn | null): boolean {
+/**
+ * Whether `run` failed in itself: an error, a command that did not exit 0, or a Bot turn a provider's error ended. A
+ * command whose routine posts only its failures hands its output to the Bot by exiting non-zero, so that exit is no error.
+ */
+function errored(routine: Routine, run: RoutineRun, turn: RunTurn | null): boolean {
 	const { outcome } = run;
-	if (run.errors.length > 0 || outcome.kind === "failed") return true;
-	if (outcome.kind === "command") return outcome.run.phase === "stopped" || outcome.run.phase === "failed" || (outcome.run.phase === "exited" && outcome.run.code !== 0);
+	const code = outcome.kind === "command" && outcome.run.phase === "exited" ? outcome.run.code : 0;
+	const handOff = code !== 0 && routine.task.kind === "command" && routine.task.post === "failures" ? exitedWith(code) : null;
+	if (run.errors.some(error => error !== handOff) || outcome.kind === "failed") return true;
+	if (outcome.kind === "command") return outcome.run.phase === "stopped" || outcome.run.phase === "failed" || (code !== 0 && handOff === null);
 	return turn?.failed ?? false;
 }
 
@@ -69,25 +79,27 @@ const median = (values: number[]): number => {
 
 /**
  * Why `run` of `routine` exited early, or `null` when it did not. `older` is the routine's newest scheduled run before
- * it, from which its slot counted; `usual` is the other runs' times.
+ * it, from which its slot counted; `usual` is the other runs' times. A run is late only by the time the Mac was awake.
  */
-function exitOf(routine: Routine, run: RoutineRun, turn: RunTurn | null, older: RoutineRun | undefined, usual: number[], now: number): EarlyExit | null {
-	if (errored(run, turn)) return "errored";
+function exitOf(routine: Routine, run: RoutineRun, turn: RunTurn | null, older: RoutineRun | undefined, usual: number[], now: number, slept: SleptWithin): EarlyExit | null {
+	const late = (from: number, to: number): boolean => to - from - slept(from, to) >= LATE_AFTER_MS;
+	if (errored(routine, run, turn)) return "errored";
 	const { outcome } = run;
-	if (outcome.kind === "queued" || outcome.kind === "sending") return now - run.at >= LATE_AFTER_MS ? "missed" : null;
+	if (outcome.kind === "queued" || outcome.kind === "sending") return late(run.at, now) ? "missed" : null;
 	if (turn !== null && !turn.replied && !turn.quiet) return "no-reply";
 	const ms = durationOf(run, turn);
 	if (ms !== null && !turn?.quiet && usual.length >= MIN_USUAL_RUNS && ms < SHORT_SHARE * median(usual)) return "short";
-	if (run.triggeredBy.length === 0 && older !== undefined && run.at - nextDueAt(routine.schedules, older.at) >= LATE_AFTER_MS) return "missed";
+	if (run.triggeredBy.length === 0 && older !== undefined && late(nextDueAt(routine.schedules, older.at), run.at)) return "missed";
 	return null;
 }
 
 /**
  * Every run of `routines` that exited early among those claimed from {@link HEALTH_WINDOW_MS} before the last
  * {@link SETTLE_MS} up to it, oldest first, so two heartbeats a day apart judge each run once; and each routine that
- * runs here and has a slot overdue by {@link LATE_AFTER_MS} or more, at that slot. `turnOf` finds a prompt run's turn.
+ * runs here and has a slot overdue by {@link LATE_AFTER_MS} or more of awake time, at that slot. `turnOf` finds a prompt
+ * run's turn, and `slept` how long the Mac slept, which no run is late for.
  */
-export function earlyRuns(routines: readonly Routine[], now: number, turnOf: TurnOf): EarlyRun[] {
+export function earlyRuns(routines: readonly Routine[], now: number, turnOf: TurnOf, slept: SleptWithin = neverSlept): EarlyRun[] {
 	const to = now - SETTLE_MS;
 	const from = to - HEALTH_WINDOW_MS;
 	const early: EarlyRun[] = [];
@@ -99,12 +111,12 @@ export function earlyRuns(routines: readonly Routine[], now: number, turnOf: Tur
 			if (run.at < from || run.at >= to) return;
 			const older = routine.runs.slice(index + 1).find(({ triggeredBy }) => triggeredBy.length === 0);
 			const usual = routine.runs.flatMap(other => (other === run ? [] : (durations.get(other.at) ?? [])));
-			const exit = exitOf(routine, run, turns.get(run.at) ?? null, older, usual, now);
+			const exit = exitOf(routine, run, turns.get(run.at) ?? null, older, usual, now, slept);
 			if (exit !== null) early.push({ botId, routineId, name, at: run.at, exit });
 		});
 		if (!runsHere(routine) || routine.schedules.length === 0) continue;
 		const due = nextDueAt(routine.schedules, routine.scheduledAt ?? routine.createdAt);
-		if (now - due >= LATE_AFTER_MS) early.push({ botId, routineId, name, at: due, exit: "missed" });
+		if (now - due - slept(due, now) >= LATE_AFTER_MS) early.push({ botId, routineId, name, at: due, exit: "missed" });
 	}
 	return early.toSorted((a, b) => a.at - b.at);
 }

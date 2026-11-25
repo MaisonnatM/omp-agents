@@ -3,6 +3,11 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-25
+
+- Fixed: the "routine runs exited early" notification no longer lists a run that started late only because the Mac was asleep, such as the catch-up runs when you open the lid.
+- Fixed: a routine set to post its output When it fails no longer counts as exited early each time it hands work to its Bot on purpose.
+
 ## 2026-11-24
 
 - The session details sidebar's Overview tab has a Jobs section that lists the commands the agent runs in the background, live, with how long each has run and its last line of output.

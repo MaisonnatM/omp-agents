@@ -17,6 +17,7 @@ import { createIntegrations, type Integrations, integrationFetch, integrationSig
 import { errorText } from "../json";
 import { type LiveSession, routineTurn } from "../live-session";
 import { earlyRuns } from "../routine-health";
+import { macSleeps, sleptWithin } from "../sleep-log";
 import { startDictation } from "../omp/dictation";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
@@ -303,11 +304,18 @@ export class Dashboard {
 						const saved = files.savedOf(sessionId);
 						return { sessionId, title: saved?.title ?? null, cwdDisplay: saved ? displayPath(saved.cwd) : null };
 					}),
-				earlyRuns: () =>
-					earlyRuns(routines.value, Date.now(), (sessionId, routineId, at) => {
-						const path = files.pathOf(sessionId);
-						return path === null ? null : routineTurn(path, routineId, at);
-					}),
+				earlyRuns: async () => {
+					const sleeps = await macSleeps();
+					return earlyRuns(
+						routines.value,
+						Date.now(),
+						(sessionId, routineId, at) => {
+							const path = files.pathOf(sessionId);
+							return path === null ? null : routineTurn(path, routineId, at);
+						},
+						(from, to) => sleptWithin(sleeps, from, to),
+					);
+				},
 				now: Date.now,
 			},
 			() => this.#broadcasts.pushList("notices"),
