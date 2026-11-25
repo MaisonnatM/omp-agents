@@ -30,7 +30,7 @@ The dashboard calls the run's `changed` after every change to the module and whe
 
 `BoardRunner` in `src/server/board-runner.ts` does the rest while its server is the owner:
 
-- It starts a session on each Board task `unstartedReady` lists, prompted by `startPrompt` to claim it, and records the `start`.
+- It starts a session on each Board task `unstartedReady` lists, prompted by `startPrompt` to claim it, and records the `start`. The prompt leads with the Board task's title and text and wraps the claim steps in a `<board-task>` block, because omp's titler names the session from that prompt and titles plain claim steps "Claim Board task N".
 - It wakes `wakeTarget` for each new reply with `wakePrompt`, which carries `DASHBOARD_PROMPT_PREFIX`, and records `woke` when the session had stopped; the core's `wake` switches a session this dashboard started to the reply's model and thinking level, and starts the prompt with the reply's `/skill:`.
 - Every 30 seconds its sweep records an `expire` for each Board task `lapsed` lists, which makes it ready again and so starts a new session.
 
