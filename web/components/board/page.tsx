@@ -400,9 +400,11 @@ type ThreadTabValue = "thread" | "session";
 /** The Board thread as Slack's thread pane, at the width you drag its left edge to, under a row of tabs as the session details sidebar draws them: **Thread**, the Board task, a line with the reply count, the replies and the Board's grey lines, and the reply box; and **Session**, the conversation of the session its replies wake. Escape closes it. */
 function Thread({ state, task, core, workspace, channel, closeHref, disabled, onChange }: { state: BoardState; task: BoardTask; core: CoreData; workspace: Workspace; channel: string; closeHref: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const sessions = core.sessions;
-	const count = said(task).length;
 	const [tab, setTab] = useState<ThreadTabValue>("thread");
+	// The thread and its reply box address the same session; a thread with none shows only **Thread**.
 	const target = wakeTarget(task, { kind: "user" });
+	const name = target ? sessionLabel(target, sessions).name : null;
+	const shown: ThreadTabValue = target ? tab : "thread";
 	const [width, setWidth] = useStoredState("omp-agents.board-thread-width", raw => {
 		const stored = Number(raw);
 		return stored >= MIN_THREAD && stored <= MAX_THREAD ? stored : THREAD_WIDTH;
@@ -433,65 +435,24 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 		document.addEventListener("keydown", close);
 		return () => document.removeEventListener("keydown", close);
 	}, [closeHref]);
-	// A grey line ends a run of messages, so the reply after it shows its avatar and name again.
-	let previous: { at: number; by: BoardAuthor } | null = task;
 	return (
 		<aside aria-label={`Thread #${task.id}`} style={{ width }} className="relative flex max-w-[calc(100%-360px)] shrink-0 flex-col border-l border-border">
 			<Separator {...resize} axis="vertical" label="Resize the thread" min={MIN_THREAD} max={MAX_THREAD} now={width} className="inset-y-0 -left-1.5 w-3 cursor-col-resize select-none" />
-			<TabsPrimitive.Tabs value={tab} onValueChange={value => setTab(value === "session" ? "session" : "thread")} className="flex min-h-0 flex-1 flex-col">
+			<TabsPrimitive.Tabs value={shown} onValueChange={value => setTab(value === "session" ? "session" : "thread")} className="flex min-h-0 flex-1 flex-col">
 				{/* Content-box, so the hairline sits under the full header height, level with the Board header's. */}
 				<header className="box-content flex h-(--page-header-height) shrink-0 items-center gap-1 border-b border-border px-2">
 					<h2 className="sr-only">Thread #{task.id} in #{channel}</h2>
-					<TabsPrimitive.TabsList aria-label={`Thread #${task.id}`} className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
-						<ThreadTab value="thread" icon={IconBubble3} name="Thread" active={tab === "thread"} control="board.thread.tab.thread" />
-						{target && <ThreadTab value="session" icon={IconAiBotHead} name={sessionLabel(target, sessions).name} active={tab === "session"} control="board.thread.tab.session" />}
+					<TabsPrimitive.TabsList aria-label="Thread views" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
+						<ThreadTab value="thread" icon={IconBubble3} name="Thread" active={shown === "thread"} control="board.thread.tab.thread" />
+						{target && name && <ThreadTab value="session" icon={IconAiBotHead} name={name} active={shown === "session"} control="board.thread.tab.session" />}
 					</TabsPrimitive.TabsList>
 					<Button {...activityControl("board.thread.close")} variant="ghost" size="icon-xs" aria-label="Close thread" render={<a href={closeHref} />}>
 						<IconCrossMedium />
 					</Button>
 				</header>
 				<TabsPrimitive.TabsPanel value="thread" className="flex min-h-0 flex-1 flex-col outline-none">
-			<MessageScrollerProvider autoScroll>
-				<MessageScroller className="flex-1">
-					<MessageScrollerViewport>
-						<MessageScrollerContent className="gap-0 py-2">
-							<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={false}>
-								<TaskBody state={state} task={task} sessions={sessions} />
-							</MessageRow>
-							<div className="flex items-center gap-3 px-5 py-2 text-[13px] text-muted-foreground">
-								<span className="shrink-0">
-									{count === 0 ? "No replies yet" : `${count} ${count === 1 ? "reply" : "replies"}`}
-								</span>
-								<span className="h-px flex-1 bg-border" />
-							</div>
-							<ol className="flex flex-col">
-								{task.replies.map((entry, index) => {
-									if ("note" in entry) {
-										previous = null;
-										return (
-											<li key={index} className="flex gap-2 px-5 py-0.5 text-[13px] text-muted-foreground">
-												<span className="w-9 shrink-0 pt-px text-right text-[11px] tabular-nums">{shortClock(entry.at)}</span>
-												<span className="min-w-0 flex-1 italic">{noteText(entry.note, sessions)}</span>
-											</li>
-										);
-									}
-									const grouped = previous !== null && continues(previous, entry);
-									previous = entry;
-									return (
-										<li key={index}>
-											<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped}>
-												<BoardText text={entry.text} />
-											</MessageRow>
-										</li>
-									);
-								})}
-							</ol>
-						</MessageScrollerContent>
-					</MessageScrollerViewport>
-					<MessageScrollerButton />
-				</MessageScroller>
-			</MessageScrollerProvider>
-			<ThreadComposer task={task} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
+					<ThreadMessages state={state} task={task} sessions={sessions} />
+					<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} />
 				</TabsPrimitive.TabsPanel>
 				{target && (
 					<TabsPrimitive.TabsPanel value="session" className="relative flex min-h-0 flex-1 flex-col outline-none">
@@ -503,12 +464,12 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 	);
 }
 
-/** One of the thread's tabs, drawn as the session details sidebar draws its first tab, which stays open. */
+/** One of the thread's tabs, drawn as the session details sidebar draws its first tab, which stays open; the row scrolls when they overflow. */
 function ThreadTab({ value, icon: Icon, name, active, control }: { value: ThreadTabValue; icon: IconComponent; name: string; active: boolean; control: BoardControlId }) {
 	return (
-		<ClosableTab name={name} active={active} onClose={null} closeControl="details.tab.close" activePadding="pr-2.5" className={cn("min-w-0", value === "thread" ? "shrink-0" : "shrink", active && "bg-active text-foreground")}>
+		<ClosableTab name={name} active={active} onClose={null} closeControl="details.tab.close" activePadding="pr-2.5" className={cn("min-w-0 shrink-0", active && "bg-active text-foreground")}>
 			{body => (
-				<TabsPrimitive.TabsTab value={value} {...activityControl(control)} className={body}>
+				<TabsPrimitive.TabsTab value={value} {...activityControl(control)} title={name} className={body}>
 					<Icon aria-hidden="true" className="size-3.5 shrink-0" />
 					<span className="truncate">{name}</span>
 				</TabsPrimitive.TabsTab>
@@ -517,33 +478,67 @@ function ThreadTab({ value, icon: Icon, name, active, control }: { value: Thread
 	);
 }
 
-/** The **Session** tab: the conversation of the session the Board task's replies wake, live or saved, with its own composer. */
+/** The **Session** tab: the conversation of the session the Board task's replies wake, live with its composer, or saved and read-only, where the Thread tab's reply wakes it. */
 function SessionTab({ sessionId, core }: { sessionId: string; core: CoreData }) {
 	const host = core.sessions.hosts.find(each => each.sessionId === sessionId) ?? null;
 	const past = core.sessions.past.find(each => each.sessionId === sessionId) ?? null;
 	const instanceId = host?.instanceId ?? null;
 	const view = useMemo<View | null>(() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : past ? { kind: "past", sessionId } : null), [instanceId, past, sessionId]);
 	useShowConversation(view);
-	if (view === null) return <p className="px-5 py-6 text-sm text-muted-foreground">This session is not on this computer.</p>;
+	if (view === null) return <p className="px-5 py-6 text-sm text-muted-foreground">This session's conversation isn't listed yet.</p>;
+	return <ViewConversation view={view} focused={false} host={host} lastHost={null} session={past} models={(instanceId !== null && core.models.get(instanceId)) || UNREAD} workspaces={core.workspaces} header={false} />;
+}
+
+/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies and the Board's grey lines. */
+function ThreadMessages({ state, task, sessions }: { state: BoardState; task: BoardTask; sessions: KnownSessions }) {
+	const count = said(task).length;
+	// A grey line ends a run of messages, so the reply after it shows its avatar and name again.
+	let previous: { at: number; by: BoardAuthor } | null = task;
 	return (
-		<ViewConversation
-			view={view}
-			focused={false}
-			host={host}
-			lastHost={instanceId !== null ? (core.lastHosts.get(instanceId) ?? null) : null}
-			session={past}
-			models={(instanceId !== null && core.models.get(instanceId)) || UNREAD}
-			workspaces={core.workspaces}
-			header={false}
-		/>
+		<MessageScrollerProvider autoScroll>
+			<MessageScroller className="flex-1">
+				<MessageScrollerViewport>
+					<MessageScrollerContent className="gap-0 py-2">
+						<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={false}>
+							<TaskBody state={state} task={task} sessions={sessions} />
+						</MessageRow>
+						<div className="flex items-center gap-3 px-5 py-2 text-[13px] text-muted-foreground">
+							<span className="shrink-0">{count === 0 ? "No replies yet" : `${count} ${count === 1 ? "reply" : "replies"}`}</span>
+							<span className="h-px flex-1 bg-border" />
+						</div>
+						<ol className="flex flex-col">
+							{task.replies.map((entry, index) => {
+								if ("note" in entry) {
+									previous = null;
+									return (
+										<li key={index} className="flex gap-2 px-5 py-0.5 text-[13px] text-muted-foreground">
+											<span className="w-9 shrink-0 pt-px text-right text-[11px] tabular-nums">{shortClock(entry.at)}</span>
+											<span className="min-w-0 flex-1 italic">{noteText(entry.note, sessions)}</span>
+										</li>
+									);
+								}
+								const grouped = previous !== null && continues(previous, entry);
+								previous = entry;
+								return (
+									<li key={index}>
+										<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped}>
+											<BoardText text={entry.text} />
+										</MessageRow>
+									</li>
+								);
+							})}
+						</ol>
+					</MessageScrollerContent>
+				</MessageScrollerViewport>
+				<MessageScrollerButton />
+			</MessageScroller>
+		</MessageScrollerProvider>
 	);
 }
 
-/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session it is for on the model, thinking level, and skill picked here. */
-function ThreadComposer({ task, core, workspace, disabled, onChange }: { task: BoardTask; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here. */
+function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
-	const target = wakeTarget(task, { kind: "user" });
-	const name = target ? sessionLabel(target, core.sessions).name : null;
 	const reply = ({ prompt, model, thinking, skill }: { prompt: string; model: BoardLaunch["model"]; thinking: string | null; skill: string | null }) => {
 		if (!prompt || disabled) return;
 		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: prompt, launch: { model, thinking, skill } });

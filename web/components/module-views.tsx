@@ -39,8 +39,6 @@ export interface CoreData {
 	onPickWorkspace: (cwd: string | null) => void;
 	/** The running sessions in the sidebar's workspace. */
 	hosts: RosterHost[];
-	/** Each live session's last roster row, which a Board thread's **Session** tab reads once the session ended. */
-	lastHosts: ReadonlyMap<string, RosterHost>;
 	/** Each live session's model list, which a Board thread's **Session** tab's composer offers. */
 	models: ReadonlyMap<string, ModelList>;
 	/** Every live and past session, in any workspace, which a project's page names and links. */

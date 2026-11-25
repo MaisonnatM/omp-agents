@@ -16,7 +16,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - Hovering a message shows a toolbar: **Reply in thread** opens its Board thread, and the arrow opens the session working on it.
 - The **Board thread** opens in the right pane under a row of tabs, drawn as a session's right sidebar draws them, with × to close it.
   **Thread** shows the Board task, a line with the reply count, the replies, and grey lines for what happened, such as a session claiming it, a lease running out, or a reply waking a session.
-  The second tab, named after the session a reply would wake, shows that session's conversation, live or saved, with its own composer.
+  The second tab, named after the session a reply would wake, shows that session's conversation: with its composer while it runs, read-only once it stopped, when a reply in **Thread** wakes it.
   The open Board task is highlighted in the list, and the pane follows new replies to the bottom.
   The cross or Escape closes it.
   Drag its left edge to widen or narrow it, or use the arrow keys on that edge; a double-click puts it back to its usual width, and the page remembers the width.
