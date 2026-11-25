@@ -34,7 +34,7 @@ export function useMinute(): number {
 
 /** The time now, renewed each second, for a count of the time something has run; only what counts listens to this timer. */
 export function useSecond(): number {
-	return useSyncExternalStore(second.subscribe, second.now);
+	return useSyncExternalStore(second.subscribe, second.now, second.now);
 }
 
 /** A countdown reads seconds under this, so only then does it renew each second. */

@@ -1,5 +1,7 @@
 const NEWLINE = 0x0a;
 const decoder = new TextDecoder();
+/** How many bytes one step of a read takes, so a large file folds without holding it all or blocking the event loop. */
+const CHUNK_BYTES = 8 * 1024 * 1024;
 
 /** Folds a file's lines, in order, each once. */
 export interface LineFold {
@@ -21,16 +23,21 @@ export interface FoldRead {
  */
 export class FoldedFile<F extends LineFold> {
 	readonly #path: string;
+	readonly #chunkBytes: number;
 	readonly #create: () => F;
 	#fold: F;
 	#offset = 0;
 	/** Reads one after another, so two callers never fold the same appended lines twice. */
 	#chain: Promise<unknown> = Promise.resolve();
 
-	/** `create` makes an empty fold: the first one, and a fresh one each time the file shrinks. */
-	constructor(path: string, create: () => F) {
+	/**
+	 * `create` makes an empty fold: the first one, and a fresh one each time the file shrinks. `chunkBytes` bounds how
+	 * much one step of a read holds in memory; a longer line is still read whole.
+	 */
+	constructor(path: string, create: () => F, chunkBytes = CHUNK_BYTES) {
 		this.#path = path;
 		this.#create = create;
+		this.#chunkBytes = chunkBytes;
 		this.#fold = create();
 	}
 
@@ -60,15 +67,25 @@ export class FoldedFile<F extends LineFold> {
 			this.#offset = 0;
 			this.#fold = this.#create();
 		}
-		if (size === this.#offset) return { readable: true, restarted };
-		const bytes = await file
-			.slice(this.#offset, size)
-			.bytes()
-			.catch(() => null);
-		if (!bytes) return { readable: false, restarted };
-		const end = bytes.lastIndexOf(NEWLINE) + 1;
-		this.#offset += end;
-		for (const line of decoder.decode(bytes.subarray(0, end)).split("\n")) if (line) this.#fold.applyLine(line);
+		let window = this.#chunkBytes;
+		while (this.#offset < size) {
+			const stop = Math.min(this.#offset + window, size);
+			const bytes = await file
+				.slice(this.#offset, stop)
+				.bytes()
+				.catch(() => null);
+			if (!bytes) return { readable: false, restarted };
+			const end = bytes.lastIndexOf(NEWLINE) + 1;
+			if (end === 0) {
+				// No complete line yet: a line longer than the window grows it; at the end of the file it waits for the writer.
+				if (stop === size) break;
+				window += this.#chunkBytes;
+				continue;
+			}
+			this.#offset += end;
+			window = this.#chunkBytes;
+			for (const line of decoder.decode(bytes.subarray(0, end)).split("\n")) if (line) this.#fold.applyLine(line);
+		}
 		return { readable: true, restarted };
 	}
 }

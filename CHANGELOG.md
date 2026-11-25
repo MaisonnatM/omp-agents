@@ -5,6 +5,10 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The dashboard uses less CPU with many sessions open: idle sessions no longer check their running programs every 10 seconds, and the session list only resends rows that changed.
+- Long replies stream more smoothly: only the part still being written is redrawn, instead of the whole reply on every word.
+- Pull requests refresh with fewer GitHub calls at once, so the dashboard stays under GitHub's limits.
+- Opening the dashboard with very large sessions uses less memory, and searching conversations is faster.
 - The Board's message box is now the New session composer: pick the model, thinking level, and skill the session starts on, with `/` suggestions and dictation; the **Needs** picker is gone, and the thread's reply box uses the session composer.
 - The Board now has its own tab at the top of the sidebar, beside Sessions; under it the sidebar lists the Board's workspaces and their sessions, and the page gets the full width.
 - New **Board** page: post a message in a workspace and a new session starts on it as a Board task; pick what it **Needs** so it waits for another one to finish, follow each one's thread on the right, and reply to reach the session working on it, which wakes it if it stopped.

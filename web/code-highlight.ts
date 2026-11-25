@@ -28,10 +28,17 @@ export interface Token {
 	text: string;
 }
 
+/** How many highlighted texts {@link highlightLines} keeps, the least recently read leaving first. */
+const KEPT_HIGHLIGHTS = 200;
+
+/** Highlighted texts by grammar and text, least recently read first: a `Map` keeps insertion order, and a read moves its entry last. */
+const highlighted = new Map<string, Token[][]>();
+
 /**
  * `text` cut into lines of tokens, colored as `language`, a grammar's name or alias or a file's extension. The whole
  * text is highlighted at once, so a comment or string that spans lines keeps its color; a language no grammar knows
- * gets uncolored lines.
+ * gets uncolored lines. The last {@link KEPT_HIGHLIGHTS} results are kept by grammar and text, so code that renders
+ * again, as a message's does with each streamed token, reads its lines back; callers must not change what it returns.
  */
 export function highlightLines(text: string, language: string): Token[][] {
 	const lowlight = grammars.value ?? NO_GRAMMARS;
@@ -39,6 +46,14 @@ export function highlightLines(text: string, language: string): Token[][] {
 	// A file named `x.constructor` must not reach the object's prototype.
 	const alias = Object.hasOwn(LANGUAGE_OF, name) ? LANGUAGE_OF[name]! : name;
 	const grammar = lowlight.registered(alias) ? alias : null;
+	// The grammar, not the language asked for, keys the cache: until the grammars load, every language reads as none.
+	const key = `${grammar ?? ""}\u0000${text}`;
+	const kept = highlighted.get(key);
+	if (kept) {
+		highlighted.delete(key);
+		highlighted.set(key, kept);
+		return kept;
+	}
 	const lines: Token[][] = [[]];
 	const add = (className: string, value: string) => {
 		value.split("\n").forEach((part, index) => {
@@ -57,6 +72,8 @@ export function highlightLines(text: string, language: string): Token[][] {
 	};
 	if (grammar) walk(lowlight.highlight(grammar, text).children, "");
 	else add("", text);
+	highlighted.set(key, lines);
+	if (highlighted.size > KEPT_HIGHLIGHTS) highlighted.delete(highlighted.keys().next().value!);
 	return lines;
 }
 

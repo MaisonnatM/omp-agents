@@ -21,3 +21,14 @@ test("colors a hunk's rows by their place in it, whatever line it starts at", as
 	expect(tokens.map(line => line.map(token => token.text).join(""))).toEqual(hunk.map(row => row.text));
 	expect(tokens).toEqual(highlightRows(at(1), "src/file.ts"));
 });
+
+test("highlighting the same text again reads back the lines it highlighted, by grammar rather than by the name asked for", async () => {
+	await loadGrammars();
+	const text = "let cached = true;\n// again";
+	const colored = highlightLines(text, "javascript");
+	expect(colored[0]).toContainEqual({ className: "hljs-keyword", text: "let" });
+	expect(highlightLines(text, "mjs")).toBe(colored);
+	const plain = highlightLines(text, "no-such-language");
+	expect(plain).toEqual([[{ className: "", text: "let cached = true;" }], [{ className: "", text: "// again" }]]);
+	expect(highlightLines(text, "")).toBe(plain);
+});

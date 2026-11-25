@@ -234,7 +234,8 @@ async function queryRepo(repo: Repo): Promise<PullRequestSummary[]> {
 	return parseListAnswer(answer, repo, await readThreadStarters(repo, openThreadIds(answer)));
 }
 
-const loaded = createCache<PullRequestSummary[]>();
+/** Each repository's pull request list for 90 seconds, longer than the page's one-minute poll, so the polls of several tabs and the activity check share one read; a write reads again with `fresh`. */
+const loaded = createCache<PullRequestSummary[]>(90_000);
 
 const REACTION_FIELDS = `reactionGroups { content viewerHasReacted users { totalCount } }`;
 

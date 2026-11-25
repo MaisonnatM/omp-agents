@@ -61,4 +61,16 @@ describe("FoldedFile", () => {
 		await Promise.all([file.read(), file.read(), file.read()]);
 		expect(file.fold.lines).toEqual(["a", "b"]);
 	});
+
+	test("a read in small chunks folds lines across chunk edges, a line longer than a chunk whole, and leaves a trailing partial line", async () => {
+		const { path } = folded();
+		const file = new FoldedFile(path, () => new Lines(), 4);
+		writeFileSync(path, "ab\ncdef\nabcdefghijkl\né€\npart");
+		expect(await file.read()).toEqual({ readable: true, restarted: false });
+		expect(file.fold.lines).toEqual(["ab", "cdef", "abcdefghijkl", "é€"]);
+
+		appendFileSync(path, "ial\n");
+		await file.read();
+		expect(file.fold.lines).toEqual(["ab", "cdef", "abcdefghijkl", "é€", "partial"]);
+	});
 });

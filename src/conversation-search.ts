@@ -6,7 +6,7 @@
 import type { LineFold } from "./line-reader";
 import type { SessionFormat } from "./session-format";
 import { formatOf, SESSION_FORMATS } from "./session-formats";
-import { everyWord, searchWords } from "./shared/every-word";
+import { searchWords } from "./shared/every-word";
 import type { ConversationHit } from "./shared/sessions";
 import { messageItemsOf } from "./transcript";
 
@@ -15,6 +15,8 @@ interface ConversationMessage {
 	id: string;
 	role: "user" | "assistant";
 	text: string;
+	/** `text` lowercased once when folded, so each search matches without lowercasing it again. */
+	lower: string;
 }
 
 /** A session file's prompts and replies in file order, by item id, so a message omp writes again keeps its place. */
@@ -30,7 +32,7 @@ class ConversationFold implements LineFold {
 		if (!this.#format.messageLine.test(line)) return;
 		for (const entry of this.#format.decode(line)) {
 			// A routine's or another Bot's message is not the user's words, as a dashboard prompt is not.
-			for (const item of messageItemsOf(entry)) if (item.kind === "user" || item.kind === "assistant") this.messages.set(item.id, { id: item.id, role: item.kind, text: item.text });
+			for (const item of messageItemsOf(entry)) if (item.kind === "user" || item.kind === "assistant") this.messages.set(item.id, { id: item.id, role: item.kind, text: item.text, lower: item.text.toLowerCase() });
 		}
 	}
 }
@@ -72,11 +74,18 @@ export class Conversations {
 
 	/** The conversations of `sessions`, in the order given, whose prompts or replies hold every word of `query`, each by its latest such message. */
 	search(sessions: readonly { id: string; path: string }[], query: string): ConversationHit[] {
-		const holds = everyWord(query);
+		const words = searchWords(query);
 		return sessions.flatMap(session => {
-			const matching = [...(this.#byPath.get(session.path)?.messages.values() ?? [])].filter(message => holds(message.text));
-			const latest = matching.at(-1);
-			return latest ? [{ sessionId: session.id, messageId: latest.id, role: latest.role, snippet: snippetOf(latest.text, query), matches: matching.length }] : [];
+			const messages = this.#byPath.get(session.path)?.messages;
+			if (!messages) return [];
+			let latest: ConversationMessage | undefined;
+			let matches = 0;
+			for (const message of messages.values()) {
+				if (!words.every(word => message.lower.includes(word))) continue;
+				latest = message;
+				matches++;
+			}
+			return latest ? [{ sessionId: session.id, messageId: latest.id, role: latest.role, snippet: snippetOf(latest.text, query), matches }] : [];
 		});
 	}
 }

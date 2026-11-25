@@ -8,7 +8,7 @@ import { errorText } from "../src/json";
 import { deliveryOf, subjectOf } from "./components/subject";
 import { toasts } from "./components/toaster";
 import { keyedStore } from "./keyed-store";
-import { type PaneData, usePaneSelect } from "./pane-store";
+import { itemsSelector, usePaneSelect } from "./pane-store";
 import { opensTurn } from "./transcript-view";
 import type { Dashboard } from "./use-dashboard";
 
@@ -65,10 +65,10 @@ const NONE: OpenPullRequest = { kind: "none" };
 const OPENING: OpenPullRequest = { kind: "opening" };
 
 /** The text of the prompt that opened a pane's last turn, the user's or the dashboard's; none when a routine or another Bot sent it, as no press does. */
-const lastPrompt = ({ items }: PaneData): string | null => {
+const lastPrompt = itemsSelector((items): string | null => {
 	const opener = items.findLast(opensTurn);
 	return opener?.kind === "user" || opener?.kind === "dashboard" ? opener.text : null;
-};
+});
 
 /** The press under way per session id. */
 const presses = keyedStore<Press | null>(null);
