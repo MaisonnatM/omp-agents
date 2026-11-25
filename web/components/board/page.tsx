@@ -6,6 +6,7 @@
 import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
 import { type ReactNode, useEffect } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
+import { splitSuggestions } from "../../../src/shared/transcript";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
@@ -413,10 +414,10 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 		clamp: (next, element) => clampThread(next, room(element)),
 		read: (event, start) => clampThread(start.value - (event.clientX - start.coordinate), start.size),
 	});
-	// Escape closes the thread wherever focus is, unless a menu or dialog is open and takes it first.
+	// Escape closes the thread wherever focus is, unless a menu or dialog is open and takes it first; the reply box's suggested prompts stay listed, so they never count.
 	useEffect(() => {
 		const close = (event: globalThis.KeyboardEvent) => {
-			if (event.key !== "Escape" || event.defaultPrevented || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+			if (event.key !== "Escape" || event.defaultPrevented || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]:not([aria-label="Suggested prompts"])')) return;
 			event.preventDefault();
 			location.hash = closeHref;
 		};
@@ -467,7 +468,7 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 									return (
 										<li key={index}>
 											<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped}>
-												<BoardText text={entry.text} />
+												<BoardText text={entry.by.kind === "session" ? splitSuggestions(entry.text).body : entry.text} />
 											</MessageRow>
 										</li>
 									);
@@ -483,11 +484,13 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 	);
 }
 
-/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session it is for on the model, thinking level, and skill picked here. */
+/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session it is for on the model, thinking level, and skill picked here, and the prompts a session's last reply suggests list under it. */
 function ThreadComposer({ task, core, workspace, disabled, onChange }: { task: BoardTask; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
 	const target = wakeTarget(task, { kind: "user" });
 	const name = target ? sessionLabel(target, core.sessions).name : null;
+	const last = said(task).at(-1);
+	const suggestions = last?.by.kind === "session" ? splitSuggestions(last.text).suggestions : [];
 	const reply = ({ prompt, model, thinking, skill }: { prompt: string; model: BoardLaunch["model"]; thinking: string | null; skill: string | null }) => {
 		if (!prompt || disabled) return;
 		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: prompt, launch: { model, thinking, skill } });
@@ -495,7 +498,7 @@ function ThreadComposer({ task, core, workspace, disabled, onChange }: { task: B
 	return (
 		<div {...activityControl("board.reply")} className="shrink-0">
 			<NewSession
-				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply" }}
+				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply", suggestions }}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
 				launch={null}
