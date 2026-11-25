@@ -1,8 +1,8 @@
 /** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it. */
 import { IconFolder1, IconFolderOpen } from "central-icons";
-import { hashForSession } from "../../../src/shared/sessions";
+import { revealDetailsTab } from "../../details-tabs";
 import type { Workspace } from "../../../src/shared/workspaces";
-import { type BoardState, type BoardTask, statusOf } from "../../../templates/omp/agent/extensions/board/log";
+import { type BoardState, type BoardTask, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { activityControl } from "../../activity";
 import { folderName } from "../../labels";
@@ -31,18 +31,30 @@ export function boardWorkspaces(state: BoardState, sidebar: readonly Workspace[]
 	return { workspaces, open: open === null ? null : (known.get(open) ?? null) };
 }
 
-/** The sessions Board tasks in a Workspace name: who posted, replied, was started on, or claimed them, first seen first. */
-function boardSessions(tasks: readonly BoardTask[]): string[] {
-	const ids = new Set<string>();
-	for (const task of tasks) {
-		if (task.by.kind === "session") ids.add(task.by.sessionId);
-		for (const entry of task.replies) {
-			if ("by" in entry && entry.by.kind === "session") ids.add(entry.by.sessionId);
-			if ("note" in entry && "sessionId" in entry.note && entry.note.sessionId) ids.add(entry.note.sessionId);
-		}
+/** The sessions Board task `task` names: who posted it, replied to it, was started on it, or claimed it. */
+function namedIn(task: BoardTask): string[] {
+	const ids: string[] = [];
+	if (task.by.kind === "session") ids.push(task.by.sessionId);
+	for (const entry of task.replies) {
+		if ("by" in entry && entry.by.kind === "session") ids.push(entry.by.sessionId);
+		if ("note" in entry && "sessionId" in entry.note && entry.note.sessionId) ids.push(entry.note.sessionId);
 	}
-	return [...ids];
+	return ids;
 }
+
+
+/** The Board thread's open tabs, kept across threads. */
+export const THREAD_TABS = "omp-agents.board-thread-tabs";
+
+/** The Board's address for session `sessionId` in Workspace `workspace`: the latest Board thread whose replies wake it, which shows its conversation, else the latest that names it. */
+export function hashForBoardSession(state: BoardState, workspace: string, sessionId: string): string {
+	const tasks = state.tasks.filter(task => task.workspace === workspace).reverse();
+	const task = tasks.find(each => wakeTarget(each, { kind: "user" }) === sessionId) ?? tasks.find(each => namedIn(each).includes(sessionId));
+	return hashForBoard(workspace, task?.id ?? null);
+}
+
+/** Shows the session's conversation tab in the Board thread the address it goes with opens. */
+export const revealSessionTab = () => revealDetailsTab(THREAD_TABS, "session", "thread");
 
 const go = (hash: string) => () => {
 	location.hash = hash;
@@ -67,7 +79,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 					{workspaces.map(workspace => {
 						const inIt = state.tasks.filter(task => task.workspace === workspace.cwd);
 						const ready = inIt.filter(task => statusOf(state, task).kind === "ready").length;
-						const ids = boardSessions(inIt)
+						const ids = [...new Set(inIt.flatMap(namedIn))]
 							.map(id => ({ id, ...sessionLabel(id, sessions) }))
 							.filter(row => row.host);
 						const current = workspace.cwd === open?.cwd;
@@ -93,7 +105,15 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 									<SidebarMenu aria-label={`Board sessions in ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="my-1 ml-[15px] w-auto gap-px border-l border-border pl-1">
 										{ids.map(({ id, name }) => (
 											<SidebarMenuItem key={id}>
-												<SidebarMenuButton {...activityControl("board.session.open")} size="short" dot="filled" onClick={go(hashForSession(id))}>
+												<SidebarMenuButton
+													{...activityControl("board.session.open")}
+													size="short"
+													dot="filled"
+													onClick={() => {
+														revealSessionTab();
+														location.hash = hashForBoardSession(state, workspace.cwd, id);
+													}}
+												>
 													<span className="min-w-0 flex-1 truncate">{name}</span>
 												</SidebarMenuButton>
 											</SidebarMenuItem>

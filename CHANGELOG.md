@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- Clicking a session on the Board, in its sidebar, on a message's author, on "Working on it…", or with **Open its session**, now opens that session's conversation in its Board thread instead of leaving the Board for Sessions.
 - The tab row under a Workspace's name on the Board is gone; the Board shows its tasks, and the Board thread keeps its own tabs.
 - Fixed: the rule under the Board's tabs no longer flickers a pixel up and down when you click a tab.
 - A Board task still in work now reads "Working on it…" followed by its session's name, instead of "<session> is on it…", and its open thread shows the same line under the replies.
