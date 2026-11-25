@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- The Board sidebar's Bot groups now look and fold like the workspace groups in Sessions, smaller than before, and the Workspaces and Bots headers each fold their whole list.
 - The Board sidebar's Bot groups, Pinned, each section, and Other Bots, now fold open and shut when you click them, instead of opening the gallery of every Bot.
 - You can now edit your own messages on the Board and in a Board thread: hover one, click the pencil (**Edit message**), change it, and press Enter or **Save**. The session working on it stops what it was doing and picks up the new text; the message shows "(edited)".
 - Clicking a session on the Board, in its sidebar, on a message's author, on "Working on it…", or with **Open its session**, now opens that session's conversation in its Board thread instead of leaving the Board for Sessions.
