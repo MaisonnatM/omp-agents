@@ -263,20 +263,21 @@ function BoardText({ text }: { text: string }) {
 	);
 }
 
-/** The message's text, its Board task number, what it waits on, and labels. */
-function TaskBody({ status, task }: { status: BoardStatus; task: BoardTask }) {
+/** The message's text and its labels. */
+function TaskBody({ task }: { task: BoardTask }) {
+	const labels = Object.entries(task.labels);
 	return (
 		<>
 			<BoardText text={task.text || task.title} />
-			<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-				<span className="text-xs text-muted-foreground tabular-nums">#{task.id}</span>
-				{status.kind === "waiting" && <span className="text-xs text-muted-foreground">· waits on #{status.on}</span>}
-				{Object.entries(task.labels).map(([key, value]) => (
-					<Badge key={key} variant="dot" size="compact" color="gray">
-						{key}={value}
-					</Badge>
-				))}
-			</span>
+			{labels.length > 0 && (
+				<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
+					{labels.map(([key, value]) => (
+						<Badge key={key} variant="dot" size="compact" color="gray">
+							{key}={value}
+						</Badge>
+					))}
+				</span>
+			)}
 		</>
 	);
 }
@@ -305,7 +306,7 @@ function TaskMessage({ state, task, sessions, open, grouped, href }: { state: Bo
 	);
 	return (
 		<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={grouped} highlighted={open} toolbar={toolbar}>
-			<TaskBody status={status} task={task} />
+			<TaskBody task={task} />
 			{replies.length > 0 && <ThreadSummary replies={replies} sessions={sessions} href={href} />}
 			{(status.kind === "ready" || status.kind === "claimed") && <WorkingLine sessionId={session} sessions={sessions} href={href} />}
 		</MessageRow>
@@ -519,7 +520,7 @@ function ThreadMessages({ state, task, sessions }: { state: BoardState; task: Bo
 				<MessageScrollerViewport>
 					<MessageScrollerContent className="gap-0 py-2">
 						<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={false}>
-							<TaskBody status={statusOf(state, task)} task={task} />
+							<TaskBody task={task} />
 						</MessageRow>
 						<div className="flex items-center gap-3 px-5 py-2 text-[13px] text-muted-foreground">
 							<span className="shrink-0">{count === 0 ? "No replies yet" : `${count} ${count === 1 ? "reply" : "replies"}`}</span>
