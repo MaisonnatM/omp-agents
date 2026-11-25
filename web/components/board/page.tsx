@@ -238,33 +238,20 @@ function MessageRow({ by, at, sessions, grouped, highlighted = false, toolbar, c
 	);
 }
 
-function StatusBadge({ status, sessions }: { status: BoardStatus; sessions: KnownSessions }) {
-	switch (status.kind) {
-		case "ready":
-			return (
-				<Badge variant="dot" size="compact" color="blue">
-					ready
-				</Badge>
-			);
-		case "waiting":
-			return (
-				<Badge variant="dot" size="compact" color="gray">
-					waiting on #{status.on}
-				</Badge>
-			);
-		case "claimed":
-			return (
-				<Badge variant="dot" size="compact" color="amber">
-					claimed by {sessionLabel(status.sessionId, sessions).name} · {Math.max(0, Math.ceil((status.until - Date.now()) / 60_000))} min left
-				</Badge>
-			);
-		case "done":
-			return (
-				<Badge variant="dot" size="compact" color="green">
-					done
-				</Badge>
-			);
-	}
+/** A row under a Board task still in work, in the thread summary's style: who works on it, with shimmering text, as a Slack bot shows it is thinking. */
+function WorkingLine({ sessionId, sessions, href }: { sessionId: string | null; sessions: KnownSessions; href: string }) {
+	return (
+		<a {...activityControl("board.task.open")} href={href} className="mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background">
+			{sessionId ? (
+				<Avatar by={{ kind: "session", sessionId }} sessions={sessions} size="summary" />
+			) : (
+				<span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+					<IconAiBotHead className="size-4" />
+				</span>
+			)}
+			<span className="shimmer-text text-[13px]">{sessionId ? `${sessionLabel(sessionId, sessions).name} is on it…` : "Starting a session…"}</span>
+		</a>
+	);
 }
 
 /** A Board task's or reply's text as Markdown, with single line breaks kept, as a Bot's message shows. */
@@ -276,14 +263,14 @@ function BoardText({ text }: { text: string }) {
 	);
 }
 
-/** The message's text, its Board task number, status, and labels. */
-function TaskBody({ state, task, sessions }: { state: BoardState; task: BoardTask; sessions: KnownSessions }) {
+/** The message's text, its Board task number, what it waits on, and labels. */
+function TaskBody({ status, task }: { status: BoardStatus; task: BoardTask }) {
 	return (
 		<>
 			<BoardText text={task.text || task.title} />
 			<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
 				<span className="text-xs text-muted-foreground tabular-nums">#{task.id}</span>
-				<StatusBadge status={statusOf(state, task)} sessions={sessions} />
+				{status.kind === "waiting" && <span className="text-xs text-muted-foreground">· waits on #{status.on}</span>}
 				{Object.entries(task.labels).map(([key, value]) => (
 					<Badge key={key} variant="dot" size="compact" color="gray">
 						{key}={value}
@@ -298,6 +285,7 @@ const said = (task: BoardTask): Extract<BoardReply, { by: BoardAuthor }>[] => ta
 
 function TaskMessage({ state, task, sessions, open, grouped, href }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string }) {
 	const replies = said(task);
+	const status = statusOf(state, task);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const toolbar = (
 		<>
@@ -317,8 +305,9 @@ function TaskMessage({ state, task, sessions, open, grouped, href }: { state: Bo
 	);
 	return (
 		<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={grouped} highlighted={open} toolbar={toolbar}>
-			<TaskBody state={state} task={task} sessions={sessions} />
+			<TaskBody status={status} task={task} />
 			{replies.length > 0 && <ThreadSummary replies={replies} sessions={sessions} href={href} />}
+			{(status.kind === "ready" || status.kind === "claimed") && <WorkingLine sessionId={session} sessions={sessions} href={href} />}
 		</MessageRow>
 	);
 }
@@ -530,7 +519,7 @@ function ThreadMessages({ state, task, sessions }: { state: BoardState; task: Bo
 				<MessageScrollerViewport>
 					<MessageScrollerContent className="gap-0 py-2">
 						<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={false}>
-							<TaskBody state={state} task={task} sessions={sessions} />
+							<TaskBody status={statusOf(state, task)} task={task} />
 						</MessageRow>
 						<div className="flex items-center gap-3 px-5 py-2 text-[13px] text-muted-foreground">
 							<span className="shrink-0">{count === 0 ? "No replies yet" : `${count} ${count === 1 ? "reply" : "replies"}`}</span>
