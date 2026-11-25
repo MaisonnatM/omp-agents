@@ -46,6 +46,9 @@ export type RoutineTask =
 /** When a command run posts its output to the Bot, beside every run. */
 export const COMMAND_POSTS = ["failures", "changes"] as const;
 export type CommandPost = (typeof COMMAND_POSTS)[number];
+
+/** The error a command run records when it exits with `code`, other than 0. */
+export const exitedWith = (code: number): string => `Exited with code ${code}.`;
 const isCommandPost = oneOf(COMMAND_POSTS);
 
 /**

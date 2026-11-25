@@ -99,6 +99,23 @@ describe("earlyRuns", () => {
 			{ routineId: "r1", hoursAgo: 2 },
 		]);
 	});
+
+	test("a command whose routine posts only its failures hands off by exiting non-zero, which is no error unless the run errored otherwise", () => {
+		const handOff = { ...command(2, 10 * MINUTE, 1), errors: ["Exited with code 1."] };
+		const failures = routine({ task: { kind: "command", command: "check", post: "failures" }, runs: [handOff, ...usual().slice(1)] });
+		expect(earlyRuns([failures], NOW, noTurn)).toEqual([]);
+		expect(earlyRuns([{ ...failures, task: { kind: "command", command: "check" } }], NOW, noTurn).map(({ exit }) => exit)).toEqual(["errored"]);
+		const alsoFailed = { ...failures, runs: [{ ...handOff, errors: [...handOff.errors, "The Bot's session did not start."] }, ...usual().slice(1)] };
+		expect(earlyRuns([alsoFailed], NOW, noTurn).map(({ exit }) => exit)).toEqual(["errored"]);
+	});
+
+	test("a run late only by the time the Mac slept did not miss its schedule, and an overdue slot the Mac slept through is not listed", () => {
+		const late = command(2);
+		const sleptAll = () => 2 * HOUR;
+		expect(earlyRuns([routine({ runs: [late, command(5)] })], NOW, noTurn, sleptAll)).toEqual([]);
+		expect(earlyRuns([routine({ runs: [late, command(5)] })], NOW, noTurn, () => HOUR)).toEqual([{ botId: BOT, routineId: "r1", name: "Digest", at: late.at, exit: "missed" }]);
+		expect(earlyRuns([routine({ scheduledAt: NOW - 3 * HOUR })], NOW, noTurn, sleptAll)).toEqual([]);
+	});
 });
 
 describe("routineTurn", () => {

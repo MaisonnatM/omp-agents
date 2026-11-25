@@ -7,7 +7,7 @@
  */
 import { errorText } from "../json";
 import type { ShellResult } from "../proc";
-import { COMMAND_TIME_LIMIT, type CommandPost, isDue, isTriggeredBy, MAX_TRIGGER_EVENTS, triggersOn, type CommandRun, type Routine, type RoutineRun, type TriggerEvent } from "../routines";
+import { COMMAND_TIME_LIMIT, type CommandPost, exitedWith, isDue, isTriggeredBy, MAX_TRIGGER_EVENTS, triggersOn, type CommandRun, type Routine, type RoutineRun, type TriggerEvent } from "../routines";
 import { SerialLane } from "../serial-lane";
 import type { BotId } from "../shared/bots";
 import { type RoutineMessage, routineMessageText } from "../shared/routine-message";
@@ -181,7 +181,7 @@ export class RoutineRunner {
 			({ exitCode, output, slept }) => {
 				const endedAt = this.#deps.now();
 				if (exitCode === null) ended({ phase: "stopped", reason: "time-limit", output, startedAt, endedAt, slept }, `Stopped after ${COMMAND_TIME_LIMIT}.`);
-				else ended({ phase: "exited", code: exitCode, output, startedAt, endedAt, slept }, exitCode === 0 ? null : `Exited with code ${exitCode}.`);
+				else ended({ phase: "exited", code: exitCode, output, startedAt, endedAt, slept }, exitCode === 0 ? null : exitedWith(exitCode));
 			},
 			(err: unknown) => {
 				const error = errorText(err);

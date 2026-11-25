@@ -40,7 +40,7 @@ export interface NoticeSources {
 	/** The interrupted dashboard sessions that stopped while their turn ran. */
 	stoppedSessions(): StoppedSession[];
 	/** The routine runs that exited early, which the daily heartbeat lists. */
-	earlyRuns(): EarlyRun[];
+	earlyRuns(): Promise<EarlyRun[]>;
 	now(): number;
 }
 
@@ -316,7 +316,7 @@ export class Notices {
 			case "stopped":
 				return all(stoppedNotices(this.#sources.stoppedSessions(), this.#sources.now()), false);
 			case "routine-health":
-				return all(healthNotices(this.#sources.earlyRuns(), this.#sources.now()), false);
+				return all(healthNotices(await this.#sources.earlyRuns(), this.#sources.now()), false);
 		}
 	}
 
