@@ -4,7 +4,7 @@
  * task's Board thread at the right, as Slack's thread pane. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
 import { IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
-import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header } from "../page-header";
@@ -16,6 +16,7 @@ import { InputMessage } from "@/components/ui/input-message";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { getJson } from "../../api";
 import { activityControl } from "../../activity";
 import { boardDraftKey, boardThreadDraftKey, useComposerDraft } from "../../composer-drafts";
 import { useShortcuts } from "../../shortcuts";
@@ -138,15 +139,37 @@ function hueOf(id: string): string {
 	return HUES[Math.abs(hash) % HUES.length] ?? "bg-sky-600";
 }
 
-/** The author's square picture: a person for you, a session's initial on its own color for a session. */
+/** Your Slack profile picture, asked once per page load; `null` when Slack is not connected or the ask failed. */
+let yourPicture: Promise<string | null> | null = null;
+
+/** Your square picture: your Slack profile picture, else a person. */
+function YourAvatar({ size, box }: { size: "message" | "summary"; box: string }) {
+	const [url, setUrl] = useState<string | null>(null);
+	useEffect(() => {
+		yourPicture ??= getJson<{ avatarUrl: string | null }>("/api/integrations/slack/me").then(
+			answer => answer.avatarUrl,
+			() => null,
+		);
+		let live = true;
+		void yourPicture.then(found => {
+			if (live) setUrl(found);
+		});
+		return () => {
+			live = false;
+		};
+	}, []);
+	if (url) return <img aria-hidden src={url} alt="" referrerPolicy="no-referrer" className={cn("shrink-0 object-cover", box)} />;
+	return (
+		<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-foreground text-background", box)}>
+			<IconUser className={size === "message" ? "size-5" : "size-3.5"} />
+		</span>
+	);
+}
+
+/** The author's square picture: yours for you, a session's initial on its own color for a session. */
 function Avatar({ by, sessions, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
 	const box = size === "message" ? "size-9 rounded-lg text-sm" : "size-6 rounded-md text-[11px]";
-	if (by.kind === "user")
-		return (
-			<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-foreground text-background", box)}>
-				<IconUser className={size === "message" ? "size-5" : "size-3.5"} />
-			</span>
-		);
+	if (by.kind === "user") return <YourAvatar size={size} box={box} />;
 	const name = sessionLabel(by.sessionId, sessions).name;
 	return (
 		<span aria-hidden className={cn("flex shrink-0 items-center justify-center font-semibold text-white", hueOf(by.sessionId), box)}>

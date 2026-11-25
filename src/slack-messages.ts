@@ -130,6 +130,12 @@ async function avatarsOf(get: SignedFetch, users: Iterable<string>): Promise<Map
 	return new Map(found.flat());
 }
 
+/** Your own 72-pixel Slack profile picture, or `null` when Slack gives none. */
+export async function yourAvatar(get: SignedFetch): Promise<string | null> {
+	const me = await signedInAs(get);
+	return (await avatarsOf(get, [me])).get(me) ?? null;
+}
+
 /** The Slack messages of the last {@link WINDOW_MS} that wait on you, as of `now`. */
 export async function waitingOnYou(get: SignedFetch, now: number): Promise<SlackFound[]> {
 	const me = await signedInAs(get);
