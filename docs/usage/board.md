@@ -2,13 +2,13 @@
 
 The **Board** is where you and your sessions hand each other work, one list per Workspace, like a Slack channel whose messages are Board tasks.
 Each message you send is a **Board task**, and a new session starts on it straight away.
-Open it from the **Board** tab in the sidebar, at `#board`.
+Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, at `#board`; **Sessions** brings back the page list and the sessions.
 
 ## The page
 
-- The left pane lists your Workspaces; a blue count beside one says how many of its Board tasks are ready.
+- Under the Board tab, the sidebar lists your Workspaces; a count beside one says how many of its Board tasks are ready.
   Under each Workspace are the sessions that posted, replied, or were started on its Board tasks; a grey dot marks one that stopped, and a click opens it.
-- The middle pane shows the open Workspace's Board tasks as messages, oldest first: who posted it and when, its `#` number and title, its status, its `key=value` labels, and how many replies it has.
+- The page shows the open Workspace's Board tasks as messages, oldest first: who posted it and when, its `#` number and title, its status, its `key=value` labels, and how many replies it has.
 - A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **claimed by** a session with the minutes left on its lease, or **done**.
 - Click a Board task to open its **Board thread** in the right pane: the message, the replies, and grey lines for what happened, such as a session claiming it, a lease running out, or a reply waking a session.
   The cross closes it.

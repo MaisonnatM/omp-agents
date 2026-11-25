@@ -1,10 +1,9 @@
 /**
- * The Board page: the Workspaces with their Board sessions at the left, the open Workspace's Board tasks as messages
- * with a composer that posts one, and the open Board task's Board thread at the right.
+ * The Board page: the open Workspace's Board tasks as messages with a composer that posts one, and the open Board
+ * task's Board thread at the right; the sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
 import { IconCrossMedium } from "central-icons";
 import { type KeyboardEvent, useState } from "react";
-import { hashForSession } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { type BoardAuthor, type BoardChange, type BoardNote, type BoardState, type BoardStatus, type BoardTask, MAX_TITLE, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
@@ -13,12 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import type { ModuleControlId } from "../../modules";
-import { hashForPage } from "../../routing";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
 import type { CoreData } from "../module-views";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute } from "./module";
+import { boardWorkspaces, hashForBoard } from "./sidebar";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -28,63 +27,15 @@ interface BoardPageProps {
 	onChange: (change: BoardChange) => Promise<void>;
 }
 
-const hashForBoard = (workspace: string | null, thread: number | null = null): string => hashForPage({ kind: "board", workspace, thread });
-
-/** The sessions Board tasks in a Workspace name: who posted, replied, was started on, or claimed them, first seen first. */
-function boardSessions(tasks: readonly BoardTask[]): string[] {
-	const ids = new Set<string>();
-	for (const task of tasks) {
-		if (task.by.kind === "session") ids.add(task.by.sessionId);
-		for (const entry of task.replies) {
-			if ("by" in entry && entry.by.kind === "session") ids.add(entry.by.sessionId);
-			if ("note" in entry && "sessionId" in entry.note && entry.note.sessionId) ids.add(entry.note.sessionId);
-		}
-	}
-	return [...ids];
-}
-
 export function BoardPage({ route, core, state, disabled, onChange }: BoardPageProps) {
 	useMinute();
 	if (state === null) return <p className="px-6 py-6 text-sm text-muted-foreground">Loading the Board…</p>;
-	const known = new Map<string, Workspace>(core.workspaces.map(workspace => [workspace.cwd, workspace]));
-	for (const task of state.tasks) if (!known.has(task.workspace)) known.set(task.workspace, { cwd: task.workspace, cwdDisplay: task.workspace });
-	if (route.workspace !== null && !known.has(route.workspace)) known.set(route.workspace, { cwd: route.workspace, cwdDisplay: route.workspace });
-	const workspaces = [...known.values()];
-	const open = route.workspace ?? core.workspace ?? state.tasks.at(-1)?.workspace ?? workspaces[0]?.cwd ?? null;
-	const openWorkspace = open === null ? null : (known.get(open) ?? { cwd: open, cwdDisplay: open });
+	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
+	const open = openWorkspace?.cwd ?? null;
 	const tasks = state.tasks.filter(task => task.workspace === open);
 	const thread = route.thread === null ? null : (tasks.find(task => task.id === route.thread) ?? null);
 	return (
 		<div className="flex h-full min-h-0 flex-1">
-			<aside aria-label="Workspaces" className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border">
-				<h2 className="px-4 pt-4 pb-1 text-sm font-semibold">Board</h2>
-				<p className="px-4 pt-2 pb-1 text-xs font-medium text-muted-foreground">Workspaces</p>
-				<ul className="flex flex-col gap-0.5 px-2 pb-4">
-					{workspaces.map(workspace => {
-						const inIt = state.tasks.filter(task => task.workspace === workspace.cwd);
-						const ready = inIt.filter(task => statusOf(state, task).kind === "ready").length;
-						return (
-							<li key={workspace.cwd}>
-								<a
-									{...activityControl("board.workspace")}
-									href={hashForBoard(workspace.cwd)}
-									aria-current={workspace.cwd === open ? "page" : undefined}
-									title={workspace.cwdDisplay}
-									className={cn("flex h-8 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent", workspace.cwd === open && "bg-accent font-medium")}
-								>
-									<span className="min-w-0 flex-1 truncate">{folder(workspace.cwdDisplay)}</span>
-									{ready > 0 && (
-										<Badge size="compact" color="blue" aria-label={`${ready} ready`}>
-											{ready}
-										</Badge>
-									)}
-								</a>
-								<SessionRows ids={boardSessions(inIt)} sessions={core.sessions} />
-							</li>
-						);
-					})}
-				</ul>
-			</aside>
 			<main className="flex min-w-0 flex-1 flex-col">
 				<header className="flex h-14 shrink-0 flex-col justify-center border-b border-border px-6">
 					<h1 className="truncate text-sm font-semibold">{openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace"}</h1>
@@ -106,26 +57,6 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 }
 
 const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
-
-function SessionRows({ ids, sessions }: { ids: string[]; sessions: KnownSessions }) {
-	if (!ids.length) return null;
-	return (
-		<ul className="flex flex-col py-0.5 pl-4">
-			{ids.map(id => {
-				const { name, host } = sessionLabel(id, sessions);
-				return (
-					<li key={id}>
-						<a {...activityControl("board.session.open")} href={hashForSession(id)} className="flex h-7 items-center gap-2 rounded-md px-2 text-xs hover:bg-accent">
-							<span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", host ? "bg-green-500" : "bg-muted-foreground/40")} />
-							<span className="min-w-0 flex-1 truncate">{name}</span>
-							{!host && <span className="text-muted-foreground">stopped</span>}
-						</a>
-					</li>
-				);
-			})}
-		</ul>
-	);
-}
 
 function authorName(by: BoardAuthor, sessions: KnownSessions): string {
 	return by.kind === "user" ? "You" : sessionLabel(by.sessionId, sessions).name;

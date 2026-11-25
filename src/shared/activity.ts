@@ -100,6 +100,8 @@ export const CONTROLS = [
 	{ id: "sidebar.right.toggle", label: "Right sidebar toggle", area: "Sidebar" },
 	{ id: "sidebar.workspace", label: "Sidebar workspace picker", area: "Sidebar" },
 	{ id: "sidebar.command-menu", label: "Command menu button", area: "Sidebar" },
+	{ id: "sidebar.view.sessions", label: "Sidebar Sessions tab, which shows the page list and the sessions", area: "Sidebar" },
+	{ id: "sidebar.view.board", label: "Sidebar Board tab, which opens the Board and lists its workspaces", area: "Sidebar" },
 	{ id: "bots.delete", label: "Bot Delete, before it is confirmed", area: "Bots" },
 	{ id: "bots.restart", label: "Bot Restart conversation, before it is confirmed", area: "Bots" },
 	{ id: "bots.details", label: "Bot details sidebar, shown or hidden from its name", area: "Bots" },
