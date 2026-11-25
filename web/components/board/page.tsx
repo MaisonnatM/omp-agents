@@ -7,6 +7,7 @@ import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { hashForSession, type View } from "../../../src/shared/sessions";
+import { splitSuggestions } from "../../../src/shared/transcript";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
@@ -428,7 +429,7 @@ function Thread({ state, task, core, workspace, channel, closeHref, disabled, on
 	// Escape closes the thread wherever focus is, unless a menu or dialog is open and takes it first.
 	useEffect(() => {
 		const close = (event: globalThis.KeyboardEvent) => {
-			if (event.key !== "Escape" || event.defaultPrevented || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+			if (event.key !== "Escape" || event.defaultPrevented || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]:not([aria-label="Suggested prompts"])')) return;
 			event.preventDefault();
 			location.hash = closeHref;
 		};
@@ -522,7 +523,7 @@ function ThreadMessages({ state, task, sessions }: { state: BoardState; task: Bo
 								return (
 									<li key={index}>
 										<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped}>
-											<BoardText text={entry.text} />
+											<BoardText text={entry.by.kind === "session" ? splitSuggestions(entry.text).body : entry.text} />
 										</MessageRow>
 									</li>
 								);
@@ -536,9 +537,11 @@ function ThreadMessages({ state, task, sessions }: { state: BoardState; task: Bo
 	);
 }
 
-/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here. */
+/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name` on the model, thinking level, and skill picked here, and the prompts a session's last reply suggests list under it. */
 function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const { send } = useDashboardActions();
+	const last = said(task).at(-1);
+	const suggestions = last?.by.kind === "session" ? splitSuggestions(last.text).suggestions : [];
 	const reply = ({ prompt, model, thinking, skill }: { prompt: string; model: BoardLaunch["model"]; thinking: string | null; skill: string | null }) => {
 		if (!prompt || disabled) return;
 		void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: prompt, launch: { model, thinking, skill } });
@@ -546,7 +549,7 @@ function ThreadComposer({ task, name, core, workspace, disabled, onChange }: { t
 	return (
 		<div {...activityControl("board.reply")} className="shrink-0">
 			<NewSession
-				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply" }}
+				board={{ placeholder: name ? `Reply to ${name}…` : "Reply…", sendLabel: name ? "Send reply; it wakes the session if it stopped" : "Send reply", suggestions }}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
 				launch={null}

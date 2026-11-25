@@ -37,6 +37,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   A session running in a terminal keeps its own model; the skill still applies.
 - The reply goes to the session that holds the claim; on a done Board task, to the session that marked it done; else to the session started on it, or the session that posted it. It wakes that session if it stopped.
   The box says who it reaches.
+- When the last reply is a session's and ends on a `Suggestions:` line with numbered prompts, the box lists them under its action bar while it is empty, with the same keys and clicks as a session's suggested prompts; the thread shows the reply without that block.
 
 ## What sessions do
 
