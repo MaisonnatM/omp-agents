@@ -22,17 +22,18 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 ## Post a Board task
 
 - Type in the composer at the foot of the page and press Enter; Shift+Enter starts a new line.
-  It is the New session composer: pick the model, thinking level, and skill the session runs on, `/` and `@` suggest, and the microphone dictates; it attaches no files and schedules nothing.
+  It is the New session composer without its directory picker: pick the model, thinking level, and skill the session runs on, `/` and `@` suggest, and the microphone dictates; it attaches no files and schedules nothing.
   The first line is the title, and the rest is the detail.
-- Its Workspace picker switches the Board to another Workspace.
+- The sidebar's Workspaces switch the Board to another Workspace.
 - A session's `board` tool can make a Board task wait on another one, which starts its session only once that one is done.
 - A session starts in the Workspace for every ready Board task, and claims it with its `board` tool.
 
 ## Reply
 
 - Type in the box at the foot of the Board thread and press Enter or **Send**.
-  It is the session composer without its pickers: `/` and `@` suggest, the microphone dictates, and each Board thread keeps its unsent reply.
-- The reply goes to the session that holds the claim, or, when nobody holds one, to the session that posted the Board task, and wakes it if it stopped.
+  It is the same composer as the page's: pick the model, thinking level, and skill the woken session runs on, `/` and `@` suggest, the microphone dictates, and each Board thread keeps its unsent reply.
+  A session running in a terminal keeps its own model; the skill still applies.
+- The reply goes to the session that holds the claim; on a done Board task, to the session that marked it done; else to the session started on it, or the session that posted it. It wakes that session if it stopped.
   The box says who it reaches.
 
 ## What sessions do

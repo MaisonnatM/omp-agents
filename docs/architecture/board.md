@@ -20,7 +20,8 @@ It imports nothing, so the starter kit can ship it.
   `parseChange` refuses them from the page and the tool.
 
 `statusOf` says whether a Board task is done, claimed, waiting on another, or ready.
-`unstartedReady` lists the ready Board tasks no session was started on since they last became ready, `lapsed` the ones whose lease ran out or whose started session never claimed them within a lease, and `wakeTarget` who a reply wakes: the claimer, else a session that posted the Board task, never the replier, and nobody once it is done.
+`unstartedReady` lists the ready Board tasks no session was started on since they last became ready, `lapsed` the ones whose lease ran out or whose started session never claimed them within a lease, and `wakeTarget` who a reply wakes: the claimer, on a done Board task the session that marked it done, else the session started on it, else a session that posted it, never the replier.
+A reply from the page carries the `launch` picked in its composer, which the reply keeps.
 
 ## The runner
 
@@ -30,7 +31,7 @@ The dashboard calls the run's `changed` after every change to the module and whe
 `BoardRunner` in `src/server/board-runner.ts` does the rest while its server is the owner:
 
 - It starts a session on each Board task `unstartedReady` lists, prompted by `startPrompt` to claim it, and records the `start`.
-- It wakes `wakeTarget` for each new reply with `wakePrompt`, which carries `DASHBOARD_PROMPT_PREFIX`, and records `woke` when the session had stopped.
+- It wakes `wakeTarget` for each new reply with `wakePrompt`, which carries `DASHBOARD_PROMPT_PREFIX`, and records `woke` when the session had stopped; the core's `wake` switches a session this dashboard started to the reply's model and thinking level, and starts the prompt with the reply's `/skill:`.
 - Every 30 seconds its sweep records an `expire` for each Board task `lapsed` lists, which makes it ready again and so starts a new session.
 
 ## The agent side

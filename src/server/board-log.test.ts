@@ -82,7 +82,7 @@ describe("the Board's projection", () => {
 		expect(lapsed(state, LEASE_MS).map(each => each.id)).toEqual([1]);
 	});
 
-	test("a reply wakes the claimer, else a session author, never the replier, and nobody once done", () => {
+	test("a reply wakes the claimer, the finisher once done, else the started session or a session author, never the replier", () => {
 		const posted = play([[0, { op: "post", by: session("author"), workspace: WS, title: "One" }]]);
 		expect(wakeTarget(task(posted, 1), user)).toBe("author");
 		expect(wakeTarget(task(posted, 1), session("author"))).toBeNull();
@@ -92,8 +92,19 @@ describe("the Board's projection", () => {
 		expect(wakeTarget(task(claimed, 1), session("worker"))).toBeNull();
 		const byUser = play([[0, { op: "post", by: user, workspace: WS, title: "Two" }]]);
 		expect(wakeTarget(task(byUser, 1), user)).toBeNull();
+		const started = play([[1, { op: "start", task: 1, sessionId: "fresh" }]], byUser);
+		expect(wakeTarget(task(started, 1), user)).toBe("fresh");
 		const done = play([[2, { op: "done", sessionId: "worker", task: 1 }]], claimed);
-		expect(wakeTarget(task(done, 1), user)).toBeNull();
+		expect(wakeTarget(task(done, 1), user)).toBe("worker");
+		expect(wakeTarget(task(done, 1), session("worker"))).toBeNull();
+	});
+
+	test("a reply keeps the launch picked for the session it wakes", () => {
+		const launch = { model: { provider: "anthropic", id: "claude-opus-5-5" }, thinking: "high", skill: null };
+		const change = parseChange({ op: "reply", by: user, task: 1, text: "Go on", launch }, false);
+		expect(change).toEqual({ op: "reply", by: user, task: 1, text: "Go on", launch });
+		const replied = play([[1, change as BoardChange]], play([[0, { op: "post", by: user, workspace: WS, title: "One" }]]));
+		expect(task(replied, 1).replies.at(-1)).toEqual({ at: 1, by: user, text: "Go on", launch });
 	});
 
 	test("the server's own changes never come from a page or a tool", () => {

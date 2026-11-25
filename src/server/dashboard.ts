@@ -523,9 +523,14 @@ export class Dashboard {
 				const sessionId = sessions.get(result.instanceId)?.sessionId;
 				return sessionId ? { sessionId } : { error: "The session exited as it started." };
 			},
-			async wake(sessionId, text) {
+			async wake(sessionId, text, launch) {
 				const live = sessions.bySessionId(sessionId);
-				await (live ?? (await reach(sessionId))).prompt(null, text, [], "followUp");
+				const session = live ?? (await reach(sessionId));
+				// Only a session this dashboard started switches models; one running in a terminal keeps its own.
+				const owned = sessions.started(session.instanceId);
+				if (launch?.model) await owned?.setModel(launch.model, launch.thinking);
+				else if (launch?.thinking) await owned?.setThinking(launch.thinking);
+				await session.prompt(null, launch?.skill ? `/skill:${launch.skill} ${text}` : text, [], "followUp");
 				return { resumed: !live };
 			},
 			owner: () => ownerLock.held,

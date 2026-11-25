@@ -2,7 +2,7 @@
  * What the Board does on its own while this server runs the unattended work: it starts a new session on each ready
  * Board task, wakes the session a reply is for, and returns each lapsed claim to ready. See docs/architecture/board.md.
  */
-import { type BoardAuthor, type BoardChange, type BoardState, type BoardTask, lapsed, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardState, type BoardTask, lapsed, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
 import { errorText } from "../json";
 import type { ModuleRun, ModuleRunCore } from "../modules";
 import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
@@ -64,7 +64,7 @@ export class BoardRunner implements ModuleRun {
 				for (const entry of task.replies.slice(seen.get(task.id) ?? 0))
 					if ("by" in entry) {
 						const target = wakeTarget(task, entry.by);
-						if (target !== null) void this.#wake(task, target, entry.by, entry.text);
+						if (target !== null) void this.#wake(task, target, entry.by, entry.text, entry.launch);
 					}
 		for (const task of unstartedReady(state)) if (!this.#starting.has(task.id)) void this.#start(task);
 	}
@@ -85,9 +85,9 @@ export class BoardRunner implements ModuleRun {
 		}
 	}
 
-	async #wake(task: BoardTask, sessionId: string, by: BoardAuthor, text: string): Promise<void> {
+	async #wake(task: BoardTask, sessionId: string, by: BoardAuthor, text: string, launch?: BoardLaunch): Promise<void> {
 		try {
-			const { resumed } = await this.#core.wake(sessionId, wakePrompt(task, by, text));
+			const { resumed } = await this.#core.wake(sessionId, wakePrompt(task, by, text), launch);
 			if (resumed) this.#change({ op: "woke", task: task.id, sessionId });
 		} catch (error) {
 			console.error(`omp-agents: could not wake ${sessionId} for Board task #${task.id}: ${errorText(error)}`);
