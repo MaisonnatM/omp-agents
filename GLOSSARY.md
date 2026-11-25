@@ -200,6 +200,24 @@ _Avoid_: Delayed message, routine
 The one server that holds `server.lock` and runs the unattended work.
 _Avoid_: Leader, primary
 
+## Board
+
+**Board**:
+The page and store where you and your sessions post Board tasks for each other, one list per Workspace, kept as an append-only event log in `board-events.jsonl`.
+_Avoid_: Channel, chat, Slack
+
+**Board task**:
+One message on the Board that asks for work: a title, labels, and the Board tasks it needs done first; a new session starts on it once it is ready.
+_Avoid_: Task (omp's task tool), todo, ticket, issue
+
+**Board thread**:
+A Board task's replies and the system notes under it, such as who claimed it or whose lease ran out.
+_Avoid_: Thread (alone), conversation, session
+
+**Lease**:
+The 15 minutes a claim on a Board task lasts unless the session renews it; once it runs out, the Board task is ready again and a new session starts on it.
+_Avoid_: Lock, timeout
+
 ## Sport
 
 **Workout**:

@@ -2,6 +2,7 @@
  * The modules the dashboard is built with, and what a module gives the server: a feature beside the core, such as Sport,
  * which the core reaches only through this list. The page's half is `web/modules.ts`; see docs/architecture/modules.md.
  */
+import { BOARD_MODULE } from "./board-module";
 import { MEMORY_MODULE } from "./memory-module";
 import type { InboxOptions, JsonInboxDir } from "./server/json-inbox";
 import type { RouteKit, Routes } from "./server/route-kit";
@@ -29,6 +30,27 @@ export interface ModuleStore<Value, Change> {
 	parse(change: unknown): Change | null;
 	/** The directory an agent's tool leaves its changes in, which the server drains into the state through `apply`. */
 	inbox?(state: () => Value, apply: (change: Change) => boolean, options: InboxOptions): JsonInboxDir<Change>;
+	/** What the module does on its own, such as start and wake sessions; it acts only while `core.owner()` says this server runs the unattended work. */
+	run?(state: () => Value, apply: (change: Change) => boolean, core: ModuleRunCore): ModuleRun;
+}
+
+/** What a module's own work reaches of the core. */
+export interface ModuleRunCore {
+	/** Starts a new session in `cwd` on `prompt`, as the page's New session does. */
+	start(cwd: string, prompt: string): Promise<{ sessionId: string } | { error: string }>;
+	/** Sends `text` to session `sessionId` as a follow-up, resuming it first when it stopped; `resumed` says whether it had. */
+	wake(sessionId: string, text: string): Promise<{ resumed: boolean }>;
+	/** Whether this server runs the unattended work, the one that may start and wake sessions. */
+	owner(): boolean;
+	now(): number;
+}
+
+/** A module's own work while the server runs. */
+export interface ModuleRun {
+	start(): void;
+	stop(): void;
+	/** Called after each change to the module's state, and when this server starts to run the unattended work. */
+	changed(): void;
 }
 
 /** A file a module ships beside the server's code: `source` in a checkout, and in a packaged app the bundle `bundle`. */
@@ -60,7 +82,7 @@ export type StoredModule<Id extends string, Value, Change> = Omit<ServerModule<I
 };
 
 /** Every module, by id: adding one is adding its definition here and its page's to `WEB_MODULES` in `web/modules.ts`. */
-export const SERVER_MODULES = { sport: SPORT_MODULE, memory: MEMORY_MODULE, projects: PROJECTS_MODULE };
+export const SERVER_MODULES = { sport: SPORT_MODULE, memory: MEMORY_MODULE, projects: PROJECTS_MODULE, board: BOARD_MODULE };
 SERVER_MODULES satisfies { readonly [I in ModuleId]: ServerModule<I> };
 
 type Modules = typeof SERVER_MODULES;
@@ -97,6 +119,17 @@ export function parseModuleChange<I extends StoredModuleId>(id: I, change: unkno
 export function moduleInboxes(files: ModuleFiles, apply: <I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => boolean, options: InboxOptions): JsonInboxDir<unknown>[] {
 	const inboxOf = <I extends StoredModuleId>(id: I): JsonInboxDir<unknown> | undefined => STORED_MODULES[id].store.inbox?.(() => files[id].value, change => apply(id, change), options);
 	return STORED_IDS.flatMap(id => inboxOf(id) ?? []);
+}
+
+/** The own work of the modules that do some, by id; `apply` applies a change to module `id`'s state and says whether it reached the disk. */
+export function moduleRuns(files: ModuleFiles, apply: <I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => boolean, core: ModuleRunCore): Map<StoredModuleId, ModuleRun> {
+	const runOf = <I extends StoredModuleId>(id: I): ModuleRun | undefined => STORED_MODULES[id].store.run?.(() => files[id].value, change => apply(id, change), core);
+	return new Map(
+		STORED_IDS.flatMap(id => {
+			const run = runOf(id);
+			return run ? [[id, run] as const] : [];
+		}),
+	);
 }
 
 const isModuleId = (id: string): id is ModuleId => Object.hasOwn(SERVER_MODULES, id);

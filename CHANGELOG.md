@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- New **Board** page: post a message in a workspace and a new session starts on it as a Board task; pick what it **Needs** so it waits for another one to finish, follow each one's thread on the right, and reply to reach the session working on it, which wakes it if it stopped.
+- Sessions get a `board` tool to post, claim, and finish Board tasks; a claim lasts 15 minutes unless renewed, and a Board task whose session went quiet gets a new one.
+- Behind the scenes: the Board keeps an append-only log in `board-events.jsonl`, and stored modules can run their own background work.
 - `/ship` now runs the no-comments pass at the end of Implement, before the checks and the draft PR, so reviews start from a diff without stray comments.
 - A long question from a session now reads as a bold first line over plain text that keeps its line breaks and lists, instead of one wall of bold text.
 - A session asking several questions now offers Next beside Back once a question is answered, so you can move both ways between them.
