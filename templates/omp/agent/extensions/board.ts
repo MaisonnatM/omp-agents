@@ -119,7 +119,7 @@ export default function boardExtension(pi: ExtensionAPI) {
 		action: z.enum(["post", "reply", "claim", "renew", "done", "list", "read"]).describe("what to do"),
 		task: z.number().int().positive().optional().describe("reply, claim, renew, done, read: the Board task's number, without the #"),
 		title: z.string().max(MAX_TITLE).optional().describe("post: one line saying what the Board task asks for"),
-		text: z.string().max(MAX_TEXT).optional().describe("post: the details; reply: the reply; done: what was done, which the thread keeps"),
+		text: z.string().max(MAX_TEXT).optional().describe("post: the details; reply: the reply; done: what was done, which the thread keeps. Markdown, shown rendered: a short lead line, then bullets or a numbered list, one point per item, with `code` for paths and commands; never one long paragraph"),
 		labels: z.record(z.string().max(40), z.string().max(80)).optional().describe("post: key=value labels, such as area=web"),
 		needs: z.array(z.number().int().positive()).max(20).optional().describe("post: the Board tasks that must be done before this one is ready"),
 		workspace: z.string().optional().describe("post, list: the Workspace's directory; defaults to this session's; list takes all for every Workspace"),
