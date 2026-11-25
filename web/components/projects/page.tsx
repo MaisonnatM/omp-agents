@@ -23,13 +23,15 @@ interface ProjectsPageProps {
 	onChange: OnProjectChange;
 	/** The empty state's title, for a page showing only some projects, such as a Board's Projects tab. */
 	empty?: string;
+	/** The Workspace a new project is made in, for a Board's Projects tab; absent on the Projects page. */
+	workspace?: string;
 }
 
 const ABOUT = "Efforts that span sessions";
 
 const HEAD = "h-10 font-medium whitespace-nowrap";
 
-export function ProjectsPage({ route, core, state, disabled, onChange, empty = "No projects yet" }: ProjectsPageProps) {
+export function ProjectsPage({ route, core, state, disabled, onChange, empty = "No projects yet", workspace }: ProjectsPageProps) {
 	if (state === null) {
 		return (
 			<PageFrame title="Projects" meta={ABOUT}>
@@ -52,14 +54,14 @@ export function ProjectsPage({ route, core, state, disabled, onChange, empty = "
 						<EmptyTitle>{empty}</EmptyTitle>
 						<EmptyDescription>A project gathers the sessions of one effort, with its goal, plan, decisions, and log, which each session in it gets at its start.</EmptyDescription>
 					</EmptyHeader>
-					<NewProjectButton disabled={disabled} />
+					<NewProjectButton disabled={disabled} workspace={workspace} />
 				</Empty>
 			</PageFrame>
 		);
 	}
 	const live = new Set(core.sessions.hosts.map(host => host.sessionId));
 	return (
-		<PageFrame title="Projects" meta={open.length === 0 ? "No open project" : `${open.length} open`} actions={<NewProjectButton disabled={disabled} />}>
+		<PageFrame title="Projects" meta={open.length === 0 ? "No open project" : `${open.length} open`} actions={<NewProjectButton disabled={disabled} workspace={workspace} />}>
 			<div className="@container mx-auto w-full max-w-5xl px-6 py-6">
 				<section aria-label="Projects" className="overflow-hidden rounded-xl border border-border">
 					<table className="w-full table-fixed text-sm">
@@ -95,10 +97,10 @@ export function ProjectsPage({ route, core, state, disabled, onChange, empty = "
 	);
 }
 
-function NewProjectButton({ disabled }: { disabled: boolean }) {
+function NewProjectButton({ disabled, workspace }: { disabled: boolean; workspace?: string }) {
 	const { changeModule } = useDashboardActions();
 	return (
-		<Button {...activityControl("projects.new")} size="compact" leadingIcon={IconPlusSmall} disabled={disabled} onClick={() => createProject(changeModule)}>
+		<Button {...activityControl("projects.new")} size="compact" leadingIcon={IconPlusSmall} disabled={disabled} onClick={() => createProject(changeModule, workspace)}>
 			New project
 		</Button>
 	);

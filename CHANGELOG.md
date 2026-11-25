@@ -9,6 +9,7 @@ The dashboard shows the same lines in Settings › What's new.
 - A Board thread no longer shows grey lines for a session starting on, claiming, renewing, or finishing its Board task; lines for a failed start, a lapsed lease, or a woken session stay.
 - A session the Board starts now finishes on its own: it lands its work on `main` (or opens a draft PR where the repository ships through pull requests), posts its outcome in the Board thread, and ends itself, so you no longer merge or end Board sessions by hand. A reply resumes it, and it finishes the same way again.
 - A Board thread now shows only what was said: no grey lines at all, and no suggested prompts under its reply box.
+- A project made from a Board's **Projects** tab now belongs to that Workspace and shows there right away, before any session joins it; it no longer shows in another Workspace's tab.
 - A rule now separates the Board's tabs from the content below them, as in Slack.
 - A Board message still in work now shows a shimmering "<session> is on it…" line under it, styled like the reply line, instead of the ready and claimed badges. Board messages no longer show their #number or what they wait on.
 - A Board thread no longer gets a "#5 is done, so this Board task is ready" line when the Board task it waited on finishes; its ready badge already says so.

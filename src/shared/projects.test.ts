@@ -12,7 +12,7 @@ function applyAll(list: ProjectList, changes: ProjectChange[]): ProjectList {
 const AT = "2026-11-20T10:00:00.000Z";
 const twoProjects = applyAll(EMPTY_PROJECTS, [
 	{ op: "create", id: "p1", name: "Migration", goal: "Move to Postgres", at: AT },
-	{ op: "create", id: "p2", name: "Launch", goal: "", at: AT },
+	{ op: "create", id: "p2", name: "Launch", goal: "", at: AT, workspace: "/code/app" },
 ]);
 
 describe("parse", () => {
@@ -30,6 +30,13 @@ describe("parse", () => {
 
 	test("the list round-trips through JSON", () => {
 		expect(parseProjectList(JSON.parse(JSON.stringify(twoProjects)))).toEqual(twoProjects);
+	});
+
+	test("a project made in a Workspace keeps it, and one made without keeps none", () => {
+		const parsed = parseProjectChange({ op: "create", id: "p3", name: "Docs", goal: "", at: AT, workspace: " /code/app " });
+		if (!("ok" in parsed)) throw new Error(parsed.error);
+		const list = applyAll(twoProjects, [parsed.ok]);
+		expect(list.projects.map(project => project.workspace)).toEqual([undefined, "/code/app", "/code/app"]);
 	});
 });
 
