@@ -28,7 +28,7 @@ export function LineCommentBox({ path, range, onClose }: LineCommentSlotProps) {
 	const [body, setBody] = useState<string | null>(null);
 	const add = useAction(async (text: string) => {
 		await addComment(path, { line: range.end, startLine: range.start === range.end ? null : range.start, side: range.side, body: text });
-		toasts.add({ title: "Comment added to Review draft" });
+		toasts({ title: "Comment added to Review draft" });
 		onClose();
 	}, "Could not add the comment");
 	const lines = range.start === range.end ? `line ${range.end}` : `lines ${range.start}–${range.end}`;

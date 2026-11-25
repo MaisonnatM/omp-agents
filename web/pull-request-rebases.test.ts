@@ -57,6 +57,8 @@ interface Shown {
 
 /** Each toast as it reads now, by id, in the order they opened. */
 let shown: Map<string, Shown>;
+/** Stops recording what the toasts say. */
+let stopShowing = (): void => {};
 /** What each toast said, by id, every time it changed. */
 let said: Map<string, string[]>;
 /** Each toast's type, by id, every time it changed: `loading` while it shows a spinner. */
@@ -77,22 +79,21 @@ beforeEach(() => {
 	shown = new Map();
 	said = new Map();
 	typed = new Map();
-	let ids = 0;
 	spyOn(globalThis, "fetch").mockImplementation((async (_url: string, init: RequestInit) => {
 		const body = JSON.parse(String(init.body)) as PullRequestRebase;
 		requested.push(body);
 		return answers[body.number]!;
 	}) as typeof fetch);
-	spyOn(toasts, "add").mockImplementation(({ id = `toast-${(ids += 1)}`, type, title, description }) => {
-		show(id, { type, title, description });
-		return id;
-	});
-	spyOn(toasts, "update").mockImplementation((id, change) => {
-		if (typeof change !== "function") show(id, { title: change.title, description: change.description });
+	stopShowing = toasts.subscribe(() => {
+		for (const { id, type, title, description } of toasts.toasts()) show(id, { type, title, description });
 	});
 });
 
-afterEach(() => mock.restore());
+afterEach(() => {
+	stopShowing();
+	toasts.dismiss();
+	mock.restore();
+});
 
 /** Runs `queue` and resolves once the run reads the list again, with the jobs handed to **Resolve conflicts**. */
 function settled(queue: (hooks: RebaseHooks) => void): Promise<RebaseJob[]> {
@@ -119,7 +120,7 @@ describe("rebasePullRequest", () => {
 				"Rebased me/branch-1 on main",
 			],
 		]);
-		expect([...typed.values()]).toEqual([["loading", undefined]]);
+		expect([...typed.values()]).toEqual([["loading", "default"]]);
 	});
 
 	test("ends after fetching when the branch already has its base", async () => {
@@ -134,7 +135,7 @@ describe("rebasePullRequest", () => {
 		answers = { 1: reply(409, { error: "The worktree has uncommitted changes." }) };
 		expect(await settled(hooks => rebasePullRequest(job(1), hooks))).toEqual([]);
 		expect([...said.values()]).toEqual([["Rebasing me/branch-1 on main: Reading the pull request", "Could not rebase me/branch-1: The worktree has uncommitted changes."]]);
-		expect([...typed.values()]).toEqual([["loading", undefined]]);
+		expect([...typed.values()]).toEqual([["loading", "default"]]);
 	});
 
 	test("turns its loading toast into why a step failed", async () => {
@@ -175,7 +176,7 @@ describe("rebasePullRequests", () => {
 			],
 			["me/branch-1 conflicts with main: 2 files conflict: a.ts and b.ts. A Resolve conflicts session takes over."],
 		]);
-		expect([...typed.values()]).toEqual([["loading", undefined], [undefined]]);
+		expect([...typed.values()]).toEqual([["loading", "default"], ["default"]]);
 	});
 
 	test("rebases what sits on a pull request once it is pushed", async () => {

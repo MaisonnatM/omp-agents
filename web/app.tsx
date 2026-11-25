@@ -113,7 +113,7 @@ export function App() {
 				await end(instanceId, latest.current.listedHosts);
 				return true;
 			} catch (error) {
-				toasts.add({ title: "Could not end the session", description: errorText(error) });
+				toasts({ title: "Could not end the session", description: errorText(error) });
 				return false;
 			}
 		},

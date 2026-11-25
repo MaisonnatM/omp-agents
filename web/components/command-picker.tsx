@@ -1,5 +1,6 @@
 /** `CommandPicker`, the searchable grouped list behind the branch, workspace, skill, and settings pickers, and `CommandResults`, which the model menu's search shares. */
 import { IconCheckmark1, IconChevronGrabberVertical } from "central-icons";
+import { fuzzyScore } from "@ui-sdk/react/text-match";
 import { type KeyboardEvent, type ReactNode, type Ref, useContext, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -15,7 +16,7 @@ import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import { ComposerEditor } from "./composer";
 
 export interface PickerItem {
-	/** What cmdk filters and keys on; unique across the picker. */
+	/** What the search matches, with `keywords`, and keys on; unique across the picker. */
 	value: string;
 	label: ReactNode;
 	/** Drawn before the label, as for an action such as moving the workspace. */
@@ -34,7 +35,7 @@ export interface PickerGroup {
 	heading?: ReactNode;
 	/** Not drawn while empty, so a heading never sits over nothing. */
 	items: PickerItem[];
-	/** Shows the group and its items whatever the search, as cmdk's `forceMount` does. */
+	/** Shows the group and its items whatever the search. */
 	forceMount?: boolean;
 }
 
@@ -48,6 +49,11 @@ export function fromList<T>(read: ReadState<T>, loading: string, groups: (data: 
 	return { kind: "ready", groups: groups(read.data) };
 }
 
+/** Whether, or how well, a choice matches what is typed: 0 or `false` hides it. */
+type PickerFilter = (item: { value: string; label: string; keywords?: string[] }, query: string) => boolean | number;
+
+const fuzzy: PickerFilter = (item, query) => fuzzyScore([item.label, ...(item.keywords ?? [])].join(" "), query);
+
 interface CommandResultsProps {
 	search?: { label: string; query?: { value: string; onChange: (value: string) => void }; ref?: Ref<HTMLInputElement> };
 	list: PickerList;
@@ -57,16 +63,25 @@ interface CommandResultsProps {
 	closeOnSelect?: boolean;
 	/** Closes the surface that holds the list, when a choice asks to close. */
 	onClose?: () => void;
-	filter?: (value: string, search: string, keywords?: string[]) => number;
+	filter?: PickerFilter;
 	onKeyDown?: (event: KeyboardEvent) => void;
 	listClassName?: string;
 }
 
 /** The search field and grouped results a {@link CommandPicker} and the model menu's search share. */
 export function CommandResults({ search, list, empty, disabled, selectionDisabled = false, closeOnSelect = true, onClose, filter, onKeyDown, listClassName }: CommandResultsProps) {
+	const groups = list.kind === "ready" ? list.groups.filter(group => group.items.length > 0) : [];
+	const shown = new Set(groups.flatMap(group => (group.forceMount ? group.items.map(item => item.value) : [])));
+	const match = filter ?? fuzzy;
 	return (
-		<Command filter={filter} onKeyDown={onKeyDown}>
-			{search && <CommandInput ref={search.ref} aria-label={search.label} placeholder={`${search.label}…`} value={search.query?.value} onValueChange={search.query?.onChange} />}
+		<Command
+			filter={shown.size > 0 ? (item, query) => shown.has(item.value) || match(item, query) : filter}
+			query={search?.query?.value}
+			onQueryChange={search?.query?.onChange}
+			onKeyDown={onKeyDown}
+		>
+			{search && <CommandInput ref={search.ref} aria-label={search.label} placeholder={`${search.label}…`} />}
+			{empty && list.kind === "ready" && <CommandEmpty className="px-3 py-6 text-center text-sm">{empty}</CommandEmpty>}
 			<CommandList className={listClassName}>
 				{list.kind === "loading" ? (
 					<p role="status" className="py-6 text-center text-sm text-muted-foreground">
@@ -78,19 +93,16 @@ export function CommandResults({ search, list, empty, disabled, selectionDisable
 					</p>
 				) : (
 					<>
-						{empty && <CommandEmpty className="px-3 py-6 text-center text-sm">{empty}</CommandEmpty>}
-						{list.groups
-							.filter(group => group.items.length > 0)
-							.map(group => (
-								<CommandGroup key={group.key} heading={group.heading} forceMount={group.forceMount}>
+						{groups.map(group => (
+								<CommandGroup key={group.key} heading={group.heading}>
 									{group.items.map(item => (
 										<CommandItem
 											key={item.value}
 											value={item.value}
+											label={item.value}
 											keywords={item.keywords}
 											title={item.title}
 											aria-label={item.ariaLabel}
-											forceMount={group.forceMount}
 											disabled={disabled || selectionDisabled}
 											onSelect={() => {
 												if (closeOnSelect) onClose?.();
@@ -159,24 +171,24 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, ariaLa
 	const composer = useContext(ComposerEditor);
 	const picked = useRef(false);
 	const button = (
-		<PopoverTrigger asChild>
-			<Button
-				{...(control ? activityControl(control) : {})}
-				variant="ghost"
-				size="compact"
-				leadingIcon={icon}
-				trailingIcon={chevron ? IconChevronGrabberVertical : undefined}
-				aria-label={ariaLabel}
-				aria-labelledby={ariaLabelledby}
-				// Keeps Radix's popover `data-state` contract under a Tooltip trigger, which stamps its own.
-				data-state={shown ? "open" : "closed"}
-				disabled={disabled}
-				active={shown}
-				className={className}
-			>
-				{trigger}
-			</Button>
-		</PopoverTrigger>
+		<PopoverTrigger
+			render={
+				<Button
+					{...(control ? activityControl(control) : {})}
+					variant="ghost"
+					size="compact"
+					leadingIcon={icon}
+					trailingIcon={chevron ? IconChevronGrabberVertical : undefined}
+					aria-label={ariaLabel}
+					aria-labelledby={ariaLabelledby}
+					disabled={disabled}
+					active={shown}
+					className={className}
+				>
+					{trigger}
+				</Button>
+			}
+		/>
 	);
 	return (
 		<Popover open={shown} onOpenChange={change}>
@@ -191,14 +203,14 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, ariaLa
 			<PopoverContent
 				side={side}
 				align="start"
-				className={cn(WIDTH[width], "min-w-0 max-h-[var(--radix-popover-content-available-height)] overflow-x-hidden overflow-y-auto overscroll-contain p-0")}
+				className={cn(WIDTH[width], "min-w-0 max-h-(--available-height) overflow-x-hidden overflow-y-auto overscroll-contain p-0")}
 				onMouseDown={event => event.stopPropagation()}
-				onCloseAutoFocus={event => {
+				finalFocus={() => {
 					const refocus = picked.current && composer !== null;
 					picked.current = false;
-					if (!refocus) return;
-					event.preventDefault();
+					if (!refocus) return undefined;
 					composer.current?.focus();
+					return document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
 				}}
 			>
 				<CommandResults

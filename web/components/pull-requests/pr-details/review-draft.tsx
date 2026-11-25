@@ -3,8 +3,7 @@
  * with its verdict and summary; **Preview** shows what posting sends, and **Post review** posts it after a confirmation.
  */
 import { IconCheckmark1, IconCrossMedium, IconEyeOpen, IconPencil, IconSend, IconSquareArrowTopRight, IconTrashCan } from "central-icons";
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
+import { Radio, RadioGroup, RadioIndicator } from "@ui-sdk/react/radio";
 import { useId, useState } from "react";
 import { MAX_COMMENT_BODY, type PullRequest, pullRequestName } from "../../../../src/shared/github";
 import { findingLocation, type FindingState, REVIEW_VERDICTS, type ReviewDraft, type ReviewDraftEdit, type ReviewEvent, type ReviewFinding, type ReviewPreview } from "../../../../src/shared/review-drafts";
@@ -67,9 +66,9 @@ export function ReviewDraftPanel({ draft, headOid }: { draft: ReviewDraft; headO
 				<RadioGroup aria-label="Verdict" value={draft.verdict} disabled={posted !== null} onValueChange={value => edit({ op: "verdict", pr, verdict: REVIEW_VERDICTS.find(verdict => verdict === value) ?? draft.verdict })} className="flex flex-wrap gap-x-4 gap-y-1">
 					{REVIEW_VERDICTS.map(verdict => (
 						<label key={verdict} className="flex cursor-pointer items-center gap-2 text-[13px]">
-							<Radio.Root value={verdict} className="flex size-3.5 items-center justify-center rounded-full shadow-[0_0_0_1px_var(--border)] outline-none focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary">
-								<Radio.Indicator className="size-1.5 rounded-full bg-background" />
-							</Radio.Root>
+							<Radio value={verdict} className="flex size-3.5 items-center justify-center rounded-full shadow-[0_0_0_1px_var(--border)] outline-none focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary">
+								<RadioIndicator className="size-1.5 rounded-full bg-background" />
+							</Radio>
 							{VERDICT_LABELS[verdict]}
 						</label>
 					))}
@@ -284,11 +283,13 @@ function PostButton({ draft, previewUrl }: { draft: ReviewDraft; previewUrl: str
 	const comments = data?.payload.comments.length ?? 0;
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<Button variant="primary" size="compact" leadingIcon={IconSend} loading={post.pending}>
-					Post review
-				</Button>
-			</PopoverTrigger>
+			<PopoverTrigger
+				render={
+					<Button variant="primary" size="compact" leadingIcon={IconSend} loading={post.pending}>
+						Post review
+					</Button>
+				}
+			/>
 			<PopoverContent align="start" className="w-80 space-y-3 p-3">
 				{!data ? (
 					<LoadNote loading="Reading the pull request's diff…" error={error && `Cannot read the pull request: ${error}`} />

@@ -210,7 +210,7 @@ function ActionItem({ action, confirm }: { action: PaletteAction<SessionRun>; co
 			variant={action.tone}
 			disabled={action.disabled}
 			aria-busy={(action.id === "end" && action.disabled) || undefined}
-			{...(action.confirm !== undefined ? { closeOnClick: armed, ...confirm.props(action.id, run.fn) } : { onClick: run.fn })}
+			{...(action.confirm !== undefined ? { closeOnSelect: armed, ...confirm.props(action.id, run.fn) } : { onClick: run.fn })}
 		>
 			<Icon />
 			{armed ? action.confirm : title}

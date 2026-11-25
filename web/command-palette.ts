@@ -1,4 +1,4 @@
-import { defaultFilter } from "cmdk";
+import { fuzzyScore } from "@ui-sdk/react/text-match";
 import { IconCmd, IconFolder1, IconTodos } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { everyWord } from "../src/shared/every-word";
@@ -230,7 +230,7 @@ export interface Section {
 
 /**
  * How a section lists. A `browsed` section lists with nothing typed too. A `searched` one lists only for a search, and
- * matches only an item holding every word typed, since cmdk's loose match would find most of hundreds of todos for any
+ * matches only an item holding every word typed, since the fuzzy match would find most of hundreds of todos for any
  * word; its most used items still lead an empty search under Suggestions. A `found` one holds what the server found
  * for the search: it lists in the order given, after the ranked sections. A `typed` one holds what the search itself
  * becomes: it matches anything and lists after every match.
@@ -266,16 +266,16 @@ const UNRANKED_ORDER = SECTION_ORDER.filter(section => !ranks(section));
 
 const headingOf = (id: SectionId, search: string): string | null => (id === "suggestions" ? "Suggestions" : id === "fallback" ? `Use “${search}”` : SECTIONS[id].heading);
 
-/** cmdk's match of `search` against the item's words, times its frecency boost; 0 when it does not match. `holds` tests a `searched` item's words. */
+/** The fuzzy match of `search` against the item's words, times its frecency boost; 0 when it does not match. `holds` tests a `searched` item's words. */
 function matchScore(item: PaletteItem, search: string, holds: (text: string) => boolean, frecency: Frecency, now: number): number {
-	const words = item.subtitle ? [item.subtitle, ...item.keywords] : [...item.keywords];
-	if (listingOf(item.section) === "searched" && !holds([item.title, ...words].join("\n"))) return 0;
-	return defaultFilter(item.title, search, words) * frecencyBoost(frecency[item.id], now);
+	const words = item.subtitle ? [item.title, item.subtitle, ...item.keywords] : [item.title, ...item.keywords];
+	if (listingOf(item.section) === "searched" && !holds(words.join("\n"))) return 0;
+	return fuzzyScore(words.join(" "), search) * frecencyBoost(frecency[item.id], now);
 }
 
 /**
  * The sections a view lists for `query`. With nothing typed, the `suggestions` most used items lead, and leave their
- * own sections. With a search, the matches rank by cmdk's score times frecency, within a section and section against
+ * own sections. With a search, the matches rank by the fuzzy score times frecency, within a section and section against
  * section, and what the search itself becomes, such as a todo, lists last.
  */
 export function paletteSections(items: readonly PaletteItem[], query: string, frecency: Frecency, now: number, suggestions = 0): Section[] {
@@ -307,7 +307,7 @@ export function paletteSections(items: readonly PaletteItem[], query: string, fr
 
 /**
  * The item to highlight once `found` matches arrive, after the rest of a search listed: the first item, when the
- * highlight sits on what the search becomes, where cmdk leaves it while nothing else matched; `null` to leave it.
+ * highlight sits on what the search becomes, where the list leaves it while nothing else matched; `null` to leave it.
  */
 export function highlightOnFound(sections: readonly Section[], selectedId: string): string | null {
 	const selected = sections.flatMap(section => section.items).find(item => item.id === selectedId);

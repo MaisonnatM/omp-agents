@@ -78,19 +78,13 @@ function ScheduleMenu({ draft, files, disabled, pending, onSchedule }: ScheduleB
 			<Tooltip content={blocked ?? "Send later"} side="top" forceOpen={open ? false : undefined}>
 				{/* A disabled button takes no pointer events, so the tooltip that says why sits on a wrapper. */}
 				<span className="inline-flex">
-					<PopoverTrigger asChild>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							aria-label="Send later"
-							disabled={disabled || blocked !== null}
-							loading={pending}
-							data-state={open ? "open" : "closed"}
-							active={open}
-						>
-							<IconClockAlert aria-hidden="true" />
-						</Button>
-					</PopoverTrigger>
+					<PopoverTrigger
+						render={
+							<Button variant="ghost" size="icon-sm" aria-label="Send later" disabled={disabled || blocked !== null} loading={pending} active={open}>
+								<IconClockAlert aria-hidden="true" />
+							</Button>
+						}
+					/>
 				</span>
 			</Tooltip>
 			<PopoverContent align="end" side="top" className="w-72 p-1">

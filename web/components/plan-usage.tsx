@@ -6,7 +6,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DashboardState } from "../dashboard-state";
 import { DAY_FORMAT, providerOrg } from "../labels";
-import { useHoverPopover } from "../use-hover-popover";
 import { useMinute } from "../use-minute";
 import { GaugeBar, GaugeCell, GaugeTile, TONE_CLASS, type Tone } from "./gauge-tile";
 import { dollars } from "./settings/analytics-format";
@@ -225,7 +224,6 @@ export function PlanCard({ plan, now }: { plan: PlanUsage; now: number }) {
 
 /** A plan's tile: its logo beside a bar; hovering or clicking opens {@link PlanCard}, or for a plan known by name, a tooltip. */
 function PlanTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
-	const popover = useHoverPopover();
 	const now = useMinute();
 	const tile = {
 		label: gauge.label,
@@ -238,11 +236,9 @@ function PlanTile({ plan, gauge }: { plan: PlanUsage; gauge: PlanGauge }) {
 	switch (gauge.detail.kind) {
 		case "card":
 			return (
-				<Popover {...popover.root}>
-					<PopoverTrigger asChild>
-						<GaugeTile {...popover.trigger} as="button" {...tile} />
-					</PopoverTrigger>
-					<PopoverContent {...popover.content} side="right" align="end" aria-label={`${plan.name} usage`} className="w-96 max-w-[calc(100vw-2rem)] p-0">
+				<Popover openOnHover delay={0} closeDelay={120}>
+					<PopoverTrigger render={<GaugeTile as="button" {...tile} />} />
+					<PopoverContent side="right" align="end" aria-label={`${plan.name} usage`} className="w-96 max-w-[calc(100vw-2rem)] p-0">
 						<PlanCard plan={plan} now={now} />
 					</PopoverContent>
 				</Popover>

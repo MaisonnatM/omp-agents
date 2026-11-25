@@ -1,7 +1,6 @@
 import { IconLayersTwo, IconMerged } from "central-icons";
 import type { ReactElement } from "react";
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
+import { Radio, RadioGroup, RadioIndicator } from "@ui-sdk/react/radio";
 import { mergesNow, type PullRequest, type PullRequestDetail, pullRequestName, type StackedPullRequest } from "../../../src/shared/github";
 import type { QueuedMerge } from "../../../src/shared/merge-queue";
 import { MERGE_METHOD_LABELS, type MergeMethod } from "../../../src/shared/source-control";
@@ -98,7 +97,7 @@ export function MergePopover({ pr, stack, target, error = null, onQueued, open, 
 		onOpenChange(false);
 		merge();
 	};
-	const trigger = <PopoverTrigger asChild>{children({ method, queued, pending: merging })}</PopoverTrigger>;
+	const trigger = <PopoverTrigger render={children({ method, queued, pending: merging })} />;
 	const question = (): ReactElement => {
 		if (target === null)
 			return (
@@ -144,9 +143,9 @@ export function MergePopover({ pr, stack, target, error = null, onQueued, open, 
 							<RadioGroup aria-label="Merge method" value={method} onValueChange={value => { const candidate = allowed.find(each => each === value); if (candidate) pick(candidate); }} className="space-y-1">
 								{allowed.map(candidate => (
 									<label key={candidate} className="flex cursor-pointer items-center gap-2 text-[13px]">
-										<Radio.Root value={candidate} className="flex size-3.5 items-center justify-center rounded-full shadow-[0_0_0_1px_var(--border)] outline-none focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary">
-											<Radio.Indicator className="size-1.5 rounded-full bg-background" />
-										</Radio.Root>
+										<Radio value={candidate} className="flex size-3.5 items-center justify-center rounded-full shadow-[0_0_0_1px_var(--border)] outline-none focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary">
+											<RadioIndicator className="size-1.5 rounded-full bg-background" />
+										</Radio>
 										{MERGE_METHOD_LABELS[candidate]}
 									</label>
 								))}

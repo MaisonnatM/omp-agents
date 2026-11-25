@@ -100,12 +100,12 @@ describe("providerQuota", () => {
 
 describe("modelMatch", () => {
 	test("every word typed must appear, in any order, in the selector or a name", () => {
-		expect(modelMatch("openrouter/z-ai/glm-5.3-flash", "glm 5.3 flash", ["GLM 5.3 Flash"])).toBe(1);
-		expect(modelMatch("openrouter/z-ai/glm-5.3-flash", "FLASH glm", [])).toBe(1);
-		expect(modelMatch("anthropic/claude-opus-5-5", "opus 5.5", ["Opus 5.5", "Claude Opus 5.5"])).toBe(1);
+		expect(modelMatch({ value: "openrouter/z-ai/glm-5.3-flash", keywords: ["GLM 5.3 Flash"] }, "glm 5.3 flash")).toBe(true);
+		expect(modelMatch({ value: "openrouter/z-ai/glm-5.3-flash" }, "FLASH glm")).toBe(true);
+		expect(modelMatch({ value: "anthropic/claude-opus-5-5", keywords: ["Opus 5.5", "Claude Opus 5.5"] }, "opus 5.5")).toBe(true);
 	});
 
 	test("letters scattered across another model's name do not match", () => {
-		expect(modelMatch("cursor/gemini-3.5-flash", "glm 5.3 flash", ["Gemini 3.5 Flash"])).toBe(0);
+		expect(modelMatch({ value: "cursor/gemini-3.5-flash", keywords: ["Gemini 3.5 Flash"] }, "glm 5.3 flash")).toBe(false);
 	});
 });

@@ -1,5 +1,4 @@
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
+import { Radio, RadioGroup } from "@ui-sdk/react/radio";
 import { ToggleSwitch } from "../toggle-switch";
 import { IconImac, IconMoon, IconSun } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
@@ -153,7 +152,7 @@ const SESSION_IDLE_CHOICES: Record<SessionIdleChoice, string> = { off: "Off", "4
 /** A select of `choices`, keyed by a setting's value as text, `off` for `null`. */
 function IdleSelect<Choice extends string>({ label, choices, value, onChoose }: { label: string; choices: Record<Choice, string>; value: number | null; onChoose: (choice: Choice) => void }) {
 	return (
-		<Select<Choice> items={choices} value={(value === null ? "off" : String(value)) as Choice} onValueChange={next => next && onChoose(next)}>
+		<Select<Choice> items={(Object.entries(choices) as [Choice, string][]).map(([choice, text]) => ({ value: choice, label: text }))} value={(value === null ? "off" : String(value)) as Choice} onValueChange={next => next && onChoose(next)}>
 			<SelectTrigger aria-label={label} className="w-fit">
 				<SelectValue />
 			</SelectTrigger>
@@ -234,14 +233,14 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 					{THEMES.map(option => {
 						const [label, Icon] = THEME_OPTIONS[option];
 						return (
-							<Radio.Root
+							<Radio
 								key={option}
 								value={option}
 								className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md pr-3 pl-2 text-[12px] text-muted-foreground shadow-[0_0_0_1px_var(--border)] outline-none hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-active data-[checked]:text-foreground"
 							>
 								<Icon aria-hidden className="size-3.5" />
 								{label}
-							</Radio.Root>
+							</Radio>
 						);
 					})}
 				</RadioGroup>

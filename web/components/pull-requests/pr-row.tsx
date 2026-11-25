@@ -126,7 +126,7 @@ function useReviewRequests(pr: PullRequestSummary, options: PullRequestOptionsRe
 		setQueued(current => [...current, change]);
 		chain.current = chain.current
 			.then(() => onChange(pr, change))
-			.catch((error: unknown) => { toasts.add({ title: "GitHub refused the change", description: errorText(error) }); })
+			.catch((error: unknown) => { toasts({ title: "GitHub refused the change", description: errorText(error) }); })
 			// GitHub's answer reaches the list before the pick leaves the queue, and showing a pick twice changes nothing.
 			.finally(() => setQueued(current => current.slice(1)));
 	};

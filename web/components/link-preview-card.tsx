@@ -7,18 +7,18 @@
 import { useEffect, useState } from "react";
 import type { LinkPreview } from "../../src/shared/link-preview";
 import { getJson } from "../api";
-import { Popover, PopoverAnchor, PopoverContent } from "./ui/popover";
+import { Popover, PopoverContent } from "./ui/popover";
 import { addressParts, SiteAddress, SiteIcon } from "./site-icon";
 
 const OPEN_DELAY_MS = 400;
 
 /**
- * The link to another site that `target` sits in. A link with a Radix tooltip or hover card of its own, which marks
- * its trigger `data-state`, keeps that one instead, as the Overview's Sources rows do.
+ * The link to another site that `target` sits in. A link with a tooltip or hover card of its own keeps that one
+ * instead, as the Overview's Sources rows do.
  */
 function outsideLink(target: EventTarget | null): HTMLAnchorElement | null {
 	const link = target instanceof Element ? target.closest<HTMLAnchorElement>("a[href]") : null;
-	if (!link || link.hasAttribute("data-state")) return null;
+	if (!link || link.matches('[data-slot="tooltip-trigger"], [data-slot="hover-card-trigger"]')) return null;
 	const url = URL.parse(link.href);
 	return url && (url.protocol === "https:" || url.protocol === "http:") && url.origin !== location.origin ? link : null;
 }
@@ -78,17 +78,17 @@ export function LinkPreviewCard() {
 	if (!link) return null;
 	return (
 		<Popover open>
-			<PopoverAnchor virtualRef={{ current: link }} />
 			<PopoverContent
 				key={link.href}
+				anchor={link}
 				aria-hidden="true"
 				side="bottom"
 				align="start"
 				sideOffset={6}
 				collisionPadding={8}
-				onOpenAutoFocus={event => event.preventDefault()}
-				onCloseAutoFocus={event => event.preventDefault()}
-				className="pointer-events-none w-80 max-w-[calc(100vw-1rem)] origin-(--radix-popover-content-transform-origin) p-3 animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none"
+				initialFocus="none"
+				finalFocus="none"
+				className="pointer-events-none w-80 max-w-[calc(100vw-1rem)] origin-(--transform-origin) p-3 transition-[opacity,scale] duration-150 ease-out data-starting-style:scale-95 data-starting-style:opacity-0 motion-reduce:transition-none"
 			>
 				<Body href={link.href} pages={link.closest('[data-link-preview="address"]') === null} />
 			</PopoverContent>

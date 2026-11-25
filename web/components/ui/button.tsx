@@ -3,12 +3,11 @@
 import {
   cloneElement,
   forwardRef,
-  isValidElement,
   type ButtonHTMLAttributes,
   type ReactElement,
   type ReactNode,
 } from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { renderElement } from "@ui-sdk/react/primitive";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Spinner } from "@/components/spinner";
 import type { IconComponent } from "@/lib/icon-context";
@@ -90,15 +89,9 @@ interface ButtonProps
    *  compact 28px); xs (24px) is only ever asked for. Legacy sm/md/lg values
    *  still resolve. */
   size?: ButtonSize;
-  asChild?: boolean;
-  /** Base UI's spelling of `asChild`: the element to render as, with the
-   *  button's children as its label. Accepted so code written either way
-   *  works, including the shadcn CLI's asChild-to-render rewrite in Base UI
-   *  projects. */
-  render?: ReactElement;
-  /** Accepted for Base UI parity and ignored: the button already knows
-   *  whether it renders a native button. */
-  nativeButton?: boolean;
+  /** The element to render as, such as `<a href />`, with the button's
+   *  children as its label; without children, the element keeps its own. */
+  render?: ReactElement<{ children?: ReactNode }>;
   loading?: boolean;
   leadingIcon?: IconComponent;
   trailingIcon?: IconComponent;
@@ -171,9 +164,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       className,
       variant,
       size,
-      asChild = false,
       render,
-      nativeButton: _nativeButton,
       loading = false,
       leadingIcon: LeadingIcon,
       trailingIcon: TrailingIcon,
@@ -185,24 +176,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
-    // asChild: the user's element becomes the root, but the button's internal
-    // structure (bg layer, content wrapper, spinner, icons) must survive. Slot
-    // requires exactly one child, so instead of Slottable we clone the user's
-    // element with our internals as its children — the element's own children
-    // become the label inside the content wrapper.
-    // `render` is the same thing written the Base UI way: its element is the
-    // root and the children, when given, are the label (otherwise the
-    // element keeps its own).
-    const asChildElement =
-      render && isValidElement(render)
-        ? children === undefined
-          ? (render as ReactElement<{ children?: ReactNode }>)
-          : cloneElement(render as ReactElement<{ children?: ReactNode }>, undefined, children)
-        : asChild && isValidElement(children)
-          ? (children as ReactElement<{ children?: ReactNode }>)
-          : null;
-    const Comp = asChildElement ? Slot : "button";
-    const label = asChildElement ? asChildElement.props.children : children;
+    // The render element becomes the root, but the button's internals (bg
+    // layer, content wrapper, spinner, icons) must survive, so the element's
+    // own children become the label and the internals take their place.
+    const label = children ?? render?.props.children;
+    const template = render && cloneElement(render, { children: undefined });
     // Resolve the size: explicit prop (legacy aliases mapped onto the
     // canonical ladder) > surrounding SizeProvider > default.
     const contextSize = useSizeVariant();
@@ -282,10 +260,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       </>
     );
 
-    return (
-      <Comp
-        ref={ref}
-        className={cn(
+    return renderElement(
+      "button",
+      {
+        ref,
+        className: cn(
           buttonVariants({
             variant,
             size: resolvedSize,
@@ -295,19 +274,17 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           shape.button,
           variant === "glass" && "rounded-full",
           className
-        )}
-        // asChild roots (e.g. an anchor) don't take the disabled attribute —
-        // Slot would spread it onto the element as invalid HTML.
-        disabled={asChildElement ? undefined : disabled || loading}
-        style={style}
-        {...props}
-        aria-busy={loading || props["aria-busy"]}
-        data-pressed={active ? "" : undefined}
-      >
-        {asChildElement
-          ? cloneElement(asChildElement, undefined, internals)
-          : internals}
-      </Comp>
+        ),
+        // A rendered root (e.g. an anchor) doesn't take the disabled
+        // attribute, which would be invalid HTML on it.
+        disabled: template ? undefined : disabled || loading,
+        style,
+        ...props,
+        "aria-busy": loading || props["aria-busy"],
+        "data-pressed": active ? "" : undefined,
+        children: internals,
+      },
+      template
     );
   }
 );

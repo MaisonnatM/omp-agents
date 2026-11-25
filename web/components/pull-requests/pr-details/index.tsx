@@ -111,8 +111,9 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 					{findable && <FindBar root={findRoot} enabled label="Find in pull request" className="static ml-auto w-96 max-w-full" />}
 				</nav>
 			</div>
-			<SegmentedTabPanel value={tab} asChild>
-				{!detail ? (
+			<SegmentedTabPanel
+				value={tab}
+				render={!detail ? (
 					<div className={cn("py-4", page ? "px-6" : "px-4")}>
 						<LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />
 					</div>
@@ -140,7 +141,7 @@ export function PullRequestDetailContent({ pr, listed, pending, onRun, sessions,
 						</DetailsScrollerContext.Provider>
 					</div>
 				)}
-			</SegmentedTabPanel>
+			/>
 			{page && detail && (
 				<div className="absolute right-4 bottom-3 z-20">
 					<PullRequestComposer key={prKey(pr)} detail={detail} openDraft={openDraft} send={send} onDraftPosted={reload} />

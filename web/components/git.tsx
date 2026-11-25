@@ -73,9 +73,9 @@ export function releaseBranch(cwd: string, branch: string): void {
 	releaseWorktree(cwd, branch).then(
 		release => {
 			const toast = releaseToast(branch, release);
-			if (toast) toasts.add(toast);
+			if (toast) toasts(toast);
 		},
-		(error: unknown) => toasts.add({ title: `Could not remove the worktree of ${branch}`, description: errorText(error) }),
+		(error: unknown) => toasts({ title: `Could not remove the worktree of ${branch}`, description: errorText(error) }),
 	);
 }
 

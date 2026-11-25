@@ -46,15 +46,11 @@ export function WeekTab({ state, plan, selected, today, disabled, onDemo, onTime
 			<nav aria-label="Jours" className="min-h-0 shrink-0 basis-[40%] overflow-y-auto border-b border-border px-3 py-3 @3xl/sport:w-80 @3xl/sport:basis-auto @3xl/sport:border-r @3xl/sport:border-b-0">
 				<div className="flex items-center gap-1 px-1">
 					<Tooltip content="Semaine précédente">
-						<Button variant="ghost" size="icon-compact" aria-label="Semaine précédente" asChild>
-							<a href={step(-7)} {...activityControl("sport.week.step")}><IconChevronLeftSmall /></a>
-						</Button>
+						<Button variant="ghost" size="icon-compact" aria-label="Semaine précédente" render={<a href={step(-7)} {...activityControl("sport.week.step")} />}><IconChevronLeftSmall /></Button>
 					</Tooltip>
 					<h2 className="min-w-0 flex-1 truncate text-center text-sm font-medium">{weekTitle(monday)}</h2>
 					<Tooltip content="Semaine suivante">
-						<Button variant="ghost" size="icon-compact" aria-label="Semaine suivante" asChild>
-							<a href={step(7)} {...activityControl("sport.week.step")}><IconChevronRightSmall /></a>
-						</Button>
+						<Button variant="ghost" size="icon-compact" aria-label="Semaine suivante" render={<a href={step(7)} {...activityControl("sport.week.step")} />}><IconChevronRightSmall /></Button>
 					</Tooltip>
 				</div>
 				{planned > 0 && (

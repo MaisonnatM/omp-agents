@@ -66,9 +66,7 @@ function DisplayMenu({ display, onDisplay, ...panel }: CategoriesPanelProps & { 
 			description="Filter › Category shows the categories you check. Deleting one keeps its todos, in no category."
 			panelClassName="w-80"
 			// Esc in a category's name leaves the name as it was, and the panel open.
-			onEscapeKeyDown={event => {
-				if (event.target instanceof HTMLInputElement) event.preventDefault();
-			}}
+			escapeKeepsOpen={target => target instanceof HTMLInputElement}
 		>
 			<CategoriesPanel {...panel} />
 		</DisplayWithPanel>

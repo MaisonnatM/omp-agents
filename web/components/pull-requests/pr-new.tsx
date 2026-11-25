@@ -30,7 +30,6 @@ export function NewPullRequestButton({ everyRepo }: { everyRepo: RepoPullRequest
 	const [change, setChange] = useState("");
 	// This popover sent the start under way, so its success clears the text and closes it.
 	const [sent, setSent] = useState(false);
-	const titleId = useId();
 	const changeId = useId();
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const choices = everyRepo.flatMap((repo): WorkspaceChoice[] =>
@@ -74,24 +73,17 @@ export function NewPullRequestButton({ everyRepo }: { everyRepo: RepoPullRequest
 	return (
 		<Popover open={open} onOpenChange={changeOpen}>
 			<Tooltip content="New pull request" forceOpen={open ? false : undefined}>
-				<PopoverTrigger asChild>
-					<Button {...activityControl("pull-requests.new")} variant="ghost" size="icon-compact" aria-label="New pull request" data-state={open ? "open" : "closed"} active={open}>
-						<IconPlusSmall />
-					</Button>
-				</PopoverTrigger>
+				<PopoverTrigger
+					render={
+						<Button {...activityControl("pull-requests.new")} variant="ghost" size="icon-compact" aria-label="New pull request" active={open}>
+							<IconPlusSmall />
+						</Button>
+					}
+				/>
 			</Tooltip>
-			<PopoverContent
-				align="end"
-				collisionPadding={8}
-				aria-labelledby={titleId}
-				className="w-96 max-w-[calc(100vw-2rem)] space-y-3 p-3"
-				onOpenAutoFocus={event => {
-					event.preventDefault();
-					textareaRef.current?.focus();
-				}}
-			>
+			<PopoverContent align="end" collisionPadding={8} className="w-96 max-w-[calc(100vw-2rem)] space-y-3 p-3" initialFocus={() => textareaRef.current}>
 				<PopoverHeader>
-					<PopoverTitle id={titleId} className="text-sm">
+					<PopoverTitle className="text-sm">
 						New pull request
 					</PopoverTitle>
 				</PopoverHeader>

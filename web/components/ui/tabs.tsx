@@ -13,8 +13,9 @@ import {
   cloneElement,
   isValidElement,
   type ComponentPropsWithoutRef,
+  type ReactNode,
 } from "react";
-import * as TabsPrimitive from "@radix-ui/react-tabs";
+import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
@@ -43,10 +44,6 @@ interface TabsValueOrderContextValue {
   valueOrder: string[];
   setValueOrder: (order: string[]) => void;
   selectedValue: string | undefined;
-  /** The values a TabPanel shows, so a tab with none leaves out the `aria-controls` that would name a missing element. */
-  panels: ReadonlySet<string>;
-  /** Records a TabPanel for `value`; the returned cleanup removes it. */
-  registerPanel: (value: string) => () => void;
 }
 
 const TabsValueOrderContext = createContext<TabsValueOrderContextValue | null>(null);
@@ -71,9 +68,11 @@ function useTabsList() {
 
 interface TabsProps
   extends Omit<
-    ComponentPropsWithoutRef<typeof TabsPrimitive.Root>,
-    "onValueChange" | "onSelect"
+    ComponentPropsWithoutRef<typeof TabsPrimitive.Tabs>,
+    "value" | "defaultValue" | "onValueChange" | "onSelect"
   > {
+  /** The tab selected at first, when uncontrolled. */
+  defaultValue?: string;
   /** Controlled value (takes precedence over selectedIndex). */
   value?: string;
   /** Called when the active tab changes. */
@@ -120,16 +119,6 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
         return order;
       });
     }, []);
-    const [panels, setPanels] = useState<ReadonlySet<string>>(() => new Set());
-    const registerPanel = useCallback((panel: string) => {
-      setPanels((current) => new Set(current).add(panel));
-      return () =>
-        setPanels((current) => {
-          const next = new Set(current);
-          next.delete(panel);
-          return next;
-        });
-    }, []);
 
     // Resolve value: explicit value > selectedIndex lookup > uncontrolled state.
     // Uncontrolled with no defaultValue falls back to the first tab so the
@@ -141,7 +130,8 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
         : uncontrolledValue ?? valueOrder[0]);
 
     const handleValueChange = useCallback(
-      (newValue: string) => {
+      (newValue: string | null) => {
+        if (newValue === null) return;
         // Local state only backs uncontrolled use. With value or selectedIndex
         // the parent owns selection, so this just reports the change, by value
         // and by index.
@@ -163,29 +153,25 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
           valueOrder,
           setValueOrder: updateValueOrder,
           selectedValue: resolvedValue,
-          panels,
-          registerPanel,
         }}
       >
         {/*
-          Always controlled: feeding the primitive an undefined-then-defined
-          value flips it from uncontrolled to controlled, which Radix warns
-          about in dev. valueOrder is empty on the first commit, so fall back
-          to an empty-string sentinel — TabsList's layout effect populates
-          valueOrder pre-paint, so the corrected value lands before anything
-          is visible.
+          Always controlled, so the pills and the primitive read one value.
+          valueOrder is empty on the first commit, so nothing is selected
+          until TabsList's layout effect populates it pre-paint, and the
+          resolved value lands before anything is visible.
         */}
-        <TabsPrimitive.Root
+        <TabsPrimitive.Tabs
           ref={ref}
-          value={resolvedValue ?? ""}
+          value={resolvedValue ?? null}
           onValueChange={handleValueChange}
           // Arrow keys move focus and select in one step, so the pill follows
           // the keyboard the same way it follows a click.
-          activationMode="automatic"
+          activation="automatic"
           {...props}
         >
           {children}
-        </TabsPrimitive.Root>
+        </TabsPrimitive.Tabs>
       </TabsValueOrderContext.Provider>
     );
 
@@ -198,7 +184,13 @@ Tabs.displayName = "Tabs";
 
 /* ─────────────────────── TabsList ─────────────────────── */
 
-type TabsListProps = ComponentPropsWithoutRef<typeof TabsPrimitive.List>;
+type TabsListProps = Omit<
+  ComponentPropsWithoutRef<typeof TabsPrimitive.TabsList>,
+  "className" | "children"
+> & {
+  className?: string;
+  children?: ReactNode;
+};
 
 const TabsList = forwardRef<HTMLDivElement, TabsListProps>(
   ({ children, className, ...props }, ref) => {
@@ -316,7 +308,7 @@ const TabsList = forwardRef<HTMLDivElement, TabsListProps>(
           setOptimisticIdx,
         }}
       >
-        <TabsPrimitive.List
+        <TabsPrimitive.TabsList
           ref={(node) => {
             (
               containerRef as React.MutableRefObject<HTMLDivElement | null>
@@ -477,7 +469,7 @@ const TabsList = forwardRef<HTMLDivElement, TabsListProps>(
           </AnimatePresence>
 
           {indexedChildren}
-        </TabsPrimitive.List>
+        </TabsPrimitive.TabsList>
       </TabsListContext.Provider>
     );
   }
@@ -488,7 +480,11 @@ TabsList.displayName = "TabsList";
 /* ─────────────────────── TabItem ─────────────────────── */
 
 interface TabItemProps
-  extends ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> {
+  extends Omit<
+    ComponentPropsWithoutRef<typeof TabsPrimitive.TabsTab>,
+    "className" | "children"
+  > {
+  className?: string;
   /** Unique value for this tab. */
   value: string;
   /** Optional leading icon. */
@@ -509,7 +505,6 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
     const internalRef = useRef<HTMLButtonElement>(null);
     const sizeClasses = useSize();
     const { registerTab, hoveredIndex, selectedValue, setOptimisticIdx } = useTabsList();
-    const panels = useContext(TabsValueOrderContext)?.panels;
 
     // Register the button so the list can measure its rect; the cleanup
     // unregisters it so no pill aims at a tab that has gone.
@@ -524,7 +519,7 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
     const isActive = hoveredIndex === _index || isSelected;
 
     const trigger = (
-      <TabsPrimitive.Trigger
+      <TabsPrimitive.TabsTab
         // Composed (not spread-overridable): a consumer onClick must not
         // replace the optimistic indicator jump.
         onClick={(e) => {
@@ -553,11 +548,7 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
           sizeClasses.gap,
           className
         )}
-        // A tab that switches no TabPanel, such as a mode switch, names no panel; Radix would point it at one that is never rendered.
-        {...(panels?.has(value) ? {} : { "aria-controls": undefined })}
         {...props}
-        // Keeps Radix's tab `data-state` contract under a shortcut Tooltip trigger, which stamps its own.
-        data-state={isSelected ? "active" : "inactive"}
       >
         {/* Stroke 1.5 → 2 and muted → foreground on hover or selection, over
             the label's 80ms, so icon and text change together. */}
@@ -604,7 +595,7 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
             style={{ fontVariationSettings: fontWeights.medium }}
           />
         )}
-      </TabsPrimitive.Trigger>
+      </TabsPrimitive.TabsTab>
     );
     if (!tooltip && !shortcut?.length) return trigger;
     return (
@@ -620,24 +611,23 @@ TabItem.displayName = "TabItem";
 /* ─────────────────────── TabPanel ─────────────────────── */
 
 interface TabPanelProps
-  extends ComponentPropsWithoutRef<typeof TabsPrimitive.Content> {
+  extends Omit<
+    ComponentPropsWithoutRef<typeof TabsPrimitive.TabsPanel>,
+    "className"
+  > {
   /** Must match a TabItem value. */
   value: string;
+  className?: string;
 }
 
 const TabPanel = forwardRef<HTMLDivElement, TabPanelProps>(
-  ({ className, value, ...props }, ref) => {
-    const registerPanel = useContext(TabsValueOrderContext)?.registerPanel;
-    useEffect(() => registerPanel?.(value), [registerPanel, value]);
-    return (
-      <TabsPrimitive.Content
-        ref={ref}
-        value={value}
-        className={cn("outline-none", className)}
-        {...props}
-      />
-    );
-  }
+  ({ className, ...props }, ref) => (
+    <TabsPrimitive.TabsPanel
+      ref={ref}
+      className={cn("outline-none", className)}
+      {...props}
+    />
+  )
 );
 
 TabPanel.displayName = "TabPanel";

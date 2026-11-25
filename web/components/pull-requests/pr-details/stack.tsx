@@ -1,6 +1,6 @@
 /** A pull request's stack and its session's other pull requests: the popover that a session's header and the pull request header both open. */
 import { IconMerged, IconPullRequest } from "central-icons";
-import { type MouseEvent, type ReactNode, useState } from "react";
+import { type MouseEvent, type ReactElement, type ReactNode, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestDetail, prKey, pullRequestUrl, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { queuedMergeOf } from "../../../../src/shared/merge-queue";
 import { age, LINK_VERB } from "../../../labels";
@@ -28,7 +28,7 @@ interface StackPopoverProps {
 	onPick?: (pr: PullRequest) => void;
 	align: "start" | "end";
 	/** The button that opens the popover, given whether it is open. */
-	trigger: (open: boolean) => ReactNode;
+	trigger: (open: boolean) => ReactElement;
 }
 
 /** The stack on its rail with **Merge stack**, then the session's other pull requests, each with its GitHub link. */
@@ -45,8 +45,8 @@ export function StackPopover({ stack, others, current, onPick, align, trigger }:
 	};
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>{trigger(open)}</PopoverTrigger>
-			<PopoverContent align={align} className="max-h-(--radix-popover-content-available-height) w-[28rem] max-w-[calc(100vw-2rem)] overflow-y-auto p-0" onClick={closeOnLink}>
+			<PopoverTrigger render={trigger(open)} />
+			<PopoverContent align={align} className="max-h-(--available-height) w-[28rem] max-w-[calc(100vw-2rem)] overflow-y-auto p-0" onClick={closeOnLink}>
 				{top && <StackRail stack={stack} current={current} onPick={pick} trailing={pr => <GithubLink pr={pr} />} />}
 				{top && <MergeStack stack={stack} align={align} />}
 				{others.length > 0 && (

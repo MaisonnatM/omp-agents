@@ -148,7 +148,7 @@ describe("paletteSections", () => {
 		]);
 	});
 
-	test("conversation matches list for a search only, in the server's order whatever cmdk scores, after the ranked sections and before what the search becomes", () => {
+	test("conversation matches list for a search only, in the server's order whatever the fuzzy match scores, after the ranked sections and before what the search becomes", () => {
 		const items = [
 			item("fallback:create-todo", "fallback", "Create todo"),
 			item("conversation:b", "conversations", "unrelated words"),

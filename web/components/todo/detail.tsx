@@ -146,16 +146,14 @@ function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo
 		<div className="flex flex-col gap-2">
 			<div className="flex flex-wrap gap-2">
 				{main === "reply" && sessionId !== null && (
-					<Button variant="primary" size="compact" asChild>
-						<a href={hashForSession(sessionId)}>Reply in session</a>
-					</Button>
+					<Button variant="primary" size="compact" render={<a href={hashForSession(sessionId)} />}>Reply in session</Button>
 				)}
 				{actions.map(action => (
 					<QuickActionButton key={action} action={action} primary={main === action} pending={pending} onRun={() => start(todoStart(todo, action, newSessionCwd, readPinnedSkill()))} />
 				))}
 				<Tooltip content="Open a new-session draft from this todo, to edit its prompt or pick its directory">
-					<Button variant={main === "draft" ? "primary" : actions.length > 0 ? "ghost" : "secondary"} size="compact" leadingIcon={IconPlay} asChild>
-						<a href={hashForNewSession({ cwd: todoCwd(todo, newSessionCwd), todoId: todo.id })}>{sessionId === null ? "Start session" : "Start another session"}</a>
+					<Button variant={main === "draft" ? "primary" : actions.length > 0 ? "ghost" : "secondary"} size="compact" leadingIcon={IconPlay} render={<a href={hashForNewSession({ cwd: todoCwd(todo, newSessionCwd), todoId: todo.id })} />}>
+						{sessionId === null ? "Start session" : "Start another session"}
 					</Button>
 				</Tooltip>
 			</div>

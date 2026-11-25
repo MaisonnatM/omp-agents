@@ -1,6 +1,5 @@
 /** The Fait dialog, which logs a session's loads, sends, pain, effort, and note, or a test's max and bodyweight; and the Pesée dialog. */
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
+import { Radio, RadioGroup } from "@ui-sdk/react/radio";
 import { IconCheckmark1, IconCrossMedium, IconExclamationTriangle, IconPlusSmall } from "central-icons";
 import { type KeyboardEvent, useId, useState } from "react";
 import { errorText } from "../../../src/json";
@@ -186,9 +185,9 @@ export function LogForm({ state, target, disabled, onChange, onSaved, onClose }:
 					<div className="-mt-2 flex flex-col gap-2">
 						<RadioGroup aria-label="Où" value={where} onValueChange={next => setWhere(PAIN_PLACES.find(place => place === next) ?? where)} className="flex flex-wrap gap-1.5">
 							{PAIN_PLACES.map(place => (
-								<Radio.Root key={place} value={place} className="cursor-pointer rounded-full border border-border px-2.5 py-0.5 text-xs outline-none not-data-[checked]:hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[checked]:border-primary data-[checked]:bg-primary data-[checked]:text-primary-foreground">
+								<Radio key={place} value={place} className="cursor-pointer rounded-full border border-border px-2.5 py-0.5 text-xs outline-none not-data-[checked]:hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[checked]:border-primary data-[checked]:bg-primary data-[checked]:text-primary-foreground">
 									{PAIN_PLACE_LABEL[place]}
-								</Radio.Root>
+								</Radio>
 							))}
 						</RadioGroup>
 						{pain >= PAIN_FLAG_LEVEL && (
@@ -256,18 +255,18 @@ function Scale({ label, values, value, word, ends, tone, onPick }: ScaleProps) {
 					<button type="button" onClick={() => onPick(null)} className="text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">Effacer</button>
 				)}
 			</p>
-			<RadioGroup aria-label={label} value={value} onValueChange={next => onPick(values.find(level => level === next) ?? null)} className="flex gap-1">
+			<RadioGroup aria-label={label} value={value === null ? null : String(value)} onValueChange={next => onPick(values.find(level => String(level) === next) ?? null)} className="flex gap-1">
 				{values.map(level => (
-					<Radio.Root
+					<Radio
 						key={level}
-						value={level}
+						value={String(level)}
 						className={cn(
 							"inline-flex h-8 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-md border border-border bg-background text-sm tabular-nums outline-none not-data-[checked]:hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
 							tone === "warning" ? "data-[checked]:border-warning data-[checked]:bg-warning-surface data-[checked]:font-medium data-[checked]:text-warning-foreground" : "data-[checked]:border-primary data-[checked]:bg-primary data-[checked]:text-primary-foreground",
 						)}
 					>
 						{level}
-					</Radio.Root>
+					</Radio>
 				))}
 			</RadioGroup>
 			<p className="flex justify-between text-[11px] text-muted-foreground">

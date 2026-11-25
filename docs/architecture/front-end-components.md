@@ -1,9 +1,10 @@
 # Front-end components
 
-The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
+The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components, installed with the shadcn CLI into `web/components/ui`, on [UI SDK](https://ui-sdk.dev/)'s primitives (`@ui-sdk/react`), whose docs ship in `node_modules/@ui-sdk/react/docs/`.
+`web/globals.css` declares the `ui-sdk` cascade layer first, so the page's own styles win over the CSS UI SDK adds.
 The roster uses `sidebar`, and the page switch, **Pull requests**, **Bots**, and **Sessions** in the sidebar and **Todo** and **Sport** in the header, uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
 User and assistant turns use `chat-message`, and the composer uses `input-message`.
-Tool calls and the model's thinking use shadcn's Base UI `trace`, vendored as `web/components/ui/trace.tsx` on `web/components/ui/collapsible.tsx`, and code blocks in messages its `code-block`, vendored as `web/components/ui/code-block.tsx`.
+Tool calls and the model's thinking use shadcn's Base UI `trace`, vendored as `web/components/ui/trace.tsx` on `web/components/ui/collapsible.tsx`, UI SDK's collapsible, and code blocks in messages its `code-block`, vendored as `web/components/ui/code-block.tsx`.
 The utilities both use from shadcn's `tailwind.css`, such as `shimmer` and `scroll-fade-x`, are copied into `web/shadcn.css`, since that file's `scroll-fade` would clash with the page's own.
 `thinking-indicator` shows while the agent works.
 `Button`'s `loading` prop preserves its label's width, shows a spinner, disables the control, and sets `aria-busy`.
@@ -19,24 +20,24 @@ Sidebar widths and the split between panes share `web/components/drag-separator.
 Each call site still clamps its own domain, pixels for a sidebar and a ratio for a split.
 While a sidebar's width is dragged, `DashboardSidebar` turns off pointer events on any `<webview>` inside it, the Preview's, since a guest page takes the pointer from the handle's capture once the pointer crosses into it.
 
-The pull request detail tabs use `web/components/segmented-tabs.tsx`, a reusable Radix Tabs wrapper with T3's 24px segmented styling.
-Radix owns automatic arrow-key selection, roving focus, and the tab-to-panel ARIA links.
+The pull request detail tabs use `web/components/segmented-tabs.tsx`, a reusable UI SDK Tabs wrapper with T3's 24px segmented styling.
+UI SDK owns automatic arrow-key selection, roving focus, and the tab-to-panel ARIA links.
 `presentChecks` in `web/pull-request-checks.ts` derives the status line and attention, running, and completed groups from `PullRequestDetail.checkRuns`.
 The check transport remains `{ name, state, url }`, with no timing or separate workflow-approval fields.
 Skipped checks stay in the completed group but never count as passed.
 
-The sidebar rows' and pull request rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
-Both share Base UI's menu items, so each row builds one item list and both menus render it.
+The sidebar rows' and pull request rows' menus use UI SDK's `Menu`, as a context menu for right-click and from the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
+Both share the same menu items, so each row builds one item list and both menus render it.
 The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
 It leaves a right-click inside a popup the row portals out, such as a picker's search field, to the browser, since React passes that event up to the row.
 
 A session's PRs sidebar holds the PR it shows and its detail tab in `SessionPullRequestsTab`'s component state, keyed by the session, so nothing is stored.
 Only the main PR detail registers the copy-number and copy-link shortcuts.
 
-Every fixed list of choices uses shadcn's Base UI `select`, vendored as `web/components/ui/select.tsx` with the menu's popup and row look, in place of the browser's `<select>`.
-`FormDialog` is Base UI's `Dialog`, so a `Select` in its form opens and takes focus there; Esc in one of the form's Radix pickers closes only the picker.
+Every fixed list of choices uses UI SDK's `Select`, wrapped in `web/components/ui/select.tsx` with the menu's popup and row look, in place of the browser's `<select>`.
+`FormDialog` is UI SDK's `Dialog`, so a `Select` in its form opens and takes focus there, and Esc in one of the form's pickers closes only the picker, since UI SDK closes only the topmost popup.
 
-Toasts use Base UI's `Toast` through one manager in `web/components/toaster.tsx`, since the page has no Fluid or shadcn toast; they stack at the bottom right in the `popover` look.
+Toasts use UI SDK's `Toast` through one manager in `web/components/toaster.tsx`, since the page has no Fluid or shadcn toast; they stack at the bottom right in the `popover` look.
 Below the phone width, which `usePhoneWidth` in `web/use-phone-width.ts` reads, only the newest shows, at the top under the header, and a swipe up or right puts it away.
 
 Questions use `web/components/question-card.tsx`, the dashboard's own card in the look of Fluid's `ask-user-questions`, which `web/components/user-request.tsx` fills from omp's request.

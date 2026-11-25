@@ -65,7 +65,16 @@ export function ContextRingMenu({ context, compaction, working, pending, autoPen
 					<span className="inline-flex items-center gap-1.5"><Ring used={used} running={busy} /></span>
 				</DropdownMenuTrigger>
 			</Tooltip>
-			<DropdownMenuContent side="top" align="end" className="w-72" finalFocus={() => { composer?.current?.focus(); return composer ? false : true; }}>
+			<DropdownMenuContent
+				side="top"
+				align="end"
+				className="w-72"
+				finalFocus={() => {
+					if (!composer) return undefined;
+					composer.current?.focus();
+					return document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+				}}
+			>
 				<ContextWindow tokens={context.tokens} limit={context.window} level={levelOf(used)} autoAt={compaction.thresholdTokens === null ? null : compaction.thresholdTokens / context.window} busy={busy} />
 				<MenuSeparator />
 				<MenuSubmenu>

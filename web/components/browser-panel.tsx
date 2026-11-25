@@ -5,7 +5,7 @@
  */
 import { IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconAspectRatio43, IconCamera1, IconCrossMedium, IconCursorClick, IconExpand, IconEyeOpen, IconImac, IconMinimize, IconPhone, IconPlay, IconRotate, IconServer, IconSparklesTwo, IconSquareArrowTopRight, IconStopCircle, IconTablet, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import * as TabsPrimitive from "@radix-ui/react-tabs";
+import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { ControlId } from "../../src/shared/activity";
@@ -115,7 +115,7 @@ const screens = expiringStrings("omp-agents.browser-screens", KEPT_FOR);
 const APP_TAB = "app";
 
 /** With no tab strip, the session's page is not a tab panel. */
-const LONE_PANEL = { role: undefined, "aria-labelledby": undefined } as const;
+const lonePanel = ({ role: _role, "aria-labelledby": _labelledBy, ...props }: Record<string, unknown>) => <div {...props} />;
 
 const reviewPagesOf = (pane: PaneData): ReviewPage[] => latestReviewPages(pane.items);
 
@@ -167,29 +167,29 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 			setActive(next);
 		});
 		// The close button left with its tab: the shown tab takes the focus, or once the strip is gone, the address field.
-		if (refocus) rootRef.current?.querySelector<HTMLElement>(':scope > [role="tablist"] [data-state="active"], :scope > [data-state="active"] input[aria-label="Address"]')?.focus();
+		if (refocus) rootRef.current?.querySelector<HTMLElement>(':scope > [role="tablist"] [data-selected], :scope > [data-selected] input[aria-label="Address"]')?.focus();
 	};
 	const strip = open.length > 0;
 	return (
-		<TabsPrimitive.Root ref={rootRef} value={active} onValueChange={setActive} className="flex min-h-0 flex-1 flex-col">
+		<TabsPrimitive.Tabs
+			ref={rootRef}
+			value={active}
+			onValueChange={value => {
+				if (value !== null) setActive(value);
+			}}
+			className="flex min-h-0 flex-1 flex-col"
+		>
 			{strip && <BrowserTabStrip pages={open} active={active} onClose={close} />}
 			{[null, ...open].map(page => {
 				const value = page?.url ?? APP_TAB;
 				return (
-					<TabsPrimitive.Content
-						key={value}
-						value={value}
-						forceMount
-						tabIndex={undefined}
-						{...(strip ? null : LONE_PANEL)}
-						className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
-					>
+					<TabsPrimitive.TabsPanel key={value} value={value} keepMounted render={strip ? undefined : lonePanel} className="flex min-h-0 flex-1 flex-col">
 						{page?.note && <p className="shrink-0 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">{page.note}</p>}
 						<BrowserPage view={view} sessionId={sessionId} page={page} active={value === active} pages={pages} onReview={() => void review(pages)} screen={screen} onScreen={chooseScreen} />
-					</TabsPrimitive.Content>
+					</TabsPrimitive.TabsPanel>
 				);
 			})}
-		</TabsPrimitive.Root>
+		</TabsPrimitive.Tabs>
 	);
 }
 
@@ -200,7 +200,7 @@ export function BrowserPanel({ view, sessionId }: { view: LiveView; sessionId: s
 function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPage[]; active: string; onClose: (url: string, refocus: boolean) => void }) {
 	const tabs = [null, ...pages];
 	return (
-		<TabsPrimitive.List aria-label="Browser tabs" className="flex h-9 shrink-0 items-end overflow-x-auto bg-muted/60 px-2 pt-1.5 [scrollbar-width:none]">
+		<TabsPrimitive.TabsList aria-label="Browser tabs" className="flex h-9 shrink-0 items-end overflow-x-auto bg-muted/60 px-2 pt-1.5 [scrollbar-width:none]">
 			{tabs.map((page, at) => {
 				const value = page?.url ?? APP_TAB;
 				const selected = value === active;
@@ -220,7 +220,7 @@ function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPag
 								"before:absolute before:bottom-0 before:-left-2 before:size-2 before:bg-[radial-gradient(circle_at_0_0,transparent_0.5rem,var(--color-background)_calc(0.5rem+0.5px))] after:absolute after:-right-2 after:bottom-0 after:size-2 after:bg-[radial-gradient(circle_at_100%_0,transparent_0.5rem,var(--color-background)_calc(0.5rem+0.5px))]",
 						)}
 					>
-						<TabsPrimitive.Trigger
+						<TabsPrimitive.TabsTab
 							{...activityControl("browser.tab")}
 							value={value}
 							title={page?.url ?? "The session's app"}
@@ -239,7 +239,7 @@ function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPag
 							>
 								{page?.label ?? "App"}
 							</span>
-						</TabsPrimitive.Trigger>
+						</TabsPrimitive.TabsTab>
 						{page && (
 							<button
 								type="button"
@@ -255,7 +255,7 @@ function BrowserTabStrip({ pages, active, onClose }: { pages: readonly ReviewPag
 					</div>
 				);
 			})}
-		</TabsPrimitive.List>
+		</TabsPrimitive.TabsList>
 	);
 }
 
@@ -284,7 +284,7 @@ function ScreenSizeMenu({ screen, onScreen }: { screen: ScreenChoice; onScreen: 
 						// Each touch size reads turned while the chosen one is.
 						const sized = screenOf(screenChoice(size, screen.landscape));
 						return (
-							<MenuRadioItem key={size} value={size} closeOnClick>
+							<MenuRadioItem key={size} value={size} closeOnSelect>
 								<Icon />
 								<span className="flex-1">{SCREEN_LABELS[size]}</span>
 								{sized && (
@@ -373,15 +373,15 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 		const answer = await writeStartServer(view.instanceId);
 		if ("started" in answer) {
 			webview.load(`http://localhost:${answer.started.port}`);
-			toasts.add({ title: `Started ${answer.started.command}` });
+			toasts({ title: `Started ${answer.started.command}` });
 			return;
 		}
 		request({ t: "prompt", view, text: `${START_SERVER_PROMPT}\n\nStarting it directly failed: ${answer.fallback}`, images: [], delivery: "followUp" });
-		toasts.add({ title: "Asked the session to start its dev server", description: answer.fallback });
+		toasts({ title: "Asked the session to start its dev server", description: answer.fallback });
 	}, "Cannot start the dev server");
 	const stopServer = useAction(async (server: DevServer) => {
 		await writeProcessStop(view.instanceId, server.id);
-		toasts.add({ title: `Stopped ${commandLabel(server.label)}` });
+		toasts({ title: `Stopped ${commandLabel(server.label)}` });
 	}, "Cannot stop the dev server");
 	// The candidates choose the first address, fill the server menu, and name the ports a sign-in comes back to, so `ps` and `lsof` run only until they are read once, and while the menu is open.
 	sessionProcessesStore.usePolling(null, webview.src === null || read === null || menuOpen);

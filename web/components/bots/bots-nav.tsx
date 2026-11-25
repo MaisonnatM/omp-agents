@@ -94,17 +94,13 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 					<SidebarSearch label="Filter the Bots" placeholder="Search Bots" query={query} onQuery={setQuery} />
 				</div>
 				<Tooltip content="All Bots" side="bottom">
-					<Button asChild variant="ghost" size="icon-compact" className="shrink-0">
-						<a href={hashForBots(null)} aria-label="All Bots">
-							<IconLayoutGrid1 />
-						</a>
+					<Button variant="ghost" size="icon-compact" className="shrink-0" render={<a href={hashForBots(null)} aria-label="All Bots" />}>
+						<IconLayoutGrid1 />
 					</Button>
 				</Tooltip>
 				<Tooltip content="New Bot" side="bottom">
-					<Button asChild variant="ghost" size="icon-compact" className="shrink-0">
-						<a href={hashForNewBot()} aria-label="New Bot" aria-current={openId === null ? "page" : undefined}>
-							<IconPlusSmall />
-						</a>
+					<Button variant="ghost" size="icon-compact" className="shrink-0" render={<a href={hashForNewBot()} aria-label="New Bot" aria-current={openId === null ? "page" : undefined} />}>
+						<IconPlusSmall />
 					</Button>
 				</Tooltip>
 			</SidebarGroup>

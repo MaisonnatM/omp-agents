@@ -214,7 +214,7 @@ const sidebarMenuButtonVariants = cva(
   // container keeps seeing the moves, and fluid hover simply never lights it.
   // `group/menu-button` lets the icon, dot and label light from the
   // `data-fluid-hover-active` mark the menu's hover puts on this button.
-  "peer/menu-button group/menu-button relative z-10 flex w-full cursor-pointer select-none items-center gap-2 pl-2 text-left outline-none disabled:opacity-50 disabled:pointer-events-none transition-[padding] duration-80 pr-[var(--row-gutter)] group-hover/menu-item:pr-[var(--row-gutter-hover)] group-focus-within/menu-item:pr-[var(--row-gutter-hover)] group-has-[[data-sidebar=menu-action]:is([data-state=open],[data-popup-open],[aria-expanded=true])]/menu-item:pr-[var(--row-gutter-hover)]",
+  "peer/menu-button group/menu-button relative z-10 flex w-full cursor-pointer select-none items-center gap-2 pl-2 text-left outline-none disabled:opacity-50 disabled:pointer-events-none transition-[padding] duration-80 pr-[var(--row-gutter)] group-hover/menu-item:pr-[var(--row-gutter-hover)] group-focus-within/menu-item:pr-[var(--row-gutter-hover)] group-has-[[data-sidebar=menu-action]:is([data-open],[aria-expanded=true])]/menu-item:pr-[var(--row-gutter-hover)]",
   {
     variants: {
       variant: {
@@ -436,7 +436,7 @@ const SidebarMenuAction = forwardRef<HTMLButtonElement, SidebarMenuActionProps>(
           shape.item,
           // Reveal on the OWN row only: tracks the row's button (its peer).
           showOnHover &&
-            "opacity-0 peer-hover/menu-button:opacity-100 peer-focus-visible/menu-button:opacity-100 hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 aria-expanded:opacity-100",
+            "opacity-0 peer-hover/menu-button:opacity-100 peer-focus-visible/menu-button:opacity-100 hover:opacity-100 focus-visible:opacity-100 data-open:opacity-100 aria-expanded:opacity-100",
           className
         ),
         onClick: (event: React.MouseEvent<HTMLButtonElement>) => {

@@ -106,7 +106,7 @@ export function MemoryEditor({
 			<Field label="Kind" htmlFor={ids.kind}>
 				<Select value={draft.kind} disabled={busy} onValueChange={next => edit({ kind: next as MemoryKind })}>
 					<SelectTrigger id={ids.kind} className="w-40">
-						<SelectValue>{(shown: unknown) => KIND_LABELS[shown as MemoryKind]}</SelectValue>
+						<SelectValue>{({ value }) => KIND_LABELS[value as MemoryKind]}</SelectValue>
 					</SelectTrigger>
 					<SelectContent>
 						{MEMORY_KINDS.map(each => (

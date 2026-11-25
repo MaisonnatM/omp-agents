@@ -152,7 +152,7 @@ export function FindBar({ root: rootRef, enabled, label, className }: FindBarPro
 				setCurrent(index => Math.min(index, Math.max(0, again.length - 1)));
 			});
 		});
-		observer.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["data-state", "hidden", "open"] });
+		observer.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["data-open", "data-closed", "hidden", "open"] });
 		return () => {
 			observer.disconnect();
 			cancelAnimationFrame(frame);

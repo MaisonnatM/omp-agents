@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, type Mock, mock, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import type { ReactNode } from "react";
 import type { WorktreeBlocker, WorktreeRemovalRequest, WorktreeRemovalResult } from "../src/worktrees-shared";
 import { toasts } from "./components/toaster";
@@ -38,6 +38,9 @@ function show(id: string, change: Shown): void {
 	if (before.at(-1) !== words) said.set(id, [...before, words]);
 }
 
+/** Stops recording what the toasts say. */
+let stopShowing = (): void => {};
+
 beforeEach(() => {
 	previews = {};
 	removals = {};
@@ -45,7 +48,6 @@ beforeEach(() => {
 	shortPreviews = 0;
 	shown = new Map();
 	said = new Map();
-	let ids = 0;
 	spyOn(globalThis, "fetch").mockImplementation((async (_url: string, init: RequestInit) => {
 		const body = JSON.parse(String(init.body)) as WorktreeRemovalRequest;
 		requested.push(body);
@@ -64,16 +66,16 @@ beforeEach(() => {
 		});
 		return reply({ results });
 	}) as typeof fetch);
-	spyOn(toasts, "add").mockImplementation(({ id = `toast-${(ids += 1)}`, type, title, description }) => {
-		show(id, { type, title, description });
-		return id;
-	});
-	spyOn(toasts, "update").mockImplementation((id, change) => {
-		if (typeof change !== "function") show(id, { title: change.title, description: change.description });
+	stopShowing = toasts.subscribe(() => {
+		for (const { id, type, title, description } of toasts.toasts()) show(id, { type, title, description });
 	});
 });
 
-afterEach(() => mock.restore());
+afterEach(() => {
+	stopShowing();
+	toasts.dismiss();
+	mock.restore();
+});
 
 const removed = (): string[] => requested.flatMap(request => (request.action === "remove" ? request.plans.map(plan => branchOf(plan.path)) : []));
 
@@ -137,7 +139,7 @@ describe("removeWorktrees", () => {
 
 	test("a run that throws ends with its error, and the next run still removes", async () => {
 		// The first toast update, which says run `a` is checking, throws.
-		(toasts.update as Mock<typeof toasts.update>).mockImplementationOnce(() => {
+		spyOn(toasts, "update").mockImplementationOnce(() => {
 			throw new Error("The toaster is gone.");
 		});
 		await removeWorktrees([target("a")], false);

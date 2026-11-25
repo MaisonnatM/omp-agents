@@ -95,7 +95,7 @@ function ReviewersSubmenu({ pr, options, onChange }: MenuReviewers) {
 				{people?.map(person => {
 					const on = requested.includes(person.login);
 					return (
-						<MenuItem key={person.login} closeOnClick={false} onClick={() => onChange({ field: "reviewer", login: person.login, on: !on })}>
+						<MenuItem key={person.login} closeOnSelect={false} onClick={() => onChange({ field: "reviewer", login: person.login, on: !on })}>
 							<PersonPicture person={person} />
 							<span className="truncate">{person.name ?? person.login}</span>
 							{person.name && <span className="flex-1 truncate text-muted-foreground">{person.login}</span>}
@@ -141,7 +141,7 @@ export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, mer
 			{(quick.actions.length > 0 || offersRebase || !!ask) && <MenuSeparator />}
 			{changesState && merge && merge.allowed.length > 1 && <>
 				<MenuRadioGroup aria-label="Merge method" value={merge.method ?? ""} onValueChange={value => { const method = merge.allowed.find(candidate => candidate === value); if (method) merge.onPick(method); }}>
-					{merge.allowed.map(method => <MenuRadioItem key={method} value={method} disabled={pending || !!merge.queued} closeOnClick><IconMerged />{MERGE_METHOD_LABELS[method]}</MenuRadioItem>)}
+					{merge.allowed.map(method => <MenuRadioItem key={method} value={method} disabled={pending || !!merge.queued} closeOnSelect><IconMerged />{MERGE_METHOD_LABELS[method]}</MenuRadioItem>)}
 				</MenuRadioGroup>
 				<MenuSeparator />
 			</>}
@@ -157,7 +157,7 @@ export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, mer
 			<MenuItem onClick={() => clipboard.run(`#${pr.number}`)}><IconSquareBehindSquare1 />Copy PR number</MenuItem>
 			{state && state !== "merged" && <>
 				<MenuSeparator />
-				<MenuItem variant={state === "closed" ? "default" : "destructive"} disabled={pending} closeOnClick={confirm.isArmed(endAction)} aria-label={endLabel} {...confirm.props(endAction, () => onState(state === "closed" ? "open" : "closed"))}>
+				<MenuItem variant={state === "closed" ? "default" : "destructive"} disabled={pending} closeOnSelect={confirm.isArmed(endAction)} aria-label={endLabel} {...confirm.props(endAction, () => onState(state === "closed" ? "open" : "closed"))}>
 					{state === "closed" ? <IconPullRequest /> : <IconPullRequestClosedSimple />}{endLabel}
 				</MenuItem>
 			</>}

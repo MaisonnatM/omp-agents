@@ -242,7 +242,7 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 				<div className="flex items-center gap-2 text-sm text-muted-foreground">
 					Sort
 					<Select<SortKey>
-						items={SORTS}
+						items={(Object.entries(SORTS) as [SortKey, string][]).map(([value, label]) => ({ value, label }))}
 						value={sort}
 						onValueChange={next => {
 							if (!next) return;

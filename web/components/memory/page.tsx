@@ -31,7 +31,7 @@ function ViewTabs({ tab }: { tab: MemoryRoute["tab"] }) {
 				const view = MEMORY_TABS.find(({ route }) => route.tab === next);
 				if (view) location.hash = memoryHash(view.route);
 			}}
-			activationMode="manual"
+			activation="manual"
 		>
 			<SegmentedTabsList aria-label="View">
 				{MEMORY_TABS.map(({ route, name, control }) => (

@@ -5,7 +5,7 @@ import type { ClientMsg } from "../../src/shared/protocol";
 import { follow, presentNotice } from "../notice-model";
 import type { StartOp } from "../starts";
 import { NoticeOrigin } from "./notices";
-import { toasts } from "./toaster";
+import { type ToastData, toasts } from "./toaster";
 
 /** A news toast shows only while its news is this fresh, so a check after a long gap does not toast what you missed. */
 const TOAST_FRESH_MS = 15 * 60_000;
@@ -21,7 +21,7 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: (ms
 	useEffect(() => {
 		const close = (id: string) => {
 			open.current.delete(id);
-			toasts.close(id);
+			toasts.dismiss(id);
 		};
 		const listed = new Set(notices.map(({ id }) => id));
 		for (const id of open.current) if (!listed.has(id)) close(id);
@@ -29,7 +29,7 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: (ms
 		for (const notice of notices) {
 			const { id } = notice;
 			const shown = presentNotice(notice, now);
-			const onClose = () => {
+			const onDismiss = () => {
 				if (open.current.delete(id)) send({ t: "notice", ids: [id], op: "seen" });
 			};
 			const { toast, action } = shown;
@@ -40,18 +40,19 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: (ms
 				}
 				if (notice.seen || notice.read || now - notice.at > TOAST_FRESH_MS) continue;
 				open.current.add(id);
-				toasts.add({
+				toasts({
 					id,
-					data: { source: <NoticeOrigin notice={notice} /> },
-					timeout: toast.timeout,
-					onClose,
+					data: { source: <NoticeOrigin notice={notice} /> } satisfies ToastData,
+					duration: toast.duration,
+					onDismiss,
 					title: shown.headline,
 					description: <span className="line-clamp-2">{shown.preview}</span>,
-					actionProps:
+					action:
 						action.kind === "continue-all"
 							? {
-									children: "Continue all",
-									onClick: () => {
+									label: "Continue all",
+									dismiss: false,
+									onAction: () => {
 										start({ kind: "resume-all", sessionIds: action.sessionIds });
 										send({ t: "notice", ids: [id], op: "read" });
 									},
@@ -59,8 +60,9 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: (ms
 							: shown.link === null
 								? undefined
 								: {
-										children: "Open",
-										onClick: () => {
+										label: "Open",
+										dismiss: false,
+										onAction: () => {
 											follow(shown.link);
 											send({ t: "notice", ids: [id], op: "read" });
 										},
@@ -70,16 +72,14 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: (ms
 			}
 			const content = {
 				title: shown.headline,
-				actionProps:
-					action.kind === "update"
-						? { children: action.updating ? "Updating" : "Update", disabled: !connected || !action.ready, onClick: () => send({ t: "notice", ids: [id], op: "update" }) }
-						: undefined,
+				action: action.kind === "update" ? { label: action.updating ? "Updating" : "Update", dismiss: false, onAction: () => send({ t: "notice", ids: [id], op: "update" }) } : undefined,
 				description: shown.preview,
+				data: { source: <NoticeOrigin notice={notice} />, actionDisabled: action.kind === "update" && (!connected || !action.ready) } satisfies ToastData,
 			};
 			if (!open.current.has(id)) {
 				if (notice.seen) continue;
 				open.current.add(id);
-				toasts.add({ id, timeout: 0, onClose, data: { source: <NoticeOrigin notice={notice} /> }, ...content });
+				toasts({ id, duration: Infinity, onDismiss, ...content });
 			} else if (toast.dismissedElsewhere) {
 				close(id);
 			} else {

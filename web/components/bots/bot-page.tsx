@@ -141,9 +141,7 @@ function MissingRoutine({ bot }: { bot: Bot }) {
 		<PageFrame title="No such routine" meta={`${bot.name}'s routine`}>
 			<div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 py-10 text-center text-sm text-pretty text-muted-foreground">
 				<p>{bot.name} has no routine at this address. It may have been deleted.</p>
-				<Button asChild variant="ghost" size="compact">
-					<a href={hashForBots(bot.id)}>Back to {bot.name}</a>
-				</Button>
+				<Button variant="ghost" size="compact" render={<a href={hashForBots(bot.id)} />}>Back to {bot.name}</Button>
 			</div>
 		</PageFrame>
 	);

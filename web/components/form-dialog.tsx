@@ -1,7 +1,7 @@
 /** `FormDialog`, the dialog shell the dashboard's forms share, with its header, error line, and Cmd+Enter submit chord. */
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { Dialog, DialogBackdrop, DialogClose, DialogContent, DialogTitle } from "@ui-sdk/react/dialog";
 import { IconCrossMedium } from "central-icons";
-import { type KeyboardEvent, type ReactNode, type RefObject, useRef } from "react";
+import type { KeyboardEvent, ReactNode, RefObject } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -26,7 +26,7 @@ interface FormDialogProps {
 	className: string;
 	/** The form, which shows a {@link FormDialogHeader} first. */
 	children: ReactNode;
-	/** Keys pressed anywhere in the dialog, including the arrows, Home, and End, which the popup keeps from the page. */
+	/** Keys pressed anywhere in the dialog. */
 	onKeyDown?: (event: KeyboardEvent) => void;
 	/** What takes the focus as the dialog opens, in place of its first button. */
 	initialFocus?: RefObject<HTMLElement | null>;
@@ -36,29 +36,29 @@ interface FormDialogProps {
 
 /** A dialog over the page that holds one form to fill in and send, such as a new issue or a new event. */
 export function FormDialog({ busy, onClose, className, children, onKeyDown, initialFocus, onDismiss }: FormDialogProps) {
-	const popup = useRef<HTMLDivElement>(null);
 	return (
-		<DialogPrimitive.Root
+		<Dialog
 			open
+			container={document.body}
+			dismissible={!busy}
 			onOpenChange={(open, details) => {
-				// The form's Radix pickers render outside the popup; Esc there closes only the picker.
-				if (details.reason === "escape-key" && !popup.current?.contains(details.event.target as Node)) return;
-				if ((details.reason === "escape-key" || details.reason === "outside-press") && onDismiss && !onDismiss(details.reason)) return;
-				if (!open && !busy) onClose();
+				if (open) return;
+				if ((details.reason === "escape-key" || details.reason === "outside-press") && onDismiss && !onDismiss(details.reason)) {
+					details.cancel();
+					return;
+				}
+				onClose();
 			}}
 		>
-			<DialogPrimitive.Portal>
-				<DialogPrimitive.Backdrop className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
-				<DialogPrimitive.Popup
-					ref={popup}
-					onKeyDown={onKeyDown}
-					initialFocus={initialFocus}
-					className={cn("fixed left-1/2 z-50 flex max-h-[calc(100vh-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden", className)}
-				>
-					{children}
-				</DialogPrimitive.Popup>
-			</DialogPrimitive.Portal>
-		</DialogPrimitive.Root>
+			<DialogBackdrop className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
+			<DialogContent
+				onKeyDown={onKeyDown}
+				initialFocus={initialFocus && (() => initialFocus.current)}
+				className={cn("fixed left-1/2 z-50 flex max-h-[calc(100vh-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden", className)}
+			>
+				{children}
+			</DialogContent>
+		</Dialog>
 	);
 }
 
@@ -81,13 +81,13 @@ export function FormDialogHeader({ title, busy, lead, actions, closeLabel = "Clo
 	return (
 		<div className="flex items-center gap-1.5 px-4 pt-3.5 text-[13px]">
 			{lead}
-			<DialogPrimitive.Title className="font-normal text-foreground">{title}</DialogPrimitive.Title>
+			<DialogTitle className="font-normal text-foreground">{title}</DialogTitle>
 			<div className="ml-auto flex items-center gap-0.5">
 				{actions}
 				<Tooltip content={closeLabel} shortcut={["Esc"]} side="bottom">
-					<DialogPrimitive.Close render={<Button variant="ghost" size="icon-compact" className={closeClassName} aria-label={closeLabel} disabled={busy} />}>
+					<DialogClose disabled={busy} render={<Button variant="ghost" size="icon-compact" className={closeClassName} aria-label={closeLabel} />}>
 						<IconCrossMedium />
-					</DialogPrimitive.Close>
+					</DialogClose>
 				</Tooltip>
 			</div>
 		</div>

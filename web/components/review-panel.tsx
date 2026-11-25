@@ -128,7 +128,7 @@ function ChangeRequest({ change, draft, update, live }: { change: BeforeAfter; d
 	const prompt = tweakPrompt(change, draft);
 	const toComposer = (text: string) => {
 		appendToComposer(liveDraftKey(live), text);
-		toasts.add({ title: "Added to the composer" });
+		toasts({ title: "Added to the composer" });
 		update(prev => ({ ...prev, pins: [], ask: "" }));
 	};
 	return (
@@ -245,7 +245,7 @@ export function ReviewPanel({ scope, changes, live }: { scope: string; changes: 
 							<DropdownMenuContent align="start" className="max-w-96">
 								<MenuRadioGroup aria-label="Changes" value={key} onValueChange={(value: string) => setPicked(value)}>
 									{changes.map(each => (
-										<MenuRadioItem key={changeKey(each)} value={changeKey(each)} closeOnClick>
+										<MenuRadioItem key={changeKey(each)} value={changeKey(each)} closeOnSelect>
 											<span className="block min-w-0 flex-1 truncate">{each.title}</span>
 										</MenuRadioItem>
 									))}

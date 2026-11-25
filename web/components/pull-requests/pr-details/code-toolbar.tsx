@@ -99,21 +99,21 @@ function CommitScope({ commits, commit, onCommit }: Pick<CodeToolbarProps, "comm
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="max-w-[min(28rem,calc(100vw-2rem))]">
 				<MenuRadioGroup aria-label="Commit scope" value={commit ?? "all"} onValueChange={value => onCommit(value === "all" ? null : value)}>
-					<MenuRadioItem value="all" closeOnClick>
+					<MenuRadioItem value="all" closeOnSelect>
 						All commits
 					</MenuRadioItem>
 					{commits
 						.toReversed()
 						.slice(0, shown)
 						.map(entry => (
-							<MenuRadioItem key={entry.oid} value={entry.oid} closeOnClick>
+							<MenuRadioItem key={entry.oid} value={entry.oid} closeOnSelect>
 								<span className="min-w-0 flex-1 truncate">{entry.headline}</span>
 								<span className="pl-4 font-mono text-2xs">{entry.sha}</span>
 							</MenuRadioItem>
 						))}
 				</MenuRadioGroup>
 				{commits.length > shown && (
-					<MenuItem closeOnClick={false} onClick={() => setShown(count => count + COMMIT_PAGE)}>
+					<MenuItem closeOnSelect={false} onClick={() => setShown(count => count + COMMIT_PAGE)}>
 						Show more ({commits.length - shown} left)
 					</MenuItem>
 				)}

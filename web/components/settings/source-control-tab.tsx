@@ -115,7 +115,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 									</p>
 								</div>
 								<Select<RepoPull>
-									items={{ default: `Default (${on ? "on" : "off"})`, on: "On", off: "Off" }}
+									items={[{ value: "default", label: `Default (${on ? "on" : "off"})` }, { value: "on", label: "On" }, { value: "off", label: "Off" }]}
 									disabled={pending}
 									value={repo.on === null ? "default" : repo.on ? "on" : "off"}
 									onValueChange={next => next && change({ op: "repo", repo: repo.path, on: next === "default" ? null : next === "on" })}
@@ -142,7 +142,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 				</label>
 			</Section>
 			<Section title="Default merge method" meta="Pull requests start with this method. Last selected reuses the method of your last merge on this device.">
-				<Select<MergeMethodChoice> items={MERGE_METHOD_CHOICES} value={choice} onValueChange={next => next && setChoice(next)}>
+				<Select<MergeMethodChoice> items={(Object.entries(MERGE_METHOD_CHOICES) as [MergeMethodChoice, string][]).map(([value, label]) => ({ value, label }))} value={choice} onValueChange={next => next && setChoice(next)}>
 					<SelectTrigger aria-label="Default merge method">
 						<SelectValue />
 					</SelectTrigger>

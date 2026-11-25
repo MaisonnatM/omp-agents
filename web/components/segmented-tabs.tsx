@@ -1,9 +1,12 @@
-import * as TabsPrimitive from "@radix-ui/react-tabs";
-import { forwardRef, type ComponentPropsWithoutRef, type ForwardedRef, useCallback, useLayoutEffect, useRef } from "react";
+import * as TabsPrimitive from "@ui-sdk/react/tabs";
+import { forwardRef, type ComponentPropsWithoutRef, type ForwardedRef, type ReactNode, useCallback, useLayoutEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
-export const SegmentedTabs = TabsPrimitive.Root;
-export const SegmentedTabPanel = TabsPrimitive.Content;
+export const SegmentedTabs = TabsPrimitive.Tabs;
+export const SegmentedTabPanel = TabsPrimitive.TabsPanel;
+
+type ListProps = Omit<ComponentPropsWithoutRef<typeof TabsPrimitive.TabsList>, "className" | "children"> & { className?: string; children?: ReactNode };
+type TabProps = Omit<ComponentPropsWithoutRef<typeof TabsPrimitive.TabsTab>, "className"> & { className?: string };
 
 const EASE = "cubic-bezier(0.25, 0.9, 0.3, 1)";
 
@@ -25,7 +28,7 @@ function useMergedRef<T>(own: { current: T | null }, forwarded: ForwardedRef<T>)
  * The tabs' tray, with a raised card under the selected tab that glides to the next one picked; it jumps when the tray
  * resizes, and always under reduced motion.
  */
-export const SegmentedTabsList = forwardRef<HTMLDivElement, ComponentPropsWithoutRef<typeof TabsPrimitive.List>>(({ className, children, ...props }, ref) => {
+export const SegmentedTabsList = forwardRef<HTMLDivElement, ListProps>(({ className, children, ...props }, ref) => {
 	const tray = useRef<HTMLDivElement | null>(null);
 	const card = useRef<HTMLSpanElement>(null);
 	const setTray = useMergedRef(tray, ref);
@@ -36,7 +39,6 @@ export const SegmentedTabsList = forwardRef<HTMLDivElement, ComponentPropsWithou
 		if (!list || !pill) return;
 		const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
 		const place = (animate: boolean) => {
-			// `aria-selected`, not `data-state`: a Tooltip around a tab sets the trigger's `data-state` to its own.
 			const tab = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
 			pill.hidden = !tab;
 			if (!tab) return;
@@ -65,7 +67,7 @@ export const SegmentedTabsList = forwardRef<HTMLDivElement, ComponentPropsWithou
 	}, []);
 
 	return (
-		<TabsPrimitive.List ref={setTray} className={cn("relative flex w-fit shrink-0 gap-0.5 rounded-lg bg-input/40 p-0.5", className)} {...props}>
+		<TabsPrimitive.TabsList ref={setTray} className={cn("relative flex w-fit shrink-0 gap-0.5 rounded-lg bg-input/40 p-0.5", className)} {...props}>
 			<span
 				ref={card}
 				aria-hidden
@@ -73,16 +75,16 @@ export const SegmentedTabsList = forwardRef<HTMLDivElement, ComponentPropsWithou
 				className="pointer-events-none absolute rounded-md bg-background shadow-surface-2 dark:bg-input/72"
 			/>
 			{children}
-		</TabsPrimitive.List>
+		</TabsPrimitive.TabsList>
 	);
 });
 
-export const SegmentedTab = forwardRef<HTMLButtonElement, ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>>(
+export const SegmentedTab = forwardRef<HTMLButtonElement, TabProps>(
 	({ className, ...props }, ref) => (
-		<TabsPrimitive.Trigger
+		<TabsPrimitive.TabsTab
 			ref={ref}
 			className={cn(
-				"relative inline-flex h-6 min-w-0 shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent px-2.5 text-xs font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground aria-selected:text-foreground focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-60",
+				"relative inline-flex h-6 min-w-0 shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent px-2.5 text-xs font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground aria-selected:text-foreground focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring data-disabled:pointer-events-none data-disabled:opacity-60",
 				className,
 			)}
 			{...props}

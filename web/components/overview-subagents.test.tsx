@@ -22,9 +22,29 @@ const row = (id: string, fields: Partial<AgentRow>): AgentRow => ({
 	...fields,
 });
 
+/** `html` without its `hidden` elements, such as a closed tooltip's content, which the page keeps mounted. */
+function withoutHidden(html: string): string {
+	for (let open = /<(\w+)[^>]*\shidden=""[^>]*>/.exec(html); open; open = /<(\w+)[^>]*\shidden=""[^>]*>/.exec(html)) {
+		const tag = open[1];
+		const tags = new RegExp(`<${tag}[\\s>]|</${tag}>`, "g");
+		tags.lastIndex = open.index + open[0].length;
+		let depth = 1;
+		let end = html.length;
+		for (let next = tags.exec(html); next; next = tags.exec(html)) {
+			depth += next[0].startsWith("</") ? -1 : 1;
+			if (depth === 0) {
+				end = next.index + next[0].length;
+				break;
+			}
+		}
+		html = html.slice(0, open.index) + html.slice(end);
+	}
+	return html;
+}
+
 /** The visible text of each subagent row, one string per row. */
 function rowTexts(agents: AgentRow[]): string[] {
-	const html = renderToStaticMarkup(<SubagentsSection links={{ instanceId: "i1", agents, onOpen: () => {}, onCancel: null }} nodes={subagentTree(agents, null)} arenas={[]} />);
+	const html = withoutHidden(renderToStaticMarkup(<SubagentsSection links={{ instanceId: "i1", agents, onOpen: () => {}, onCancel: null }} nodes={subagentTree(agents, null)} arenas={[]} />));
 	const list = html.slice(html.indexOf('aria-label="Subagents"'));
 	return [...list.matchAll(/<li[^>]*>(.*?)<\/li>/g)].map(([, inner]) => inner.replace(/<span class="sr-only">[^<]*<\/span>/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
 }

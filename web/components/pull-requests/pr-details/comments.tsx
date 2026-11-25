@@ -177,7 +177,7 @@ export function Comments({ detail, save, send }: CommentsProps) {
 				<DropdownMenuContent align="end">
 					<MenuSwitchItem
 						checked={filter.bots}
-						closeOnClick={false}
+						closeOnSelect={false}
 						onCheckedChange={bots => {
 							setFilter(value => ({ ...value, bots }));
 							showRecent();
@@ -187,7 +187,7 @@ export function Comments({ detail, save, send }: CommentsProps) {
 					</MenuSwitchItem>
 					<MenuSwitchItem
 						checked={filter.resolved}
-						closeOnClick={false}
+						closeOnSelect={false}
 						onCheckedChange={resolved => {
 							setFilter(value => ({ ...value, resolved }));
 							showRecent();

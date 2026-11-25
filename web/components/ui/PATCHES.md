@@ -55,16 +55,14 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/thinking-indicator.tsx`: the infinity path is `GLYPH` from `web/components/spinner.tsx`, in place of its own copy.
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`.
   Long labels wrap at 16rem.
-- `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.
+- `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys to that tooltip.
   `badge` on `TabItem` draws a count after the label, which the Sessions tab uses for the sessions waiting on you and the Pull requests tab for the pull requests that wait on your move.
-  `TabItem` sets `aria-controls` only when a `TabPanel` of its value is mounted under the same `Tabs`, so a switch with no panels, such as the changes dialog's **All changes** and **This session**, names no missing element.
   The keyboard focus ring is 2px, not the registry's 1px.
 - `hooks/use-merge-split.tsx`, `ui/sidebar-group.tsx`, and the sidebar menu files use React's `useLayoutEffect`, since the dashboard never renders on a server.
 - `hooks/use-fluid-hover.ts`: `remeasure` called again before its frame runs does nothing, so a list of rows registering drops readiness and queues one measurement instead of one per row.
 - `hooks/use-fluid-hover.ts`: a click in the gap beside a row reaches the row with the click's modifier keys, instead of as a plain `element.click()`.
   A Cmd+click there marks a suggested prompt instead of sending it.
-- `ui/scroll-area.tsx`: the thumb drops Radix's inline size on its cross axis, so `w-1` and `h-1` size it.
-  Radix writes both `width` and `height` from variables it defines only for the scrolling axis, which left a vertical thumb 0px wide.
+- `ui/scroll-area.tsx` is built on UI SDK's scroll area: the scrollbars show on hover or scroll and hide 450ms after, and touch-primary devices keep native scrollbars.
 - `ui/sidebar.tsx`: `panelClassName` replaces the inner panel's side border, so the dashboard draws the sessions sidebar with no border and the details sidebar as a rounded inset panel.
 - `ui/sidebar.tsx`: `scroll-fade-once-scrolled` on the scroll areas, so the fade shows only once scrolled.
 - `ui/sidebar-menu.tsx`: `gap-0.5` between rows, and the `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
@@ -92,14 +90,13 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   Its shapes carry their own stroke width inside a mask, so a heavier stroke or a solid fill targets them with the `icon-shapes` variant from `web/globals.css`, such as `icon-shapes:stroke-2`, never `strokeWidth` or `fill-*` on the `<svg>`.
   The package's install script checks for a `CENTRAL_LICENSE_KEY`; Bun skips untrusted install scripts, so `bun install` needs no key, while `npm install` would stop on it.
 - `ui/fluid-hover-highlight.tsx` is the registry file unchanged, moved from `web/components/` into `ui/`.
-- `ui/select.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/select.json`).
-  Its trigger has the settings fields' 28px height and border, and its popup and rows take the look of `ui/menu.tsx`.
-  `SelectGroup`, `SelectLabel`, `SelectSeparator`, and the exported scroll buttons and trigger `size` are removed, since nothing uses them; the popup keeps its scroll arrows.
-  Its unused React namespace import is removed.
+- `ui/select.tsx` is built on UI SDK's Select.
+  Its trigger has the settings fields' 28px height and border, and its popup and rows take the look of `ui/menu.tsx`; it has no scroll arrows, since UI SDK has no such part.
 - `ui/empty.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/empty.json`).
   It imports `cn` from `@/lib/utils`, `EmptyContent` is removed, since nothing uses it, and `EmptyTitle` drops the registry's `cn-font-heading` hook, which this app's CSS does not define.
-- `ui/collapsible.tsx`, `ui/trace.tsx`, and `ui/code-block.tsx` come from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/<name>.json`).
+- `ui/trace.tsx` and `ui/code-block.tsx` come from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/<name>.json`).
   They import `cn` from `@/lib/utils` and each other from `@/components/ui/`.
+  `ui/collapsible.tsx` re-exports UI SDK's collapsible, with `CollapsiblePanel` as `CollapsibleContent`, and the trace parts drop their `data-slot` props, since UI SDK's parts keep their own.
   `CodeBlockCopyButton` is Fluid's `Button` at `icon-compact`, since Fluid's has no `icon-xs`, and `ui/code-block.tsx` drops `"use client"`.
   `CodeBlockLine` drops the `supports-[content:counter(line)_/_'']` alt text for line numbers, since Bun's CSS parser rejects `content: counter(line) / ''` and fails the page build; the dashboard shows no line numbers.
   The shadcn utilities they use are `web/shadcn.css`, with `scrollbar-thin`, which the registry's code block uses and no stylesheet defines.
@@ -113,8 +110,9 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   `BadgeDot` exports the `dot` variant's dot alone, which the Project memory tab's kind filter draws beside each kind.
 - `lib/shape-context.tsx`: the rounded shape's `button` is `rounded-sm`, where the registry's is `rounded-lg`.
 - `ui/message-scroller.tsx`: the scroll button's default `variant` is `tertiary`, where the registry's is `secondary`.
-- `ui/tooltip.tsx`: `disabled` anchors hover to a non-focusable wrapper around a disabled child, `wrapperClassName` styles that wrapper, and the trigger ignores a focus that `isReturnedFocus` in `web/use-return-focus.ts` reports.
+- `ui/tooltip.tsx`: `disabled` anchors hover to a non-focusable wrapper around a disabled child, and `wrapperClassName` styles that wrapper.
 - `ui/button.tsx`: `data-pressed` while `active`; the label truncates with an ellipsis and the icons do not shrink.
+- `ui/button.tsx`: `render` takes the element to render as, such as `<a href />`, with the button's children as its label; `asChild` is removed.
 - `ui/sidebar-menu.tsx`: `SidebarMenuButton` takes `size="short"`, `sm`'s 28px row at the surrounding text size, which `sm` drops to 12px; the sessions sidebar's page and session rows use it.
   `SidebarMenuNested` is an item that holds a list under a row of its menu, such as the open page's list in the sidebar's page list.
 - `ui/sidebar-menu-scope.tsx`: the menu's sliding hover leaves a `SidebarMenuNested` region alone: it fades out there instead of snapping to the nearest row, a click on a gap there opens no outer row, and arrow keys skip the nested rows.

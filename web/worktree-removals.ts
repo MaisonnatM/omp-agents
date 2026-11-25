@@ -140,7 +140,7 @@ async function execute(run: Run): Promise<void> {
 		if (last.outcome === "removed") removedAt = new Map(removedAt).set(key, Date.now());
 		// Also tells `useRemovedAt` subscribers, so the row leaves the list as its state clears.
 		states.set([key], null);
-		if (targets.length > 1 && TOASTS_ALONE[last.outcome](run)) toasts.add(last.text);
+		if (targets.length > 1 && TOASTS_ALONE[last.outcome](run)) toasts(last.text);
 	}
 	settleToast(run.toast, targets.length === 1 && last ? last.text : summary(targets.length, outcomes));
 }

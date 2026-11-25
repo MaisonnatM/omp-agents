@@ -125,7 +125,7 @@ function useReply(onAnswer: (answer: UserAnswer) => Promise<void>): { sent: bool
 		setSent(true);
 		onAnswer(answer).catch((error: unknown) => {
 			setSent(false);
-			toasts.add({ title: "Could not answer", description: errorText(error) });
+			toasts({ title: "Could not answer", description: errorText(error) });
 		});
 	};
 	return { sent, reply };

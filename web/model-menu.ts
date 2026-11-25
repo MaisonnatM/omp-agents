@@ -67,9 +67,9 @@ export function menuModels(models: readonly ModelEntry[], query: string, current
 	);
 }
 
-/** The model search's filter, as cmdk calls it: every word typed is in the model's selector or one of its names, in any order. */
-export function modelMatch(value: string, search: string, keywords: readonly string[] = []): number {
-	return everyWord(search)([value, ...keywords].join(" ")) ? 1 : 0;
+/** The model search's filter: every word typed is in the model's selector or one of its names, in any order. */
+export function modelMatch({ value, keywords = [] }: { value: string; keywords?: readonly string[] }, search: string): boolean {
+	return everyWord(search)([value, ...keywords].join(" "));
 }
 
 const LEVEL_LABELS: Record<string, string> = {

@@ -143,7 +143,7 @@ function MediaActions({ picked, pullRequests, onClear }: MediaActionsProps) {
 	const toPullRequest = useAction(async (pr: LinkedPullRequest) => {
 		const files = await Promise.all(picked.map((media, index) => imageFile(media, index + 1)));
 		await putJson<object>("/api/pull-request/attachment", { owner: pr.owner, repo: pr.repo, number: pr.number, files });
-		toasts.add({ title: `Added ${images(picked.length)} to ${pullRequestName(pr)}` });
+		toasts({ title: `Added ${images(picked.length)} to ${pullRequestName(pr)}` });
 		onClear();
 	}, "Could not add the images to the pull request");
 	const pending = toPullRequest.pending;

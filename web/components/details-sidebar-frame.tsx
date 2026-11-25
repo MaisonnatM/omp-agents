@@ -1,5 +1,5 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a row of the tabs open in it with + to open more, and the open tab's panel. */
-import * as TabsPrimitive from "@radix-ui/react-tabs";
+import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import type { IconComponent } from "@/lib/icon-context";
 import { IconMagnifyingGlass, IconPlusSmall } from "central-icons";
 import { type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -23,7 +23,7 @@ import { SidebarOpen } from "./sidebar-panel";
 const PANEL_VIEWPORT = "pt-2";
 
 /** The tab on screen in the row, which a change scrolls into view and a keyboard close focuses. */
-const ACTIVE_TAB = '[role="tab"][data-state="active"]';
+const ACTIVE_TAB = '[role="tab"][data-selected]';
 
 export interface DetailsTab<T extends string> {
 	value: T;
@@ -98,7 +98,7 @@ function DetailsTabChip({ tab, active, onClose }: DetailsTabChipProps) {
 			className={cn("min-w-0 shrink-0", active && "bg-active text-foreground")}
 		>
 			{body => (
-				<TabsPrimitive.Trigger
+				<TabsPrimitive.TabsTab
 					value={tab.value}
 					{...activityControl(tab.control)}
 					aria-label={tab.count > 0 ? `${tab.name} (${tab.count})` : undefined}
@@ -112,7 +112,7 @@ function DetailsTabChip({ tab, active, onClose }: DetailsTabChipProps) {
 					<Icon aria-hidden="true" className="size-3.5 shrink-0" />
 					<span className="truncate">{tab.name}</span>
 					{tab.count > 0 && <CountPill count={tab.count} />}
-				</TabsPrimitive.Trigger>
+				</TabsPrimitive.TabsTab>
 			)}
 		</ClosableTab>
 	);
@@ -172,7 +172,7 @@ function OpenTabMenu<T extends string>({ tabs, active, onPick, sections }: { tab
 					{matching.map(each => {
 						const Icon = each.icon;
 						return (
-							<MenuRadioItem key={each.value} value={each.value} closeOnClick {...activityControl(each.control)}>
+							<MenuRadioItem key={each.value} value={each.value} closeOnSelect {...activityControl(each.control)}>
 								<Icon aria-hidden="true" />
 								<span className="flex-1">{each.name}</span>
 								{(each.count > 0 || each.shortcut) && (
@@ -237,30 +237,28 @@ export function DetailsSidebarFrame<T extends string>({ label, storageKey, defau
 
 	return (
 		<FileBaseContext.Provider value={fileBase}>
-			<TabsPrimitive.Root value={active} onValueChange={pick} className="flex min-h-0 flex-1 flex-col">
+			<TabsPrimitive.Tabs value={active} onValueChange={pick} className="flex min-h-0 flex-1 flex-col">
 				<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-1 border-b border-border px-2 py-0">
 					<h2 className="sr-only">{label}</h2>
-					<TabsPrimitive.List ref={list} aria-label={label} onScroll={edges.onScroll} style={edges.style} className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
+					<TabsPrimitive.TabsList ref={list} aria-label={label} onScroll={edges.onScroll} style={edges.style} className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
 						{shown.map(each => (
 							<DetailsTabChip key={each.value} tab={each} active={each.value === active} onClose={each.value === defaultTab ? null : byKey => close(each.value, byKey)} />
 						))}
-					</TabsPrimitive.List>
+					</TabsPrimitive.TabsList>
 					<OpenTabMenu tabs={tabs} active={active} onPick={pick} sections={menuSections} />
 				</SidebarHeader>
 				{shown.map(each => {
-					// A kept panel stays drawn while inactive, so its class hides it.
-					const panel = { value: each.value, forceMount: each.keepMounted && mounted.has(each.value) ? (true as const) : undefined };
+					// Once shown, a kept panel stays mounted, hidden while another tab shows.
+					const panel = { value: each.value, keepMounted: each.keepMounted && mounted.has(each.value) };
 					return each.scrollsItself ? (
-						<TabsPrimitive.Content key={each.value} {...panel} className="flex min-h-0 flex-1 flex-col outline-none data-[state=inactive]:hidden">
+						<TabsPrimitive.TabsPanel key={each.value} {...panel} className="flex min-h-0 flex-1 flex-col outline-none">
 							{each.content}
-						</TabsPrimitive.Content>
+						</TabsPrimitive.TabsPanel>
 					) : (
-						<TabsPrimitive.Content key={each.value} {...panel} asChild className="outline-none data-[state=inactive]:hidden">
-							<SidebarContent viewportClassName={PANEL_VIEWPORT}>{each.content}</SidebarContent>
-						</TabsPrimitive.Content>
+						<TabsPrimitive.TabsPanel key={each.value} {...panel} className="outline-none" render={<SidebarContent viewportClassName={PANEL_VIEWPORT}>{each.content}</SidebarContent>} />
 					);
 				})}
-			</TabsPrimitive.Root>
+			</TabsPrimitive.Tabs>
 		</FileBaseContext.Provider>
 	);
 }
