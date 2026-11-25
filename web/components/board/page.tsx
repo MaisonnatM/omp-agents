@@ -6,7 +6,7 @@
  */
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconRobot, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { hashForSession, type PastSession, type PromptImage, type RosterHost, type View } from "../../../src/shared/sessions";
+import { type PastSession, type PromptImage, type RosterHost, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
@@ -37,7 +37,7 @@ import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute, BoardView } from "./module";
 import { boardTabsOn, WorkspaceTab } from "./tabs";
-import { boardWorkspaces, hashForBoard } from "./sidebar";
+import { boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, THREAD_TABS } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
 import { botRows } from "../../bots-model";
@@ -240,12 +240,12 @@ export function Avatar({ by, sessions, size = "message" }: { by: BoardAuthor; se
 	);
 }
 
-/** The author's name, which opens the session for a session, and a tag that says it is one, as Slack tags an app. */
-function AuthorName({ by, sessions }: { by: BoardAuthor; sessions: KnownSessions }) {
+/** The author's name, which opens the session's conversation in its Board thread for a session, and a tag that says it is one, as Slack tags an app. */
+function AuthorName({ by, sessions, state, workspace }: { by: BoardAuthor; sessions: KnownSessions; state: BoardState; workspace: string }) {
 	if (by.kind === "user") return <span className="text-[15px] font-bold">You</span>;
 	return (
 		<span className="flex min-w-0 items-center gap-1">
-			<a {...activityControl("board.session.open")} href={hashForSession(by.sessionId)} title={sessionLabel(by.sessionId, sessions).name} className="truncate text-sm font-bold hover:underline">
+			<a {...activityControl("board.session.open")} href={hashForBoardSession(state, workspace, by.sessionId)} onClick={revealSessionTab} title={sessionLabel(by.sessionId, sessions).name} className="truncate text-sm font-bold hover:underline">
 				{sessionLabel(by.sessionId, sessions).name}
 			</a>
 			<SessionTag />
@@ -258,7 +258,7 @@ export function SessionTag() {
 }
 
 /** One message row: avatar, name, and time, or for a grouped one only the time on hover in the avatar's place. */
-function MessageRow({ by, at, sessions, grouped, highlighted = false, toolbar, children }: { by: BoardAuthor; at: number; sessions: KnownSessions; grouped: boolean; highlighted?: boolean; toolbar?: ReactNode; children: ReactNode }) {
+function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted = false, toolbar, children }: { by: BoardAuthor; at: number; sessions: KnownSessions; state: BoardState; workspace: string; grouped: boolean; highlighted?: boolean; toolbar?: ReactNode; children: ReactNode }) {
 	return (
 		<div className={cn("group/message relative flex gap-2 px-5 hover:bg-accent/40", grouped ? "py-0.5" : "pt-2 pb-1", highlighted && "bg-amber-100/60 hover:bg-amber-100/80 dark:bg-amber-500/10 dark:hover:bg-amber-500/15")}>
 			<div className="flex w-9 shrink-0 justify-end">
@@ -273,7 +273,7 @@ function MessageRow({ by, at, sessions, grouped, highlighted = false, toolbar, c
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 				{!grouped && (
 					<span className="flex min-w-0 items-baseline gap-2">
-						<AuthorName by={by} sessions={sessions} />
+						<AuthorName by={by} sessions={sessions} state={state} workspace={workspace} />
 						<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="shrink-0 text-xs text-muted-foreground tabular-nums hover:underline">
 							{clock(at)}
 						</time>
@@ -286,10 +286,10 @@ function MessageRow({ by, at, sessions, grouped, highlighted = false, toolbar, c
 	);
 }
 
-/** A row under a Board task still in work, in the thread summary's style: who works on it, with shimmering text, as a Slack bot shows it is thinking. */
+/** A row under a Board task still in work, in the thread summary's style: who works on it, with shimmering text, as a Slack bot shows it is thinking; it opens that session's conversation in the thread. */
 function WorkingLine({ sessionId, sessions, href }: { sessionId: string | null; sessions: KnownSessions; href: string }) {
 	return (
-		<a {...activityControl("board.task.open")} href={href} className="mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background">
+		<a {...activityControl("board.task.open")} href={href} onClick={sessionId ? revealSessionTab : undefined} className="mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background">
 			{sessionId ? (
 				<Avatar by={{ kind: "session", sessionId }} sessions={sessions} size="summary" />
 			) : (
@@ -377,7 +377,7 @@ function TaskMessage({ state, task, sessions, open, grouped, href }: { state: Bo
 			</Tooltip>
 			{session && (
 				<Tooltip content="Open its session">
-					<Button {...activityControl("board.session.open")} variant="ghost" size="icon-xs" aria-label="Open its session" render={<a href={hashForSession(session)} />}>
+					<Button {...activityControl("board.session.open")} variant="ghost" size="icon-xs" aria-label="Open its session" render={<a href={href} onClick={revealSessionTab} />}>
 						<IconArrowUpRight />
 					</Button>
 				</Tooltip>
@@ -385,7 +385,7 @@ function TaskMessage({ state, task, sessions, open, grouped, href }: { state: Bo
 		</>
 	);
 	return (
-		<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={grouped} highlighted={open} toolbar={toolbar}>
+		<MessageRow by={task.by} at={task.at} sessions={sessions} state={state} workspace={task.workspace} grouped={grouped} highlighted={open} toolbar={toolbar}>
 			<TaskBody task={task} />
 			{replies.length > 0 && <ThreadSummary replies={replies} unread={open ? 0 : unreadOf(task, seenMap[task.id])} sessions={sessions} href={href} />}
 			{(status.kind === "ready" || status.kind === "claimed") && <WorkingLine sessionId={session} sessions={sessions} href={href} />}
@@ -560,8 +560,6 @@ function Thread({ state, task, reply, core, workspace, channel, closeHref, onSea
 	);
 }
 
-/** The Board thread's open tabs, kept across threads. */
-const THREAD_TABS = "omp-agents.board-thread-tabs";
 
 /** Opens the woken session's PRs, Linear, and Review tabs in the thread once it shows one, as the session details sidebar does. */
 const THREAD_OPENERS = workTabOpeners(THREAD_TABS);
@@ -608,7 +606,7 @@ function ThreadMessages({ state, task, reply, follow, sessions, children }: { st
 			<MessageScroller className="flex-1">
 				<MessageScrollerViewport>
 					<MessageScrollerContent className="gap-0 py-2">
-						<MessageRow by={task.by} at={task.at} sessions={sessions} grouped={false}>
+						<MessageRow by={task.by} at={task.at} sessions={sessions} state={state} workspace={task.workspace} grouped={false}>
 							<TaskBody task={task} />
 						</MessageRow>
 						<div className="flex items-center gap-3 px-5 py-2 text-[13px] text-muted-foreground">
@@ -623,7 +621,7 @@ function ThreadMessages({ state, task, reply, follow, sessions, children }: { st
 								return (
 									<li key={index}>
 										<MessageScrollerItem messageId={`reply-${index}`}>
-											<MessageRow by={entry.by} at={entry.at} sessions={sessions} grouped={grouped} highlighted={index === reply}>
+											<MessageRow by={entry.by} at={entry.at} sessions={sessions} state={state} workspace={task.workspace} grouped={grouped} highlighted={index === reply}>
 												<BoardText text={replyText(entry.by, entry.text)} />
 											</MessageRow>
 										</MessageScrollerItem>
@@ -633,7 +631,7 @@ function ThreadMessages({ state, task, reply, follow, sessions, children }: { st
 						</ol>
 						{(status.kind === "ready" || status.kind === "claimed") && (
 							<div className="px-5 pt-1">
-								<WorkingLine sessionId={session} sessions={sessions} href={session ? hashForSession(session) : ""} />
+								<WorkingLine sessionId={session} sessions={sessions} href={hashForBoard(task.workspace, task.id)} />
 							</div>
 						)}
 					</MessageScrollerContent>
