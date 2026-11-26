@@ -252,6 +252,9 @@ function hiddenCheck(repo: string, task: EvalTask, clone: string, dir: string): 
 	// bun test prints `(fail) name`; pytest prints `FAILED path::test - why` and `ERROR path::test`.
 	const failures = [...run.output.matchAll(/^\(fail\) (.+?)(?: \[[\d.]+m?s\])?$|^(?:FAILED|ERROR) (\S+)/gm)].map(match => (match[1] ?? match[2])!);
 	const passedIds = passedTests(run.output);
+	// A failed check that names no failing test and passes none never ran, as when Docker is down: scoring it as the model's
+	// failure would skew every run after it, so the set stops here and the run stays unrecorded, to rerun on resume.
+	if (!run.ok && failures.length === 0 && passedIds.size === 0) throw new Error(`the hidden check of ${task.id} did not run; see ${join(dir, "check.log")}`);
 	const testsPassed = task.testIds ? task.testIds.filter(id => run.ok || passedIds.has(id)).length : null;
 	return { passed: run.ok, failures: [...new Set(failures)], testsPassed, testsTotal: task.testIds?.length ?? null };
 }
