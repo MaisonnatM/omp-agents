@@ -2,7 +2,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, readdir, readFile, rm } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
-import { canonical, commonDir, git, holderOf, repositoryAt, worktreeAt, worktreesOf, type Registration } from "./git";
+import { canonical, commonDir, git, worktreeOnBranch, repositoryAt, worktreeAt, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { displayPath } from "./paths";
@@ -531,7 +531,7 @@ export class Worktrees {
 	 * waiting for a session to leave, so the branch can be checked out elsewhere. A main checkout is never one.
 	 */
 	async releaseBranch(cwd: string, branch: string): Promise<BranchRelease> {
-		const holder = await holderOf(cwd, branch);
+		const holder = await worktreeOnBranch(cwd, branch);
 		const result = holder && !holder.main ? await this.removeCheckout(holder.path, `releasing branch ${branch}`, 0) : null;
 		if (!result) return { kind: "none" };
 		if (result.removed) return { kind: "removed", path: result.path };
