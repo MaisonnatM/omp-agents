@@ -76,6 +76,7 @@ const MOVE_LOOK: Record<MoveId, [string, IconComponent | null]> = {
 	reply: ["bg-amber-500/10 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300", IconBubbleText],
 	answer: ["bg-violet-500/10 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300", IconBubbleQuestion],
 	agent: [MUTED, null],
+	approval: ["bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300", null],
 	"in-review": [MUTED, null],
 	"checks-running": [MUTED, null],
 	draft: [MUTED, null],

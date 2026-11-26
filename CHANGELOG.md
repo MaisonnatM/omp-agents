@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- On Pull requests, a pull request whose only failing checks wait on someone's approval, such as a workflow GitHub holds for approval or a `human-review` gate, now shows an **Approval** badge under Waiting on others instead of **Fix CI**.
 - The Todo page is gone, along with its list, the todo picker in new sessions, todo links in messages, and the todo tool sessions used to add items to it. Settings › Sync no longer carries a todo list.
 - A new branch or Board task in a repository whose origin was added by hand, not cloned, now starts from its main branch instead of failing with a git usage message.
 - **Merge on main** on a Board task now merges right away from the server, without starting a session; a session starts only if the merge fails.

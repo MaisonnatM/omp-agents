@@ -27,6 +27,7 @@ export const MOVES: Record<MoveId, Move> = {
 	reply: { label: "Reply", group: "Your move", actions: ["address-comments"] },
 	answer: { label: "Answer", group: "Agent on it", actions: [] },
 	agent: { label: "Working", group: "Agent on it", actions: [] },
+	approval: { label: "Approval", group: "Waiting on others", actions: [] },
 	"in-review": { label: "In review", group: "Waiting on others", actions: [] },
 	"checks-running": { label: "CI running", group: "Waiting on others", actions: [] },
 	draft: { label: "Draft", group: "Drafts", actions: [] },
@@ -78,6 +79,7 @@ const REASON: Record<MoveId, (pr: PullRequestSummary) => string> = {
 	},
 	answer: () => "a session asks you",
 	agent: () => "an agent is working on it",
+	approval: () => "approval required",
 	"in-review": pr => {
 		const waitingOn = pr.reviewers.filter(reviewer => reviewer.state === "requested").map(({ login }) => `@${login}`);
 		return waitingOn.length > 0 ? `waiting on ${AND.format(waitingOn)}` : "waiting for review";
