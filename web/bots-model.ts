@@ -73,14 +73,15 @@ function openRoutine(route: BotRoutineRoute | null, own: readonly Routine[]): Op
 	}
 }
 
-/** The Bot `page` opens, `null` on another page, on the New Bot form, while the Bots load, or for a Bot that is gone. */
+/** The Bot `page` opens, on the Bots page or a Board's Bots tab; `null` on another page, on the New Bot form, while the Bots load, or for a Bot that is gone. */
 export function openBot(page: Page | null, bots: readonly Bot[] | null, hosts: readonly RosterHost[], routines: readonly Routine[]): OpenBot | null {
-	if (page?.kind !== "bots" || page.target === null) return null;
-	const bot = bots?.find(({ id }) => id === page.target);
+	const route = page?.kind === "board" && page.view.tab === "bots" ? page.view.page : page;
+	if (route?.kind !== "bots" || route.target === null) return null;
+	const bot = bots?.find(({ id }) => id === route.target);
 	if (!bot) return null;
 	const host = botHost(bot, hosts);
 	const own = botRoutines(routines, bot.id);
-	const routine = openRoutine(page.routine, own);
+	const routine = openRoutine(route.routine, own);
 	return { bot, host, view: routine.kind === "conversation" ? botView(bot, hosts) : null, routines: own, routine, status: botStatus(bot, host) };
 }
 

@@ -18,6 +18,7 @@ import { HostRow, PastRow } from "./session-row";
 import { activityControl } from "../activity";
 import { useModulesOff } from "../modules-off";
 import { hashForProject } from "../routing";
+import { usePageHash } from "../page-hash";
 import { createProject } from "./projects/new-project";
 import { SidebarOpen } from "./sidebar-panel";
 import { SidebarSearch } from "./sidebar-search";
@@ -170,11 +171,12 @@ interface ProjectsGroupProps {
 
 /** The Projects section, its own group above the Workspaces section: one folder per open project, and a button that starts a new one. */
 function ProjectsGroup({ projects, current, open, onOpenChange, row }: ProjectsGroupProps) {
+	const to = usePageHash();
 	const { changeModule } = useDashboardActions();
 	const newProject = (
 		<SidebarGroupActions className="top-4 h-8">
 			<Tooltip content="New project" side="right">
-				<SidebarGroupAction aria-label="New project" {...activityControl("projects.new")} onClick={() => createProject(changeModule)}>
+				<SidebarGroupAction aria-label="New project" {...activityControl("projects.new")} onClick={() => createProject(changeModule, to)}>
 					<IconPlusSmall />
 				</SidebarGroupAction>
 			</Tooltip>

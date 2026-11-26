@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { routeFromHash } from "../../routing";
 import { applyChange, type BoardChange, type BoardState, emptyBoard } from "../../../templates/omp/agent/extensions/board/log";
 import { BOARD_PAGE, type BoardRoute } from "./module";
 import { matchRanges, searchBoard, snippet } from "./search";
@@ -56,7 +57,12 @@ test("marks merge overlapping words, and a long snippet starts near its first ma
 	expect(cut).not.toContain("**");
 });
 
-const parse = (query: string, rest: string | null = null): BoardRoute => BOARD_PAGE.address.parse(rest, new URLSearchParams(query));
+const parse = (query: string, rest: string | null = null): BoardRoute => {
+	const route = routeFromHash(`#board${rest === null ? "" : `/${rest}`}?${query}`);
+	if (route.kind !== "page" || route.page.kind !== "board") throw new Error(query);
+	const { kind: _, ...board } = route.page;
+	return board;
+};
 
 test("the Board's address round-trips its search, its scope, and the reply it highlights", () => {
 	const route = parse("workspace=%2Fa&q=login+fix&in=thread&reply=2", "1");

@@ -10,14 +10,22 @@ import { BOARD_PAGE } from "./components/board/module";
 import { MEMORY_PAGE } from "./components/memory/module";
 import { SPORT_PAGE } from "./components/sport/module";
 import { PROJECTS_PAGE } from "./components/projects/module";
+import type { Page } from "./routing";
 import type { Binding } from "./shortcuts";
+
+/** Another page's address, which a module's address may hold, such as a Bot's page in a Board tab; `web/routing.ts` passes it, since a definition imports no hub. */
+export interface PageAddresses {
+	/** The page `hash` names, `null` for an address that names no page. */
+	page(hash: string): Page | null;
+	hash(page: Page): string;
+}
 
 /** How a module's page reads and writes its address, `#<id>/<rest>?<query>`. */
 export interface PageAddress<Route> {
 	/** The route the address names; `rest` is `null` for `#<id>` alone, and anything it does not know names the module's home. */
-	parse(rest: string | null, query: URLSearchParams): Route;
+	parse(rest: string | null, query: URLSearchParams, pages: PageAddresses): Route;
 	/** What follows `#<id>/`, `null` for nothing. */
-	rest(route: Route): string | null;
+	rest(route: Route, pages: PageAddresses): string | null;
 	/** What follows the `?`, `null` for nothing. */
 	query(route: Route): string | null;
 }
@@ -103,7 +111,7 @@ export const isModulePage = (page: { kind: string }): page is ModulePage => isWe
 export const moduleOf = ({ kind }: { kind: WebModuleId }): AnyPageModule => BY_ID[kind];
 
 /** Module `id`'s page at the address `#<id>/<rest>?<query>`; TypeScript cannot pair `id` with its module's route, so the result is asserted. */
-export const modulePage = (id: WebModuleId, rest: string | null, query: URLSearchParams): ModulePage => ({ kind: id, ...WEB_MODULES[id].address.parse(rest, query) }) as ModulePage;
+export const modulePage = (id: WebModuleId, rest: string | null, query: URLSearchParams, pages: PageAddresses): ModulePage => ({ kind: id, ...WEB_MODULES[id].address.parse(rest, query, pages) }) as ModulePage;
 
 /** Module `id`'s page as its tab opens it. */
 export const moduleHome = (id: WebModuleId): ModulePage => ({ kind: id, ...WEB_MODULES[id].home }) as ModulePage;

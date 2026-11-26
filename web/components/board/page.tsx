@@ -40,8 +40,9 @@ import { sessionOverviewTab, sessionWorkTabs, useOpenTabOnNew, useSessionWork, w
 import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute, BoardView } from "./module";
+import { PageHashContext } from "../../page-hash";
 import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
-import { boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
+import { boardPageHash, boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
 import { botRows } from "../../bots-model";
@@ -67,7 +68,10 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 				<Header leading={<IconRobot aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title="Bots" />
 				<HeaderTitleShown.Provider value={false}>
 					<div className="flex min-h-0 flex-1">
-						<BotsGallery rows={core.bots && botRows(core.bots, core.sessions.hosts, core.botLasts)} routines={core.routines} />
+						{/* Each Bot opens in its own Workspace's Bots tab. */}
+						<PageHashContext.Provider value={page => boardPageHash(page.kind === "bots" && page.target !== null ? (core.bots?.find(bot => bot.id === page.target)?.cwd ?? null) : null)(page)}>
+							<BotsGallery rows={core.bots && botRows(core.bots, core.sessions.hosts, core.botLasts)} routines={core.routines} />
+						</PageHashContext.Provider>
 					</div>
 				</HeaderTitleShown.Provider>
 			</section>

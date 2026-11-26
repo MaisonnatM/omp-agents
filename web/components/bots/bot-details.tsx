@@ -11,6 +11,7 @@ import { activityControl } from "../../activity";
 import { botAsking, type OpenBot, type OpenRoutine } from "../../bots-model";
 import { PAGE_ICON } from "../../page-icons";
 import { hashForBotRoutine, hashForBots } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { age } from "../../labels";
 import { sessionUsageStore } from "../../reads";
 import { notHereWords, runWords, startsWords } from "../../routines-model";
@@ -63,6 +64,7 @@ function RestartConversation({ bot, connected }: { bot: Bot; connected: boolean 
 
 /** **Delete**, which asks first in its place; the Bot's routines go with it, and its conversation stays a session of yours. */
 function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
+	const to = usePageHash();
 	const { changeBot } = useDashboardActions();
 	const [confirming, setConfirming] = useState(false);
 	if (confirming) {
@@ -76,7 +78,7 @@ function DeleteBot({ bot, connected }: { bot: Bot; connected: boolean }) {
 						disabled={!connected}
 						onClick={() => {
 							changeBot({ op: "remove", id: bot.id });
-							location.hash = hashForBots(null);
+							location.hash = hashForBots(null, to);
 						}}
 					>
 						Delete Bot
@@ -193,20 +195,21 @@ function JobEditor({ bot, connected }: { bot: Bot; connected: boolean }) {
 
 /** The Bot's routines, each opening the card of them with its row open in place of the conversation, **All routines** opening the card, and **New routine**; `open` is what the page shows, which they mark. */
 function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: readonly Routine[]; open: OpenRoutine; connected: boolean }) {
+	const to = usePageHash();
 	const openId = open.kind === "open" || open.kind === "edit" ? open.routine.id : null;
 	const now = useMinute();
 	return (
 		<div className="space-y-2">
 			<div className="flex items-center justify-between gap-2">
 				<a
-					href={hashForBotRoutine(bot.id, { kind: "list" })}
+					href={hashForBotRoutine(bot.id, { kind: "list" }, to)}
 					aria-current={open.kind === "list" ? "page" : undefined}
 					className="rounded-sm text-xs font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:text-muted-foreground"
 				>
 					All routines
 				</a>
 				{connected ? (
-					<Button {...activityControl("bots.routine.new")} variant="ghost" size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForBotRoutine(bot.id, { kind: "new" })} aria-current={open.kind === "new" ? "page" : undefined} />}>
+					<Button {...activityControl("bots.routine.new")} variant="ghost" size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForBotRoutine(bot.id, { kind: "new" }, to)} aria-current={open.kind === "new" ? "page" : undefined} />}>
 						New routine
 					</Button>
 				) : (
@@ -225,7 +228,7 @@ function BotRoutines({ bot, routines, open, connected }: { bot: Bot; routines: r
 						return (
 							<li key={routine.id}>
 								<a
-									href={hashForBotRoutine(bot.id, { kind: "open", id: routine.id })}
+									href={hashForBotRoutine(bot.id, { kind: "open", id: routine.id }, to)}
 									aria-current={openId === routine.id ? "page" : undefined}
 									className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-sm outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 								>

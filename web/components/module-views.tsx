@@ -10,6 +10,7 @@ import type { ProjectList } from "../../src/shared/projects";
 import type { RosterHost } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
 import type { UserTodoList } from "../../src/user-todos-shared";
+import type { OpenBot } from "../bots-model";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { Completions } from "../pane-store";
 import type { ModelList } from "../reads";
@@ -52,6 +53,16 @@ export interface CoreData {
 	section: SectionTarget | null;
 	/** The server's last answer to the new-session draft's `complete`, which the Board's composer shares. */
 	newSessionCompletions: Completions | null;
+	/** The Bot a Board's Bots tab opens, `null` on any other view, while the Bots load, or for a Bot that is gone. */
+	openBot: OpenBot | null;
+	/** Each session's last roster entry, which an open Bot's ended conversation reads. */
+	lastHosts: ReadonlyMap<string, RosterHost>;
+	/** Where a new Bot starts when no Workspace picks it. */
+	defaultWorkspace: string;
+	connected: boolean;
+	/** The right sidebar, which shows an open Bot's details, is open; `onToggleDetails` shows or hides it. */
+	detailsOpen: boolean;
+	onToggleDetails: () => void;
 }
 
 /** A module's list in the page column: the route its page shows, and the page section a link there last chose, which `onSection` sets. */

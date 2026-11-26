@@ -8,7 +8,7 @@ import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { decodeSegment } from "./hash-segment";
 import { PAGE_ICON } from "./page-icons";
-import { isModulePage, isWebModuleId, MODULE_LIST, type ModulePage, moduleOf, modulePage, type WebModuleId } from "./modules";
+import { isModulePage, isWebModuleId, MODULE_LIST, type ModulePage, moduleOf, modulePage, type PageAddresses, type WebModuleId } from "./modules";
 
 /** A sidebar tab's row: its label, its icon, and its `place` among the tabs, lowest first. */
 export interface SidebarTabRow {
@@ -293,14 +293,26 @@ function queryOfPage(page: CorePage): string | null {
 	}
 }
 
+/** The page addresses a module's address may hold. */
+const PAGE_ADDRESSES: PageAddresses = {
+	page: hash => {
+		const route = routeFromHash(hash);
+		return route.kind === "page" ? route.page : null;
+	},
+	hash: page => hashForPage(page),
+};
+
 export function hashForPage(page: Page): string {
-	const rest = isModulePage(page) ? moduleOf(page).address.rest(page) : restOfPage(page);
+	const rest = isModulePage(page) ? moduleOf(page).address.rest(page, PAGE_ADDRESSES) : restOfPage(page);
 	const query = isModulePage(page) ? moduleOf(page).address.query(page) : queryOfPage(page);
 	return `#${page.kind}${rest === null ? "" : `/${rest}`}${query === null ? "" : `?${query}`}`;
 }
 
-export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
-export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
+/** How a link names a page: {@link hashForPage}, or, inside a Board's Workspace tab, that tab's address for the same page, which `usePageHash` in `web/page-hash.ts` reads. */
+export type PageHash = (page: Page) => string;
+
+export const hashForPullRequests = (target: PullRequest | null, to: PageHash = hashForPage): string => to(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
+export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null, to: PageHash = hashForPage): string => to({ kind: "pull-requests", target: pr, files: { path } });
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
 /** Todo `id` opened in every todo's list, or in **Archive** once put away; `null` for a todo deleted for good. */
 export function hashForTodoId({ todos, archive }: UserTodoList, id: string): string | null {
@@ -308,14 +320,14 @@ export function hashForTodoId({ todos, archive }: UserTodoList, id: string): str
 	if (todos.some(holds)) return hashForTodo("all", id);
 	return archive.some(holds) ? hashForTodo("archive", id) : null;
 }
-export const hashForBots = (target: string | null): string => hashForPage(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
-export const hashForNewBot = (): string => hashForPage({ kind: "bots", target: null, adding: true });
-export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute): string => hashForPage({ kind: "bots", target: botId, routine });
+export const hashForBots = (target: string | null, to: PageHash = hashForPage): string => to(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
+export const hashForNewBot = (to: PageHash = hashForPage): string => to({ kind: "bots", target: null, adding: true });
+export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute, to: PageHash = hashForPage): string => to({ kind: "bots", target: botId, routine });
 export const hashForNotifications = (): string => hashForPage({ kind: "notifications" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = ({ cwd = null, todoId = null, projectId = null }: Partial<NewSessionRoute> = {}): string => hashForPage({ kind: "new", cwd, todoId, projectId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });
-export const hashForProject = (open: string | null): string => hashForPage({ kind: "projects", open });
+export const hashForProject = (open: string | null, to: PageHash = hashForPage): string => to({ kind: "projects", open });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives
@@ -331,7 +343,7 @@ export function routeFromHash(hash: string): Route {
 	const head = slash < 0 ? raw : raw.slice(0, slash);
 	const rest = slash < 0 ? null : raw.slice(slash + 1);
 	if (isPageKind(head)) return { kind: "page", page: PAGES[head](rest, query) };
-	if (isWebModuleId(head)) return { kind: "page", page: modulePage(head, rest, query) };
+	if (isWebModuleId(head)) return { kind: "page", page: modulePage(head, rest, query, PAGE_ADDRESSES) };
 	if (`${head}/` === SESSION_HASH_PREFIX && rest) {
 		const sessionId = decodeSegment(rest);
 		return sessionId === null ? { kind: "panes", layout: EMPTY_LAYOUT } : { kind: "session", sessionId };

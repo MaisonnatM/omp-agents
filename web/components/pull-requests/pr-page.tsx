@@ -14,6 +14,7 @@ import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart, quickOn } from "../../quick-actions";
 import { pullRequestsStore } from "../../reads";
 import { hashForPullRequestFiles, hashForPullRequests } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { sessionsOn, type WindowScope } from "../../sessions";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Header } from "../page-header";
@@ -121,11 +122,12 @@ interface PullRequestDetailPageProps extends Pick<PullRequestDetailsProps, "host
  * Its host keys it by the pull request, so another one starts on **Summary**; the route alone says whether it shows **Code**.
  */
 export function PullRequestDetailPage({ files, onDock, ...props }: PullRequestDetailPageProps) {
+	const to = usePageHash();
 	const [kept, setKept] = useState<PullRequestDetailTab>("summary");
 	const tab = files !== null ? "code" : kept;
 	const choose = (next: PullRequestDetailTab): void => {
 		if (next !== "code") setKept(next);
-		if ((next === "code") !== (files !== null)) location.hash = next === "code" ? hashForPullRequestFiles(props.target) : hashForPullRequests(props.target);
+		if ((next === "code") !== (files !== null)) location.hash = next === "code" ? hashForPullRequestFiles(props.target, null, to) : hashForPullRequests(props.target, to);
 	};
 	usePullRequestCopyShortcuts(props.target);
 	const back = (

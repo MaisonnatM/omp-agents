@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../../activity";
 import { listTime } from "../../labels";
 import { hashForNewSession, hashForProject } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { PageFrame } from "../list-page";
 import type { KnownSessions } from "../todo/links";
 import { takeJustCreated } from "./new-project";
@@ -26,6 +27,7 @@ interface ProjectDetailProps {
 }
 
 export function ProjectDetail({ project, sessions, disabled, onChange }: ProjectDetailProps) {
+	const to = usePageHash();
 	const projectId = project.id;
 	const work = projectWork(project, sessions);
 	const archived = project.archivedAt !== undefined;
@@ -46,7 +48,7 @@ export function ProjectDetail({ project, sessions, disabled, onChange }: Project
 			meta={`${archived ? "Archived" : "Started"} ${listTime(Date.parse(project.archivedAt ?? project.createdAt))}`}
 			leading={
 				<Tooltip content="Back to Projects">
-					<Button variant="ghost" size="icon-compact" aria-label="Back to Projects" className="text-muted-foreground" render={<a href={hashForProject(null)} />}>
+					<Button variant="ghost" size="icon-compact" aria-label="Back to Projects" className="text-muted-foreground" render={<a href={hashForProject(null, to)} />}>
 						<IconArrowLeft />
 					</Button>
 				</Tooltip>

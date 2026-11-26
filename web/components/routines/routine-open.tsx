@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { hashForBotRoutine, hashForBots } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import {
 	CADENCES,
 	type Cadence,
@@ -81,6 +82,7 @@ export function TriggeredBy({ events }: { events: TriggerEvent[] }) {
 
 /** The picked run: how it went, when, how long its command took, what started it, what it printed, and its errors. */
 function RunReport({ run, latest, routine, botName, now }: { run: RoutineRun | undefined; latest: boolean; routine: Routine; botName: string; now: number }) {
+	const to = usePageHash();
 	const headingId = useId();
 	const heading = (
 		<h4 id={headingId} className={HEADING}>
@@ -104,7 +106,7 @@ function RunReport({ run, latest, routine, botName, now }: { run: RoutineRun | u
 			<p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
 				<RunIcon run={run} />
 				{outcome.kind === "sent" ? (
-					<a href={hashForBots(routine.botId)} className="font-medium underline-offset-2 hover:underline">
+					<a href={hashForBots(routine.botId, to)} className="font-medium underline-offset-2 hover:underline">
 						Sent to {botName}
 					</a>
 				) : (
@@ -231,6 +233,7 @@ function ScheduleEditor({ routine, disabled }: { routine: Routine; disabled: boo
 
 /** Edit, the full editor, and Delete, which asks first in its place, then leaves the card with no row open. */
 function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) {
+	const to = usePageHash();
 	const { send } = useDashboardActions();
 	const [confirming, setConfirming] = useState(false);
 	const { id, botId, name } = routine;
@@ -243,7 +246,7 @@ function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) 
 					disabled={disabled}
 					onClick={() => {
 						send({ t: "routine", change: { op: "remove", id } });
-						location.hash = hashForBotRoutine(botId, { kind: "list" });
+						location.hash = hashForBotRoutine(botId, { kind: "list" }, to);
 					}}
 				>
 					Delete routine
@@ -256,7 +259,7 @@ function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) 
 	}
 	return (
 		<div className="flex items-center justify-end gap-1">
-			<Button variant="ghost" size="compact" leadingIcon={IconPencil} render={<a href={hashForBotRoutine(botId, { kind: "edit", id })} />}>Edit</Button>
+			<Button variant="ghost" size="compact" leadingIcon={IconPencil} render={<a href={hashForBotRoutine(botId, { kind: "edit", id }, to)} />}>Edit</Button>
 			<Button {...activityControl("bots.routine.delete")} variant="ghost" size="compact" leadingIcon={IconTrashCan} disabled={disabled} onClick={() => setConfirming(true)}>
 				Delete
 			</Button>

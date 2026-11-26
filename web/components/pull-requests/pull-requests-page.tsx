@@ -16,6 +16,7 @@ import { QUICK_ACTIONS } from "../../quick-actions";
 import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsDisplay, usePullRequestsFilter, usePullRequestsFolds } from "../../pull-requests-state";
 import { activityControl } from "../../activity";
 import { hashForPullRequestFiles, hashForPullRequests, type PullRequestsRoute } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { useRebasing } from "../../pull-request-rebases";
 import { useStoredState } from "../../stored-state";
 import { DROP_LINE } from "../../order";
@@ -225,6 +226,7 @@ function EveryRepositoryHidden({ everyRepo }: { everyRepo: RepoPullRequests[] })
 
 /** The details of the pull request `route` names, docked beside the list at the width you drag their edge to, with buttons that show them as a page or close them. */
 function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route: Extract<PullRequestsRoute, { target: PullRequest }>; onExpand: () => void }) {
+	const to = usePageHash();
 	// The docked details keep their own tab, starting on Code when the route opens a file.
 	const [tab, setTab] = useState<PullRequestDetailTab>(route.files ? "code" : "summary");
 	usePullRequestCopyShortcuts(route.target);
@@ -250,7 +252,7 @@ function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route:
 	});
 	const expand = (): void => {
 		// The page takes Code from the route alone, so expanding on Code puts it in the address.
-		if (tab === "code" && !route.files) location.hash = hashForPullRequestFiles(route.target);
+		if (tab === "code" && !route.files) location.hash = hashForPullRequestFiles(route.target, null, to);
 		onExpand();
 	};
 	return (
@@ -263,7 +265,7 @@ function DockedDetails({ hosts, route, onExpand }: { hosts: RosterHost[]; route:
 						</Button>
 					</Tooltip>
 					<Tooltip content="Close the details" side="bottom">
-						<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Close the details" render={<a href={hashForPullRequests(null)} />}>
+						<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Close the details" render={<a href={hashForPullRequests(null, to)} />}>
 							<IconCrossMedium />
 						</Button>
 					</Tooltip>

@@ -6,6 +6,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { hashForProject } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { Age } from "../age";
 import { useDashboardActions } from "../dashboard-context";
 import { PageFrame } from "../list-page";
@@ -98,9 +99,10 @@ export function ProjectsPage({ route, core, state, disabled, onChange, empty = "
 }
 
 function NewProjectButton({ disabled, workspace }: { disabled: boolean; workspace?: string }) {
+	const to = usePageHash();
 	const { changeModule } = useDashboardActions();
 	return (
-		<Button {...activityControl("projects.new")} size="compact" leadingIcon={IconPlusSmall} disabled={disabled} onClick={() => createProject(changeModule, workspace)}>
+		<Button {...activityControl("projects.new")} size="compact" leadingIcon={IconPlusSmall} disabled={disabled} onClick={() => createProject(changeModule, to, workspace)}>
 			New project
 		</Button>
 	);
@@ -108,6 +110,7 @@ function NewProjectButton({ disabled, workspace }: { disabled: boolean; workspac
 
 /** A project's row: its name, which opens it, its status, how much of its plan is done, its sessions, and when it was last logged. */
 function ProjectRow({ project, running }: { project: Project; running: number }) {
+	const to = usePageHash();
 	const archived = project.archivedAt !== undefined;
 	const done = project.steps.filter(step => step.done).length;
 	const total = project.steps.length;
@@ -116,7 +119,7 @@ function ProjectRow({ project, running }: { project: Project; running: number })
 	return (
 		<tr className={cn("relative h-10 border-b border-border/60 last:border-b-0 hover:bg-accent/50 has-[:focus-visible]:bg-accent/50", archived && "text-muted-foreground")}>
 			<td className="px-4">
-				<a {...activityControl("projects.open")} href={hashForProject(project.id)} title={project.name} className="flex min-w-0 items-center gap-2.5 after:absolute after:inset-0 hover:underline">
+				<a {...activityControl("projects.open")} href={hashForProject(project.id, to)} title={project.name} className="flex min-w-0 items-center gap-2.5 after:absolute after:inset-0 hover:underline">
 					<IconFlag1 className="size-3.5 shrink-0 text-muted-foreground" />
 					<span className={cn("truncate", !archived && "font-medium")}>{project.name}</span>
 				</a>

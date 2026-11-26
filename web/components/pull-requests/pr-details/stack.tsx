@@ -5,6 +5,7 @@ import { type LinkedPullRequest, type PullRequest, type PullRequestDetail, prKey
 import { queuedMergeOf } from "../../../../src/shared/merge-queue";
 import { age, LINK_VERB } from "../../../labels";
 import { hashForPullRequests } from "../../../routing";
+import { usePageHash } from "../../../page-hash";
 import { useRead } from "../../../reads";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -64,6 +65,7 @@ export function StackPopover({ stack, others, current, onPick, align, trigger }:
 
 /** One of the session's other pull requests: its state, number and title once GitHub answers, and how the session touched it. */
 function OtherRow({ pr, onPick }: { pr: LinkedPullRequest; onPick?: (pr: PullRequest) => void }) {
+	const to = usePageHash();
 	const read = useRead<Pick<PullRequestDetail, "title" | "state">>(`/api/pull-request/title?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
 	const label = (
 		<>
@@ -79,7 +81,7 @@ function OtherRow({ pr, onPick }: { pr: LinkedPullRequest; onPick?: (pr: PullReq
 					{label}
 				</button>
 			) : (
-				<a href={hashForPullRequests(pr)} title={name} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
+				<a href={hashForPullRequests(pr, to)} title={name} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
 					{label}
 				</a>
 			)}
@@ -136,6 +138,7 @@ interface StackRailProps {
 
 /** `stack`, top first, on a rail down to the branch the bottom one merges into; each one but `current` links to its details, or `onPick` shows it in place. */
 export function StackRail({ stack, current, onPick, trailing, className }: StackRailProps) {
+	const to = usePageHash();
 	const bottom = stack[stack.length - 1];
 	if (!bottom) return null;
 	return (
@@ -155,7 +158,7 @@ export function StackRail({ stack, current, onPick, trailing, className }: Stack
 								{label}
 							</button>
 						) : (
-							<a href={hashForPullRequests(pr)} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
+							<a href={hashForPullRequests(pr, to)} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
 								{label}
 							</a>
 						)}
