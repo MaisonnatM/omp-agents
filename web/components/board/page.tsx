@@ -11,6 +11,7 @@ import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
 import { AppMark } from "../app-mark";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CountPill } from "../count-pill";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { splitSuggestions } from "../../../src/shared/transcript";
@@ -196,7 +197,7 @@ function DayDivider({ at }: { at: number }) {
 /** The channel's stand-in while the Board loads: three message rows of avatar and text bars. */
 function BoardLoading() {
 	return (
-		<div role="status" className="flex flex-col gap-5 px-5 py-6">
+		<div role="status" className="flex min-h-0 flex-1 flex-col justify-end gap-5 px-5 py-6">
 			<span className="sr-only">Loading the Board</span>
 			{[280, 420, 340].map(width => (
 				<div key={width} className="flex gap-2">
@@ -273,10 +274,6 @@ function AuthorName({ by, sessions, state, workspace }: { by: BoardAuthor; sessi
 			</a>
 		</span>
 	);
-}
-
-export function SessionTag() {
-	return <span className="shrink-0 rounded-sm bg-muted px-1 text-xs font-medium text-muted-foreground">Session</span>;
 }
 
 /** One message row: avatar, name, and time, or for a grouped one only the time on hover in the avatar's place. */
@@ -549,19 +546,19 @@ function ThreadSummary({ replies, unread, work, sessions, href }: { replies: Ext
 			{...activityControl("board.task.open")}
 			href={href}
 			onClick={revealThreadTab}
-			className="group/summary mt-1 -ml-1 flex max-w-md items-center gap-2 rounded-lg p-1 pr-2 ring-1 ring-transparent ring-inset hover:bg-background hover:ring-border"
+			className="group/summary mt-1 -ml-1 flex w-fit max-w-full items-center gap-2 rounded-lg p-1 pr-2 ring-1 ring-transparent ring-inset hover:bg-background hover:ring-border"
 		>
 			<span className="flex gap-0.5">
 				{authors.map(by => (
 					<Avatar key={authorKey(by)} by={by} sessions={sessions} size="summary" />
 				))}
 			</span>
-			<span className="text-xs font-semibold text-foreground">
+			<span className="text-xs font-semibold whitespace-nowrap text-foreground">
 				{replies.length} {replies.length === 1 ? "reply" : "replies"}
 			</span>
 			{unread > 0 && (
-				<span aria-label={`${unread} unread`} className="rounded-full bg-primary px-1.5 text-xs leading-4 font-medium text-primary-foreground tabular-nums">
-					{unread}
+				<span aria-label={`${unread} unread`} className="flex">
+					<CountPill count={unread} />
 				</span>
 			)}
 			{work ? (
@@ -570,12 +567,12 @@ function ThreadSummary({ replies, unread, work, sessions, href }: { replies: Ext
 				</span>
 			) : (
 				last && (
-					<span className="text-xs text-muted-foreground">
+					<span className="min-w-0 truncate text-xs whitespace-nowrap text-muted-foreground">
 						Last reply <Age at={last.at} className="tabular-nums" /> ago
 					</span>
 				)
 			)}
-			<IconChevronRightSmall aria-hidden className="ml-auto size-4 shrink-0 text-muted-foreground opacity-0 group-hover/summary:opacity-100" />
+			<IconChevronRightSmall aria-hidden className="-ml-1 size-4 shrink-0 text-muted-foreground opacity-0 group-hover/summary:opacity-100" />
 		</a>
 	);
 }

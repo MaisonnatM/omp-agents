@@ -12,7 +12,7 @@ import { activityControl } from "../../activity";
 import type { CoreData } from "../module-views";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute } from "./module";
-import { Avatar, clock, dayLabel, folder, SessionTag } from "./page";
+import { Avatar, clock, dayLabel, folder } from "./page";
 import { type BoardHit, type BoardScope, type BoardSearch, matchRanges, scopeOf, searchBoard, snippet } from "./search";
 import { hashForBoard } from "./sidebar";
 
@@ -206,8 +206,7 @@ function SearchResult({ hit, query, words, sessions, workspace }: { hit: BoardHi
 				<Avatar by={by} sessions={sessions} />
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 					<span className="flex min-w-0 items-baseline gap-2">
-						<span className="truncate text-sm font-bold">{by.kind === "user" ? "You" : sessionLabel(by.sessionId, sessions).name}</span>
-						{by.kind === "session" && <SessionTag />}
+						<span className="truncate text-sm font-semibold">{by.kind === "user" ? "You" : sessionLabel(by.sessionId, sessions).name}</span>
 						<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="shrink-0 text-xs text-muted-foreground tabular-nums">
 							{clock(at)}
 						</time>
