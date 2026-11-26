@@ -61,6 +61,7 @@ export function hashForBoardSession(state: BoardState, workspace: string, sessio
 
 /** Shows the session's conversation tab in the Board thread the address it goes with opens. */
 export const revealSessionTab = () => revealDetailsTab(THREAD_TABS, "session", "thread");
+export const revealThreadTab = () => revealDetailsTab(THREAD_TABS, "thread", "thread");
 const GROUP_ICONS: Record<BotGroup["kind"], IconComponent> = { pinned: IconPin, section: IconFolder1, rest: IconUserGroup };
 
 const go = (hash: string) => () => {

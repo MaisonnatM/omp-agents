@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-26
+
+- Opening a Board thread from the message list now always shows its Thread tab first, not the session's conversation.
+
 ## 2026-11-25
 
 - A finished Board task's suggested next steps now sit under the thread's reply box, as they do under a session's composer, with the same keys: Enter sends one, Tab fills it in to edit first. They no longer show as buttons under the last message.
