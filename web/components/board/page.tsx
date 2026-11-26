@@ -4,7 +4,7 @@
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconPencil, IconRobot, IconUser } from "central-icons";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconBubbleWideNotification, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconPencil, IconRobot, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { type PastSession, type PromptImage, type RosterHost, type Stop, stopOf, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -382,6 +382,17 @@ function EditButton({ disabled, onEdit }: { disabled: boolean; onEdit: () => voi
 	);
 }
 
+/** Slack's **Mark unread**: the thread counts this reply and those after it as unread again. */
+function MarkUnreadButton({ onMark }: { onMark: () => void }) {
+	return (
+		<Tooltip content="Mark unread">
+			<Button {...activityControl("board.message.unread")} variant="ghost" size="icon-xs" aria-label="Mark unread" onClick={onMark}>
+				<IconBubbleWideNotification />
+			</Button>
+		</Tooltip>
+	);
+}
+
 /** Your message's text in a box, as Slack edits one: Enter or **Save** saves it, which stops the turn of the session working from it and sends it the new text; Shift+Enter starts a new line; Escape or **Cancel** leaves it as it was. */
 function MessageEditor({ text, onSave, onClose }: { text: string; onSave: (text: string) => Promise<void>; onClose: () => void }) {
 	const [draft, setDraft] = useState(text);
@@ -654,7 +665,19 @@ function Thread({ state, task, reply, core, workspace, channel, closeHref, onSea
 		count: 0,
 		scrollsItself: true,
 		content: (
-			<ThreadMessages state={state} task={task} reply={reply} follow={follow} sessions={sessions} disabled={disabled} onChange={onChange}>
+			<ThreadMessages
+				state={state}
+				task={task}
+				reply={reply}
+				follow={follow}
+				sessions={sessions}
+				disabled={disabled}
+				onChange={onChange}
+				onMarkUnread={from => {
+					markSeen(task.id, from);
+					location.hash = closeHref;
+				}}
+			>
 				<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} onSend={() => setSentOn(reply)} />
 			</ThreadMessages>
 		),
@@ -717,8 +740,8 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 	return <DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={row?.cwd ?? null} tabs={tabs} trailing={close} />;
 }
 
-/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. */
-function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChange, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; children: ReactNode }) {
+/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs; each reply's **Mark unread** passes how many replies come before it. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. */
+function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChange, onMarkUnread, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onMarkUnread: (from: number) => void; children: ReactNode }) {
 	const work = workOf(state, task, sessions);
 	const replies = said(task);
 	const count = replies.length;
@@ -752,7 +775,7 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 							<span className="h-px flex-1 bg-border" />
 						</div>
 						<ol className="flex flex-col">
-							{replies.map(entry => {
+							{replies.map((entry, position) => {
 								const grouped = continues(previous, entry);
 								previous = entry;
 								const index = task.replies.indexOf(entry);
@@ -768,7 +791,14 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 												workspace={task.workspace}
 												grouped={grouped}
 												highlighted={index === reply}
-												toolbar={entry.by.kind === "user" && editing !== index ? <EditButton disabled={disabled} onEdit={() => setEditing(index)} /> : undefined}
+												toolbar={
+													editing === index ? undefined : (
+														<>
+															{entry.by.kind === "user" && <EditButton disabled={disabled} onEdit={() => setEditing(index)} />}
+															<MarkUnreadButton onMark={() => onMarkUnread(position)} />
+														</>
+													)
+												}
 											>
 												{editing === index ? editor(entry.text, index) : <BoardText text={replyText(entry.by, entry.text)} editedAt={entry.editedAt} />}
 											</MessageRow>

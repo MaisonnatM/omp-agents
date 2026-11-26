@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its blue unread count comes back, counting from that reply, until you open the thread again.
 - A Board thread now shows what each session did right under that session's reply, instead of in one **Actions** card at the bottom, without the "Actions" heading: each line is just the Git, GitHub, or Linear logo and the branch, pull request, or issue name, with what the session did with it on hover.
 - A Board session now asks first only when your message is unclear, such as when it could mean two different changes. A clear request, such as "Merge on main" or a plain "make the button blue", runs right away.
 - Behind the scenes: the agent's always-loaded instructions shrank from about 6,000 tokens to about 900. Rules only some tasks need, such as design handoff, pull-request reviews, and subagent worktrees, now live in skills that load when the task needs them.
