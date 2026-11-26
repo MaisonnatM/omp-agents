@@ -20,12 +20,17 @@ Every session in it gets that brief when it starts, so a new session knows where
   On a narrow page the status and sessions columns fold away.
 - An open project's page has an arrow back to the table, and its header says when it started, or when it was archived.
 - Edit the project's name and goal in place: Enter or leaving the field saves, Escape drops your edit.
-- A strip of four figures sums it up: steps done and left, sessions running out of all, linked pull requests and Linear issues, and its last update, green while it moved today and red once it has been quiet longer.
-- **Plan** is a checklist with **To do**, **Done**, and **All** tabs, each with its count: tick a step's box, click its text to edit it, remove it, or add one in the field at the card's foot.
-- A step can hold sub-steps, one level deep: the plus button on a step's row opens a field under it, where Enter adds one and Escape closes it.
-- Sub-steps are numbered under their step, such as 2.1, and a tab that hides a step still shows it above its sub-steps.
+- Under them, a large percentage and a progress bar show how much of the plan is done, out of how many steps.
+- **Up next** names the first step left to do that has no sub-step left under it, with its number and its group: **Mark done** ticks it and moves the box to the step after it, opening that step's group, and **Start session** opens a new session in the project on it.
+- **Plan** is a checklist grouped by step: each step heads its group, with its sub-steps under it and a small bar of how many of them are done, such as 2/7. Groups with work left come first and finished ones go last.
+- Only the group holding the step up next starts open; its chevron opens or closes a group, and **Expand all** or **Collapse all** does every group at once.
+- Tick a step's box, click its text to edit it, remove it, or add one in the field at the plan's foot.
+- A step can hold sub-steps, one level deep: the plus button on a step's row opens its group and a field under it, where Enter adds one and Escape closes it.
+- Sub-steps are numbered under their step, such as 2.1.
+- The bar over the plan stays at the top while you scroll it. **Hide done**, with how many steps are done, hides finished groups and ticked sub-steps.
 - The play button on a step's row, shown on hover for a step not done yet, opens a new session in the project with that step and its sub-steps already written in its prompt, along with a line asking it to tick each one it finishes.
-- **Select** turns the boxes into a selection: picking a step picks its sub-steps too, and **Start session** does the same for every picked step.
+- **Select** turns the boxes into a selection: picking a step picks its sub-steps too, and **Start session** in the bar does the same for every picked step.
+- Under the plan, **Sessions** and **Decisions** sit side by side, with **Recent activity** below them.
 - **Sessions** is a table of the project's sessions, running first, each with its status, the pull requests it links, and its last update; hover a name to read it whole.
 - **Decisions** lists what was settled, and **Recent activity** lists log lines newest first, each with the session that wrote it, or You; each card adds a line from the field at its foot.
 - Removing a step removes its sub-steps too; removing a step or a decision offers **Undo**, and an undone step comes back at the end of the plan, with its sub-steps under it.

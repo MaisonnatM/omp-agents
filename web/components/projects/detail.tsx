@@ -1,4 +1,4 @@
-/** The open project's page: a header to go back, archive it, or start a session in it; its name and goal to edit in place; its stat strip; its plan and sessions beside its decisions and recent activity. */
+/** The open project's page: a header to go back, archive it, or start a session in it; its name and goal to edit in place; its plan as the page's checklist; its sessions, decisions, and recent activity below. */
 import { IconArchive, IconArrowLeft, IconArrowLoopDownLeft, IconPlusSmall } from "central-icons";
 import { type ChangeEvent, type FocusEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { collapseSpaces } from "../../../src/shared/collapse-spaces";
@@ -17,7 +17,6 @@ import type { OnProjectChange } from "./parts";
 import { Plan } from "./plan";
 import { projectWork } from "./project-work";
 import { SessionsTable } from "./sessions-table";
-import { ProjectStats } from "./stats";
 
 interface ProjectDetailProps {
 	project: Project;
@@ -70,6 +69,7 @@ export function ProjectDetail({ project, sessions, disabled, onChange }: Project
 					{!archived && (
 						<Button
 							{...activityControl("projects.session.new")}
+							variant="outline"
 							size="compact"
 							leadingIcon={IconPlusSmall}
 							disabled={disabled}
@@ -82,7 +82,7 @@ export function ProjectDetail({ project, sessions, disabled, onChange }: Project
 			}
 		>
 			<section aria-label={project.name} className="@container min-w-0">
-				<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-6">
+				<div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 pt-8 pb-10">
 					<div className="flex min-w-0 flex-col gap-1">
 						<input
 							{...activityControl("projects.name")}
@@ -103,17 +103,12 @@ export function ProjectDetail({ project, sessions, disabled, onChange }: Project
 							className="-mx-1.5 field-sizing-content max-w-prose resize-none rounded-md bg-transparent px-1.5 py-0.5 text-sm leading-relaxed text-muted-foreground outline-none placeholder:text-muted-foreground hover:bg-accent/50 focus-visible:bg-background focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring read-only:hover:bg-transparent"
 						/>
 					</div>
-					<ProjectStats project={project} work={work} />
-					<div className="grid items-start gap-4 @4xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-						<div className="flex min-w-0 flex-col gap-4">
-							<Plan project={project} readOnly={readOnly} onChange={onChange} />
-							<SessionsTable project={project} rows={work.sessions} archived={archived} />
-						</div>
-						<div className="flex min-w-0 flex-col gap-4">
-							<Decisions project={project} readOnly={readOnly} onChange={onChange} />
-							<RecentActivity project={project} sessions={sessions} readOnly={readOnly} onChange={onChange} />
-						</div>
+					<Plan project={project} readOnly={readOnly} onChange={onChange} />
+					<div className="grid items-start gap-4 pt-4 @3xl:grid-cols-2">
+						<SessionsTable project={project} rows={work.sessions} archived={archived} />
+						<Decisions project={project} readOnly={readOnly} onChange={onChange} />
 					</div>
+					<RecentActivity project={project} sessions={sessions} readOnly={readOnly} onChange={onChange} />
 				</div>
 			</section>
 		</PageFrame>
