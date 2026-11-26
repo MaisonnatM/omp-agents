@@ -504,6 +504,7 @@ function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onC
 					</Button>
 				</Tooltip>
 			)}
+			{!open && unreadOf(task, 0) > 0 && <MarkUnreadButton onMark={() => markSeen(task.id, 0)} />}
 		</>
 	);
 	return (
