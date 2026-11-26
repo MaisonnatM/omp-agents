@@ -1,10 +1,10 @@
-/** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it, then the Bots under the Bots tab's own groups (Pinned, each section, Other Bots), each a collapsible group like the Sessions workspaces. */
-import { IconFolder1, IconFolderOpen, IconPin, IconUserGroup } from "central-icons";
+/** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it, each Workspace folding its sessions with a chevron, then the Bots under the Bots tab's own groups (Pinned, each section, Other Bots), each a collapsible group like the Sessions workspaces. */
+import { IconChevronDownSmall, IconFolder1, IconFolderOpen, IconPin, IconUserGroup } from "central-icons";
 import { useState } from "react";
 import { revealDetailsTab } from "../../details-tabs";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { type BoardState, type BoardTask, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
-import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { activityControl } from "../../activity";
 import { folderName } from "../../labels";
 import { type BotGroup, type BotRow, botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups } from "../../bots-model";
@@ -98,17 +98,21 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 							.map(id => ({ id, ...sessionLabel(id, sessions) }))
 							.filter(row => row.host);
 						const current = !route.bots && workspace.cwd === open?.cwd;
+						const name = folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay;
+						const foldKey = `workspace:${workspace.cwd}`;
+						const folded = collapsed.has(foldKey);
 						return (
 							<SidebarMenuItem key={workspace.cwd}>
 								<SidebarMenuButton
 									{...activityControl("board.workspace")}
-									icon={current && ids.length > 0 ? IconFolderOpen : IconFolder1}
+									icon={current && ids.length > 0 && !folded ? IconFolderOpen : IconFolder1}
 									isActive={current}
 									aria-current={current ? "page" : undefined}
 									title={workspace.cwdDisplay}
+									className={ids.length > 0 ? "pr-8" : undefined}
 									onClick={go(hashForBoard(workspace.cwd))}
 								>
-									<span className="min-w-0 flex-1 truncate">{folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
+									<span className="min-w-0 flex-1 truncate">{name}</span>
 									{ready > 0 && (
 										<>
 											<CountPill count={ready} />
@@ -117,7 +121,18 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 									)}
 								</SidebarMenuButton>
 								{ids.length > 0 && (
-									<SidebarMenu aria-label={`Board sessions in ${folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}`} className="my-1 ml-[15px] w-auto gap-px border-l border-border pl-1">
+									<SidebarMenuAction
+										{...activityControl("board.workspace.fold")}
+										aria-expanded={!folded}
+										aria-label={`${folded ? "Show" : "Hide"} Board sessions in ${name}`}
+										title={folded ? "Show sessions" : "Hide sessions"}
+										onClick={() => toggle(foldKey)}
+									>
+										<IconChevronDownSmall className={`transition-transform ${folded ? "-rotate-90" : ""}`} aria-hidden />
+									</SidebarMenuAction>
+								)}
+								{ids.length > 0 && !folded && (
+									<SidebarMenu aria-label={`Board sessions in ${name}`} className="my-1 ml-[15px] w-auto gap-px border-l border-border pl-1">
 										{ids.map(({ id, name }) => (
 											<SidebarMenuItem key={id}>
 												<SidebarMenuButton
