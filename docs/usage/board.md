@@ -20,6 +20,8 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   A Board task no session started on yet just takes the new text, which its session reads when it starts; a done one stays done.
 - The **Board thread** opens in the right pane under the same tab row as a session's right sidebar, with × to close the thread.
   **Thread** shows the Board task, a line with the reply count, and the replies: what you and its sessions said, nothing about claims, leases, or wakes.
+  Under the replies, an **Actions** card lists what the sessions started on it did, so you see it before you merge: the Linear issues they saved, the branches they worked on, and the pull requests they opened or worked on.
+  A pull request opens on GitHub; a Linear issue opens the **Linear** tab.
   The next tab, named after the session a reply would wake, shows that session's conversation: with its composer while it runs, read-only once it stopped, when a reply in **Thread** wakes it.
   The + opens that session's sidebar tabs, **Overview**, **Diffs**, **PRs**, **Artifacts**, **Review**, and **Linear**, and opens **PRs**, **Linear**, or **Review** by itself once the session has one; the thread keeps the tabs you open across Board threads.
   The open Board task is highlighted in the list, and the pane follows new replies to the bottom.

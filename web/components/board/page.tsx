@@ -45,6 +45,7 @@ import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
 import { botRows } from "../../bots-model";
 import { BotsGallery } from "../bots/bots-gallery";
+import { ActionsCard, boardActions } from "./actions";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -766,6 +767,7 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 								);
 							})}
 						</ol>
+						<ActionsCard actions={boardActions(task, sessions)} />
 						{work && (
 							<div className="px-5 pt-1">
 								<WorkingLine work={work} sessions={sessions} href={hashForBoard(task.workspace, task.id)} />

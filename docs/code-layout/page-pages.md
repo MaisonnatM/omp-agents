@@ -96,6 +96,7 @@
   `web/components/board/module.ts` holds `BOARD_PAGE`, the page half of the Board module: its tab, its address `#board/<n>?workspace=<dir>`, its views, its controls, and the reducer it applies before the server answers; see [Board](../architecture/board.md).
   `web/components/board/search.ts` holds `searchBoard`, the search across Board tasks and replies in a Board thread, a Workspace, or every Workspace, `scopeOf`, the scope an address or the menu names, and the snippet and marks its results show.
   `web/components/board/search-view.tsx` holds `BoardSearchField`, the header's search field with its scope chip, and `SearchResults`, the results page that shows in place of the Board tasks.
+  `web/components/board/actions.tsx` holds `ActionsCard`, the Board thread's **Actions** card, and `boardActions`, which reads the Linear issues, branches, and pull requests from the session facts of the sessions started on a Board task.
 - `web/components/memory/page.tsx`: the Memory page, `MemoryPage`, a `PageFrame` whose header holds the `SegmentedTabs` of its two tabs, over the project memory or the bookmarks.
   `web/components/memory/module.ts` holds `MEMORY_PAGE`, the page half of the Memory module: its tab, address, title, views, shortcuts, and controls; its data comes over the module's own routes, typed in `src/shared/memory-page.ts`; see [Modules](../architecture/modules.md).
   `tabs.ts` holds `MEMORY_TABS` and `memoryHash`, each tab's address, name, and control.
