@@ -16,11 +16,7 @@
 		"web/lib/dither/shader.tsx": 1
 	},
 	"glossary-terms": {
-		"README.md": 1,
-		"docs/usage/keyboard-shortcuts.md": 1,
-		"docs/usage/sessions-sidebar.md": 1,
 		"docs/usage/settings.md": 1,
-		"docs/usage/todo-list.md": 1,
-		"templates/omp/README.md": 1
+		"docs/usage/todo-list.md": 1
 	}
 }

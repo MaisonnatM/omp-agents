@@ -109,7 +109,7 @@ Alt is Option on macOS.
   Cmd+Alt+↑ and Cmd+Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then the ones waiting on subagents, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   ↓ and ↑, or J and K, do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
-- Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does.
+- Cmd+Shift+O opens the new-session draft, as **New session** at the top of the roster does.
   S outside a text field does it too; on the Todo page, S changes a focused or open todo's status instead.
   Cmd+T opens a new header tab on the new-session draft, as the + after the tabs does.
   Cmd+W closes the header tab on screen and leaves its session running; it does nothing when the page has no header tab, or when the tab on screen is pinned.
