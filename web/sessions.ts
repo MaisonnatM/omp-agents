@@ -173,38 +173,35 @@ export function latestSession(lists: SidebarSessions): View | null {
 	return saved ? { kind: "past", sessionId: saved.sessionId } : null;
 }
 
-/** One workspace of the roster: its unpinned live sessions, in the sidebar's order, and its interrupted ones. */
+/** One workspace of the roster: its unpinned live sessions, in the sidebar's order. Interrupted sessions show in no folder. */
 export interface WorkspaceGroup {
 	workspace: Workspace;
 	hosts: RosterHost[];
-	interrupted: PastSession[];
 }
 
 /**
- * The roster's workspaces, each with the live and interrupted sessions `lists` holds in it: one per workspace of
- * `workspaces`, then one per other workspace a session runs in. Those with a session come first, then the rest, each
- * in `workspaces` order, so opening a session never moves a workspace.
+ * The roster's workspaces, each with the live sessions `lists` holds in it: one per workspace of `workspaces`, then one
+ * per other workspace a session runs in. Those with a session come first, then the rest, each in `workspaces` order, so
+ * opening a session never moves a workspace.
  */
 export function workspaceGroups(lists: SidebarSessions, workspaces: readonly Workspace[]): WorkspaceGroup[] {
 	const groups = new Map<string, WorkspaceGroup>();
-	const groupOf = (row: RosterHost | PastSession): WorkspaceGroup => {
-		const workspace = workspaceOf(row);
+	for (const workspace of workspaces) groups.set(workspace.cwd, { workspace, hosts: [] });
+	for (const host of liveHosts(lists)) {
+		const workspace = workspaceOf(host);
 		let group = groups.get(workspace.cwd);
 		if (!group) {
-			group = { workspace, hosts: [], interrupted: [] };
+			group = { workspace, hosts: [] };
 			groups.set(workspace.cwd, group);
 		}
-		return group;
-	};
-	for (const workspace of workspaces) groups.set(workspace.cwd, { workspace, hosts: [], interrupted: [] });
-	for (const host of liveHosts(lists)) groupOf(host).hosts.push(host);
-	for (const session of lists.interrupted) groupOf(session).interrupted.push(session);
+		group.hosts.push(host);
+	}
 	const all = [...groups.values()];
-	const busy = (group: WorkspaceGroup): boolean => group.hosts.length > 0 || group.interrupted.length > 0;
+	const busy = (group: WorkspaceGroup): boolean => group.hosts.length > 0;
 	return [...all.filter(busy), ...all.filter(group => !busy(group))];
 }
 
-/** A workspace the roster shows: its group, and how many session rows it holds, its live and interrupted ones. */
+/** A workspace the roster shows: its group, and how many session rows it holds. */
 export interface RosterFolder {
 	group: WorkspaceGroup;
 	rows: number;
@@ -219,11 +216,11 @@ export interface RosterFolders {
 }
 
 /**
- * The roster's folders in `groups` order. At most `limit` folders show, or as many as hold a live or interrupted
+ * The roster's folders in `groups` order. At most `limit` folders show, or as many as hold a live
  * session, unless `all`. Ended sessions stay in Past, never in a folder. `filtering` drops the folders a search leaves empty.
  */
 export function rosterFolders(groups: readonly WorkspaceGroup[], { limit, all, filtering }: { limit: number; all: boolean; filtering: boolean }): RosterFolders {
-	const folders = groups.map((group): RosterFolder => ({ group, rows: group.hosts.length + group.interrupted.length }));
+	const folders = groups.map((group): RosterFolder => ({ group, rows: group.hosts.length }));
 	const matching = filtering ? folders.filter(folder => folder.rows > 0) : folders;
 	const busy = matching.filter(folder => folder.rows > 0).length;
 	const shown = all ? matching : matching.slice(0, Math.max(limit, busy));
@@ -278,7 +275,7 @@ export function listedViews(lists: SidebarSessions, projects: readonly ProjectGr
 		...projects.flatMap(group => [...live(group.hosts), ...saved(group.past)]),
 		...live(pinned.hosts),
 		...saved(pinned.past),
-		...groups.flatMap(group => [...live(group.hosts.filter(host => !awaitsScheduled(host))), ...saved(group.interrupted)]),
+		...groups.flatMap(group => live(group.hosts.filter(host => !awaitsScheduled(host)))),
 		...groups.flatMap(group => live(group.hosts.filter(awaitsScheduled))),
 		...saved(ended),
 	];

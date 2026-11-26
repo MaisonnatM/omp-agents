@@ -339,7 +339,6 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, 
 				return (
 					<WorkspaceFolder key={cwd} folder={folder} name={folderName(cwdDisplay) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
 						{folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false))}
-						{folder.group.interrupted.map(session => pastRow(session, false, false))}
 					</WorkspaceFolder>
 				);
 			})}

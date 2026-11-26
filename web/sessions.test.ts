@@ -221,7 +221,7 @@ describe("sidebarSessions", () => {
 		expect(waitingCount(sidebarSessions(live, [], "~/a", new Set(["h4"])))).toBe(3);
 	});
 
-	test("the previous and next session keys walk pinned rows first, then each workspace's idle, running, waiting on subagents, and interrupted rows, then past", () => {
+	test("the previous and next session keys walk pinned rows first, then each workspace's idle, running, and waiting on subagents rows, then past, skipping interrupted ones", () => {
 		const delegating = fromPartial<RosterHost>({ ...host("h9", "~/a"), status: "idle", agents: subagents("running") });
 		const live = [delegating, { ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
 		const lists = sidebarSessions(live, sessions, "~/a", new Set(["h2", "p3"]));
@@ -231,20 +231,18 @@ describe("sidebarSessions", () => {
 			{ kind: "live", instanceId: "i-h0", agentId: null },
 			{ kind: "live", instanceId: "i-h1", agentId: null },
 			{ kind: "live", instanceId: "i-h9", agentId: null },
-			{ kind: "past", sessionId: "p2" },
 			{ kind: "past", sessionId: "p1" },
 		]);
 	});
 
-	test("the roster groups live and interrupted sessions by workspace, busy workspaces first, each in the workspaces' order", () => {
+	test("the roster groups live sessions by workspace, busy workspaces first, each in the workspaces' order, and leaves interrupted ones out", () => {
 		const workspace = (cwd: string) => ({ cwd, cwdDisplay: cwd });
 		const live = [{ ...host("h1", "~/b"), status: "idle" as const }, { ...host("h2", "~/c"), status: "working" as const }];
 		const lists = sidebarSessions(live, [past("p1", "~/a", true), past("p2", "~/a", false)], null, none);
 		const groups = workspaceGroups(lists, [workspace("~/a"), workspace("~/quiet"), workspace("~/b")]);
-		expect(groups.map(group => group.workspace.cwd)).toEqual(["~/a", "~/b", "~/c", "~/quiet"]);
-		expect(groups.map(group => [ids(group.hosts), ids(group.interrupted)])).toEqual([[[], ["p1"]], [["h1"], []], [["h2"], []], [[], []]]);
+		expect(groups.map(group => group.workspace.cwd)).toEqual(["~/b", "~/c", "~/a", "~/quiet"]);
+		expect(groups.map(group => ids(group.hosts))).toEqual([["h1"], ["h2"], [], []]);
 		expect(listedViews(lists, [], groups)).toEqual([
-			{ kind: "past", sessionId: "p1" },
 			{ kind: "live", instanceId: "i-h1", agentId: null },
 			{ kind: "live", instanceId: "i-h2", agentId: null },
 			{ kind: "past", sessionId: "p2" },
@@ -261,7 +259,7 @@ describe("sidebarSessions", () => {
 		expect(ids(rest.pinned.hosts)).toEqual([]);
 		expect(ids(rest.ended)).toEqual(["p2"]);
 		const groups = workspaceGroups(rest, [workspace("~/a"), workspace("~/b")]);
-		expect(groups.map(group => [group.workspace.cwd, ids(group.hosts), ids(group.interrupted)])).toEqual([["~/a", ["h1"], []], ["~/b", [], []]]);
+		expect(groups.map(group => [group.workspace.cwd, ids(group.hosts)])).toEqual([["~/a", ["h1"]], ["~/b", []]]);
 		expect(listedViews(rest, projects, groups).slice(0, 3)).toEqual([
 			{ kind: "live", instanceId: "i-h3", agentId: null },
 			{ kind: "live", instanceId: "i-h2", agentId: null },
