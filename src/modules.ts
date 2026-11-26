@@ -13,7 +13,7 @@ import type { PagePreferences } from "./shared/preferences";
 import { PROJECTS_MODULE } from "./projects-module";
 import { SPORT_MODULE } from "./sport-module";
 
-/** A module's state as the server holds it, read from its file once; the server is the file's one writer. */
+/** A module's state as the server holds it, read from its file at startup and when it takes over the unattended work. */
 export interface ModuleFile<Value, Change> {
 	readonly value: Value;
 	/** Applies `change` and saves; `false` when it changed nothing, and a throw when the state refuses it. */
@@ -22,6 +22,8 @@ export interface ModuleFile<Value, Change> {
 	replace(value: Value): boolean;
 	/** Whether what `apply` saved reached the disk. */
 	flush(): boolean;
+	/** Reads the file again, for what the server that ran the unattended work saved since this one read it. */
+	reload(): void;
 }
 
 /** State a module keeps in a file: every page holds it whole, and changes it through `{ t: "module-change" }`. */
@@ -37,8 +39,12 @@ export interface ModuleStore<Value, Change> {
 
 /** What a module's own work reaches of the core. */
 export interface ModuleRunCore {
-	/** Starts a new session in `cwd` on `prompt`, as the page's New session does, on the model, thinking level, and skill `launch` names, else omp's defaults. */
-	start(cwd: string, prompt: string, launch?: { model: ModelOption | null; thinking: string | null; skill: string | null }): Promise<{ sessionId: string } | { error: string }>;
+	/**
+	 * Starts a new session in `cwd` on `prompt`, as the page's New session does, on the model, thinking level, and skill
+	 * `launch` names, else omp's defaults. `task` is the work's identity, such as `board:<workspace>#<id>`, so a session
+	 * already started on it is adopted rather than a second one started.
+	 */
+	start(cwd: string, prompt: string, launch: { model: ModelOption | null; thinking: string | null; skill: string | null } | undefined, task: string): Promise<{ sessionId: string } | { error: string }>;
 	/**
 	 * Sends `text` to session `sessionId` as a follow-up, resuming it first when it stopped, on the model, thinking level,
 	 * and skill `launch` names; `interrupt` first stops a running turn, and queues the user's own waiting messages after
@@ -51,10 +57,19 @@ export interface ModuleRunCore {
 	alive(sessionId: string): boolean;
 	/** Ends session `sessionId` as **End session** does, removing the worktree it worked in; nothing when it no longer runs. */
 	end(sessionId: string): Promise<void>;
-	/** The worktree of `workspace`'s repository on `branch`, made ready for a session; `null` when `workspace` is outside git. */
+	/**
+	 * The worktree of `workspace`'s repository on `branch`, made ready for a session: once project trust admits it, with
+	 * `.omp/land.json`'s setup run in a worktree it adds. `null` when `workspace` is outside git.
+	 */
 	checkout(workspace: string, branch: string): Promise<string | null>;
-	/** Lands the branch checked out at `dir` on the repository's target branch with `.omp/land.json`'s checks; `text` is the result in words. */
-	land(dir: string, sessionId: string | undefined): Promise<{ landed: boolean; text: string }>;
+	/**
+	 * Lands `branch` of `workspace`'s repository on its target branch with `.omp/land.json`'s checks, once project trust
+	 * admits the checkout it lands from; runs no session setup and leaves no worktree behind. `landed` covers a branch its
+	 * target already holds; `refused`, a repository with no land config; `failed`, any other result. `text` says it in words.
+	 */
+	land(workspace: string, branch: string, sessionId: string | undefined): Promise<{ outcome: "landed" | "failed" | "refused"; text: string }>;
+	/** Whether `workspace`'s repository has a land config, so the Board can land its branches. */
+	landable(workspace: string): boolean;
 	/** Whether this server runs the unattended work, the one that may start and wake sessions. */
 	owner(): boolean;
 	now(): number;

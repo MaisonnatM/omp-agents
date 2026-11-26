@@ -4,24 +4,19 @@
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconBubbleWideNotification, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconPencil, IconRobot, IconUser } from "central-icons";
-import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { type PastSession, type PromptImage, type RosterHost, type Stop, stopOf, type View } from "../../../src/shared/sessions";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconRobot } from "central-icons";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import type { PastSession, PromptImage, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
-import { AppMark } from "../app-mark";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CountPill } from "../count-pill";
-import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
-import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { splitSuggestions } from "../../../src/shared/transcript";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { getJson, putJson } from "../../api";
-import { errorText } from "../../../src/json";
+import { putJson } from "../../api";
 import { useShowConversation } from "../../pane-store";
 import { UNREAD } from "../../reads";
 import { activityControl } from "../../activity";
@@ -44,13 +39,15 @@ import { type KnownSessions, sessionLabel } from "../../labels";
 import type { BoardRoute, BoardView } from "./module";
 import { PageHashContext } from "../../page-hash";
 import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
-import { boardPageHash, boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
+import { boardPageHash, boardWorkspaces, hashForBoard, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
 import { botRows, crossProject } from "../../bots-model";
 import { BotsGallery } from "../bots/bots-gallery";
 import { boardActions, SessionActions } from "./actions";
-import { MergeNote } from "./merge-note";
+import { BoardNoteLine, isThreadNote } from "./board-note";
+import { threadSession, type Work, workOf } from "./work";
+import { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, folder, MarkUnreadButton, markSeen, MessageEditor, MessageRow, said, sameDay, TaskBody, unreadOf, useSeen, WorkingLine, WorkLabel, Avatar } from "./messages";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -146,6 +143,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 					state={state}
 					task={thread}
 					reply={route.reply}
+					session={route.session}
 					core={core}
 					workspace={openWorkspace}
 					channel={name}
@@ -155,42 +153,6 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 					onChange={onChange}
 				/>
 			)}
-		</div>
-	);
-}
-
-export const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
-
-/** Slack starts a later message from the same author within five minutes of the last one without its avatar and name. */
-const GROUP_MS = 5 * 60_000;
-
-const authorKey = (by: BoardAuthor): string => (by.kind === "user" ? "user" : by.sessionId);
-
-function continues(previous: { at: number; by: BoardAuthor }, next: { at: number; by: BoardAuthor }): boolean {
-	return authorKey(previous.by) === authorKey(next.by) && next.at - previous.at < GROUP_MS && sameDay(previous.at, next.at);
-}
-
-const sameDay = (a: number, b: number): boolean => new Date(a).toDateString() === new Date(b).toDateString();
-
-export const clock = (at: number): string => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-
-/** The time in the 36px avatar column, without its AM or PM, as Slack shows it there. */
-const shortClock = (at: number): string => clock(at).replace(/\s?[AP]M$/i, "");
-
-export function dayLabel(at: number): string {
-	const now = Date.now();
-	if (sameDay(at, now)) return "Today";
-	if (sameDay(at, now - 86_400_000)) return "Yesterday";
-	return new Date(at).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
-}
-
-/** The day's line across the messages, with its name in a pill, as Slack splits a channel by day. */
-function DayDivider({ at }: { at: number }) {
-	return (
-		<div role="separator" aria-label={dayLabel(at)} className="relative my-2 flex items-center px-6">
-			<span className="h-px flex-1 bg-border" />
-			<span className="rounded-full border border-border bg-background px-3 py-0.5 text-xs font-medium text-muted-foreground">{dayLabel(at)}</span>
-			<span className="h-px flex-1 bg-border" />
 		</div>
 	);
 }
@@ -225,290 +187,16 @@ function ChannelIntro({ name }: { name: string }) {
 	);
 }
 
-/** Your Slack profile picture, asked once per page load to refresh the stored one, which shows meanwhile; `undefined` when the ask failed. */
-let yourPicture: Promise<string | null | undefined> | null = null;
-
-/** Your square picture: your Slack profile picture, else a person. */
-function YourAvatar({ size, box }: { size: "message" | "summary"; box: string }) {
-	const [url, setUrl] = useStoredState<string | null>("omp-agents.slack-picture", raw => raw || null, value => value ?? "");
-	useEffect(() => {
-		yourPicture ??= getJson<{ avatarUrl: string | null }>("/api/integrations/slack/me").then(
-			answer => answer.avatarUrl,
-			() => undefined,
-		);
-		let live = true;
-		void yourPicture.then(found => {
-			if (live && found !== undefined && found !== url) setUrl(found);
-		});
-		return () => {
-			live = false;
-		};
-	}, [url, setUrl]);
-	if (url) return <img aria-hidden src={url} alt="" referrerPolicy="no-referrer" className={cn("shrink-0 object-cover", box)} />;
-	return (
-		<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-foreground text-background", box)}>
-			<IconUser className={size === "message" ? "size-5" : "size-3.5"} />
-		</span>
-	);
-}
-
-/** The author's square picture: yours for you, omp's mark for a session. */
-export function Avatar({ by, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
-	const box = size === "message" ? "size-9 rounded-lg text-sm" : "size-6 rounded-md text-[11px]";
-	if (by.kind === "user") return <YourAvatar size={size} box={box} />;
-	return (
-		<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-muted", box)}>
-			<AppMark className={size === "message" ? "size-5" : "size-3.5"} />
-		</span>
-	);
-}
-
-/** The author's name: yours, or for a session "omp agent" then the session's title, which opens its conversation in its Board thread. */
-function AuthorName({ by, sessions, state, workspace }: { by: BoardAuthor; sessions: KnownSessions; state: BoardState; workspace: string }) {
-	if (by.kind === "user") return <span className="text-sm font-semibold">You</span>;
-	const title = sessionLabel(by.sessionId, sessions).name;
-	return (
-		<span className="flex min-w-0 items-baseline gap-1.5">
-			<span className="shrink-0 text-sm font-semibold">omp agent</span>
-			<a {...activityControl("board.session.open")} href={hashForBoardSession(state, workspace, by.sessionId)} onClick={revealSessionTab} title={title} className="truncate text-xs text-muted-foreground hover:text-foreground hover:underline">
-				{title}
-			</a>
-		</span>
-	);
-}
-
-/** One message row: avatar, name, and time, or for a grouped one only the time on hover in the avatar's place. */
-function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted = false, toolbar, children }: { by: BoardAuthor; at: number; sessions: KnownSessions; state: BoardState; workspace: string; grouped: boolean; highlighted?: boolean; toolbar?: ReactNode; children: ReactNode }) {
-	return (
-		<div className={cn("group/message relative flex gap-2 px-6 hover:bg-accent/40", grouped ? "py-0.5" : "pt-2 pb-1", highlighted && "bg-accent hover:bg-accent")}>
-			<div className="flex w-9 shrink-0 justify-end">
-				{grouped ? (
-					<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="pt-0.5 text-xs text-muted-foreground tabular-nums opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100">
-						{shortClock(at)}
-					</time>
-				) : (
-					<Avatar by={by} sessions={sessions} />
-				)}
-			</div>
-			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-				{!grouped && (
-					<span className="flex min-w-0 items-baseline gap-2">
-						<AuthorName by={by} sessions={sessions} state={state} workspace={workspace} />
-						<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="shrink-0 text-xs text-muted-foreground tabular-nums hover:underline">
-							{clock(at)}
-						</time>
-					</span>
-				)}
-				{children}
-			</div>
-			{toolbar && <div className="invisible absolute -top-4 right-6 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 shadow-sm group-focus-within/message:visible group-hover/message:visible">{toolbar}</div>}
-		</div>
-	);
-}
-
-/** Where a Board task in work stands: no session yet, its session working, or its session stopped for you, as `stopOf` says. */
-type Work = { kind: "starting" } | { kind: "working"; sessionId: string } | { kind: "waiting"; sessionId: string; stop: Stop };
-
-/** Board task `task`'s {@link Work}, `null` once it is done or waits on another Board task. */
-function workOf(state: BoardState, task: BoardTask, sessions: KnownSessions): Work | null {
-	const status = statusOf(state, task);
-	if (status.kind !== "ready" && status.kind !== "claimed") return null;
-	const sessionId = task.claim?.sessionId ?? task.start?.sessionId ?? null;
-	if (sessionId === null) return { kind: "starting" };
-	const host = sessions.hosts.find(each => each.sessionId === sessionId);
-	const stop = host ? stopOf(host) : null;
-	return stop ? { kind: "waiting", sessionId, stop } : { kind: "working", sessionId };
-}
-
-/** What a Board task in work shows: shimmering while a session starts or works, else in amber what its session waits on you for, then `detail`. */
-function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
-	const [label, rest] =
-		work.kind === "starting"
-			? ["Starting a session…", null]
-			: work.kind === "working"
-				? ["Working on it…", detail]
-				: work.stop.kind === "ask"
-					? ["Asks you", work.stop.request.title]
-					: [work.stop.kind === "input" ? "Waiting for your input" : "Waiting for your reply", detail];
-	return (
-		<span className="flex min-w-0 items-baseline gap-1.5 text-xs">
-			<span className={cn("shrink-0", work.kind === "waiting" ? "font-semibold text-amber-600 dark:text-amber-400" : "shimmer-text")}>{label}</span>
-			{rest && <span className="truncate text-muted-foreground">{rest}</span>}
-		</span>
-	);
-}
-
-/** A row under a Board task still in work, in the thread summary's style: who works on it and how it stands, as a Slack bot shows it is thinking; it opens the thread with its Thread tab in front. */
-function WorkingLine({ work, sessions, href }: { work: Work; sessions: KnownSessions; href: string }) {
-	const sessionId = work.kind === "starting" ? null : work.sessionId;
-	return (
-		<a {...activityControl("board.task.open")} href={href} onClick={revealThreadTab} className="mt-1 -ml-1 flex max-w-md items-center gap-2 rounded-lg p-1 ring-1 ring-transparent ring-inset hover:bg-background hover:ring-border">
-			{sessionId ? (
-				<Avatar by={{ kind: "session", sessionId }} sessions={sessions} size="summary" />
-			) : (
-				<span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-					<IconAiBotHead className="size-4" />
-				</span>
-			)}
-			<WorkLabel work={work} detail={sessionId && sessionLabel(sessionId, sessions).name} />
-		</a>
-	);
-}
-
-/** A Board task's or reply's text as Markdown, with single line breaks kept, as a Bot's message shows; `(edited)` after it once its author edited it, as Slack marks one. */
-function BoardText({ text, editedAt }: { text: string; editedAt?: number }) {
-	return (
-		<div className="max-w-conversation min-w-0 text-sm leading-relaxed">
-			<MessageMarkdown text={text} preset={BOT_MESSAGE_PRESET} />
-			{editedAt !== undefined && (
-				<span title={`Edited ${new Date(editedAt).toLocaleString()}`} className="text-xs text-muted-foreground">
-					(edited)
-				</span>
-			)}
-		</div>
-	);
-}
-
-/** The message's text, or `editor` in its place while you edit it, and its labels. */
-function TaskBody({ task, editor }: { task: BoardTask; editor?: ReactNode }) {
-	const labels = Object.entries(task.labels);
-	return (
-		<>
-			{editor ?? <BoardText text={task.text || task.title} editedAt={task.editedAt} />}
-			{labels.length > 0 && (
-				<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-					{labels.map(([key, value]) => (
-						<Badge key={key} variant="dot" size="compact" color="gray">
-							{key}={value}
-						</Badge>
-					))}
-				</span>
-			)}
-		</>
-	);
-}
-
-/** The pencil in your own message's toolbar, which puts its text in a box to edit. */
-function EditButton({ disabled, onEdit }: { disabled: boolean; onEdit: () => void }) {
-	return (
-		<Tooltip content="Edit message">
-			<Button {...activityControl("board.message.edit")} variant="ghost" size="icon-xs" aria-label="Edit message" disabled={disabled} onClick={onEdit}>
-				<IconPencil />
-			</Button>
-		</Tooltip>
-	);
-}
-
-/** Slack's **Mark unread**: the thread counts this reply and those after it as unread again. */
-function MarkUnreadButton({ onMark }: { onMark: () => void }) {
-	return (
-		<Tooltip content="Mark unread">
-			<Button {...activityControl("board.message.unread")} variant="ghost" size="icon-xs" aria-label="Mark unread" onClick={onMark}>
-				<IconBubbleWideNotification />
-			</Button>
-		</Tooltip>
-	);
-}
-
-/** Your message's text in a box, as Slack edits one: Enter or **Save** saves it, which stops the turn of the session working from it and sends it the new text; Shift+Enter starts a new line; Escape or **Cancel** leaves it as it was. */
-function MessageEditor({ text, onSave, onClose }: { text: string; onSave: (text: string) => Promise<void>; onClose: () => void }) {
-	const [draft, setDraft] = useState(text);
-	const [pending, setPending] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const ref = useRef<HTMLTextAreaElement>(null);
-	useEffect(() => {
-		const box = ref.current;
-		box?.focus();
-		box?.setSelectionRange(box.value.length, box.value.length);
-	}, []);
-	const save = async () => {
-		const next = draft.trim();
-		if (!next || next === text.trim()) return onClose();
-		setPending(true);
-		try {
-			await onSave(next);
-			onClose();
-		} catch (failure) {
-			setError(errorText(failure));
-			setPending(false);
-		}
-	};
-	return (
-		<div className="flex max-w-conversation min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-background p-2 focus-within:border-ring">
-			<textarea
-				ref={ref}
-				aria-label="Edit message"
-				aria-busy={pending || undefined}
-				readOnly={pending}
-				value={draft}
-				rows={1}
-				onChange={event => setDraft(event.target.value)}
-				onKeyDown={event => {
-					if (event.nativeEvent.isComposing) return;
-					// Escape is taken here, so the Board thread around the box stays open.
-					if (event.key === "Escape") {
-						event.preventDefault();
-						if (!pending) onClose();
-					} else if (event.key === "Enter" && !event.shiftKey) {
-						event.preventDefault();
-						if (!pending) void save();
-					}
-				}}
-				className="block w-full resize-none bg-transparent text-sm leading-relaxed [field-sizing:content] outline-none"
-			/>
-			{error && (
-				<p role="alert" className="text-xs text-destructive">
-					{error}
-				</p>
-			)}
-			<div className="flex items-center gap-1.5">
-				<span className="mr-auto text-xs text-muted-foreground">Saving stops the session's turn and sends your edit</span>
-				<Button variant="outline" size="compact" disabled={pending} onClick={onClose}>
-					Cancel
-				</Button>
-				<Button variant="primary" size="compact" disabled={pending} onClick={() => void save()}>
-					Save
-				</Button>
-			</div>
-		</div>
-	);
-}
-
-const said = (task: BoardTask): Extract<BoardReply, { by: BoardAuthor }>[] => task.replies.filter((entry): entry is Extract<BoardReply, { by: BoardAuthor }> => "by" in entry);
-
-/** How many replies of each Board task's thread you have seen, by task id, kept in this browser. */
-const SEEN_KEY = "omp-agents.board-thread-seen";
-const seenListeners = new Set<() => void>();
-let seen: Record<string, number> = {};
-try {
-	seen = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "{}") as Record<string, number>;
-} catch {}
-function markSeen(id: number, count: number) {
-	if (seen[id] === count) return;
-	seen = { ...seen, [id]: count };
-	localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
-	for (const listener of seenListeners) listener();
-}
-const useSeen = (): Record<string, number> =>
-	useSyncExternalStore(
-		listener => {
-			seenListeners.add(listener);
-			return () => seenListeners.delete(listener);
-		},
-		() => seen,
-	);
-/** Replies past the ones seen that someone else wrote: the unread count, as Slack's thread pill. */
-const unreadOf = (task: BoardTask, seenCount: number | undefined): number => said(task).slice(seenCount ?? 0).filter(reply => reply.by.kind !== "user").length;
-
 function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onChange }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const replies = said(task);
 	const seenMap = useSeen();
-	const work = workOf(state, task, sessions);
+	const work = workOf(state, task, sessions.hosts);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const [editing, setEditing] = useState(false);
 	const toolbar = (
 		<>
 			{task.by.kind === "user" && !editing && <EditButton disabled={disabled} onEdit={() => setEditing(true)} />}
+			{task.doneAt === null && <CloseTaskButton task={task} disabled={disabled} onChange={onChange} />}
 			<Tooltip content="Reply in thread">
 				<Button {...activityControl("board.task.open")} variant="ghost" size="icon-xs" aria-label={`Reply in thread #${task.id}`} render={<a href={href} />}>
 					<IconBubble3 />
@@ -516,7 +204,7 @@ function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onC
 			</Tooltip>
 			{session && (
 				<Tooltip content="Open its session">
-					<Button {...activityControl("board.session.open")} variant="ghost" size="icon-xs" aria-label="Open its session" render={<a href={href} onClick={revealSessionTab} />}>
+					<Button {...activityControl("board.session.open")} variant="ghost" size="icon-xs" aria-label="Open its session" render={<a href={hashForBoard(task.workspace, task.id, { session })} onClick={revealSessionTab} />}>
 						<IconArrowUpRight />
 					</Button>
 				</Tooltip>
@@ -538,7 +226,7 @@ function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onC
 
 /** Who replied, how many replies, and when the last came, or while a session works on it how it stands in that place, which opens the thread, as under a Slack message. */
 function ThreadSummary({ replies, unread, work, sessions, href }: { replies: Extract<BoardReply, { by: BoardAuthor }>[]; unread: number; work: Work | null; sessions: KnownSessions; href: string }) {
-	const worker: BoardAuthor[] = work && work.kind !== "starting" ? [{ kind: "session", sessionId: work.sessionId }] : [];
+	const worker: BoardAuthor[] = work && (work.kind === "working" || work.kind === "waiting") ? [{ kind: "session", sessionId: work.sessionId }] : [];
 	// Every session draws the same omp mark, so all sessions count as one avatar.
 	const authors = [...new Map([...worker, ...replies.map(reply => reply.by)].map(by => [by.kind === "session" ? "session" : authorKey(by), by])).values()].slice(0, 5);
 	const last = replies.at(-1);
@@ -629,13 +317,16 @@ const STEP = 16;
 const clampThread = (width: number, room: number): number => Math.round(Math.max(MIN_THREAD, Math.min(MAX_THREAD, room - MIN_CHANNEL, width)));
 
 /** The Board thread as Slack's thread pane, at the width you drag its left edge to, under the session details sidebar's tab row: **Thread**, the Board task, a line with the reply count, the replies, and the reply box; then the conversation and sidebar tabs of the session its replies wake. Escape closes it. */
-function Thread({ state, task, reply, core, workspace, channel, closeHref, onSearch, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; core: CoreData; workspace: Workspace; channel: string; closeHref: string; onSearch: () => void; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+function Thread({ state, task, reply, session, core, workspace, channel, closeHref, onSearch, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; session: string | null; core: CoreData; workspace: Workspace; channel: string; closeHref: string; onSearch: () => void; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const sessions = core.sessions;
 	const replyCount = said(task).length;
 	useEffect(() => markSeen(task.id, replyCount), [task.id, replyCount]);
-	// The thread shows the session a reply wakes, or on a done Board task the last one that worked on it; a thread with none, or one not listed yet, shows only **Thread**.
-	const target = wakeTarget(task, { kind: "user" }) ?? (task.doneAt !== null ? (startedOn(task).at(-1) ?? null) : null);
+	// The thread shows the session the address picked, else the one a reply wakes, or on a done Board task the last one that worked on it; a thread with none, or one not listed yet, shows only **Thread**.
+	const target = threadSession(task, session);
 	const name = target ? sessionLabel(target, sessions).name : null;
+	// The reply box names the session a reply wakes, which may not be the one the tabs show.
+	const woken = wakeTarget(task, { kind: "user" });
+	const wokenName = woken ? sessionLabel(woken, sessions).name : null;
 	const host = target ? (sessions.hosts.find(each => each.sessionId === target) ?? null) : null;
 	const past = target ? (sessions.past.find(each => each.sessionId === target) ?? null) : null;
 	const instanceId = host?.instanceId ?? null;
@@ -695,7 +386,7 @@ function Thread({ state, task, reply, core, workspace, channel, closeHref, onSea
 					location.hash = closeHref;
 				}}
 			>
-				<ThreadComposer task={task} name={name} core={core} workspace={workspace} disabled={disabled} onChange={onChange} onSend={() => setSentOn(reply)} />
+				<ThreadComposer task={task} failed={workOf(state, task, sessions.hosts)?.kind === "failed"} name={wokenName} core={core} workspace={workspace} disabled={disabled} onChange={onChange} onSend={() => setSentOn(reply)} />
 			</ThreadMessages>
 		),
 	};
@@ -757,9 +448,9 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 	return <DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={row?.cwd ?? null} tabs={tabs} trailing={close} />;
 }
 
-/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs; each reply's **Mark unread** passes how many replies come before it. Of the Board's notes only the merges it ran show, between the replies; the rest, such as a claim or a start, stay out. */
+/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs; each reply's **Mark unread** passes how many replies come before it. Of the Board's notes only those `isThreadNote` picks show, between the replies: the merges it ran, a session that did not start, and your closing it. */
 function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChange, onMarkUnread, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onMarkUnread: (from: number) => void; children: ReactNode }) {
-	const work = workOf(state, task, sessions);
+	const work = workOf(state, task, sessions.hosts);
 	const replies = said(task);
 	const count = replies.length;
 	let previous: { at: number; by: BoardAuthor } = task;
@@ -783,7 +474,14 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 							state={state}
 							workspace={task.workspace}
 							grouped={false}
-							toolbar={task.by.kind === "user" && editing !== "task" ? <EditButton disabled={disabled} onEdit={() => setEditing("task")} /> : undefined}
+							toolbar={
+								editing === "task" ? undefined : (
+									<>
+										{task.by.kind === "user" && <EditButton disabled={disabled} onEdit={() => setEditing("task")} />}
+										{task.doneAt === null && <CloseTaskButton task={task} disabled={disabled} onChange={onChange} />}
+									</>
+								)
+							}
 						>
 							<TaskBody task={task} editor={editing === "task" ? editor(task.text || task.title) : undefined} />
 						</MessageRow>
@@ -793,7 +491,12 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 						</div>
 						<ol className="flex flex-col">
 							{task.replies.map((entry, index) => {
-								if ("note" in entry) return entry.note.kind === "landed" || entry.note.kind === "land-failed" ? <li key={index}><MergeNote note={entry.note} /></li> : null;
+								if ("note" in entry)
+									return isThreadNote(entry.note) ? (
+										<li key={index}>
+											<BoardNoteLine note={entry.note} />
+										</li>
+									) : null;
 								const position = replies.indexOf(entry);
 								const grouped = continues(previous, entry);
 								previous = entry;
@@ -854,8 +557,8 @@ function ScrollToReply({ reply }: { reply: number }) {
 /** The thread's `@` menu offers sessions only, so a reply can point its session at another. */
 const THREAD_MENTIONS = ["session"] as const;
 
-/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name`, or on a done Board task starts a new one, on the model, thinking level, and skill picked here. A done Board task's session's suggested prompts list under its action bar; each sends itself as the user's reply. */
-function ThreadComposer({ task, name, core, workspace, disabled, onChange, onSend }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onSend: () => void }) {
+/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name`, or on a done Board task, or one whose session `failed` to start, starts a new one, on the model, thinking level, and skill picked here. A done Board task's session's suggested prompts list under its action bar; each sends itself as the user's reply. */
+function ThreadComposer({ task, failed, name, core, workspace, disabled, onChange, onSend }: { task: BoardTask; failed: boolean; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onSend: () => void }) {
 	const last = said(task).at(-1);
 	const prompts = task.doneAt !== null && last?.by.kind === "session" ? splitSuggestions(last.text).suggestions : undefined;
 	const { send } = useDashboardActions();
@@ -870,8 +573,8 @@ function ThreadComposer({ task, name, core, workspace, disabled, onChange, onSen
 		<div {...activityControl("board.reply")} className="shrink-0">
 			<NewSession
 				board={{
-					placeholder: task.doneAt !== null ? "Reply to start a new session on it…" : name ? `Reply to ${name}…` : "Reply…",
-					sendLabel: task.doneAt !== null ? "Send reply; a new session takes it from the thread" : name ? "Send reply; it wakes the session if it stopped" : "Send reply",
+					placeholder: task.doneAt !== null ? "Reply to start a new session on it…" : failed ? "Reply to try again…" : name ? `Reply to ${name}…` : "Reply…",
+					sendLabel: task.doneAt !== null ? "Send reply; a new session takes it from the thread" : failed ? "Send reply; a new session starts on it" : name ? "Send reply; it wakes the session if it stopped" : "Send reply",
 					mentions: THREAD_MENTIONS,
 					prompts,
 				}}

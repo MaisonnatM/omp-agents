@@ -412,6 +412,7 @@ export class Dashboard {
 			workspaceOf,
 			knownWorkspaces: () => this.knownWorkspaces(),
 			owner: () => ownerLock.held,
+			admit: this.#admit,
 			stopping: this.#stopping.signal,
 		});
 		const { runner, scheduledRunner, autoContinue } = work;
@@ -517,7 +518,8 @@ export class Dashboard {
 			},
 			changeNotices: (ids, op) => notices.apply(ids, op),
 			dictation: this.#dictation,
-			activity: { owner: () => ownerLock.held, store: this.#activity },
+			owner: () => ownerLock.held,
+			activity: this.#activity,
 			}),
 			(t, error) => console.error(`omp-agents: ${t} failed: ${errorText(error)}`),
 		);

