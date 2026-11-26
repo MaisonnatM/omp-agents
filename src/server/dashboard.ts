@@ -5,54 +5,38 @@
  * and the loops through its live-update handler, and a notice change reaches the broadcasts that read the notices.
  * No constructor calls either; nothing follows the registry, watches a directory, or publishes before {@link Dashboard.start}.
  */
-import { randomUUID } from "node:crypto";
-import { statSync } from "node:fs";
 import { join } from "node:path";
 import type { Server } from "bun";
 import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
-import { fullyAwake } from "../full-wake";
-import { loadPullRequests, mergedPullRequests, repoOf } from "../pull-requests";
-import { createIntegrations, type Integrations, integrationFetch, integrationSignedIn } from "../integrations";
+import { mergedPullRequests } from "../pull-requests";
+import { createIntegrations, type Integrations } from "../integrations";
 import { errorText } from "../json";
-import { type LiveSession, routineTurn } from "../live-session";
-import { earlyRuns } from "../routine-health";
-import { macSleeps, sleptWithin } from "../sleep-log";
+import type { LiveSession } from "../live-session";
 import { startDictation } from "../omp/dictation";
 import { agentDir } from "../omp/config";
 import { type HostSnapshot, listHosts } from "../omp/collab";
-import { ompDaemons, startOwnedService } from "../omp/daemons";
 import { ompSandboxes } from "../omp/isolation";
-import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
-import { listPrice, readCreditRuns, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, builtInRoutinesFile, directoryOf, displayPath, endedWorktreesFile, HOME, interruptedFile, machineFile, mergesFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodoInboxDir, userTodosFile, workspaceFor, workspacesFile } from "../paths";
-import { type ModuleChanges, type ModuleRun, isStoredModuleId, moduleInboxes, moduleJoins, moduleRuns, openModules, type StoredModuleId } from "../modules";
+import { listPrice, stopStats } from "../omp/stats";
+import { activityDb, botInboxDir, botsDir, botsFile, endedWorktreesFile, HOME, interruptedFile, machineFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { type ModuleChanges, type ModuleRun, isStoredModuleId, moduleJoins, openModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
-import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
-import { checkOutPullRequest } from "../pull-request-checkout";
-import { rebasePullRequest } from "../pull-request-rebase";
 import { worktreeAt } from "../git";
-import { runShell } from "../proc";
 import type { ServedBuild } from "../served-build";
 import { SourceControl } from "../source-control";
 import { SettingsSync, syncStores, thisMachine } from "../settings-sync";
-import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT, watchedKinds } from "../routines";
+import { watchedKinds } from "../routines";
 import { SESSION_FORMATS } from "../session-formats";
-import { modelUpdates, upgradeModel } from "../settings";
-import { agentOn } from "../shared/moves";
-import { awaitsScheduled, awaitsSubagents, newSessionRequest, type ScheduledCheck, type StartRequest, type StartResult, type View } from "../shared/sessions";
+import type { ScheduledCheck, StartRequest, StartResult, View } from "../shared/sessions";
 import { nextSendTo } from "../shared/scheduled";
 import { inAppData } from "../shared/workspaces";
-import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { WorktreeOccupants } from "./worktree-occupants";
-import { BotInbox } from "./bot-inbox";
 import { Bots, startingRoutine } from "./bots";
-import { addBuiltInRoutines } from "./built-in-routines";
 import { BotsFile } from "./bots-file";
 import { Broadcasts } from "./broadcasts";
 import { EndInbox } from "./end-inbox";
@@ -61,33 +45,31 @@ import { InterruptedSessions } from "./interrupted";
 import { IsolationSweep } from "./isolation-sweep";
 import { ListRegistry } from "./list-registry";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
+import { liveUpdateHandler } from "./live-update";
 import { Loops, repeat } from "./loops";
-import { MergeCleanup } from "./merge-cleanup";
-import { MergeQueue } from "./merge-queue";
+import type { MergeCleanup } from "./merge-cleanup";
+import type { MergeQueue } from "./merge-queue";
 import { ACTIVITY_KINDS, DASHBOARD_KINDS, HEALTH_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import { noticeSources } from "./notice-sources";
 import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
 import { PinsFile } from "./pins-file";
 import { PrivateSessions } from "./private-sessions";
 import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
-import { startDevServer } from "./dev-server";
-import { readProcessTable } from "../process-census";
-import { readAppOf, readCwds, readListeningPorts, readSessionFiles, SessionProcessWatch, stopProcesses } from "./session-processes";
+import type { SessionProcessWatch } from "./session-processes";
+import { sessionProcessWatch } from "./session-process-watch";
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
-import { RoutineRunner } from "./routine-runner";
-import { pullRequestSightings, SLACK_SCOPE, slackSightings, TriggerWatch } from "./routine-triggers";
-import { RoutineInbox } from "./routine-inbox";
-import { ShepherdInbox } from "./shepherd-inbox";
-import { unapprovedChange } from "../pull-request-approval";
-import { configAt } from "../../templates/omp/agent/extensions/land/gate";
+import type { RoutineRunner } from "./routine-runner";
+import { TriggerWatch } from "./routine-triggers";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
-import { AutoContinue, occupiedBy } from "./auto-continue";
-import { ScheduledRunner } from "./scheduled-runner";
+import type { AutoContinue } from "./auto-continue";
+import type { ScheduledRunner } from "./scheduled-runner";
 import type { Routes } from "./route-kit";
 import type { PhoneAccessRoutesEnv } from "./phone-access-routes";
 import { createRoutes } from "./routes";
+import { dashboardRouteEnv } from "./dashboard-route-env";
 import type { SelfUpdate } from "./self-update";
 import { EndedWorktrees, endSession, restoreEndedWorktree } from "./session-end";
 import { ProjectTrustFile } from "./project-trust-file";
@@ -103,9 +85,9 @@ import { Dictation } from "./dictation";
 import { createClientHandler } from "./socket";
 import { botExtension, designerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
-import { TodoInbox } from "./todo-inbox";
 import type { JsonInboxDir } from "./json-inbox";
 import { UserTodosFile } from "./user-todos-file";
+import { unattendedWork } from "./unattended-work";
 import { UsagePoll } from "./usage-poll";
 import { type Socket, Views } from "./views";
 import { parseClientMsg } from "./wire";
@@ -116,8 +98,6 @@ type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
 
 /** How often the merge queue looks at the pull requests it waits on: checks take minutes, and a click shows its first step at once. */
 const MERGE_QUEUE_TICK_MS = 15_000;
-/** Coalesce a burst of background job output into one push of the jobs list. */
-const JOBS_PUSH_MS = 250;
 
 /** Everything the server serves, built once at startup; {@link Dashboard.start} sets it going and {@link Dashboard.stop} stops it. */
 export class Dashboard {
@@ -144,7 +124,8 @@ export class Dashboard {
 	readonly #bots: Bots;
 	readonly #projectTrust = new ProjectTrustFile(projectTrustFile);
 	readonly #admit = (dir: string): Promise<void> => this.#projectTrust.admit(dir);
-	#jobsPush: NodeJS.Timeout | undefined;
+	readonly #onLiveUpdate: (instanceId: string, update: SessionUpdate) => void;
+	readonly #takeOver: () => void;
 	readonly #moves = new SessionMoves({
 		session: instanceId => this.#sessions.started(instanceId),
 		staysPut: request => this.#bots.botOf(request) !== null,
@@ -267,59 +248,18 @@ export class Dashboard {
 		));
 		const notices = (this.#notices = new Notices(
 			noticesFile,
-			{
-				latestOmp,
-				installedOmp,
-				updateOmp,
-				modelUpdates,
-				upgradeModel,
-				dashboardNews: () => selfUpdate.news(),
-				updateDashboard: () => selfUpdate.update(),
-				pullRequests: async () => {
-					const list = await loadPullRequests(this.knownWorkspaces(), false);
-					const agent = agentOn(sessions.rows(factsOf));
-					this.#triggerWatch.learn(pullRequestSightings(list, agent));
-					this.#prWatches.learn(list);
-					// A row shows its watched pull requests' checks, which this list may have changed.
-					this.#broadcasts.pushRoster();
-					return { list, agent };
-				},
-				slack: async () => {
-					// Signed out, Slack answers nothing, so its next answer, once signed in, is a baseline rather than news.
-					if (!(await integrationSignedIn("slack"))) {
-						this.#triggerWatch.forgetScope(SLACK_SCOPE);
-						return [];
-					}
-					const found = await waitingOnYou(integrationFetch("slack"), Date.now());
-					this.#triggerWatch.learn(slackSightings(found));
-					return found;
-				},
-				plans: async () => {
-					const usage = this.#usage.report;
-					if (usage === null) throw new Error("omp usage has not run yet");
-					if (usage.error !== null) throw new Error(usage.error);
-					return usage.plans;
-				},
-				creditRuns: () => readCreditRuns(Date.now()),
-				stoppedSessions: () =>
-					interrupted.midTurn().map(sessionId => {
-						const saved = files.savedOf(sessionId);
-						return { sessionId, title: saved?.title ?? null, cwdDisplay: saved ? displayPath(saved.cwd) : null };
-					}),
-				earlyRuns: async () => {
-					const sleeps = await macSleeps();
-					return earlyRuns(
-						routines.value,
-						Date.now(),
-						(sessionId, routineId, at) => {
-							const path = files.pathOf(sessionId);
-							return path === null ? null : routineTurn(path, routineId, at);
-						},
-						(from, to) => sleptWithin(sleeps, from, to),
-					);
-				},
-				now: Date.now,
-			},
+			noticeSources({
+				selfUpdate,
+				knownWorkspaces: () => this.knownWorkspaces(),
+				hosts: () => sessions.rows(factsOf),
+				triggerWatch: this.#triggerWatch,
+				learnWatches: list => this.#prWatches.learn(list),
+				pushRoster: () => this.#broadcasts.pushRoster(),
+				usage: () => this.#usage,
+				files,
+				interrupted,
+				routines,
+			}),
 			() => this.#broadcasts.pushList("notices"),
 		));
 		const lists = (this.#lists = new ListRegistry({
@@ -378,19 +318,11 @@ export class Dashboard {
 		}));
 		this.#usage = new UsagePoll({ refresh: () => broadcasts.refreshUsage(), checkNotices: () => notices.check(PROVIDER_KINDS) });
 		const workspaceOf = (cwd: string): Promise<string> => placement.workspaceOf(cwd, worktreeAt);
-		const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), workspaceOf, { active: () => ownerLock.held });
 		// Applies a module change and writes it now, so an inbox file is deleted, and a new session's first turn reads it, only once it is on disk; a refused change throws.
 		const applyModuleNow = <I extends StoredModuleId>(id: I, change: ModuleChanges[I]): boolean => {
 			lists.applyModule(id, change);
 			return modules[id].flush();
 		};
-		const modulesInboxes = moduleInboxes(modules, applyModuleNow, { active: () => ownerLock.held });
-		const routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: () => ownerLock.held });
-		const botInbox = new BotInbox(
-			botInboxDir,
-			{ bots: () => this.#botsFile.value, save: change => lists.apply("bots", change), tell: (to, text) => this.#bots.message(to, text), now: Date.now },
-			{ active: () => ownerLock.held },
-		);
 		const starter = createStarter({
 			sessions,
 			pathFor,
@@ -417,41 +349,13 @@ export class Dashboard {
 			live: () => occupants.snapshot(sessions.rows(factsOf), (host, agentId) => sessions.transcriptPath(host.instanceId, agentId, files.pathOf)),
 		}));
 		this.#isolationSweep = new IsolationSweep({ ...ompSandboxes(), inUse: () => worktrees.inUse(), now: Date.now });
-		this.#processWatch = new SessionProcessWatch({
-			...ompDaemons(),
-			readTable: readProcessTable,
-			readPorts: readListeningPorts,
-			readCwds,
-			readSessionFiles,
-			appOf: readAppOf,
-			stopProcesses,
-			sessions: () => {
-				const botConversations = new Set(this.#bots.list.flatMap(bot => bot.sessionId ?? []));
-				return sessions.rows(factsOf).map(row => ({
-					instanceId: row.instanceId,
-					sessionId: row.sessionId,
-					file: sessions.transcriptPath(row.instanceId, null, files.pathOf),
-					pid: row.pid,
-					cwd: row.cwd,
-					status: row.status,
-					waitsOnWork: awaitsSubagents(row) || awaitsScheduled(row),
-					// A Bot ends its own idle conversation, and a private session's end deletes it.
-					stopsWhenIdle: row.source === "dashboard" && !row.private && !botConversations.has(row.sessionId),
-				}));
-			},
-			endSession: async instanceId => {
-				await sessions.started(instanceId)?.end();
-			},
-			lastWrittenAt: instanceId => {
-				const path = sessions.get(instanceId)?.transcriptPath(null, files.pathOf);
-				return path ? (statSync(path, { throwIfNoEntry: false })?.mtimeMs ?? null) : null;
-			},
-			now: Date.now,
+		this.#processWatch = sessionProcessWatch({
+			sessions,
+			hosts: () => sessions.rows(factsOf),
+			pathOf: files.pathOf,
+			bots: () => this.#bots,
 			owner: () => ownerLock.held,
-			settings: () => {
-				this.#processSettings.reload();
-				return this.#processSettings.value;
-			},
+			processSettings: this.#processSettings,
 		});
 		const startSession = (this.#startSession = async request => {
 			// Outside the checkout chain: resuming an owner restores its worktree through that chain.
@@ -495,54 +399,39 @@ export class Dashboard {
 				return true;
 			},
 		});
-		const stopping = this.#stopping.signal;
-		const runner = (this.#runner = new RoutineRunner({
-			file: routines,
-			now: Date.now,
-			workspace: botId => this.#botsFile.value.find(({ id }) => id === botId)?.cwd ?? null,
-			async exec(command, cwd, env) {
-				const dir = await directoryOf(cwd);
-				if (!dir) throw new Error(`${cwd.trim()} is not a directory.`);
-				return runShell(command, dir, { timeoutMs: COMMAND_TIMEOUT_MS, maxOutput: MAX_COMMAND_OUTPUT, signal: stopping, env });
-			},
-			fullyAwake,
-			onChange: () => broadcasts.pushList("routines"),
-			messageBot: (botId, text, fresh) => this.#bots.message(botId, text, fresh),
-		}));
-		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
-			file: scheduled,
+		const work = unattendedWork({
+			sessions,
+			hosts: () => sessions.rows(factsOf),
+			modules,
+			applyModuleNow,
+			lists,
+			broadcasts,
+			routines,
+			scheduled,
+			todos,
+			triggerWatch: this.#triggerWatch,
+			botsFile: this.#botsFile,
+			bots: this.#bots,
+			sourceControl: this.#sourceControl,
+			worktrees,
+			usage: this.#usage,
 			start: startSession,
 			reach,
-			now: Date.now,
-			onChange: () => broadcasts.pushList("scheduled"),
-		}));
-		this.#moduleRuns = moduleRuns(modules, applyModuleNow, {
-			async start(cwd, prompt, launch) {
-				const result = await startSession(newSessionRequest(cwd, prompt, launch));
-				if (!result.ok) return { error: result.error };
-				const sessionId = sessions.get(result.instanceId)?.sessionId;
-				return sessionId ? { sessionId } : { error: "The session exited as it started." };
-			},
-			async wake(sessionId, text, launch, interrupt = false) {
-				const live = sessions.bySessionId(sessionId);
-				const session = live ?? (await reach(sessionId));
-				// The turn stops, and the user's own messages it held wait until `text` has run; a stopped session has no turn to stop.
-				const withdrawn = interrupt && live ? await live.interrupt() : [];
-				// Only a session this dashboard started switches models; one running in a terminal keeps its own.
-				const owned = sessions.started(session.instanceId);
-				if (launch?.model) await owned?.setModel(launch.model, launch.thinking);
-				else if (launch?.thinking) await owned?.setThinking(launch.thinking);
-				await session.prompt(null, launch?.skill ? `/skill:${launch.skill} ${text}` : text, [], "followUp");
-				for (const message of withdrawn) await session.prompt(null, message.text, message.images, "followUp");
-				return { resumed: !live };
-			},
-			working: sessionId => {
-				const status = sessions.bySessionId(sessionId)?.row().status;
-				return status !== undefined && status !== "idle";
-			},
+			endLive: session => this.#endLive(session),
+			workspaceOf,
+			knownWorkspaces: () => this.knownWorkspaces(),
 			owner: () => ownerLock.held,
-			now: Date.now,
+			stopping: this.#stopping.signal,
 		});
+		const { runner, scheduledRunner, autoContinue } = work;
+		this.#runner = runner;
+		this.#scheduledRunner = scheduledRunner;
+		this.#moduleRuns = work.moduleRuns;
+		this.#takeOver = work.takeOver;
+		this.#autoContinue = autoContinue;
+		this.#mergeCleanup = work.mergeCleanup;
+		this.#mergeQueue = work.mergeQueue;
+		this.#inboxes = work.inboxes;
 		this.#prWatches = new PullRequestWatches({
 			file: prWatchesFile,
 			hosts: () => sessions.rows(factsOf),
@@ -551,60 +440,6 @@ export class Dashboard {
 			active: () => ownerLock.held,
 			now: Date.now,
 		});
-		const autoContinue = (this.#autoContinue = new AutoContinue({
-			file: scheduled,
-			plans: async () => {
-				const { plans, error } = await this.#usage.fresh();
-				if (error !== null) throw new Error(error);
-				return plans;
-			},
-			now: Date.now,
-			onChange: () => broadcasts.pushList("scheduled"),
-		}));
-		// Only the server that holds the owner lock steps the queue and takes the minute tick's look, so only it ends sessions after a merge, and only the ones it started.
-		const mergeCleanup = (this.#mergeCleanup = new MergeCleanup({
-			sessions: () =>
-				sessions.rows(factsOf).flatMap(host =>
-					sessions.started(host.instanceId) !== undefined && this.#sourceControl.cleanUp
-						? [{ sessionId: host.sessionId, idle: host.status === "idle", occupied: occupiedBy(host.status, autoContinue.held(host.sessionId)), pullRequests: host.pullRequests, workDir: host.worktree ?? host.cwd, branch: host.branch?.linked ? host.branch.name : null }]
-						: [],
-				),
-			states: readPullRequestStates,
-			checkout: async dir => {
-				const at = await worktreeAt(dir).catch(() => null);
-				return at && { gitDir: at.common, repo: await repoOf(dir) };
-			},
-			end: async sessionId => {
-				const session = sessions.bySessionId(sessionId);
-				if (!session) throw new Error("It does not run.");
-				await this.#endLive(session);
-			},
-			deleteBranch: (gitDir, branch, head) => worktrees.deleteMergedBranch(gitDir, branch, head),
-		}));
-		this.#mergeQueue = new MergeQueue({
-			path: mergesFile,
-			github: GITHUB_MERGES,
-			now: Date.now,
-			newId: randomUUID,
-			active: () => ownerLock.held,
-			onChange: () => broadcasts.pushList("merges"),
-			onMerged: pr => void mergeCleanup.merged(pr),
-		});
-		const shepherdInbox = new ShepherdInbox(
-			shepherdInboxDir,
-			{
-				bots: () => this.#botsFile.value,
-				pullRequests: () => loadPullRequests(this.knownWorkspaces(), true),
-				agent: () => agentOn(sessions.rows(factsOf)),
-				start: startSession,
-				queueMerge: change => this.#mergeQueue.apply(change),
-				unapprovedChange,
-				landTarget: cwd => configAt(cwd)?.target ?? null,
-				tell: (botId, text) => this.#bots.message(botId, text),
-			},
-			{ active: () => ownerLock.held },
-		);
-		this.#inboxes = [todoInbox, routineInbox, botInbox, shepherdInbox, ...modulesInboxes];
 		// Private sessions' files poke the views that follow them, but no format lists them, so they never show as past sessions.
 		this.#loops = new Loops([...SESSION_FORMATS, { root: privateSessionsDir, createRoot: true }], {
 			onRegistryTick: async () => {
@@ -696,77 +531,56 @@ export class Dashboard {
 			}),
 			(t, error) => console.error(`omp-agents: ${t} failed: ${errorText(error)}`),
 		);
+		this.#onLiveUpdate = liveUpdateHandler({
+			sessions,
+			views,
+			moves: this.#moves,
+			waits: this.#waits,
+			broadcasts,
+			reviewDrafts: this.#reviewDrafts,
+			bots: this.#bots,
+			privateSessions: this.#privateSessions,
+			interrupted,
+			loops: this.#loops,
+			autoContinue,
+			routines,
+			pathOf: files.pathOf,
+		});
 	}
 
 	/** The HTTP API over this dashboard, admitted by `guards`; `build` is what the server serves. */
 	routes(guards: Guards, build: ServedBuild, phoneAccess: PhoneAccessRoutesEnv): Routes {
-		const files = this.#files;
-		const sessions = this.#sessions;
-		const broadcasts = this.#broadcasts;
-		return createRoutes({
-			guards,
-			modules: { workspaces: () => this.#workspaceCwds() },
-			sessions: {
-				knownWorkspaces: () => this.knownWorkspaces(),
-				addedCwds: () => this.#workspaces.value.added,
-				changeWorkspaces: change => void this.#lists.apply("workspaces", change),
-				changeProjectTrust: change => void this.#lists.apply("project-trust", change),
-				summaryOf(sessionId) {
-					const saved = files.savedOf(sessionId);
-					return saved && { file: saved.path, title: saved.title, workspace: files.facts.placement.cwdOf(saved.cwd) };
+		return createRoutes(
+			dashboardRouteEnv(
+				{
+					files: this.#files,
+					sessions: this.#sessions,
+					broadcasts: this.#broadcasts,
+					lists: this.#lists,
+					workspaces: this.#workspaces,
+					foreignUsage: this.#foreignUsage,
+					sourceControl: this.#sourceControl,
+					ownerLock: this.#ownerLock,
+					integrations: this.#integrations,
+					worktrees: this.#worktrees,
+					terminals: this.terminals,
+					isolationSweep: this.#isolationSweep,
+					mergeQueue: this.#mergeQueue,
+					reviewDrafts: this.#reviewDrafts,
+					startSession: this.#startSession,
+					selfUpdate: this.#selfUpdate,
+					settingsSync: this.#settingsSync,
+					activity: this.#activity,
+					processWatch: this.#processWatch,
+					processSettings: this.#processSettings,
+					knownWorkspaces: () => this.knownWorkspaces(),
+					workspaceCwds: () => this.#workspaceCwds(),
 				},
-				foreignUsage: () => this.#foreignUsage.read(),
-				placeOf(sessionId) {
-					const file = files.pathOf(sessionId);
-					const saved = files.savedOf(sessionId);
-					if (!file || !saved) return null;
-					return { file, dir: files.factsOf(sessionId).worktree ?? sessions.bySessionId(sessionId)?.cwd ?? saved.cwd, changedPaths: () => files.facts.changedPathsOf(file) };
-				},
-				learnHeads(repo, pullRequests) {
-					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
-				},
-				searchConversations: query => files.searchConversations(query),
-				sourceControl: () => this.#sourceControl.answer(this.#workspaceCwds()),
-				changeSourceControl: change => {
-					if (this.#sourceControl.apply(change) && change.op !== "clean-up" && this.#ownerLock.held) void this.#sourceControl.pull(this.#workspaceCwds());
-				},
-			},
-			integrations: this.#integrations,
-			files: { worktrees: this.#worktrees, terminals: this.terminals, fileDirsOf: files.fileDirsOf },
-			artifacts: { sessionFileOf: id => sessions.fileOf(id, files.pathOf) },
-			storage: this.#isolationSweep,
-			pullRequests: {
-				changeMergeQueue: async change => {
-					const merged = await this.#mergeQueue.apply(change);
-					return { merges: [...this.#mergeQueue.list], merged };
-				},
-				previewReviewDraft: pr => this.#reviewDrafts.preview(pr),
-				postReviewDraft: (pr, submit) => this.#reviewDrafts.post(pr, submit),
-				checkOutPullRequest: checkout => checkOutPullRequest(checkout, this.#startSession),
-				rebasePullRequest,
-			},
-			dashboard: { build, status: () => this.#selfUpdate.status(), update: () => this.#selfUpdate.update(), changelog: () => this.#selfUpdate.changelog() },
-			sync: this.#settingsSync,
-			activity: this.#activity,
-			processes: {
-				list: () => this.#processWatch.list(),
-				stop: ({ instanceId, id }) => this.#processWatch.stop(instanceId, id),
-				startServer: async instanceId => {
-					const session = this.#sessions.get(instanceId);
-					if (!session) throw new Error("That session no longer runs.");
-					return startDevServer(session.sessionId, this.#files.factsOf(session.sessionId).worktree ?? session.cwd, startOwnedService);
-				},
-				settings: () => {
-					this.#processSettings.reload();
-					return this.#processSettings.value;
-				},
-				changeSettings: settings => {
-					this.#processSettings.apply(settings);
-					return this.#processSettings.value;
-				},
-			},
-			phoneAccess,
-		});
+				guards,
+				build,
+				phoneAccess,
+			),
+		);
 	}
 
 	/** Settles once {@link start} attached to the sessions the last server left running and learned which survived. */
@@ -873,106 +687,6 @@ export class Dashboard {
 		return [...new Set([...this.knownWorkspaces(), ...added])].filter(cwd => !hidden.includes(cwd));
 	}
 
-	#pushJobs(): void {
-		this.#jobsPush = undefined;
-		this.#broadcasts.pushList("jobs");
-	}
-
-	/** Where every live session's update goes: the views, the broadcasts, the Bots, and the loops. */
-	#onLiveUpdate(instanceId: string, update: SessionUpdate): void {
-		switch (update.kind) {
-			case "roster":
-				this.#broadcasts.rosterChanged();
-				return;
-			case "event":
-				this.#views.applyEvent(instanceId, update.event);
-				this.#moves.heard(update.event);
-				if (this.#sessions.heard(instanceId, update.event)) this.#broadcasts.rosterChanged();
-				if (this.#sessions.heardJob(instanceId, update.event)) this.#jobsPush ??= setTimeout(() => this.#pushJobs(), JOBS_PUSH_MS);
-				return;
-			case "starting":
-				this.#views.starting(instanceId);
-				return;
-			case "note":
-				this.#views.note(instanceId, update.agentId, update.level, update.text);
-				return;
-			case "exited": {
-				// Only a session this dashboard started reports its exit.
-				const sessionId = this.#sessions.get(instanceId)?.sessionId;
-				const isPrivate = this.#sessions.started(instanceId)?.private === true;
-				this.#reviewDrafts.exited(instanceId);
-				this.#moves.exited(instanceId);
-				// Its last turn may have remembered something.
-				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
-				this.#bots.exited(instanceId);
-				this.#sessions.remove(instanceId);
-				this.#waits.exited(instanceId);
-				// A private session lives exactly as long as its omp, so it is deleted rather than interrupted; the next server's sweep finishes a purge cut short.
-				if (isPrivate) void this.#privateSessions.purge(instanceId).catch((err: unknown) => console.error(`omp-agents: deleting private session ${instanceId} failed: ${errorText(err)}`));
-				else if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
-				this.#broadcasts.syncRoster();
-				void this.#loops.listNow().catch((err: unknown) => console.error(`omp-agents: listing the session files failed: ${errorText(err)}`));
-				return;
-			}
-			case "written":
-				this.#loops.fileChanged(update.path);
-				return;
-			case "switched": {
-				// Before the edited prompt's events, so they land in the new file's transcript.
-				this.#views.sync();
-				this.#broadcasts.syncRoster();
-				const sessionId = this.#sessions.get(instanceId)?.sessionId;
-				if (sessionId) {
-					this.#reviewDrafts.switched(instanceId, sessionId);
-					this.#bots.switched(instanceId, sessionId);
-				}
-				return;
-			}
-			case "turn-started": {
-				if (this.#sessions.turnStarted(instanceId)) this.#broadcasts.rosterChanged();
-				// Whoever prompted, the session works again; its own continue, already claimed, stays.
-				const sessionId = this.#sessions.get(instanceId)?.sessionId;
-				if (sessionId) this.#autoContinue.turnStarted(sessionId);
-				// Its row moves up with the prompt that started the turn.
-				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
-				return;
-			}
-			case "turn-ended": {
-				// A quiet turn, such as a Bot's routine run that found nothing, leaves the session as unread as before it.
-				this.#sessions.turnEnded(instanceId, update.quiet ? null : { at: Date.now(), reply: update.reply });
-				// A session started here that a usage limit or a transient fault stopped is held for its continue.
-				const sessionId = this.#sessions.started(instanceId)?.sessionId;
-				if (sessionId) this.#autoContinue.turnEnded(sessionId, update.failure);
-				this.#broadcasts.rosterChanged();
-				if (this.#bots.changed(instanceId)) this.#broadcasts.pushList("bots");
-				const turnSessionId = this.#sessions.get(instanceId)?.sessionId;
-				if (turnSessionId) this.#recordRunUsage(turnSessionId);
-				return;
-			}
-			default: {
-				const unhandled: never = update;
-				return unhandled;
-			}
-		}
-	}
-
-	/** Records what the Bot's turn spent on each prompt run sent into conversation `sessionId` whose usage is not recorded yet, once that turn ended. */
-	#recordRunUsage(sessionId: string): void {
-		const path = this.#files.pathOf(sessionId);
-		if (path === null) return;
-		let changed = false;
-		for (const routine of this.#routines.value) {
-			for (const run of routine.runs) {
-				if (run.usage || run.outcome.kind !== "sent" || run.outcome.sessionId !== sessionId) continue;
-				const turn = routineTurn(path, routine.id, run.at);
-				if (!turn) continue;
-				this.#routines.usage(routine.id, run.at, turn.usage);
-				changed = true;
-			}
-		}
-		if (changed) this.#broadcasts.pushList("routines");
-	}
-
 	/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
 	#clearOldDone(): void {
 		this.#lists.apply("user-todos", { op: "clear-done", categoryId: null, before: new Date(Date.now() - DONE_KEPT_HOURS * 3_600_000).toISOString() });
@@ -1027,44 +741,9 @@ export class Dashboard {
 		const owns = this.#ownerLock.acquire();
 		if (owns && !was) {
 			console.log("omp-agents: this server now runs routines and the file inboxes.");
-			// What the server that ran them saved since this one started.
-			this.#routines.reload();
-			this.#bots.reload();
-			this.#migrateRoutines();
-			this.#addBuiltInRoutines();
-			this.#todos.reload();
-			this.#broadcasts.pushList("routines");
-			this.#broadcasts.pushList("bots");
-			this.#broadcasts.pushList("user-todos");
-			this.#runner.recover();
-			this.#scheduledRunner.recover();
-			for (const inbox of this.#inboxes) void inbox.drain();
-			for (const run of this.#moduleRuns.values()) run.changed();
-			// It learned what the triggers see while another server ran routines, which that server fired.
-			this.#triggerWatch.forget();
+			this.#takeOver();
 		}
 		return owns;
-	}
-
-	/**
-	 * Moves the routines of a file from before every routine had a Bot to their Bots, creating each Bot they need unless it
-	 * exists. Only the server that runs routines saves the move, so another, such as a smoke run, never rewrites the files
-	 * an older owner still reads; any server reads the routines moved, in memory.
-	 */
-	#migrateRoutines(): void {
-		this.#routines.migrate(bot => {
-			if (!this.#botsFile.value.some(({ id }) => id === bot.id)) this.#lists.apply("bots", { op: "save", bot });
-		});
-	}
-
-	/** Adds the built-in routines not added before, disabled, each with its Bot unless that Bot exists; only the server that runs routines adds them. */
-	#addBuiltInRoutines(): void {
-		addBuiltInRoutines(builtInRoutinesFile, {
-			hasBot: id => this.#botsFile.value.some(bot => bot.id === id),
-			routine: id => this.#routines.value.find(routine => routine.id === id),
-			saveBot: bot => this.#lists.apply("bots", { op: "save", bot }),
-			saveRoutine: routine => this.#lists.apply("routines", { op: "save", routine }),
-		});
 	}
 
 	/** Starts the runs of the routines whose triggers the last check saw news for, on the server that runs routines; another server drops the news. */

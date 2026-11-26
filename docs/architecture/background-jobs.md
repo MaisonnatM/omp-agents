@@ -18,7 +18,7 @@ The eval runs that `scripts/evals/run.ts` starts show as subagents, from the rec
 ## To the page
 
 The `jobs` socket message, `{ t: "jobs", jobs }` in `src/shared/protocol.ts`, carries every live session's jobs by instance id, whole, as a read-only list of `ListRegistry` on the `roster` topic, so a page gets it on connect.
-The server pushes it at most every 250 milliseconds (`JOBS_PUSH_MS` in `src/server/dashboard.ts`), and only when it changed.
+The server pushes it at most every 250 milliseconds (`JOBS_PUSH_MS` in `src/server/live-update.ts`), and only when it changed.
 The page keeps it as `jobs` in its state and hands it down through `JobsContext` in `web/jobs-context.ts`.
 
 ## Progress
