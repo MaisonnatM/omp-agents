@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- A new branch or Board task in a repository whose origin was added by hand, not cloned, now starts from its main branch instead of failing with a git usage message.
 - **Merge on main** on a Board task now merges right away from the server, without starting a session; a session starts only if the merge fails.
 - Each Board task now has its own branch, `board/<id>`, and every session on it starts in that branch's folder, so no session has to look for it.
 - A Board session ends itself when it marks its task done, and no longer renews a 15-minute hold on it. Marking done first runs the quick merge checks, so a missing changelog line or an unexplained test edit is fixed by the session that made it.

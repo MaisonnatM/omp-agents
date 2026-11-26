@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CachedCheckouts, checkoutDir, defaultBranchOf, gitCheckout, headHistory, worktreeAt } from "./git";
+import { CachedCheckouts, checkoutDir, defaultBranchOf, gitCheckout, headHistory, restoreWorktree, worktreeAt } from "./git";
 import { runChecked } from "./proc";
 
 const dirs: string[] = [];
@@ -131,6 +131,18 @@ describe("checkoutDir", () => {
 		expect(dir).toBe(join(parent, "app-fix-login"));
 		expect((await git(dir, "branch", "--show-current")).trim()).toBe("fix/login");
 		expect(await git(dir, "rev-parse", "HEAD")).toBe(await git(main, "rev-parse", "old"));
+	});
+
+	test("starts a new branch from the main worktree's branch when origin was added rather than cloned, so it has no origin/HEAD", async () => {
+		const { parent, main } = await repo();
+		const origin = join(parent, "origin.git");
+		await git(parent, "init", "-q", "--bare", "-b", "main", origin);
+		await git(main, "remote", "add", "origin", origin);
+		await git(main, "push", "-q", "origin", "main");
+		const dir = join(parent, "app-board-1");
+		await restoreWorktree(main, dir, "board/1");
+		expect((await git(dir, "branch", "--show-current")).trim()).toBe("board/1");
+		expect(await git(dir, "rev-parse", "HEAD")).toBe(await git(main, "rev-parse", "main"));
 	});
 
 	test("refuses an unknown branch, a taken name, and a name git rejects, adding no worktree", async () => {
