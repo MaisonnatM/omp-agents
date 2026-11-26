@@ -47,7 +47,7 @@ import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
 import { botRows } from "../../bots-model";
 import { BotsGallery } from "../bots/bots-gallery";
-import { ActionsCard, boardActions } from "./actions";
+import { boardActions, SessionActions } from "./actions";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -728,6 +728,9 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 	const editor = (text: string, reply?: number) => (
 		<MessageEditor text={text} onSave={next => onChange({ op: "edit", by: { kind: "user" }, task: task.id, ...(reply === undefined ? {} : { reply }), text: next })} onClose={() => setEditing(null)} />
 	);
+	const actions = boardActions(task, sessions);
+	// Each session's last reply, by its index in `task.replies`: its actions show under it, where the session did them.
+	const lastReply = new Map(replies.flatMap(entry => (entry.by.kind === "session" ? [[entry.by.sessionId, task.replies.indexOf(entry)] as const] : [])));
 	return (
 		<MessageScrollerProvider autoScroll={follow}>
 			<MessageScroller className="flex-1">
@@ -753,6 +756,7 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 								const grouped = continues(previous, entry);
 								previous = entry;
 								const index = task.replies.indexOf(entry);
+								const done = entry.by.kind === "session" && lastReply.get(entry.by.sessionId) === index ? actions.get(entry.by.sessionId) : undefined;
 								return (
 									<li key={index}>
 										<MessageScrollerItem messageId={`reply-${index}`}>
@@ -769,11 +773,12 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 												{editing === index ? editor(entry.text, index) : <BoardText text={replyText(entry.by, entry.text)} editedAt={entry.editedAt} />}
 											</MessageRow>
 										</MessageScrollerItem>
+										{done && <SessionActions actions={done} />}
 									</li>
 								);
 							})}
 						</ol>
-						<ActionsCard actions={boardActions(task, sessions)} />
+						{[...actions].map(([sessionId, each]) => (lastReply.has(sessionId) ? null : <SessionActions key={sessionId} actions={each} />))}
 						{work && (
 							<div className="px-5 pt-1">
 								<WorkingLine work={work} sessions={sessions} href={hashForBoard(task.workspace, task.id)} />
