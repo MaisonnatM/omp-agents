@@ -27,8 +27,8 @@ The user's reply on a done Board task reopens it in the fold: `doneAt` and `star
 
 ## The runner
 
-`ModuleStore.run` in `src/modules.ts` lets a stored module run work beside its file; `moduleRuns` builds each one with a `ModuleRunCore`, which `src/server/dashboard.ts` fills: `start` goes through the dashboard's starter with `newSessionRequest`, `wake` sends a `followUp` prompt to the live session or to the one `reach` resumes, and `owner` says whether this server holds `server.lock`.
-The dashboard calls the run's `changed` after every change to the module and when it takes over the unattended work.
+`ModuleStore.run` in `src/modules.ts` lets a stored module run work beside its file; `moduleRuns` builds each one with a `ModuleRunCore`, which `src/server/unattended-work.ts` fills: `start` goes through the dashboard's starter with `newSessionRequest`, `wake` sends a `followUp` prompt to the live session or to the one `reach` resumes, and `owner` says whether this server holds `server.lock`.
+The dashboard calls the run's `changed` after every change to the module, and `takeOver` in `src/server/unattended-work.ts` calls it when the server takes over the unattended work.
 
 `BoardRunner` in `src/server/board-runner.ts` does the rest while its server is the owner:
 

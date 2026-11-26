@@ -64,7 +64,7 @@ The Dock badge and the session notifications count on the roster: the server kee
 A row's `status` of `needs-input` says that the session asks something, and its `unread` names the turn it ended since you last looked: when, and the first line of its last reply.
 Both transports report the main agent's turn as a `TurnUpdate` from `turnUpdate` in `src/live-session.ts`: `turn-started` at `agent_start`, and `turn-ended` with its last reply, its `failure`, a usage limit or a transient fault, and `quiet`, whether the run called a Bot's `stay_quiet` tool, at an `agent_end` that ends the run, not one that hands over to a queued follow-up.
 The same `turn-started` cancels a continue the session waits on, and only a `turn-ended` with a failure from a session this server started schedules one ([Scheduled sends](scheduled-sends.md)).
-`Dashboard` applies each in `#onLiveUpdate` through `LiveSessions`, which keeps the unread turns privately by instance id, saved in `unread/<port>.json` beside the access token (`unreadFile` in `src/paths.ts`), adds them to each row in `rows()`, and drops one when its session leaves.
+`Dashboard` applies each through `liveUpdateHandler` in `src/server/live-update.ts` and `LiveSessions`, which keeps the unread turns privately by instance id, saved in `unread/<port>.json` beside the access token (`unreadFile` in `src/paths.ts`), adds them to each row in `rows()`, and drops one when its session leaves.
 `turn-ended` sets the turn with `turnEnded` and always pushes the roster; `turn-started` reads it with `turnStarted` and pushes the roster only when a turn was unread.
 `turnStarted` holds the turn it read in memory until the turn ends: a quiet `turn-ended` gives it back under its own `at`, which the page's `turn/<at>` alert key already heard, so a Bot's routine run that found nothing raises no alert and leaves an earlier unread reply unread, and any other end, a look, or the session leaving drops it.
 A page sends `{ t: "read", instanceId }` while a pane shows the session's main agent in a focused window, which `LiveSessions.markRead` clears for every page.
@@ -75,7 +75,7 @@ At the first listing, after the session files are indexed, `LiveSessions.restore
 A socket that opens before that listing does not list the registry itself, so nothing follows the registry before `reattachAll` and the restore finish, or before the files it reads are indexed.
 
 A row's `turnWaits` says that the main agent's running turn waits on work it started rather than working itself.
-`Dashboard#onLiveUpdate` hands each main-agent `event` to `LiveSessions.heard`, which feeds `TurnWaits` in `src/server/turn-waits.ts` and answers whether the row's `turnWaits` changed, and the dashboard pushes the roster when it did.
+`liveUpdateHandler` in `src/server/live-update.ts` hands each main-agent `event` to `LiveSessions.heard`, which feeds `TurnWaits` in `src/server/turn-waits.ts` and answers whether the row's `turnWaits` changed, and the dashboard pushes the roster when it did.
 `TurnWaits` keeps each turn's tool calls in flight from `tool_execution_start` and `tool_execution_end`: a turn waits while every call in flight is a `wait` or `task` call, keeps that answer between two calls, and stops at its next other call or at any `agent_start` or `agent_end`, since a cut-off call never reports its end.
 
 `useAttention` in `web/use-attention.ts`, over the pure rules in `web/attention.ts`, counts the live sessions that need you for the desktop's badge.

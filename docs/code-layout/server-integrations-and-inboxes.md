@@ -49,7 +49,7 @@
   See [Projects](../architecture/projects.md).
 - `templates/omp/agent/extensions/board/log.ts` holds the Board's events, their parser, and the fold the server, the page, and the `board` tool share, tested in `src/server/board-log.test.ts`.
   `src/server/board-log.ts` keeps `board-events.jsonl` as an append-only log, and `BOARD_MODULE` in `src/board-module.ts` opens it with the inbox that drains `board-changes/`, the changes the starter kit's `board` extension leaves.
-  `src/server/board-runner.ts` holds `BoardRunner`, which starts a session on each ready Board task, wakes the session a reply is for, and sweeps lapsed leases, through the `ModuleRunCore` that `src/server/dashboard.ts` gives it, tested in `board-runner.test.ts`.
+  `src/server/board-runner.ts` holds `BoardRunner`, which starts a session on each ready Board task, wakes the session a reply is for, and sweeps lapsed leases, through the `ModuleRunCore` that `src/server/unattended-work.ts` gives it, tested in `board-runner.test.ts`.
   See [Board](../architecture/board.md).
 - `src/shared/memory-page.ts` holds the Memory module's shapes, which the page shares: project memory, its edit, the bookmarks, and the X sync's state.
   `MEMORY_MODULE` in `src/memory-module.ts` serves its routes, `GET` and `PUT /api/project-memory`, `GET /api/bookmarks`, `POST /api/bookmarks/x-sync`, and `GET /api/bookmarks/x-video`, and joins every session with the `bookmarks` tool; see [Modules](../architecture/modules.md).
