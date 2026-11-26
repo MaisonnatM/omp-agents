@@ -188,7 +188,7 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		case "new-session-completions":
 			return { ...state, newSessionCompletions: action.completions };
 		case "roster": {
-			const hosts = applyDelta(state.hosts, action.reset, action.hosts, host => host.instanceId, action.removed);
+			const hosts = applyDelta(state.hosts, action.reset, action.hosts, host => host.instanceId, action.removed).filter(host => !(host.control.phase === "live" && host.control.readOnly));
 			return { ...state, hosts, rosterError: action.error, lastHosts: rememberHosts(state.lastHosts, hosts, state.layout), models: liveModels(state.models, hosts) };
 		}
 		case "past":
