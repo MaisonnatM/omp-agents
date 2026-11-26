@@ -243,7 +243,7 @@ export const hashForPullRequests = (target: PullRequest | null, to: PageHash = h
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null, to: PageHash = hashForPage): string => to({ kind: "pull-requests", target: pr, files: { path } });
 /** Workspace `workspace`'s Routines tab, showing what `routine` names. */
 export const hashForRoutines = (workspace: string, routine: RoutineRoute = { kind: "list" }): string =>
-	hashForPage({ kind: "board", workspace, view: { tab: "routines", routine }, search: null, reply: null });
+	hashForPage({ kind: "board", workspace, view: { tab: "routines", routine }, search: null, reply: null, session: null });
 export const hashForNotifications = (): string => hashForPage({ kind: "notifications" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = ({ cwd = null, projectId = null }: Partial<NewSessionRoute> = {}): string => hashForPage({ kind: "new", cwd, projectId });

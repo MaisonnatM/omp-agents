@@ -33,7 +33,7 @@ export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: rea
 			value={tab}
 			onValueChange={next => {
 				const picked = tabs.find(each => each.id === next);
-				if (picked) location.hash = hashForPage({ kind: "board", workspace, view: tabView(picked.id), search: null, reply: null });
+				if (picked) location.hash = hashForPage({ kind: "board", workspace, view: tabView(picked.id), search: null, reply: null, session: null });
 			}}
 			activation="manual"
 		>
@@ -111,7 +111,7 @@ function WorkspacePullRequests({ workspace, hosts, past, route }: { workspace: s
 	);
 }
 
-const settingsHash = (workspace: string | null, section: string) => hashForPage({ kind: "board", workspace, view: { tab: "settings", section }, search: null, reply: null });
+const settingsHash = (workspace: string | null, section: string) => hashForPage({ kind: "board", workspace, view: { tab: "settings", section }, search: null, reply: null, session: null });
 
 /** Settings kept to the Workspace, with no workspace picker: its sections down the left, the one the address names at the right. */
 function WorkspaceSettings({ workspace, workspaces, section: named }: { workspace: string | null; workspaces: CoreData["workspaces"]; section: string | null }) {

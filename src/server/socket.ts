@@ -14,12 +14,19 @@ import type { Views } from "./views";
 import type { ActivityStore } from "./activity-store";
 import type { MsgOf } from "./wire";
 import { refusedText } from "./project-trust-file";
+import type { StoredModuleId } from "../modules";
 
 /** Why `result` failed, as the page reads it: a refusal for untrusted project code tells whoever sits at the page to trust it, where an unattended start is told to ask them. */
 const pageError = (result: StartResult): string => (result.ok ? "" : result.trust ? refusedText(result.trust) : result.error);
 
 /** `result` as the page reads it, through {@link pageError}. */
 const forPage = (result: StartResult): StartResult => (result.ok ? result : { ...result, error: pageError(result) });
+
+/**
+ * The stored modules only the owner writes: the Board's log appends events numbered from what this server read, so a
+ * second server's append would fork it.
+ */
+const OWNER_WRITTEN: Partial<Record<StoredModuleId, true>> = { board: true };
 
 export interface SocketEnv {
 	sessions: LiveSessions;
@@ -46,8 +53,10 @@ export interface SocketEnv {
 	changeNotices(ids: string[], op: NoticeOp): Promise<void>;
 	/** The one microphone capture under way. */
 	dictation: Dictation;
-	/** The activity store, written only while {@link owner} holds `server.lock`, so a smoke server on the user's state drops what it gets. */
-	activity: { owner(): boolean; store: Pick<ActivityStore, "append"> };
+	/** Whether this server holds `server.lock`, the owner lock: only it writes the files a smoke server on the user's state must leave alone. */
+	owner(): boolean;
+	/** The activity store, written only while {@link owner}, so a smoke server drops what it gets. */
+	activity: Pick<ActivityStore, "append">;
 }
 
 /** Each socket message's handler, by its `t`, so a {@link ClientMsg} variant without one does not compile. A message naming a session that is gone does nothing. */
@@ -166,7 +175,13 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	"set-advisor": ({ sessions }, _peer, { instanceId, enabled }) => sessions.started(instanceId)?.setAdvisor(enabled),
 	goal: ({ sessions }, _peer, { instanceId, change }) => sessions.started(instanceId)?.changeGoal(change),
 	answer: ({ sessions }, _peer, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
-	"module-change": ({ lists }, peer, { id, change }) => void lists.applyModule(id, change, peer),
+	"module-change"({ lists, owner }, peer, { id, change }) {
+		if (OWNER_WRITTEN[id] && !owner()) {
+			peer.send(lists.message(id));
+			throw new Error(`Only the dashboard that runs the unattended work changes the ${id} module; this server is another one on the same files.`);
+		}
+		lists.applyModule(id, change, peer);
+	},
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
 	schedule: ({ lists, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : void lists.apply("scheduled", change, peer)),
 	pin: ({ lists }, peer, { change }) => void lists.apply("pins", change, peer),
@@ -176,8 +191,8 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	"dictation-start": ({ dictation }, peer, { captureId, cwd }) => dictation.start(peer, captureId, cwd),
 	"dictation-stop": ({ dictation }, peer, { captureId }) => dictation.stop(peer.socket, captureId),
 	"dictation-discard": ({ dictation }, peer, { captureId }) => dictation.discard(peer.socket, captureId),
-	activity({ activity }, _peer, { client, first, events }) {
-		if (activity.owner()) activity.store.append(client, first, events);
+	activity({ activity, owner }, _peer, { client, first, events }) {
+		if (owner()) activity.append(client, first, events);
 	},
 };
 

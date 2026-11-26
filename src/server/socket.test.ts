@@ -44,3 +44,33 @@ describe("a start the page asked for", () => {
 		expect(frame).toEqual({ t: "resumed-all", reqId: 4, started: [], errors: ["no file"] });
 	});
 });
+
+describe("a module change the page sent", () => {
+	const board = { t: "module-change", id: "board", change: { op: "post", by: { kind: "user" }, workspace: "/repo", title: "One" } } as ClientMsg;
+
+	/** The frames and applied changes of `msg` on a server that `owner` says holds the owner lock or not. */
+	async function change(owner: boolean, msg: ClientMsg): Promise<{ frames: ServerMsg[]; applied: string[]; error: string | null }> {
+		const frames: ServerMsg[] = [];
+		const applied: string[] = [];
+		const peer = { send: (frame: ServerMsg) => frames.push(frame) } as unknown as Peer;
+		const lists = { message: (id: string) => ({ t: "list", id }), applyModule: (id: string) => void applied.push(id) };
+		const env = { lists, owner: () => owner } as unknown as SocketEnv;
+		try {
+			await createClientHandler(env)(peer, msg);
+			return { frames, applied, error: null };
+		} catch (error) {
+			return { frames, applied, error: (error as Error).message };
+		}
+	}
+
+	test("to the Board, on a server that is not the owner, is refused and puts the page back on the Board as it is", async () => {
+		const { frames, applied, error } = await change(false, board);
+		expect(applied).toEqual([]);
+		expect(frames).toEqual([{ t: "list", id: "board" } as unknown as ServerMsg]);
+		expect(error).toContain("Only the dashboard that runs the unattended work changes the board module");
+	});
+
+	test("to the Board on the owner is applied", async () => {
+		expect(await change(true, board)).toEqual({ frames: [], applied: ["board"], error: null });
+	});
+});

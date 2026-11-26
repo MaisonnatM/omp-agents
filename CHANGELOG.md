@@ -11,6 +11,12 @@ The dashboard shows the same lines in Settings › What's new.
 - Each Workspace on the Board has a Routines tab, in place of the Bots tab, where you make and edit its routines and pick their model.
 - Your Bots' routines moved to their Workspaces, each carrying its Bot's job and memory in its prompt. The Bots gallery, Bot designer, PR shepherd, and Bot messages are removed.
 - Any session can now create and edit the routines of its own Workspace.
+- A Board task whose session could not start now says why, with "Reply to try again", instead of "Starting a session…" forever; a session that keeps crashing stops after three tries the same way.
+- **Close task** on a Board task stops it: its session ends and no new one starts until you reply.
+- The Board no longer loses a reply or an edit you send while its session is still starting, and a dashboard restart no longer leaves a finished Board session running, starts a second session on the same task, or forgets a **Merge on main** you sent.
+- **Merge on main** with nothing new to merge now reads as merged instead of failing and starting a session; it no longer reinstalls the task's folder first.
+- The Board asks you to trust a repository before it runs that repository's setup or merge checks.
+- A smoke server or a second dashboard can no longer add Board tasks with a number already taken, and a dashboard that crashes mid-save no longer loses the next Board change.
 - On Pull requests, a pull request whose only failing checks wait on someone's approval, such as a workflow GitHub holds for approval or a `human-review` gate, now shows an **Approval** badge under Waiting on others instead of **Fix CI**.
 - The Todo page is gone, along with its list, the todo picker in new sessions, todo links in messages, and the todo tool sessions used to add items to it. Settings › Sync no longer carries a todo list.
 - A new branch or Board task in a repository whose origin was added by hand, not cloned, now starts from its main branch instead of failing with a git usage message.

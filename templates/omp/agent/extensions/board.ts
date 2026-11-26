@@ -2,12 +2,12 @@
 // omp-agents dashboard keeps and starts a session on once each is ready. The `board` tool posts, replies, claims, marks
 // done, lists, and reads them. Changes go to the dashboard's board inbox, one file each, which the dashboard server
 // appends to its event log, board-events.jsonl, so it stays the log's only writer. A claim, done, or post waits a few
-// seconds for the dashboard to take it, so the tool reports what happened. `done` first runs the quick checks of
-// `.omp/land.json` on the committed branch; see board/checks.ts. A subagent acts for its top-level session: a claim it
-// makes is that session's.
+// seconds for the dashboard to take it or set it aside as refused, so the tool reports what happened. `done` first
+// runs the quick checks of `.omp/land.json` on the committed branch; see board/checks.ts. A subagent acts for its
+// top-level session: a claim it makes is that session's.
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { doneRefusal } from "./board/checks";
@@ -69,12 +69,18 @@ function workspaceOf(cwd: string): string {
 	return common && basename(common) === ".git" ? dirname(common) : cwd;
 }
 
-/** Waits up to {@link TAKE_WAIT_MS} for the log to show what `taken` looks for; `null` when the dashboard has not taken the change. */
-async function untilTaken<T>(taken: (state: BoardState) => T | null): Promise<T | null> {
+/**
+ * Waits up to {@link TAKE_WAIT_MS} for the log to show what `taken` looks for, or for the dashboard to set `change`'s
+ * inbox file, `file`, aside as refused, with why as the Board says now; `null` when the dashboard has done neither.
+ */
+async function untilTaken<T>(file: string, change: BoardChange, taken: (state: BoardState) => T | null): Promise<{ taken: T } | { refused: string } | null> {
 	const end = Date.now() + TAKE_WAIT_MS;
 	for (;;) {
-		const found = taken(board());
-		if (found !== null || Date.now() >= end) return found;
+		const state = board();
+		const found = taken(state);
+		if (found !== null) return { taken: found };
+		if (existsSync(`${file}.invalid`)) return { refused: refusal(state, change) ?? "The dashboard did not take it; its log says why." };
+		if (Date.now() >= end) return null;
 		await sleep(250);
 	}
 }
@@ -91,6 +97,8 @@ function statusText(state: BoardState, task: BoardTask, me: string): string {
 			return `waiting on #${status.on}`;
 		case "ready":
 			return "ready";
+		case "failed":
+			return `its session failed to start: ${status.error}`;
 		case "claimed":
 			return `claimed by ${status.sessionId === me ? "this session" : `session ${status.sessionId}`}`;
 	}
@@ -114,6 +122,7 @@ function threadText(state: BoardState, task: BoardTask, me: string): string {
 }
 
 const DASHBOARD_DOWN = "The dashboard has not taken it yet; it will once it runs.";
+const refusedText = (what: string, why: string): string => `The dashboard refused ${what}: ${why}`;
 
 export default function boardExtension(pi: ExtensionAPI) {
 	const z = pi.zod;
@@ -125,7 +134,7 @@ export default function boardExtension(pi: ExtensionAPI) {
 		labels: z.record(z.string().max(40), z.string().max(80)).optional().describe("post: key=value labels, such as area=web"),
 		needs: z.array(z.number().int().positive()).max(20).optional().describe("post: the Board tasks that must be done before this one is ready"),
 		quiet: z.boolean().optional().describe("done: true when a routine's run found nothing worth reporting; the text is then one line, and the user gets no notification"),
-		workspace: z.string().optional().describe("post, list: the Workspace's directory; defaults to this session's; list takes all for every Workspace"),
+		workspace: z.string().optional().describe("post, list: the Workspace's directory, absolute or from this session's; defaults to this session's; list takes all for every Workspace"),
 	});
 	pi.registerTool({
 		name: "board",
@@ -148,7 +157,7 @@ export default function boardExtension(pi: ExtensionAPI) {
 			const me = topSessionId(ctx);
 			const state = board();
 			if (args.action === "list") {
-				const where = args.workspace === "all" ? null : (args.workspace ?? workspaceOf(ctx.cwd));
+				const where = args.workspace === "all" ? null : args.workspace ? resolve(ctx.cwd, args.workspace) : workspaceOf(ctx.cwd);
 				const tasks = state.tasks.filter(task => where === null || task.workspace === where);
 				if (!tasks.length) return reply(where === null ? "The Board holds no Board task." : `The Board holds no Board task for ${where}.`);
 				return reply(tasks.map(task => taskLine(state, task, me)).join("\n"));
@@ -157,14 +166,15 @@ export default function boardExtension(pi: ExtensionAPI) {
 				const title = args.title?.replace(/\s+/g, " ").trim() ?? "";
 				const labels = args.labels ?? {};
 				if (Object.keys(labels).length > MAX_LABELS) return reply(`A Board task takes ${MAX_LABELS} labels at most.`, true);
-				const change: BoardChange = { op: "post", by: { kind: "session", sessionId: me }, workspace: args.workspace ?? workspaceOf(ctx.cwd), title, ...(args.text ? { text: args.text } : {}), ...(Object.keys(labels).length ? { labels } : {}), ...(args.needs?.length ? { needs: args.needs } : {}) };
+				const change: BoardChange = { op: "post", by: { kind: "session", sessionId: me }, workspace: args.workspace ? resolve(ctx.cwd, args.workspace) : workspaceOf(ctx.cwd), title, ...(args.text ? { text: args.text } : {}), ...(Object.keys(labels).length ? { labels } : {}), ...(args.needs?.length ? { needs: args.needs } : {}) };
 				const refused = refusal(state, change);
 				if (refused) return reply(refused, true);
-				INBOX.leave(change);
+				const file = INBOX.leave(change);
 				const known = new Set(state.tasks.map(task => task.id));
-				const posted = await untilTaken(next => next.tasks.find(task => !known.has(task.id) && task.by.kind === "session" && task.by.sessionId === me && task.title === title) ?? null);
+				const posted = await untilTaken(file, change, next => next.tasks.find(task => !known.has(task.id) && task.by.kind === "session" && task.by.sessionId === me && task.title === title) ?? null);
 				if (!posted) return reply(`Posted "${title}". ${DASHBOARD_DOWN}`);
-				return reply(`Posted Board task #${posted.id} in ${posted.workspace}; it is ${statusText(board(), posted, me)}. A session starts on it once it is ready.`);
+				if ("refused" in posted) return reply(refusedText("the post", posted.refused), true);
+				return reply(`Posted Board task #${posted.taken.id} in ${posted.taken.workspace}; it is ${statusText(board(), posted.taken, me)}. A session starts on it once it is ready.`);
 			}
 			if (args.task === undefined) return reply(`${args.action} needs the Board task's number.`, true);
 			const id = args.task;
@@ -189,17 +199,19 @@ export default function boardExtension(pi: ExtensionAPI) {
 				const failed = await doneRefusal(ctx.cwd, signal);
 				if (failed) return reply(failed, true);
 			}
-			INBOX.leave(change);
+			const file = INBOX.leave(change);
 			if (args.action === "reply") return reply(`Replied on Board task #${id}.`);
 			if (args.action === "done") {
-				const done = await untilTaken(next => next.tasks.find(task => task.id === id && task.doneAt !== null) ?? null);
+				const done = await untilTaken(file, change, next => next.tasks.find(task => task.id === id && task.doneAt !== null) ?? null);
+				if (done && "refused" in done) return reply(refusedText(`marking Board task #${id} done`, done.refused), true);
 				const after = board();
 				const freed = after.tasks.filter(task => task.needs.includes(id) && statusOf(after, task).kind === "ready");
 				return reply(done ? `Board task #${id} is done.${freed.length ? ` Now ready: ${freed.map(task => `#${task.id}`).join(", ")}.` : ""}` : `Marked Board task #${id} done. ${DASHBOARD_DOWN}`);
 			}
-			const held = await untilTaken(next => next.tasks.find(task => task.id === id)?.claim ?? null);
+			const held = await untilTaken(file, change, next => next.tasks.find(task => task.id === id)?.claim ?? null);
 			if (!held) return reply(`Asked to claim Board task #${id}. ${DASHBOARD_DOWN}`);
-			if (held.sessionId !== me) return reply(`Board task #${id} is claimed by session ${held.sessionId}.`, true);
+			if ("refused" in held) return reply(refusedText(`the claim on Board task #${id}`, held.refused), true);
+			if (held.taken.sessionId !== me) return reply(`Board task #${id} is claimed by session ${held.taken.sessionId}.`, true);
 			return reply(`Claimed Board task #${id}; mark it done when you finish.\n\n${threadText(board(), current, me)}`);
 		},
 	});

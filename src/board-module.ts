@@ -15,16 +15,16 @@ export const BOARD_INBOX = join(configDir, "board-changes");
 /** The images the page's composers attach, which a Board task or reply names by path; under the data directory, so the page shows them. */
 const BOARD_IMAGES = join(dataDir, "board-images");
 
-/** What the page may change, as the user: post a Board task, reply on one, or edit one of their messages. */
+/** What the page may change, as the user: post a Board task, reply on one, edit one of their messages, or close a Board task. */
 const pageChange = (value: unknown): BoardChange | null => {
-	const change = parseChange(value, false);
-	return change && (change.op === "post" || change.op === "reply" || change.op === "edit") && change.by.kind === "user" ? change : null;
+	const change = parseChange(value);
+	return change && (change.op === "post" || change.op === "reply" || change.op === "edit" || change.op === "close") && change.by.kind === "user" ? change : null;
 };
 
 /** What a session's `board` tool may change: anything but the server's own changes and the user's, as itself. */
 const toolChange = (value: unknown): BoardChange | null => {
-	const change = parseChange(value, false);
-	return change && change.op !== "edit" && !((change.op === "post" || change.op === "reply") && change.by.kind === "user") ? change : null;
+	const change = parseChange(value);
+	return change && !("by" in change && change.by.kind === "user") ? change : null;
 };
 
 export const BOARD_MODULE: StoredModule<"board", BoardState, BoardChange> = {
@@ -36,9 +36,10 @@ export const BOARD_MODULE: StoredModule<"board", BoardState, BoardChange> = {
 			new JsonInboxDir<BoardChange>(
 				BOARD_INBOX,
 				{
-					parse(_name, value) {
+					parse(name, value) {
 						const change = toolChange(value);
-						return change ? { item: change } : { invalid: "This is no change the board tool makes." };
+						// The file's name goes in the event, so the same file applied again after a crash changes nothing.
+						return change ? { item: { ...change, request: name } } : { invalid: "This is no change the board tool makes." };
 					},
 					apply,
 				},

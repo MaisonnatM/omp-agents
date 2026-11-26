@@ -120,7 +120,7 @@ describe("layout hash", () => {
 	test("the Routines tab's hash opens its card, one routine, its editor, or a new routine's, and a bare routines hash is read as no page", () => {
 		const id = "3f2a9c1e-7b4d-4e8a-9f61-0c2d5e8b7a14";
 		const W = "workspace=%2Fw";
-		const routines = (routine: RoutineRoute): Route => ({ kind: "page", page: { kind: "board", workspace: "/w", view: { tab: "routines", routine }, search: null, reply: null } });
+		const routines = (routine: RoutineRoute): Route => ({ kind: "page", page: { kind: "board", workspace: "/w", view: { tab: "routines", routine }, search: null, reply: null, session: null } });
 		for (const routine of [{ kind: "list" }, { kind: "open", id }, { kind: "edit", id }, { kind: "new" }] as const) {
 			expect(routeFromHash(hashForRoutines("/w", routine))).toEqual(routines(routine));
 		}

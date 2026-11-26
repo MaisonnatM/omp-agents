@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-26-the-owner-server-runs-each-board-task-from-start-to-close
 date: 2026-11-25
 decision-makers: Maxence Maisonnat
 ---

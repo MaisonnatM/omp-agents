@@ -1,6 +1,6 @@
 ---
 status: superseded
-superseded-by: 2026-12-01-a-project-is-a-board-channel
+superseded-by: 2026-11-23-a-project-is-a-board-channel
 date: 2026-11-20
 decision-makers: Maxence Maisonnat
 ---

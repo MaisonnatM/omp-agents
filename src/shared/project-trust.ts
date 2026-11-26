@@ -2,10 +2,10 @@
 
 /**
  * What a piece of project code is: a module omp imports, a slash command module, a server it spawns or connects to with
- * the project's settings, a settings file, whose keys may name commands to run, or a language server config. In the order
- * the trust dialog lists them.
+ * the project's settings, a settings file, whose keys may name commands to run, a language server config, or the land
+ * config, `.omp/land.json`, whose setup and checks the Board runs. In the order the trust dialog lists them.
  */
-export const PROJECT_CODE_KINDS = ["extension", "hook", "tool", "command", "mcp-server", "settings", "lsp"] as const;
+export const PROJECT_CODE_KINDS = ["extension", "hook", "tool", "command", "mcp-server", "settings", "lsp", "land-config"] as const;
 export type ProjectCodeKind = (typeof PROJECT_CODE_KINDS)[number];
 
 /** One piece of a project's agent code. */

@@ -15,6 +15,7 @@ const KIND_LABELS: Record<ProjectCodeKind, string> = {
 	"mcp-server": "MCP server",
 	settings: "Settings",
 	lsp: "Language server config",
+	"land-config": "Land config",
 };
 
 /** Where the answer stands: asked, saving the trust, or refused with why it could not be saved. */

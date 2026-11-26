@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { fullyAwake } from "../full-wake";
 import type { LiveSession } from "../live-session";
-import { type ModuleChanges, type ModuleFiles, type ModuleRun, moduleInboxes, moduleRuns, type StoredModuleId } from "../modules";
+import { isStoredModuleId, type ModuleChanges, type ModuleFiles, type ModuleRun, moduleInboxes, moduleRuns, type StoredModuleId } from "../modules";
 import { directoryOf } from "../paths";
 import { runShell } from "../proc";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
@@ -15,6 +15,7 @@ import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { newSessionRequest, type RosterHost, type StartRequest, type StartResult } from "../shared/sessions";
 import type { SourceControl } from "../source-control";
 import type { Worktrees } from "../worktrees";
+import { configAt } from "../../templates/omp/agent/extensions/land/gate";
 import { AutoContinue, occupiedBy } from "./auto-continue";
 import { boardCheckout, landBoardBranch } from "./board-checkout";
 import type { Broadcasts } from "./broadcasts";
@@ -58,6 +59,8 @@ export interface UnattendedWorkDeps {
 	endLive(session: LiveSession): Promise<void>;
 	/** Whether this server holds the owner lock. */
 	owner(): boolean;
+	/** Lets project code run in `dir`, or throws when the user has not trusted it as it is now. */
+	admit(dir: string): Promise<void>;
 	/** Aborts as the dashboard stops, which stops every routine command still running. */
 	stopping: AbortSignal;
 }
@@ -77,7 +80,7 @@ export interface UnattendedWork {
 }
 
 export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
-	const { sessions, modules, applyModuleNow, lists, broadcasts, routines, scheduled, triggerWatch, worktrees, start: startSession, reach, owner: ownerHeld, stopping } = deps;
+	const { sessions, modules, applyModuleNow, lists, broadcasts, routines, scheduled, triggerWatch, worktrees, start: startSession, reach, owner: ownerHeld, admit, stopping } = deps;
 	/** Adds the built-in routines not added before, disabled; only the server that runs routines adds them. */
 	const addBuiltIns = (): void => {
 		addBuiltInRoutines(builtInRoutinesFile, routine => lists.apply("routines", { op: "save", routine }));
@@ -108,10 +111,14 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		onChange: () => broadcasts.pushList("scheduled"),
 	});
 	const runs = moduleRuns(modules, applyModuleNow, {
-		async start(cwd, prompt, launch) {
-			const result = await startSession(newSessionRequest(cwd, prompt, launch));
-			if (!result.ok) return { error: result.error };
-			const sessionId = sessions.get(result.instanceId)?.sessionId;
+		async start(cwd, prompt, launch, task) {
+			const result = await startSession(newSessionRequest(cwd, prompt, { ...launch, taskId: task }));
+			// A session already holding `task`, such as one a restart cut off before its start was recorded, is the one to keep.
+			let instanceId: string;
+			if (result.ok) instanceId = result.instanceId;
+			else if (result.owner?.here) instanceId = result.owner.instanceId;
+			else return { error: result.error };
+			const sessionId = sessions.get(instanceId)?.sessionId;
 			return sessionId ? { sessionId } : { error: "The session exited as it started." };
 		},
 		async wake(sessionId, text, launch, interrupt = false) {
@@ -137,8 +144,9 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 			if (live) await deps.endLive(live);
 		},
 		// In the checkout chain, so a worktree removal running meanwhile neither races the add nor removes what it added.
-		checkout: (workspace, branch) => worktrees.checkout(() => boardCheckout(workspace, branch)),
-		land: landBoardBranch,
+		checkout: (workspace, branch) => worktrees.checkout(() => boardCheckout(workspace, branch, admit)),
+		land: (workspace, branch, sessionId) => landBoardBranch(workspace, branch, sessionId, admit),
+		landable: workspace => configAt(workspace) !== null,
 		owner: ownerHeld,
 		now: Date.now,
 	});
@@ -182,7 +190,12 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		onMerged: pr => void mergeCleanup.merged(pr),
 	});
 	const takeOver = (): void => {
-		// What the server that ran them saved since this one started.
+		// What the server that ran them saved since this one started, which the modules' runs and inboxes go on from.
+		for (const id of Object.keys(modules))
+			if (isStoredModuleId(id)) {
+				modules[id].reload();
+				broadcasts.pushList(id);
+			}
 		routines.reload();
 		routines.migrate();
 		addBuiltIns();

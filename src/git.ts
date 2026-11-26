@@ -58,7 +58,7 @@ export function parseWorktrees(porcelain: string): Registration[] {
 export const worktreesOf = async (cwd: string): Promise<Registration[]> => parseWorktrees(await git(cwd, "worktree", "list", "--porcelain", "-z"));
 
 /** The worktree of `cwd`'s repository that has `branch` checked out, `null` when none does. */
-export async function holderOf(cwd: string, branch: string): Promise<Registration | null> {
+export async function worktreeOnBranch(cwd: string, branch: string): Promise<Registration | null> {
 	return (await worktreesOf(cwd)).find(worktree => worktree.prunable === null && worktree.branch === branch) ?? null;
 }
 
