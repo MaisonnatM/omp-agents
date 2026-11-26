@@ -13,7 +13,7 @@ import { AppMark } from "../app-mark";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CountPill } from "../count-pill";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
-import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
