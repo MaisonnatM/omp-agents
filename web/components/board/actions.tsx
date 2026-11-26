@@ -227,12 +227,6 @@ const VARIANTS = { "Brand rows": BrandRows, "Logo chips": LogoChips, Timeline, "
 type Variant = keyof typeof VARIANTS;
 const VARIANT_KEY = "omp-agents.actions-variant";
 
-/** Prototype data so every service shows while the variants are compared; production shows only `actions`. */
-const SAMPLE: BoardAction[] = [
-	{ kind: "linear", issue: "ENG-3013" },
-	{ kind: "pull-request", pullRequest: { owner: "yampa-ai", repo: "yampa", number: 7435 } as PullRequest, opened: true },
-];
-
 /** The **Actions** card at the foot of a Board thread, above the reply box and its suggested merge; nothing while the sessions did none. */
 export function ActionsCard({ actions }: { actions: BoardAction[] }) {
 	const [variant, setVariant] = useState<Variant>(() => {
@@ -240,7 +234,7 @@ export function ActionsCard({ actions }: { actions: BoardAction[] }) {
 		return saved && saved in VARIANTS ? (saved as Variant) : "Brand rows";
 	});
 	if (actions.length === 0) return null;
-	const items = [...SAMPLE, ...actions].map(describe);
+	const items = actions.map(describe);
 	const Body = VARIANTS[variant];
 	return (
 		<section aria-label="Actions" className="mx-5 mt-2 max-w-conversation rounded-lg border border-border bg-background">
