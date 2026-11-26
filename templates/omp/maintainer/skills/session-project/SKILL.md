@@ -10,3 +10,6 @@ Otherwise you cannot move the session yourself; tell the user which command fits
 - `/move <path>` relocates this session to that project and reloads its context files and settings.
 - `/wt [<branch>]` moves this session into a new worktree of its current repository, carrying uncommitted changes; it never switches repositories.
   When the work needs a fresh worktree of another repository, suggest `/move <path>` then `/wt <branch>`; suggest `/wt` alone when the repository is right but the session sits on `main` and must edit.
+
+Read-only work in the other project, such as reading, searching, or answering questions, needs no confirmation: do it through absolute paths while you flag the mismatch.
+Before editing, committing, or running checks there, wait until the session runs there or the user confirms working from the current one.

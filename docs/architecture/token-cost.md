@@ -82,7 +82,7 @@ The worker-model proposal is applied in part: the kit's `poteto-worker` agent ru
 ### Audit of the kit's `APPEND_SYSTEM.md`
 
 Every main request carries the whole file, about 11k chars; subagents never see it.
-The verdict per block of lines, for the proposal above:
+The verdict per block of lines, for the proposal above; the 2026-11-26 trim applied it and went further, as `docs/decisions/2026-11-26-context-files-keep-only-undiscoverable-global-lines.md` says:
 
 | Lines | Section | Verdict | Reason |
 | --- | --- | --- | --- |
