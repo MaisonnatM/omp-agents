@@ -1,10 +1,13 @@
-/** What the Routines tab marks a routine with: its task's icon, its triggers' logos, its runs' dots, icons, and ticks, and how an opened routine or run unfolds. */
-import { IconBubbleText, IconCircleCheck, IconCircleDashed, IconCircleX, IconConsole, IconLoadingCircle } from "central-icons";
+/** What the Routines tab marks a routine with: its task's icon, its triggers' logos, its runs' dots, icons, and ticks, whether it goes to every new Workspace or was copied from one that does, and how an opened routine or run unfolds. */
+import { IconBubbleText, IconCircleCheck, IconCircleDashed, IconCircleX, IconConsole, IconLayersTwo, IconLoadingCircle } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";
-import type { RoutineRun, RoutineTask, TriggerKind } from "../../../src/routines";
+import type { Routine, RoutineRun, RoutineTask, TriggerKind } from "../../../src/routines";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { folderName } from "../../labels";
 import { type RunHealth, runHealth, runWords } from "../../routines-model";
+import { hashForRoutines } from "../../routing";
 import { BrandMark, SLACK_LOGO } from "../integrations/brand-logos";
 import { OrgIcon } from "../org-icon";
 
@@ -66,3 +69,28 @@ export const TRIGGER_MARKS: Record<TriggerKind, { name: string; logo: ReactNode 
 	slack: { name: "Slack", logo: <BrandMark logo={SLACK_LOGO} className={MARK} /> },
 	"pull-request": { name: "GitHub pull requests", logo: <OrgIcon org="github" className={MARK} /> },
 };
+
+/** What the switch that makes a routine a template says, and the template mark's label. */
+export const EVERY_WORKSPACE = "Add to every new Workspace";
+
+/** A routine copied into each Workspace you start working in: two stacked layers, labelled for the screen reader. */
+export function TemplateMark() {
+	return (
+		<Tooltip content={EVERY_WORKSPACE}>
+			<IconLayersTwo aria-hidden={false} aria-label={EVERY_WORKSPACE} className="size-3.5 shrink-0 text-muted-foreground" />
+		</Tooltip>
+	);
+}
+
+/** Where a copied routine came from, linking to the routine it was copied from. */
+export function CopiedFrom({ template, className }: { template: Routine; className?: string }) {
+	return (
+		<p className={cn("text-xs text-muted-foreground", className)}>
+			Copied from{" "}
+			<a href={hashForRoutines(template.workspace, { kind: "open", id: template.id })} className="font-medium text-foreground hover:underline">
+				{template.name}
+			</a>{" "}
+			in {folderName(template.workspace) ?? template.workspace}
+		</p>
+	);
+}

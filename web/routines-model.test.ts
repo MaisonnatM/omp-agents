@@ -24,6 +24,7 @@ import {
 	specWithSchedule,
 	startsWords,
 	taskWords,
+	templateOf,
 	whenWords,
 	withCadence,
 } from "./routines-model";
@@ -315,6 +316,20 @@ describe("editor form", () => {
 		const launch = { model: { provider: "anthropic", id: "claude-opus" }, thinking: "high", skill: null };
 		expect(specOf(draftOf({ ...saved, launch }))).toMatchObject({ ok: { launch } });
 		expect(specWithSchedule({ ...saved, launch }, { kind: "every", minutes: 60 })).toMatchObject({ launch, schedules: [{ kind: "every", minutes: 60 }] });
+	});
+
+	test("a template's or a copy's form saves it back still a template or a copy, and so does a new schedule", () => {
+		const template = routine({ everyWorkspace: true });
+		expect(specOf(draftOf(template))).toMatchObject({ ok: { everyWorkspace: true } });
+		const off = specOf({ ...draftOf(template), everyWorkspace: false });
+		expect("ok" in off && "everyWorkspace" in off.ok).toBe(false);
+		const copy = routine({ id: "r2", copyOf: "r1" });
+		expect(specOf(draftOf(copy))).toMatchObject({ ok: { copyOf: "r1" } });
+		expect(specWithSchedule(copy, { kind: "every", minutes: 60 })).toMatchObject({ copyOf: "r1" });
+		expect(specWithSchedule(template, { kind: "every", minutes: 60 })).toMatchObject({ everyWorkspace: true });
+		expect(templateOf(copy, [template, copy])).toBe(template);
+		expect(templateOf(copy, [copy])).toBeNull();
+		expect(templateOf(template, [template])).toBeNull();
 	});
 
 	test("a form saves weekly days Monday first and its time as typed, and says what to fix first", () => {

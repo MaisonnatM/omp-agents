@@ -66,6 +66,7 @@ export class SessionRoutines {
 				"A command routine runs its shell command in the Workspace first and posts its prompt and the command's report, as its `post` rule allows: always, only failures, or only when the output changed.",
 				"Each result, and each refusal of an unknown `id`, lists the Workspace's routines by id and name; to list them without changing anything, call `delete_routine` with an empty `id`. Pass null as `id` to add one.",
 				"Save only what the user asked for; a new routine is disabled unless they asked to turn it on.",
+				"`everyWorkspace: true` also copies the routine into every Workspace the user works in that lacks it, now and as new ones appear; each copy is its own routine, which later edits here do not change. Leave it out to keep the routine's current setting.",
 			].join(" "),
 			parameters: {
 				type: "object",
@@ -84,6 +85,7 @@ export class SessionRoutines {
 						description: `\`{"kind":"prompt","prompt":text}\`, or \`{"kind":"command","command":sh,"post":"failures"|"changes" (omit to post every run),"prompt":text (optional)}\`. A prompt is at most ${MAX_PROMPT_LENGTH} characters.`,
 					},
 					launch: { type: ["object", "null"], description: 'null for omp\'s defaults, or `{"model":{"provider":p,"id":m} or null,"thinking":level or null,"skill":name or null}` for the sessions on its Board tasks.' },
+					everyWorkspace: { type: "boolean", description: "Whether to add this routine to every new Workspace; omit to keep its current setting, off for a new routine." },
 				},
 				required: ["id", "name", "enabled", "schedules", "triggers", "task", "launch"],
 				additionalProperties: false,
@@ -91,8 +93,10 @@ export class SessionRoutines {
 			loadMode: "essential",
 			execute: async args => {
 				const workspace = await this.#workspace(caller);
-				const id = args.id === null || args.id === undefined ? randomUUID() : this.#own(args.id, workspace).id;
-				const parsed = parseRoutineSpec({ ...args, id, workspace, launch: args.launch ?? undefined });
+				const stored = args.id === null || args.id === undefined ? null : this.#own(args.id, workspace);
+				const id = stored?.id ?? randomUUID();
+				// A copy stays a copy of its template; `everyWorkspace` left out keeps what the routine had.
+				const parsed = parseRoutineSpec({ ...args, id, workspace, launch: args.launch ?? undefined, everyWorkspace: args.everyWorkspace ?? stored?.everyWorkspace, copyOf: stored?.copyOf });
 				if (!parsed) throw new Error("The routine is not valid: check every field against this tool's description.");
 				this.#deps.apply({ op: "save", routine: parsed.ok });
 				return `Saved routine "${parsed.ok.name}" (id ${id}) in ${workspace}, ${parsed.ok.enabled ? "enabled" : "disabled"}.\n${this.#listed(workspace)}`;

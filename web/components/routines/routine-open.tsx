@@ -31,7 +31,7 @@ import {
 import { useDashboardActions } from "../dashboard-context";
 import { hashForBoard } from "../board/sidebar";
 import { FIELD } from "../form-field";
-import { RunIcon } from "./routine-marks";
+import { CopiedFrom, RunIcon } from "./routine-marks";
 
 /** A section's heading inside an opened routine or run card. */
 export const HEADING = "text-xs font-medium text-muted-foreground";
@@ -229,8 +229,8 @@ function ScheduleEditor({ routine, disabled }: { routine: Routine; disabled: boo
 	);
 }
 
-/** Edit, the full editor, and Delete, which asks first in its place, then leaves the card with no row open. */
-function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) {
+/** Where a copy came from, then Edit, the full editor, and Delete, which asks first in its place, then leaves the card with no row open. */
+function Footer({ routine, template, disabled }: { routine: Routine; template: Routine | null; disabled: boolean }) {
 	const { send } = useDashboardActions();
 	const [confirming, setConfirming] = useState(false);
 	const { id, workspace, name } = routine;
@@ -256,6 +256,7 @@ function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) 
 	}
 	return (
 		<div className="flex items-center justify-end gap-1">
+			{template && <CopiedFrom template={template} className="mr-auto min-w-0 truncate" />}
 			<Button variant="ghost" size="compact" leadingIcon={IconPencil} render={<a href={hashForRoutines(workspace, { kind: "edit", id })} />}>Edit</Button>
 			<Button {...activityControl("routines.delete")} variant="ghost" size="compact" leadingIcon={IconTrashCan} disabled={disabled} onClick={() => setConfirming(true)}>
 				Delete
@@ -266,19 +267,21 @@ function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) 
 
 interface RoutineOpenProps {
 	routine: Routine;
+	/** The routine this one was copied from, while it still exists; `null` for none. */
+	template: Routine | null;
 	/** The run the row shows, the latest unless a tick picked another; `undefined` before the first run. */
 	run: RoutineRun | undefined;
 	connected: boolean;
 	now: number;
 }
 
-export function RoutineOpen({ routine, run, connected, now }: RoutineOpenProps) {
+export function RoutineOpen({ routine, template, run, connected, now }: RoutineOpenProps) {
 	return (
 		<div className="space-y-5 pt-3">
 			<RunReport run={run} latest={run === routine.runs[0]} routine={routine} now={now} />
 			<Instructions task={routine.task} />
 			<ScheduleEditor routine={routine} disabled={!connected} />
-			<Footer routine={routine} disabled={!connected} />
+			<Footer routine={routine} template={template} disabled={!connected} />
 		</div>
 	);
 }

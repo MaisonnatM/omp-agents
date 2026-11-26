@@ -306,6 +306,10 @@ export interface RoutineDraft {
 	launch: BoardLaunch | null;
 	schedules: ScheduleDraft[];
 	triggers: TriggerKind[];
+	/** Each Workspace you start working in gets its own copy of the routine. */
+	everyWorkspace: boolean;
+	/** The id of the routine this one was copied from, kept as it was so a save does not drop it; `null` for none. */
+	copyOf: string | null;
 }
 
 /** A new routine's form for Workspace `workspace`: a prompt on weekdays at 9:00. */
@@ -323,6 +327,8 @@ export function newDraft(id: string, workspace: string): RoutineDraft {
 		launch: null,
 		schedules: [blankSchedule()],
 		triggers: [],
+		everyWorkspace: false,
+		copyOf: null,
 	};
 }
 
@@ -353,6 +359,8 @@ export function draftOf(routine: Routine): RoutineDraft {
 		launch: routine.launch ?? null,
 		schedules: routine.schedules.map(scheduleDraft),
 		triggers: routine.triggers.map(({ kind }) => kind),
+		everyWorkspace: routine.everyWorkspace === true,
+		copyOf: routine.copyOf ?? null,
 	};
 }
 
@@ -398,8 +406,19 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	}
 	if (schedules.length === 0 && draft.triggers.length === 0) return { fix: "Add a schedule or a trigger." };
 	const triggers = TRIGGER_KINDS.filter(kind => draft.triggers.includes(kind)).map(kind => ({ kind }));
-	const spec: RoutineSpec = { id: draft.id, workspace: draft.workspace, name, enabled: draft.enabled, task, schedules, triggers };
-	return { ok: draft.launch ? { ...spec, launch: draft.launch } : spec };
+	const spec: RoutineSpec = {
+		id: draft.id,
+		workspace: draft.workspace,
+		name,
+		enabled: draft.enabled,
+		task,
+		schedules,
+		triggers,
+		...(draft.launch ? { launch: draft.launch } : {}),
+		...(draft.everyWorkspace ? { everyWorkspace: true } : {}),
+		...(draft.copyOf === null ? {} : { copyOf: draft.copyOf }),
+	};
+	return { ok: spec };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */
@@ -459,8 +478,22 @@ export function cadenceOf(schedules: readonly Schedule[]): CompactSchedule | nul
 /** `current` switched to `cadence`, at the defaults when the routine was custom. */
 export const withCadence = (current: CompactSchedule | null, cadence: Cadence): CompactSchedule => ({ ...(current ?? DEFAULT_COMPACT), cadence });
 
-/** `routine` to save with `schedule` in place of all its schedules, keeping its triggers and launch. */
-export function specWithSchedule({ id, workspace, name, enabled, task, triggers, launch }: Routine, schedule: Schedule): RoutineSpec {
-	const spec: RoutineSpec = { id, workspace, name, enabled, task, schedules: [schedule], triggers };
-	return launch ? { ...spec, launch } : spec;
+/** `routine` to save with `schedule` in place of all its schedules, keeping its triggers, launch, and what makes it a template or a copy. */
+export function specWithSchedule({ id, workspace, name, enabled, task, triggers, launch, everyWorkspace, copyOf }: Routine, schedule: Schedule): RoutineSpec {
+	return {
+		id,
+		workspace,
+		name,
+		enabled,
+		task,
+		schedules: [schedule],
+		triggers,
+		...(launch ? { launch } : {}),
+		...(everyWorkspace ? { everyWorkspace } : {}),
+		...(copyOf === undefined ? {} : { copyOf }),
+	};
 }
+
+/** The routine `routine` was copied from, while it still exists; `null` for a routine that is no copy. */
+export const templateOf = (routine: Pick<Routine, "copyOf">, routines: readonly Routine[]): Routine | null =>
+	routine.copyOf === undefined ? null : (routines.find(({ id }) => id === routine.copyOf) ?? null);

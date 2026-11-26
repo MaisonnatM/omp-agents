@@ -1,6 +1,6 @@
-/** A routine's editor: its name, Workspace, model, task, schedules, and triggers, saved together. */
+/** A routine's editor: its name, Workspace, model, task, schedules, triggers, and whether every new Workspace gets a copy, saved together. */
 import { type ReactNode, useId, useState } from "react";
-import { COMMAND_TIME_LIMIT, type RoutineSpec, TRIGGER_KINDS, type TriggerKind, type Weekday } from "../../../src/routines";
+import { COMMAND_TIME_LIMIT, type Routine, type RoutineSpec, TRIGGER_KINDS, type TriggerKind, type Weekday } from "../../../src/routines";
 import { selectorOf } from "../../../src/shared/models";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,9 @@ import { PageFrame } from "../list-page";
 import { Field, FIELD, TEXT_AREA } from "../form-field";
 import { ModelPicker } from "../model-picker";
 import { SkillPicker } from "../skill-picker";
+import { ToggleSwitch } from "../toggle-switch";
 import { DirectoryPicker } from "../workspace-picker";
+import { CopiedFrom, EVERY_WORKSPACE } from "./routine-marks";
 
 const UNITS: EveryUnit[] = ["minutes", "hours", "days"];
 
@@ -139,6 +141,8 @@ interface RoutineEditorProps {
 	isNew: boolean;
 	/** The Workspaces the routine may post in. */
 	workspaces: Workspace[];
+	/** The routine this one was copied from, while it still exists; `null` for none. */
+	template: Routine | null;
 	connected: boolean;
 	/** A save is on its way to the server. */
 	saving: boolean;
@@ -146,7 +150,7 @@ interface RoutineEditorProps {
 	onCancel: () => void;
 }
 
-export function RoutineEditor({ initial, isNew, workspaces, connected, saving, onSave, onCancel }: RoutineEditorProps) {
+export function RoutineEditor({ initial, isNew, workspaces, template, connected, saving, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
 	const [tried, setTried] = useState(false);
 	const id = useId();
@@ -177,6 +181,7 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, saving, o
 					if ("ok" in result) onSave(result.ok);
 				}}
 			>
+				{template && <CopiedFrom template={template} />}
 				<Field label="Name" htmlFor={`${id}-name`}>
 					<input
 						id={`${id}-name`}
@@ -193,6 +198,16 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, saving, o
 						<DirectoryPicker cwd={draft.workspace} workspaces={workspaces} disabled={!connected} side="bottom" onPick={cwd => set("workspace", cwd)} />
 					</div>
 				</Field>
+
+				<label className="flex items-start gap-2 text-sm">
+					<span className="mt-0.5 flex">
+						<ToggleSwitch checked={draft.everyWorkspace} onCheckedChange={next => set("everyWorkspace", next)} />
+					</span>
+					<span className="space-y-0.5">
+						<span className="block">{EVERY_WORKSPACE}</span>
+						<span className="block text-xs text-muted-foreground">Copies this routine into each Workspace you start working in. Each copy is its own routine.</span>
+					</span>
+				</label>
 
 				<Field label="Model" hint="The session that takes each Board task starts on this model and effort, with this skill.">
 					<div className="flex flex-wrap items-center gap-2">

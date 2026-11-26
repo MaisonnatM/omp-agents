@@ -74,6 +74,13 @@ describe("parseRoutineSpec", () => {
 		expect(parseRoutineSpec(spec)?.ok).not.toHaveProperty("launch");
 	});
 
+	test("keeps a template's mark and a copy's template, and refuses either of the wrong type", () => {
+		expect(parseRoutineSpec({ ...spec, everyWorkspace: true, copyOf: "t1" })?.ok).toMatchObject({ everyWorkspace: true, copyOf: "t1" });
+		expect(parseRoutineSpec({ ...spec, everyWorkspace: false })).toEqual({ ok: spec });
+		expect(parseRoutineSpec({ ...spec, everyWorkspace: "yes" })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, copyOf: "" })).toBeNull();
+	});
+
 	test("takes triggers in place of schedules, drops a kind routines no longer watch, and refuses neither, a trigger that is not one, and a kind twice", () => {
 		expect(parseRoutineSpec({ ...spec, schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] })?.ok).toMatchObject({ schedules: [], triggers: [{ kind: "slack" }, { kind: "pull-request" }] });
 		expect(parseRoutineSpec({ ...spec, triggers: [{ kind: "event" }, { kind: "slack" }] })?.ok.triggers).toEqual([{ kind: "slack" }]);
