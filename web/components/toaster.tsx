@@ -91,33 +91,24 @@ export function UnderToasts({ children }: { children: ReactNode }) {
 const stackRoom = (height: number | null): string => (height ? `${height + 8}px` : "0px");
 
 /**
- * Every toast of the page, stacked at the bottom right, the newest last, each under its source when it has one; on a
- * phone, where a second toast would bury the page, only the newest, at the top, clear of the composer, and the next
- * one waits under it. A toast that never times out gets a round close button on its corner, shown on hover or focus,
- * and always on a touch screen. What {@link UnderToasts} draws sits below them, outside their region, which renders in
- * the top layer: each measures the other to keep clear of it.
+ * Every toast of the page, stacked at the top center, each under its source when it has one; on a phone, where a
+ * second toast would bury the page, only the newest, clear of the header, and the next one waits under it. Every toast
+ * gets a round close button on its corner, shown on hover or focus, and always on a touch screen. What
+ * {@link UnderToasts} draws sits in the bottom-right corner; on a phone it sits below the toast, measuring it.
  */
 export function Toaster() {
 	const phone = usePhoneWidth();
 	const [regionRef, regionHeight] = useRegionHeight();
-	const [cornerRef, cornerHeight] = useRegionHeight();
-	const placeCorner = useCallback(
-		(element: HTMLElement | null) => {
-			setCorner(element);
-			cornerRef(element);
-		},
-		[cornerRef],
-	);
+	const placeCorner = useCallback((element: HTMLElement | null) => setCorner(element), []);
 	return (
 		<>
 			<ToastRegion
 				ref={regionRef}
 				toaster={toasts}
-				side={phone ? "top" : "bottom"}
-				align="end"
+				side="top"
+				align="center"
 				maxVisible={phone ? 1 : undefined}
-				style={{ "--under-toasts": stackRoom(cornerHeight) } as CSSProperties}
-				className="right-4 bottom-[calc(2.5rem+var(--under-toasts))] w-96 max-w-[calc(100vw-2rem)] *:flex *:flex-col-reverse *:gap-2 max-phone:top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))] max-phone:right-2 max-phone:bottom-auto max-phone:max-w-[calc(100vw-1rem)]"
+				className="top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+0.75rem))] left-1/2 w-96 max-w-[calc(100vw-2rem)] -translate-x-1/2 *:flex *:flex-col *:gap-2 max-phone:top-[max(calc(var(--page-header-height)+0.5rem),calc(env(safe-area-inset-top)+2.75rem))] max-phone:max-w-[calc(100vw-1rem)]"
 			>
 				{toast => <ToastCard toast={toast} />}
 			</ToastRegion>
@@ -163,14 +154,12 @@ function ToastCard({ toast }: { toast: QueuedToast<ReactNode> }) {
 					<ToastAction disabled={data?.actionDisabled} render={<Button variant="secondary" size="compact" className="self-center" />} />
 				</div>
 			</div>
-			{toast.duration === Infinity && !loading && (
-				<ToastClose
-					aria-label="Dismiss"
-					className="absolute -top-[7px] -left-[7px] flex size-6 scale-85 cursor-pointer items-center justify-center rounded-full bg-popover text-muted-foreground opacity-0 shadow-surface-2 transition-[opacity,scale] duration-150 ease-out outline-ring group-hover/toast:scale-100 group-hover/toast:opacity-100 group-focus-within/toast:scale-100 group-focus-within/toast:opacity-100 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none pointer-coarse:-top-2 pointer-coarse:-left-2 pointer-coarse:size-8 pointer-coarse:scale-100 pointer-coarse:opacity-100"
-				>
-					<IconCrossMedium aria-hidden className="size-3.5" />
-				</ToastClose>
-			)}
+			<ToastClose
+				aria-label="Dismiss"
+				className="absolute -top-[7px] -left-[7px] flex size-6 scale-85 cursor-pointer items-center justify-center rounded-full bg-popover text-muted-foreground opacity-0 shadow-surface-2 transition-[opacity,scale] duration-150 ease-out outline-ring group-hover/toast:scale-100 group-hover/toast:opacity-100 group-focus-within/toast:scale-100 group-focus-within/toast:opacity-100 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none pointer-coarse:-top-2 pointer-coarse:-left-2 pointer-coarse:size-8 pointer-coarse:scale-100 pointer-coarse:opacity-100"
+			>
+				<IconCrossMedium aria-hidden className="size-3.5" />
+			</ToastClose>
 		</Toast>
 	);
 }
