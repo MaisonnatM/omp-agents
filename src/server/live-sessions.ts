@@ -1,6 +1,7 @@
 /** Every session the dashboard can drive, in one registry: terminal sessions it joined, and sessions it started. */
 import { forgetSession } from "../commands";
-import { DashboardSession, type DashboardUpdate, newInstanceId } from "../dashboard-session";
+import { newInstanceId } from "../dashboard-process";
+import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { evalRunRow, evalRunTranscript, readEvalRuns } from "../eval-runs";
 import { JsonFile } from "../fs";
 import { SessionGuest } from "../guest";

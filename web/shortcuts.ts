@@ -662,3 +662,18 @@ export function usePopupShortcuts(handlers: ShortcutHandlers): (event: ReactKeyb
 		dispatch(event, latest.current, scope => scope === "anywhere" || (scope === "outside-fields" && outside), null);
 	}, []);
 }
+
+/**
+ * Runs `dismiss` on every Escape the page sees, for something transient such as a hover card or an armed button to
+ * dismiss itself; a key the help lists belongs in {@link SHORTCUTS} instead. Without `capture` it hears the key on the
+ * document, before the page-wide shortcuts; with it, on the window before any other handler, so `dismiss` can keep the
+ * key from all of them. Returns what stops listening.
+ */
+export function onPageEscape(dismiss: (event: KeyboardEvent) => void, { capture = false, signal }: { capture?: boolean; signal?: AbortSignal } = {}): () => void {
+	const target: GlobalEventHandlers = capture ? window : document;
+	const listener = (event: KeyboardEvent) => {
+		if (event.key === "Escape") dismiss(event);
+	};
+	target.addEventListener("keydown", listener, { capture, signal });
+	return () => target.removeEventListener("keydown", listener, { capture });
+}

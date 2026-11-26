@@ -4,7 +4,7 @@ import { readdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { isObject, nonEmptyStr, oneOf, str } from "./json";
 import { oneLine } from "./session-entries";
-import { AGENT_STATUSES, type AgentStatus, type ContextUsage } from "./shared/sessions";
+import { AGENT_STATUSES, type AgentRow, type AgentStatus, type ContextUsage, EMPTY_QUEUE } from "./shared/sessions";
 
 const isAgentStatus = oneOf(AGENT_STATUSES);
 
@@ -109,6 +109,34 @@ export function parseSubagentFrame(channel: unknown, payload: unknown, now = Dat
 /** When a subagent stopped: `null` while it runs, else the stop already known, else `seenAt`, so one that stays stopped keeps the time it first stopped at. */
 export const stoppedAt = (status: AgentStatus, knownEndedAt: number | null, seenAt: number | null): number | null =>
 	status === "running" ? null : (knownEndedAt ?? seenAt);
+
+export interface RpcAgent extends Pick<AgentRow, "id" | "kind" | "status" | "activity" | "model" | "startedAt" | "endedAt"> {
+	sessionFile: string | null;
+}
+
+export function mergedAgent(prev: RpcAgent | undefined, frame: SubagentFrame): RpcAgent {
+	const status = frame.status ?? prev?.status ?? "running";
+	const start = Math.min(frame.startedAt ?? Infinity, prev?.startedAt ?? Infinity);
+	return {
+		id: frame.id,
+		kind: frame.kind ?? prev?.kind ?? "agent",
+		status,
+		activity: frame.activity ?? prev?.activity ?? null,
+		model: frame.model ?? prev?.model ?? null,
+		// The earliest start any frame reported, so a later progress tick, timed a little after, does not move it.
+		startedAt: Number.isFinite(start) ? start : null,
+		endedAt: stoppedAt(status, prev?.endedAt ?? null, frame.endedAt ?? null),
+		sessionFile: frame.sessionFile ?? prev?.sessionFile ?? null,
+	};
+}
+
+export const rpcAgentRow = ({ sessionFile, ...agent }: RpcAgent): AgentRow => ({
+	...agent,
+	parentId: null,
+	// omp's `steer_subagent` reaches only a running subagent.
+	canMessage: agent.status === "running",
+	queue: EMPTY_QUEUE,
+});
 
 /** omp's `ContextUsage` (a Collab state frame or an RPC state), as the roster's context numbers. */
 export function contextOf(value: unknown): ContextUsage | null {

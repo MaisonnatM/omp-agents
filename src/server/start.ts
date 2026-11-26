@@ -1,7 +1,8 @@
 /** Starting a dashboard session: a new one, a fork of a transcript, or a past session resumed. All three spawn omp the same way. */
 import { statSync } from "node:fs";
 import { withPinnedSkill } from "../commands";
-import { DashboardSession, type DashboardUpdate, recordedCwd } from "../dashboard-session";
+import { recordedCwd } from "../dashboard-process";
+import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { endedTurn, type LiveSession, skipRefused } from "../live-session";

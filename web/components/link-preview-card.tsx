@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import type { LinkPreview } from "../../src/shared/link-preview";
 import { getJson } from "../api";
+import { onPageEscape } from "../shortcuts";
 import { Popover, PopoverContent } from "./ui/popover";
 import { addressParts, SiteAddress, SiteIcon } from "./site-icon";
 
@@ -62,7 +63,7 @@ function useRestedLink(): HTMLAnchorElement | null {
 		);
 		document.addEventListener("focusout", event => within(event.target) && hide(), { signal });
 		document.addEventListener("pointerdown", hide, { signal, capture: true });
-		document.addEventListener("keydown", event => event.key === "Escape" && hide(), { signal });
+		onPageEscape(hide, { signal });
 		document.addEventListener("scroll", event => target && event.target instanceof Node && event.target.contains(target) && hide(), { signal, capture: true });
 		window.addEventListener("blur", hide, { signal });
 		return () => {

@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- Behind the scenes: the Escape key that closes a Board thread, a link preview, or an inline confirm now goes through the shortcut table, and two more large source files are split under the size limit.
 - Behind the scenes: a new lint rule keeps page-wide keyboard shortcuts in the one shortcut table, and the two largest source files are split under the size limit.
 - A Board session now talks before it builds. Unless your message names the exact step, such as "Merge on main", it first replies in the thread with what it understood, the change it would make, and its questions, and starts work only once you answer.
 - Behind the scenes: every lint rule now has a sample file it must flag, so a rule that quietly stops working fails the checks, and a new rule can start with its old findings listed and only ever shrink them.

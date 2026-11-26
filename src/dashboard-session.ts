@@ -3,34 +3,24 @@
  * its stdio. Prompts, Stop, live events, and subagent progress all stay on this
  * machine. Like any session, its transcript is read from its session file.
  */
-import { randomBytes } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { errorText, isObject, isTexts } from "./json";
 import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused, turnUpdate } from "./live-session";
 import { loadOmpConfig, loadSessionControlsConfig, type SessionControlsConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
-import { type AdmittedLaunch, attachRpc, parseRpcGoal, type RpcChild, type RpcClient, type RpcGoal, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
+import { type AdmittedLaunch, parseRpcGoal, type RpcChild, type RpcClient, type RpcGoal, type RpcLaunch, type RpcState } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
-import { type AgentRow, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
+import { type AgentRow, type ContextUsage, type Delivery, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
 import { advisorCommand, contextCommand, goalCommand, type AdvisorState, type CompactionState, type ContextAction, type GoalChange, type GoalSlot, type SessionGoal } from "./shared/session-controls";
 import { promptAuthor } from "./shared/transcript";
 import { PromptTurn } from "./prompt-turn";
 import { textOf } from "./session-entries";
-import { contextOf, parseSubagentFrame, stoppedAt, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
+import { contextOf, mergedAgent, parseSubagentFrame, type RpcAgent, rpcAgentRow, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { isUserPrompt, SKILL_PROMPT, skillArgs, type StartingPrompt } from "./transcript";
 import { SerialLane } from "./serial-lane";
 import { ASK_DIALOG_OPT_IN, PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
-import { sessionVisualsExtension } from "./server/resources";
-
-/** `launch` with the extension that tells omp which fenced blocks the dashboard draws as diagrams and charts. */
-function withSessionVisuals(launch: AdmittedLaunch): AdmittedLaunch {
-	return { ...launch, args: ["-e", sessionVisualsExtension, ...launch.args] };
-}
-
-interface RpcAgent extends Pick<AgentRow, "id" | "kind" | "status" | "activity" | "model" | "startedAt" | "endedAt"> {
-	sessionFile: string | null;
-}
+import { goneText, type Opening, type ProcessPhase, reach, recordedCwd, withSessionVisuals } from "./dashboard-process";
 
 export type DashboardUpdate =
 	| LiveUpdate
@@ -43,32 +33,10 @@ export type DashboardUpdate =
 	/** The main agent's {@link DashboardSession.starting} prompt changed. */
 	| { kind: "starting" };
 
-/** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
-export const newInstanceId = (): string => randomBytes(8).toString("hex");
-
 export interface ForkedSession {
 	session: DashboardSession;
 	/** Text of the prompt forked at. */
 	prompt: string;
-}
-
-/** The working directory a session file's header records; omp refuses to open the file from any other. */
-export async function recordedCwd(sessionFile: string): Promise<string> {
-	const head = await Bun.file(sessionFile).slice(0, 1 << 16).text();
-	// omp may write a title record ahead of the header.
-	const header = head
-		.split("\n", 4)
-		.map(line => {
-			try {
-				return JSON.parse(line) as unknown;
-			} catch {
-				return null;
-			}
-		})
-		.find(record => isObject(record) && record.type === "session");
-	if (!isObject(header) || typeof header.cwd !== "string") throw new Error("the session file has no readable header");
-	if (!(await stat(header.cwd).catch(() => null))?.isDirectory()) throw new Error(`${header.cwd} no longer exists`);
-	return header.cwd;
 }
 
 /** Session events after which the model, thinking level, or context size can have changed. */
@@ -77,51 +45,6 @@ const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_chang
 /** A message taken back from omp's queue, holding only the image fields the composer restores. */
 function withdrawn({ text, images = [] }: { text: string; images?: readonly PromptImage[] }): WithdrawnMessage {
 	return { text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) };
-}
-
-/** How a session reaches its omp, which decides what a failed opening does to it. */
-type Opening =
-	/** A new omp in `cwd` with `launch`, once `launch` admits `cwd`, which a failed opening stops, so no process outlives a failed start. */
-	| { kind: "spawn"; cwd: string; launch: AdmittedLaunch }
-	/** The omp a previous server started, which a failed opening leaves running, turn and all, for the next server. */
-	| { kind: "attach" };
-
-async function reach(instanceId: string, opening: Opening, onFrame: (frame: Record<string, unknown>) => void): Promise<{ child: RpcChild; abandon: () => Promise<void> }> {
-	switch (opening.kind) {
-		case "spawn": {
-			const child = await startRpc(instanceId, opening.cwd, onFrame, opening.launch);
-			return { child, abandon: () => child.client.stop() };
-		}
-		case "attach": {
-			const child = await attachRpc(instanceId, onFrame);
-			return { child, abandon: async () => child.detach() };
-		}
-		default: {
-			const unhandled: never = opening;
-			return unhandled;
-		}
-	}
-}
-
-/** omp's process: running; stopping on **End session**; exited, however it came to; or left running for the next server, which is no exit. */
-type ProcessPhase = "running" | "ending" | "exited" | "detached";
-
-/** Why a session in `process` takes no more prompts, or `null` while omp runs. */
-function goneText(process: ProcessPhase): string | null {
-	switch (process) {
-		case "running":
-			return null;
-		case "ending":
-			return "This session is ending.";
-		case "exited":
-			return "This session's omp exited; resume it to send more.";
-		case "detached":
-			return "The server is restarting; send it again once the session is back.";
-		default: {
-			const unhandled: never = process;
-			return unhandled;
-		}
-	}
 }
 
 export class DashboardSession implements LiveSession {
@@ -424,13 +347,7 @@ export class DashboardSession implements LiveSession {
 	}
 
 	agents(): AgentRow[] {
-		return [...this.#agents.values()].map(({ sessionFile, ...agent }) => ({
-			...agent,
-			parentId: null,
-			// omp's `steer_subagent` reaches only a running subagent.
-			canMessage: agent.status === "running",
-			queue: EMPTY_QUEUE,
-		}));
+		return [...this.#agents.values()].map(rpcAgentRow);
 	}
 
 	agentFile(agentId: string): string | null {
@@ -845,20 +762,7 @@ export class DashboardSession implements LiveSession {
 	#onSubagent(channel: string, payload: unknown): void {
 		const frame = parseSubagentFrame(channel, payload);
 		if (!frame) return;
-		const prev = this.#agents.get(frame.id);
-		const status = frame.status ?? prev?.status ?? "running";
-		const start = Math.min(frame.startedAt ?? Infinity, prev?.startedAt ?? Infinity);
-		this.#agents.set(frame.id, {
-			id: frame.id,
-			kind: frame.kind ?? prev?.kind ?? "agent",
-			status,
-			activity: frame.activity ?? prev?.activity ?? null,
-			model: frame.model ?? prev?.model ?? null,
-			// The earliest start any frame reported, so a later progress tick, timed a little after, does not move it.
-			startedAt: Number.isFinite(start) ? start : null,
-			endedAt: stoppedAt(status, prev?.endedAt ?? null, frame.endedAt ?? null),
-			sessionFile: frame.sessionFile ?? prev?.sessionFile ?? null,
-		});
+		this.#agents.set(frame.id, mergedAgent(this.#agents.get(frame.id), frame));
 		this.#emit({ kind: "roster" });
 	}
 }

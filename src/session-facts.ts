@@ -13,13 +13,13 @@
  * The read of a session's own file also feeds the `OwnFileFolds` the index is given, and folds the files its own `edit`
  * and `write` calls changed for the changes view, so another feature that folds session files does not read them a second time.
  */
-import { access } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { branchAt, type CheckoutReads, type HeadHistory, type WorktreeAt } from "./git";
+import type { CheckoutReads } from "./git";
 import { isNonEmpty, isObject, oneOf, str } from "./json";
 import { FoldedFile, type LineFold } from "./line-reader";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { expandHome } from "./paths";
+import { exists, type GitBranch, gitBranch, linkingBranch, once, workingWorktree } from "./session-branch";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, parseRemote, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo, repoKey } from "./shared/github";
@@ -438,73 +438,14 @@ interface SessionScan {
 	headless: boolean;
 }
 
-/** What git says of the branch a session works on. */
-type GitBranch = Pick<SessionBranch, "name" | "linked">;
-
 /** The directory whose checkout a session works on: its linked worktree, else `cwd`. */
 const workDirOf = (session: SessionScan): string => session.worktree ?? session.cwd;
 
 /** The session's own file first, then its subagents' files. */
 const transcriptsOf = (session: SessionScan): FoldedFile<TranscriptFold>[] => [session.own, ...session.subagents.values()];
 
-const exists = (path: string): Promise<boolean> => access(path).then(() => true, () => false);
-
 /** `dir` as omp resolves a bash `cwd`: from the home directory after `~`, else from `base`. */
 const absolute = (base: string, dir: string): string => resolve(base, expandHome(dir));
-
-/** `ask`, asking about each directory once. */
-function once<T>(ask: (dir: string) => Promise<T>): (dir: string) => Promise<T> {
-	const asked = new Map<string, Promise<T>>();
-	return dir => {
-		let answer = asked.get(dir);
-		if (!answer) asked.set(dir, (answer = ask(dir)));
-		return answer;
-	};
-}
-
-/**
- * What git says of the branch a session that last wrote at `at`, in ms, works on in `dir`: in a linked worktree the one
- * checked out now, in a main checkout the one checked out at `at`; `null` on a detached HEAD, outside git, or once `dir` is gone.
- */
-async function gitBranch(
-	dir: string,
-	at: number,
-	worktreeAt: (dir: string) => Promise<WorktreeAt | null>,
-	historyOf: (dir: string) => Promise<HeadHistory | null>,
-): Promise<GitBranch | null> {
-	if (!(await exists(dir))) return null;
-	const checkout = await worktreeAt(dir);
-	if (!checkout) return null;
-	if (checkout.linked) return checkout.branch === null ? null : { name: checkout.branch, linked: true };
-	const history = await historyOf(dir);
-	const name = history && branchAt(history, at);
-	return name ? { name, linked: false } : null;
-}
-
-/**
- * The branch whose PR a session on `branch` links: a linked worktree's, or a main checkout's other than its default
- * branch `defaultBranch`, which every session there shares; `null` for none, and while git names no default.
- */
-function linkingBranch(branch: GitBranch | null, defaultBranch: string | null): string | null {
-	return branch && (branch.linked || (defaultBranch !== null && branch.name !== defaultBranch)) ? branch.name : null;
-}
-
-/**
- * The linked worktree of `cwd`'s repository, other than the one `cwd` is in, that the most recent of `workDirs` in
- * one is in. Directories in `cwd`'s own checkout, outside git, or in another repository are passed over; a directory
- * that is gone ends the search with `null`, since it may be a worktree removed since, and an older one is stale.
- */
-async function workingWorktree(cwd: string, workDirs: readonly string[], worktreeAt: (dir: string) => Promise<WorktreeAt | null>): Promise<string | null> {
-	if (workDirs.length === 0) return null;
-	const own = await worktreeAt(cwd);
-	if (!own) return null;
-	for (const dir of workDirs) {
-		if (!(await exists(dir))) return null;
-		const at = await worktreeAt(dir);
-		if (at && at.top !== own.top && at.common === own.common) return at.top;
-	}
-	return null;
-}
 
 export interface ListedSession {
 	path: string;

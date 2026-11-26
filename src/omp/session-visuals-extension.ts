@@ -1,6 +1,6 @@
 // omp-agents session visuals: tells a session the dashboard started which fenced blocks its conversation draws as a
 // diagram or a chart, and, on a Cursor model, where to find the dashboard's tools. The dashboard loads it with `omp -e`
-// (`withSessionVisuals` in src/dashboard-session.ts), so a session started in a terminal never reads it.
+// (`withSessionVisuals` in src/dashboard-process.ts), so a session started in a terminal never reads it.
 import { MAX_BEFORE_AFTER, MAX_CHART_ROWS, MAX_CHART_SERIES, MAX_MERMAID_SOURCE, MAX_REVIEW_PAGES } from "../shared/session-visuals";
 
 /** The part of omp's `ExtensionAPI` this uses, by hand: `tsc` cannot resolve omp's own package here. */

@@ -1,9 +1,7 @@
 {
 	"file-size": {
 		"src/dashboard-session.test.ts": 4,
-		"src/dashboard-session.ts": 1,
 		"src/session-facts.test.ts": 1,
-		"src/session-facts.ts": 1,
 		"templates/omp/extensions.test.ts": 8,
 		"web/components/board/page.tsx": 1,
 		"web/components/dithercn/black-hole.tsx": 4,
@@ -16,10 +14,5 @@
 	"glossary-terms": {
 		"docs/usage/settings.md": 1,
 		"docs/usage/todo-list.md": 1
-	},
-	"keymap-owner": {
-		"web/components/board/page.tsx": 1,
-		"web/components/link-preview-card.tsx": 1,
-		"web/use-inline-confirm.ts": 1
 	}
 }
