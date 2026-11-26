@@ -157,7 +157,7 @@ function parsePullRequestHead(node: Record<string, unknown>, botStarted: Readonl
 		reviewers,
 		state,
 		review,
-		checks: checksOf(rollup),
+		...checksOf(rollup),
 		// `UNKNOWN` means GitHub has not computed it yet; a merged or closed pull request has nothing to conflict with.
 		conflicts: (state === "open" || state === "draft") && node.mergeable === "CONFLICTING",
 		additions: num(node.additions) ?? 0,
@@ -263,22 +263,25 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	} }
 }`;
 
-/** A check that fails until someone approves, such as a `human-review` job: it waits on review, not on a CI fix. */
+/** A failing check that waits on someone's approval rather than a CI fix: a `human-review` style gate, or a run GitHub holds as `ACTION_REQUIRED`. */
 const REVIEW_GATE = /review|approv/i;
 
+function awaitsApproval(node: unknown): boolean {
+	const check = parseCheck(node);
+	return check !== null && check.state === "failing" && (REVIEW_GATE.test(check.name) || (isObject(node) && node.conclusion === "ACTION_REQUIRED"));
+}
+
 /**
- * The head commit's checks, leaving out a failing review gate, so the pull request files under review rather than CI to fix.
- * An approved one still counts: its gate stays red until it reruns. GitHub's rollup stands when it has more checks than the query returned.
+ * The head commit's checks, leaving out the failing ones that wait on approval, so the pull request files under **Approval** rather than CI to fix.
+ * An approved gate still counts: it stays red until it reruns. GitHub's rollup stands when it has more checks than the query returned.
  */
-function checksOf(rollup: Record<string, unknown>): CheckState {
+function checksOf(rollup: Record<string, unknown>): { checks: CheckState; approvalRequired: boolean } {
 	const state = STATUS[str(rollup.state) ?? ""] ?? "none";
 	const nodes = nodesOf(rollup.contexts);
-	if (state !== "failing" || totalOf(rollup.contexts) > nodes.length) return state;
-	const checks = nodes.map(parseCheck).filter(check => check !== null);
-	const rest = checks.filter(check => !(check.state === "failing" && REVIEW_GATE.test(check.name)));
-	if (rest.length === checks.length) return state;
-	if (rest.some(check => check.state === "failing")) return "failing";
-	return rest.some(check => check.state === "pending") ? "pending" : "passing";
+	if (state !== "failing" || totalOf(rollup.contexts) > nodes.length || !nodes.some(awaitsApproval)) return { checks: state, approvalRequired: false };
+	const rest = nodes.filter(node => !awaitsApproval(node)).map(parseCheck).filter(check => check !== null);
+	const checks = rest.some(check => check.state === "failing") ? "failing" : rest.some(check => check.state === "pending") ? "pending" : "passing";
+	return { checks, approvalRequired: true };
 }
 
 const CHECK_ORDER: CheckRunState[] = ["failing", "pending", "passing", "skipped"];

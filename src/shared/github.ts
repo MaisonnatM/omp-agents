@@ -199,6 +199,8 @@ export interface PullRequestSummary extends PullRequest {
 	conversations: number;
 	/** Whether your latest review of it approves it. */
 	viewerApproved: boolean;
+	/** Some failing check waits on someone's approval, not a CI fix; absent from lists cached before the summary carried it. */
+	approvalRequired?: boolean;
 	/** Its label names; absent from lists cached before the summary carried them. */
 	labels?: string[];
 	/** When it was opened, in ms since the epoch. */
@@ -240,6 +242,7 @@ const isSummary = fields<PullRequestSummary>({
 	unresolved: fields<PullRequestSummary["unresolved"]>({ count: isNumber, exact: isBoolean, bots: isNumber }),
 	conversations: isNumber,
 	viewerApproved: isBoolean,
+	approvalRequired: optional(isBoolean),
 	labels: optional(isTexts),
 	createdAt: isNumber,
 	updatedAt: isNumber,

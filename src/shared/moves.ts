@@ -3,7 +3,7 @@ import { mergesNow, type PullRequestList, type PullRequestSummary, type PullRequ
 import { type HostStatus, type RosterHost, worksOn } from "./sessions";
 import type { MergeMethod } from "./source-control";
 
-export type MoveId = "review" | "merge" | "fix-ci" | "rebase" | "reply" | "answer" | "agent" | "in-review" | "checks-running" | "draft" | "merged";
+export type MoveId = "review" | "merge" | "fix-ci" | "rebase" | "reply" | "answer" | "agent" | "approval" | "in-review" | "checks-running" | "draft" | "merged";
 
 /** The moves that wait on you, each of which the bell notifies of. */
 export const YOUR_MOVES = ["review", "merge", "fix-ci", "rebase", "reply"] as const satisfies readonly MoveId[];
@@ -60,6 +60,7 @@ export function moveOf(pr: PullRequestSummary, agent: AgentState | null): MoveId
 	if (pr.checks === "failing") return "fix-ci";
 	if (pr.review === "changes-requested" || hasOpenThreads(pr)) return "reply";
 	if (pr.state === "draft") return "draft";
+	if (pr.approvalRequired) return "approval";
 	if (readyToMerge(pr)) return "merge";
 	if (pr.checks === "pending") return "checks-running";
 	return "in-review";
