@@ -84,7 +84,7 @@ After you read omp's source to learn a subsystem, add its files and the exports 
 
 Write every Markdown file with one sentence per line.
 Tools that read a doc cut a line at 768 characters, and an edit that copies the cut line back writes the truncation mark `…` into the file.
-`src/docs.test.ts` fails a line over 700 characters or ending in `…`, in root Markdown and under `docs/`, `templates/omp/`, and `.agents/`, including nested agent instructions and skills.
+`bun run lint` (the `doc-lines` rule, `scripts/lint/rules/doc-lines.ts`) fails a line over 700 characters or ending in `…`, in root Markdown and under `docs/`, `templates/omp/`, and `.agents/`, including nested agent instructions and skills.
 
 ## Template sync
 

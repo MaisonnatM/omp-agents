@@ -17,7 +17,7 @@ import { HELLO, type KeeperHello, pidFileOf, STOP } from "./keeper-wire";
 import type { RpcFrameModule } from "./omp/module-types/rpc";
 import { ProcessCensus } from "./process-census";
 
-/** How long omp and what it started get to exit on SIGTERM before SIGKILL. */
+/** How long omp gets to exit once its input closed before SIGTERM, and then before SIGKILL; also what it started gets on SIGTERM before SIGKILL. */
 const STOP_GRACE_MS = 3_000;
 /** How often the keeper notes the processes under omp, which it stops once omp exited and they were reparented. */
 const WATCH_MS = 10_000;
@@ -166,14 +166,19 @@ async function main(): Promise<void> {
 		opened.resolve();
 	};
 
-	/** End session: notes what omp started while omp is still its parent, then stops omp and all of it. */
+	/**
+	 * End session: notes what omp started while omp is still its parent, then closes omp's input, as a client that hangs
+	 * up does, so omp disposes the session and records a normal exit rather than a kill. An omp still busy after the
+	 * grace, such as one ended mid-turn, gets SIGTERM, which records that turn as interrupted, and SIGKILL after another
+	 * grace. What omp leaves behind is reaped once it exited.
+	 */
 	const stop = (): void => {
 		if (gate.kind === "stopping") return;
 		close();
 		census.note();
-		omp.kill("SIGTERM");
-		setTimeout(() => omp.kill("SIGKILL"), STOP_GRACE_MS).unref();
-		void census.reap();
+		void omp.stdin.end();
+		setTimeout(() => omp.kill("SIGTERM"), STOP_GRACE_MS).unref();
+		setTimeout(() => omp.kill("SIGKILL"), 2 * STOP_GRACE_MS).unref();
 	};
 
 	const fromOmp = ({ frame, lines }: OmpFrame): void => {

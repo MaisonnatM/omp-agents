@@ -16,14 +16,18 @@ It imports nothing, so the starter kit can ship it.
 - `post` adds a Board task in a Workspace with a title, text, labels, and the Board tasks it `needs`.
 - `reply` adds a reply to its Board thread.
 - `edit` replaces the text of the user's own Board task, whose title becomes its first line, or of their reply at index `reply` in `replies`, and sets its `editedAt`; only the page sends it, as the user.
-- `claim` and `renew` give a session a lease of `LEASE_MS`, 15 minutes; `done` ends it.
-- `start`, `woke`, and `expire` come from the server alone: a session started on a Board task, or failed to; a reply woke a stopped session; a lease ran out.
-  `parseChange` refuses them from the page and the tool.
+- `claim` lets an interactive session hold a Board task until it is done; a session the runner started holds its Board task from its `start` and never claims it.
+- `done` marks a Board task done, from the session that holds it.
+- `start`, `woke`, `expire`, and `land` come from the server alone: a session started on a Board task, with its `branch` and `worktree`, or failed to; a reply woke a stopped session; the session that held a Board task exited without marking it done; the server merged its branch on main, or failed to.
+  `parseChange` refuses them from the page and the tool, and drops a `renew` line an older Board wrote while a claim lasted 15 minutes.
 
-`statusOf` says whether a Board task is done, claimed, waiting on another, or ready.
-`unstartedReady` lists the ready Board tasks no session was started on since they last became ready, `lapsed` the ones whose lease ran out or whose started session never claimed them within a lease, and `wakeTarget` who a reply wakes: the claimer, else the session started on it, else a session that posted it, never the replier, and nobody on a done Board task.
+`statusOf` says whether a Board task is done, claimed, waiting on another, or ready; `holderOf` names the session that holds it, its claimer else the session started on it.
+`unstartedReady` lists the ready Board tasks no session was started on since they last became ready, and `wakeTarget` who a reply wakes: the claimer, else the session started on it, else a session that posted it, never the replier, and nobody on a done Board task.
 A reply from the page carries the `launch` picked in its composer, which the reply keeps.
 The user's reply on a done Board task reopens it in the fold: `doneAt` and `start` clear and the task takes the reply's `launch`, so `unstartedReady` lists it again; `startedOn` names the sessions started on it in earlier rounds.
+So does the user's reply on a Board task whose session failed to start.
+`landsOnReply` picks out the exception: the user's bare `MERGE_REPLY`, "Merge on main", on a done Board task that has a branch, which keeps it done.
+A failed `land` reopens the Board task as a reply would, and both outcomes stay in its replies as `landed` and `land-failed` notes, which the Board thread shows.
 
 ## The runner
 
@@ -32,20 +36,23 @@ The dashboard calls the run's `changed` after every change to the module, and `t
 
 `BoardRunner` in `src/server/board-runner.ts` does the rest while its server is the owner:
 
-- It starts a session on each Board task `unstartedReady` lists, prompted by `startPrompt` to claim it, and records the `start`. The prompt leads with the Board task's title and text and wraps the claim steps in a `<board-task>` block, because omp's titler names the session from that prompt and titles plain claim steps "Claim Board task N".
-  On a reopened Board task the block also holds the earlier sessions' ids and the Board thread, which ends on the reply that reopened it; that reply wakes nobody.
+- It starts a session on each Board task `unstartedReady` lists and records the `start`. `boardCheckout` in `src/server/board-checkout.ts`, through the core's `checkout`, first gives the Board task its branch `board/<id>` (`taskBranch`) and worktree `<repository>-wt/board-<id>`: it reuses the worktree that has the branch, or adds one, from the branch or else the default branch, and runs the `setup` commands of the repository's `.omp/land.json`. The session runs in that worktree; a Workspace outside git runs it in the Workspace. A checkout that fails records a failed `start` with the reason.
+- `startPrompt` is the session's whole contract: where it works and on which branch, `converse`, and `finish`. It leads with the Board task's title and text and wraps the rest in a `<board-task>` block, because omp's titler names the session from that prompt.
+  On a reopened Board task the block also holds the earlier sessions' ids and the Board thread, which ends on the reply that reopened it or the merge that failed; that reply wakes nobody.
 - It wakes `wakeTarget` for each new reply with `wakePrompt`, which carries `DASHBOARD_PROMPT_PREFIX`, and records `woke` when the session had stopped; the core's `wake` switches a session this dashboard started to the reply's model and thinking level, and starts the prompt with the reply's `/skill:`.
 - It re-prompts `wakeTarget` with `editPrompt` when the user edits a message, which it notices by `editedAt` passing what it last saw; the core's `wake` with `interrupt` first stops the session's turn through `LiveSession.interrupt` and queues the user's withdrawn messages after the prompt.
-- Both prompts end on `finish`: commit the work on its branch, or open a draft PR where the repository has no `.omp/land.json`, and land only when the user's last reply asks; mark the Board task done with a message ending on a `Suggestions:` block; then call `end_session`. The thread's reply box lists those suggestions under its action bar, as a session's composer does, each of which sends itself as the user's reply. See [Board sessions end on suggestions, and a reply starts a new session](../decisions/2026-11-25-board-sessions-end-on-suggestions-and-a-reply-starts-a-new-session.md).
+- Both prompts end on `finish`: commit the work on the session's branch and never land it, or open a draft PR where the repository has no `.omp/land.json`; mark the Board task done, which ends the session, with a message ending on a `Suggestions:` block, such as "1. Merge on main". The thread's reply box lists those suggestions under its action bar, as a session's composer does, each of which sends itself as the user's reply. See [Board sessions end on suggestions, and a reply starts a new session](../decisions/2026-11-25-board-sessions-end-on-suggestions-and-a-reply-starts-a-new-session.md).
+- On a reply `landsOnReply` picks out, it starts no session: it runs `land` from `templates/omp/agent/extensions/land/lander.ts` on the Board task's worktree through the core's `land`, off the event loop, and records the outcome as a `land` event. See [Board tasks belong to their session](../decisions/2026-11-26-board-tasks-belong-to-their-session.md).
 - `startPrompt` and `wakePrompt` also carry `converse`: a session builds right away when the user's last message is clear, naming the exact step, such as "Merge on main" or a picked suggestion, or plainly saying what to change.
   When it is unclear, because it could mean changes that differ in what the user gets or leaves out something the code and thread do not answer, or when the user says the session missed the point, it changes nothing.
   It marks the Board task done with what it understood, the change it would make, and its open questions, with the likely answers as suggestions, and ends; the user's answer starts the session that builds. See [Board sessions ask before they build](../decisions/2026-11-26-board-sessions-ask-before-they-build.md).
-- Every 30 seconds its sweep records an `expire` for each Board task `lapsed` lists, which makes it ready again and so starts a new session, except while the core's `working` says the claimer, else the started session, is mid-turn or waits on a question: under load a session misses its renewal, and expiring it then started ~30 sessions on one Board task.
+- Every 3 seconds its sweep ends each session whose `done` turn has ended, through the core's `end`, so a Board session never calls `end_session`.
+  It also records an `expire` for a Board task whose holder the core's `alive` has not seen for `GONE_MS`, 30 seconds, which makes it ready again and so starts a new session; the wait covers a restarted server that has not yet attached to its sessions.
 
 ## The agent side
 
 The starter kit's `board` extension in `templates/omp/agent/extensions/board.ts` reads `board-events.jsonl` and never writes it.
-Its `board` tool's actions are post, reply, claim, renew, done, list, and read; a change is checked with `refusal` against the Board it read, then left in `board-changes/` through `extensions/inbox/client.ts`, which the module's `JsonInboxDir` drains while its server owns the lock, and the tool waits up to six seconds to see it land.
+Its `board` tool's actions are post, reply, claim, done, list, and read; a change is checked with `refusal` against the Board it read, then left in `board-changes/` through `extensions/inbox/client.ts`, which the module's `JsonInboxDir` drains while its server owns the lock, and the tool waits up to six seconds to see it land.
 A session acts as its top-level session: `topSessionId` walks a subagent's session file up to the session that started it.
 A post goes to the Workspace of the session's directory, the main checkout of a linked worktree, unless it names another.
 

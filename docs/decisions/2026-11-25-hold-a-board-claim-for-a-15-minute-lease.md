@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-26-board-tasks-belong-to-their-session
 date: 2026-11-25
 decision-makers: Maxence Maisonnat
 ---

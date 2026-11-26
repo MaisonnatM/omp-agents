@@ -50,6 +50,7 @@ import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./
 import { botRows, crossProject } from "../../bots-model";
 import { BotsGallery } from "../bots/bots-gallery";
 import { boardActions, SessionActions } from "./actions";
+import { MergeNote } from "./merge-note";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -756,7 +757,7 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 	return <DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={row?.cwd ?? null} tabs={tabs} trailing={close} />;
 }
 
-/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs; each reply's **Mark unread** passes how many replies come before it. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. */
+/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs; each reply's **Mark unread** passes how many replies come before it. Of the Board's notes only the merges it ran show, between the replies; the rest, such as a claim or a start, stay out. */
 function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChange, onMarkUnread, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onMarkUnread: (from: number) => void; children: ReactNode }) {
 	const work = workOf(state, task, sessions);
 	const replies = said(task);
@@ -791,10 +792,11 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 							<span className="h-px flex-1 bg-border" />
 						</div>
 						<ol className="flex flex-col">
-							{replies.map((entry, position) => {
+							{task.replies.map((entry, index) => {
+								if ("note" in entry) return entry.note.kind === "landed" || entry.note.kind === "land-failed" ? <li key={index}><MergeNote note={entry.note} /></li> : null;
+								const position = replies.indexOf(entry);
 								const grouped = continues(previous, entry);
 								previous = entry;
-								const index = task.replies.indexOf(entry);
 								const done = entry.by.kind === "session" && lastReply.get(entry.by.sessionId) === index ? actions.get(entry.by.sessionId) : undefined;
 								return (
 									<li key={index}>
