@@ -25,6 +25,7 @@ import { UNREAD } from "../../reads";
 import { activityControl } from "../../activity";
 import { boardDraftKey, boardThreadDraftKey } from "../../composer-drafts";
 import { useStoredState } from "../../stored-state";
+import { onPageEscape } from "../../shortcuts";
 import { useMinute } from "../../use-minute";
 import { Age } from "../age";
 import { Separator, useDragSeparator } from "../drag-separator";
@@ -631,15 +632,15 @@ function Thread({ state, task, reply, core, workspace, channel, closeHref, onSea
 		read: (event, start) => clampThread(start.value - (event.clientX - start.coordinate), start.size),
 	});
 	// Escape closes the thread wherever focus is, unless a menu or dialog is open and takes it first.
-	useEffect(() => {
-		const close = (event: globalThis.KeyboardEvent) => {
-			if (event.key !== "Escape" || event.defaultPrevented || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]:not([aria-label="Suggested prompts"])')) return;
-			event.preventDefault();
-			location.hash = closeHref;
-		};
-		document.addEventListener("keydown", close);
-		return () => document.removeEventListener("keydown", close);
-	}, [closeHref]);
+	useEffect(
+		() =>
+			onPageEscape(event => {
+				if (event.defaultPrevented || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]:not([aria-label="Suggested prompts"])')) return;
+				event.preventDefault();
+				location.hash = closeHref;
+			}),
+		[closeHref],
+	);
 	const label = `Thread #${task.id} in #${channel}`;
 	const thread: DetailsTab<"thread"> = {
 		value: "thread",

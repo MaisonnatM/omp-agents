@@ -1,4 +1,5 @@
 import { useEffect, useState, type MouseEvent } from "react";
+import { onPageEscape } from "./shortcuts";
 
 interface ArmedAction {
 	scope: string;
@@ -25,20 +26,21 @@ export function useInlineConfirm(scope: string): InlineConfirm {
 		const pointer = (event: PointerEvent) => {
 			if (event.target instanceof Node && !armed.element.contains(event.target)) disarm();
 		};
-		const key = (event: KeyboardEvent) => {
-			if (event.key !== "Escape") return;
-			event.preventDefault();
-			event.stopPropagation();
-			disarm();
-		};
+		const stopEscape = onPageEscape(
+			event => {
+				event.preventDefault();
+				event.stopPropagation();
+				disarm();
+			},
+			{ capture: true },
+		);
 		const timeout = window.setTimeout(disarm, 3000);
 		document.addEventListener("pointerdown", pointer, true);
-		window.addEventListener("keydown", key, true);
 		window.addEventListener("blur", disarm);
 		return () => {
 			window.clearTimeout(timeout);
 			document.removeEventListener("pointerdown", pointer, true);
-			window.removeEventListener("keydown", key, true);
+			stopEscape();
 			window.removeEventListener("blur", disarm);
 		};
 	}, [armed, scope]);
