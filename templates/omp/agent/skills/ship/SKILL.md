@@ -87,14 +87,14 @@ flowchart TD
    Link the PR on a Linear issue only when `get_issue` shows no attachment or link with the PR's URL, and when a `ship_stage` read lists no `linear` post for the PR; after linking, record it with `ship_stage({posted:{kind:"linear", ref:"<PR URL>"}})`.
 5. **Interface review.** If the `ship_stage` status says the reviews are skipped on the fast path, because GitHub shows the PR within the small-change limits of step 2, skip this stage and step 6: run no reviewer, call `ship_stage({stage:"ready_gate", output:{ready_gate:{checks}}})`, which records both reviews as skipped with no verdicts, and say in one line of the report that the fast path applied.
    If the repository commits no `.omp/ui-paths`, or the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"thermonuclear", output:{interface_review:{verdicts:[]}}})` and say in one line of the report that the review was skipped and why.
-   Otherwise wait until the user approves the direction, as `# Before any pull request` in `APPEND_SYSTEM.md` says, since interface findings can redesign the UI.
+   Otherwise wait until the user approves the direction, as [Before any pull request](#before-any-pull-request) says, since interface findings can redesign the UI.
    Then run `interface-reviewer` on `pr <number>` and, unless step 6 skips the Thermonuclear review, `thermonuclear-reviewer` on `pr://<number>/diff`, in one `task` call: one judges the UI against the app's design system and the other the code's quality, so neither waits for the other.
    Pass it the contract's `done_when` list from `ship_stage`, and resolve every line and bullet it marks `BLOCKING` before you move on.
    If it reports a missing `interface-review` or `better-interface` skill, stop and tell the user to install it.
    Apply both reviews' valid findings in one fresh `task` agent, isolated or in place per the Git safety rule in `AGENTS.md`, so a file both touch changes once, then integrate and verify once, commit and push.
    Once all findings are resolved and pushed, call `ship_stage({stage:"thermonuclear", output:{interface_review:{verdicts}}})`, with one `{finding, verdict}` per finding, `verdict` being `fixed`, `dismissed`, or `deferred`; it checks `- [x] Interface review` in the PR body, ticking the template's box or appending it.
 6. **Thermonuclear.** If the repository commits `.omp/review-paths` and the PR changes no file its globs match, skip this stage: the `ship_stage` status says so, the gates do not ask for the checkbox, and you call `ship_stage({stage:"ready_gate", output:{thermonuclear:{verdicts:[]}, ready_gate:{checks}}})` and say in one line of the report that the review was skipped and why.
-   Otherwise, when step 5 already ran `thermonuclear-reviewer`, run it again on the diff of the interface fix commits alone, unless they changed only copy, design tokens, or styles; when it did not, wait until the user approves the direction, as `# Before any pull request` in `APPEND_SYSTEM.md` says, then run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`.
+   Otherwise, when step 5 already ran `thermonuclear-reviewer`, run it again on the diff of the interface fix commits alone, unless they changed only copy, design tokens, or styles; when it did not, wait until the user approves the direction, as [Before any pull request](#before-any-pull-request) says, then run `thermonuclear-reviewer` on `pr://<number>/diff` with `task`.
    Pass it the contract's `done_when` list from `ship_stage`, and resolve every line and bullet it marks `BLOCKING` before you move on.
    Review the actual PR including tests.
    Apply valid findings in a fresh `task` agent, isolated or in place per the same rule, integrate and verify once with bash in this session, commit and push.
@@ -129,3 +129,34 @@ flowchart TD
 Do not create a second Linear issue, branch, PR, Linear link, or Slack post on a resumed run.
 A blocked or failed stage stays visible; report the specific blocker.
 Your final reply follows the final-answer format: bold answer first, then only the closing lines that have content.
+
+## When ship starts
+
+A todo's "Work on it" session that forbids pushing runs ship's steps up to, not including, the Draft PR step.
+When a pull request is requested later and no ship workflow exists yet, start ship then; it grills the choices the code made and resumes at the right stage.
+When the user says "no ship", call `ship_stage({stop: true})` and finish the work without the workflow.
+Subagents never open pull requests; the parent session's ship workflow does.
+A request that only reads, answers, or prototypes does not start ship, and neither does work in a repository that merges locally without pull requests, such as omp-agents.
+Before opening or adopting a PR, or rebasing a branch, read `~/.omp/agent/docs/git-workflow.md`; before marking a PR ready, merging one, or writing its description, read `~/.omp/agent/docs/review-workflow.md`.
+When a gate blocks a merge, make the fastest path that keeps the checks honest the first option you offer.
+
+## Before any pull request
+
+When your work is done and the next step is opening, pushing, or proposing a pull request, decide whether it needs a code-quality review; in a `/ship` session, ship's steps do this.
+It does when the repository commits no `.omp/review-paths`, or when any file the pull request changes matches a glob listed there (one glob per line, repository-relative; `#` starts a comment).
+Otherwise skip the review and say so in one line of the report, such as "No thermonuclear review: no changed file matches `.omp/review-paths`."
+Run the review, and write or update tests for the change, only once the user has approved the direction: by saying so, or by asking to merge, to mark the PR ready, or to ship.
+While they are still shaping it, through a prototype, a live preview, or rounds of design tweaks, a commit or a push to a draft PR triggers neither; prove each round with a smoke run on the real surface instead. Running the existing checks, and fixing a test the change broke, stays allowed.
+Until then, end each report with "Tests and thermonuclear review wait for your go on the direction." and offer "Direction approved: add tests and run the thermonuclear review" among the suggested prompts.
+When a changed file also matches `.omp/ui-paths`, the interface review runs too, before the thermonuclear one: say "Tests, interface and thermonuclear reviews wait for your go on the direction." and offer "Direction approved: add tests and run the interface and thermonuclear reviews" instead.
+
+Once the direction is approved, run the review even for a small change; in a `/ship` session, steps 5 and 6 run it. Otherwise:
+
+1. Collect `git diff <base>...HEAD` plus the working-tree `git diff` (base defaults to `main`) and the full contents of every changed file.
+2. When a changed file matches `.omp/ui-paths`, first spawn `task` with `agent: "interface-reviewer"` on the PR, apply its findings, and add `- [x] Interface review` as `~/.omp/agent/docs/review-workflow.md` says.
+   Then spawn one `task` with `agent: "thermo-nuclear-code-quality-review"`, passing that evidence under `### Git / diff output` and `### Changed file contents`. Do not run the rubric yourself or override its model.
+3. Apply every finding that keeps behavior the same and stays inside the change's scope; skip one only with a one-line reason.
+4. Re-run the checks and smoke run that proved the change, then open or update the PR.
+5. Only then say the PR is ready, naming what the review changed and any finding you skipped and why.
+
+The review subagent itself never triggers this section.

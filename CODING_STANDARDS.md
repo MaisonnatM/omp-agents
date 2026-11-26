@@ -78,6 +78,7 @@ After you read omp's source to learn a subsystem, add its files and the exports 
 - A socket message: `ClientMsg` or `ServerMsg` in `src/shared/protocol.ts`, parsed in `src/server/wire.ts`, handled in `src/server/socket.ts` and `web/use-dashboard.ts`.
 - A keyboard shortcut: the table in `web/shortcuts.ts`.
 - A control only the page sees, which no view, command, or action records: its id in `CONTROLS` in `src/shared/activity.ts`, spread `activityControl(id)` from `web/activity.ts` on it, and a row in the coverage table of `docs/architecture/activity.md`.
+- A popup, list, tab, or other interactive part of the page: UI SDK (`@ui-sdk/react`) primitives; read `node_modules/@ui-sdk/react/docs/llms.txt` first, and for a new component search `node_modules/@ui-sdk/react/docs/core.md` by heading and read `rendering.md` beside it.
 
 ## Markdown
 

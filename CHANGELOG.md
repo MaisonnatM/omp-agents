@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-26
 
 - A Board session now asks first only when your message is unclear, such as when it could mean two different changes. A clear request, such as "Merge on main" or a plain "make the button blue", runs right away.
+- Behind the scenes: the agent's always-loaded instructions shrank from about 6,000 tokens to about 900. Rules only some tasks need, such as design handoff, pull-request reviews, and subagent worktrees, now live in skills that load when the task needs them.
 - A Board session now talks before it builds. Unless your message names the exact step, such as "Merge on main", it first replies in the thread with what it understood, the change it would make, and its questions, and starts work only once you answer.
 - Behind the scenes: every lint rule now has a sample file it must flag, so a rule that quietly stops working fails the checks, and a new rule can start with its old findings listed and only ever shrink them.
 - Notifications now appear at the top center of the window, and every one, including those still working, has a close button.
