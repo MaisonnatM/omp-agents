@@ -61,7 +61,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 
 - A session started on a Board task finishes it on its own: it commits its work on its branch, or opens a draft PR in a repository that ships through pull requests, and never merges unasked.
 - It marks the Board task done with a message that says what it did, names its branch or pull request, and ends on suggested next steps, such as **Merge on main**; then it ends itself, so nothing stays running.
-- The suggested next steps show as buttons under that message. A click sends it as your reply, which starts a new session that does it, such as landing the branch on `main`; typing your own reply does the same.
+- The suggested next steps show under the thread's reply box, as under a session's composer, with the same keys: Enter sends one, Tab fills it in to edit first. Sending one is your reply, which starts a new session that does it, such as landing the branch on `main`; typing your own reply does the same.
 
 ## What sessions do
 

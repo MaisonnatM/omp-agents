@@ -40,7 +40,7 @@ import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute, BoardView } from "./module";
 import { boardTabsOn, WorkspaceTab } from "./tabs";
-import { boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, THREAD_TABS } from "./sidebar";
+import { boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
 import { botRows } from "../../bots-model";
@@ -296,9 +296,6 @@ function workOf(state: BoardState, task: BoardTask, sessions: KnownSessions): Wo
 	return stop ? { kind: "waiting", sessionId, stop } : { kind: "working", sessionId };
 }
 
-/** A question waits in the session's conversation; a turn it ended waits for your reply in the thread. */
-const answersInConversation = (work: Work): boolean => work.kind === "waiting" && work.stop.kind !== "turn-ended";
-
 /** What a Board task in work shows: shimmering while a session starts or works, else in amber what its session waits on you for, then `detail`. */
 function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 	const [label, rest] =
@@ -317,12 +314,11 @@ function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 	);
 }
 
-/** A row under a Board task still in work, in the thread summary's style: who works on it and how it stands, as a Slack bot shows it is thinking; it opens that session's conversation in the thread, or the thread itself while the session waits for your reply there. */
+/** A row under a Board task still in work, in the thread summary's style: who works on it and how it stands, as a Slack bot shows it is thinking; it opens the thread with its Thread tab in front. */
 function WorkingLine({ work, sessions, href }: { work: Work; sessions: KnownSessions; href: string }) {
 	const sessionId = work.kind === "starting" ? null : work.sessionId;
-	const reveal = work.kind === "working" || answersInConversation(work);
 	return (
-		<a {...activityControl("board.task.open")} href={href} onClick={reveal ? revealSessionTab : undefined} className="mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background">
+		<a {...activityControl("board.task.open")} href={href} onClick={revealThreadTab} className="mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background">
 			{sessionId ? (
 				<Avatar by={{ kind: "session", sessionId }} sessions={sessions} size="summary" />
 			) : (
@@ -514,7 +510,7 @@ function ThreadSummary({ replies, unread, work, sessions, href }: { replies: Ext
 		<a
 			{...activityControl("board.task.open")}
 			href={href}
-			onClick={work && answersInConversation(work) ? revealSessionTab : undefined}
+			onClick={revealThreadTab}
 			className="group/summary mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background"
 		>
 			<span className="flex gap-0.5">
@@ -714,13 +710,11 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 	return <DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={row?.cwd ?? null} tabs={tabs} trailing={close} />;
 }
 
-/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. Under a done Board task's last reply sit its session's suggested prompts; each sends itself as the user's reply, which starts a new session on the thread. */
+/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. */
 function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChange, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; children: ReactNode }) {
 	const work = workOf(state, task, sessions);
 	const replies = said(task);
 	const count = replies.length;
-	const last = replies.at(-1);
-	const suggestions = task.doneAt !== null && last?.by.kind === "session" ? splitSuggestions(last.text).suggestions : [];
 	let previous: { at: number; by: BoardAuthor } = task;
 	// The message being edited: the Board task, or a reply by its index in `task.replies`.
 	const [editing, setEditing] = useState<"task" | number | null>(null);
@@ -766,15 +760,6 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 												toolbar={entry.by.kind === "user" && editing !== index ? <EditButton disabled={disabled} onEdit={() => setEditing(index)} /> : undefined}
 											>
 												{editing === index ? editor(entry.text, index) : <BoardText text={replyText(entry.by, entry.text)} editedAt={entry.editedAt} />}
-												{entry === last && suggestions.length > 0 && (
-													<div {...activityControl("board.thread.suggestion")} role="group" aria-label="Suggested next steps" className="flex flex-wrap gap-1.5 pt-1.5">
-														{suggestions.map(prompt => (
-															<Button key={prompt} variant="outline" size="compact" disabled={disabled} onClick={() => void onChange({ op: "reply", by: { kind: "user" }, task: task.id, text: prompt, ...(task.launch ? { launch: task.launch } : {}) })}>
-																{prompt}
-															</Button>
-														))}
-													</div>
-												)}
 											</MessageRow>
 										</MessageScrollerItem>
 									</li>
@@ -808,8 +793,10 @@ function ScrollToReply({ reply }: { reply: number }) {
 /** The thread's `@` menu offers sessions only, so a reply can point its session at another. */
 const THREAD_MENTIONS = ["session"] as const;
 
-/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name`, or on a done Board task starts a new one, on the model, thinking level, and skill picked here. */
+/** The thread's reply box, the New session composer without its directory picker: the reply wakes the session named `name`, or on a done Board task starts a new one, on the model, thinking level, and skill picked here. A done Board task's session's suggested prompts list under its action bar; each sends itself as the user's reply. */
 function ThreadComposer({ task, name, core, workspace, disabled, onChange, onSend }: { task: BoardTask; name: string | null; core: CoreData; workspace: Workspace; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onSend: () => void }) {
+	const last = said(task).at(-1);
+	const prompts = task.doneAt !== null && last?.by.kind === "session" ? splitSuggestions(last.text).suggestions : undefined;
 	const { send } = useDashboardActions();
 	const { scrollToEnd } = useMessageScroller();
 	const reply = async ({ prompt, images, model, thinking, skill }: ComposerSend) => {
@@ -825,6 +812,7 @@ function ThreadComposer({ task, name, core, workspace, disabled, onChange, onSen
 					placeholder: task.doneAt !== null ? "Reply to start a new session on it…" : name ? `Reply to ${name}…` : "Reply…",
 					sendLabel: task.doneAt !== null ? "Send reply; a new session takes it from the thread" : name ? "Send reply; it wakes the session if it stopped" : "Send reply",
 					mentions: THREAD_MENTIONS,
+					prompts,
 				}}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
