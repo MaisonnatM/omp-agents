@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- Board threads no longer suggest ending the session, which a Board session does by itself.
 - Behind the scenes: an eval run now stops when a task's hidden tests could not run, such as with Docker down, instead of scoring every run after it as the model's failure.
 - The comment count on each Pull requests row now counts only unresolved review threads, and hides when none are left open.
 - Opening a Board thread from the message list now always shows its Thread tab first, not the session's conversation.
