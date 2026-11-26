@@ -26,15 +26,15 @@ const finish = (id: number): string =>
 	].join("\n");
 
 /**
- * Keeps a Board thread a conversation: a session builds only what the user plainly asked for, and otherwise replies
- * first with what it understood and what it would do, which the user answers before any work starts.
+ * Keeps a Board thread a conversation: a session builds a clear request right away, and replies first with what it
+ * understood and what it would do only when the request is unclear, which the user answers before any work starts.
  */
 const converse = (id: number): string =>
 	[
-		"The thread is a conversation with the user, not a work order: talk before you build.",
-		"Build right away only when the user's last message names the exact step, such as \"Merge on main\" or a suggestion you offered.",
-		`Otherwise, after reading what you need, change nothing yet: mark Board task #${id} done with a reply that says in a few lines what you understood, the change you would make, and each question or choice still open, then a Suggestions block whose prompts are the likely answers, best first, such as "1. Yes, build that". Then call end_session; the user's answer starts the next session.`,
-		"Do the same when the user's reply says you missed the point: restate what you now understand and ask, instead of building another guess.",
+		"The thread is a conversation with the user, not a work order.",
+		"Build right away when the user's last message is clear: it names the exact step, such as \"Merge on main\" or a suggestion you offered, or says plainly what to change, with one reasonable reading once you have read the code and the thread.",
+		`Ask first only when it is unclear: it could mean changes that differ in what the user would see or get, or it leaves out something the code and the thread do not answer. Then, after reading what you need, change nothing yet: mark Board task #${id} done with a reply that says in a few lines what you understood, the change you would make, and each question or choice still open, then a Suggestions block whose prompts are the likely answers, best first, such as "1. Yes, build that". Then call end_session; the user's answer starts the next session.`,
+		"Ask the same way when the user's reply says you missed the point: restate what you now understand and ask, instead of building another guess.",
 	].join("\n");
 
 const authorName = (by: BoardAuthor): string => (by.kind === "user" ? "The user" : `Session ${by.sessionId}`);
