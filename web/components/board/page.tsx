@@ -130,7 +130,8 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 					</>
 				) : (
 					<HeaderTitleShown.Provider value={false}>
-						<div className="flex min-h-0 flex-1">
+						{/* A column, as the page area beside the page column is, so every tab's page takes the full width. */}
+						<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 							<WorkspaceTab view={view} workspace={open} core={core} disabled={disabled} />
 						</div>
 					</HeaderTitleShown.Provider>

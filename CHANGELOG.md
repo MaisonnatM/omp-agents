@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- A Board Workspace's **Bots** and **Settings** tabs now look like the Sessions side's pages: the Bots tab lists its Bots in a resizable column with search, and the Settings tab lists its sections with **Search settings**. The **Memory** tab now fills the width, with the open memory beside the list.
 - A Board session now asks first only when your message is unclear, such as when it could mean two different changes. A clear request, such as "Merge on main" or a plain "make the button blue", runs right away.
 - Behind the scenes: the agent's always-loaded instructions shrank from about 6,000 tokens to about 900. Rules only some tasks need, such as design handoff, pull-request reviews, and subagent worktrees, now live in skills that load when the task needs them.
 - Behind the scenes: the Escape key that closes a Board thread, a link preview, or an inline confirm now goes through the shortcut table, and two more large source files are split under the size limit.
