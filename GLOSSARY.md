@@ -219,10 +219,6 @@ _Avoid_: Task (omp's task tool), todo, ticket, issue
 A Board task and the replies under it: what you and its sessions said, ending on the outcome of the session that did the work.
 _Avoid_: Thread (alone), conversation, session
 
-**Lease**:
-The 15 minutes a claim on a Board task lasts unless the session renews it; once it runs out, the Board task is ready again and a new session starts on it.
-_Avoid_: Lock, timeout
-
 ## Sport
 
 **Workout**:

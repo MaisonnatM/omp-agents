@@ -5,6 +5,11 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- **Merge on main** on a Board task now merges right away from the server, without starting a session; a session starts only if the merge fails.
+- Each Board task now has its own branch, `board/<id>`, and every session on it starts in that branch's folder, so no session has to look for it.
+- A Board session ends itself when it marks its task done, and no longer renews a 15-minute hold on it. Marking done first runs the quick merge checks, so a missing changelog line or an unexplained test edit is fixed by the session that made it.
+- Screenshot checks sign in to the page without printing your access token into the session.
+- An ended session now reads as finished in the archive instead of interrupted.
 - A Board Workspace's **Projects** tab now lists its projects in a resizable column with search, **All projects**, and **New project**, as the **Bots** tab does; a project you pick opens on the right, beside the list.
 - Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its blue unread count comes back, counting from that reply, until you open the thread again.
 - The Board looks calmer: reply counts and unread counts use the app's own colors instead of bright blue, names drop the **SESSION** tag and use one size, the open Board task is marked in gray instead of yellow, the last reply's time no longer turns into "View thread" on hover, and messages line up with the Board's title.

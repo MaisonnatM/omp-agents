@@ -3,8 +3,6 @@
 // Board tasks. The kit cannot import the dashboard's `src/`, so the dashboard imports this file instead: one copy
 // of the event shapes, the checks, and the fold. It imports nothing, so it runs in either place.
 
-/** How long a claim holds a Board task before the dashboard's sweep returns it to ready, unless it is renewed. */
-export const LEASE_MS = 15 * 60_000;
 /** The longest title, reply, body, and label a Board change takes. */
 export const MAX_TITLE = 200;
 export const MAX_TEXT = 8000;
@@ -22,31 +20,30 @@ export interface BoardLaunch {
 
 /**
  * What the page and the `board` tool ask for. The server stamps each with the time, and a post with its number,
- * then appends it to the log. `start`, `woke`, and `expire` come only from the server itself: auto-start, the wake
- * path, and the lease sweep.
+ * then appends it to the log. `start`, `woke`, `expire`, and `land` come only from the server itself: auto-start, the
+ * wake path, a session that exited without marking its Board task done, and the merge it runs for a bare "Merge on main".
  */
 export type BoardChange =
 	| { op: "post"; by: BoardAuthor; workspace: string; title: string; text?: string; labels?: Record<string, string>; needs?: number[]; launch?: BoardLaunch }
 	| { op: "reply"; by: BoardAuthor; task: number; text: string; launch?: BoardLaunch }
 	| { op: "edit"; by: BoardAuthor; task: number; reply?: number; text: string }
 	| { op: "claim"; sessionId: string; task: number }
-	| { op: "renew"; sessionId: string; task: number }
 	| { op: "done"; sessionId: string; task: number; text?: string }
-	| { op: "start"; task: number; sessionId: string | null; error?: string }
+	| { op: "start"; task: number; sessionId: string | null; error?: string; branch?: string; worktree?: string }
 	| { op: "woke"; task: number; sessionId: string }
-	| { op: "expire"; task: number };
+	| { op: "expire"; task: number }
+	| { op: "land"; task: number; landed: boolean; text: string };
 
 /** One line of the log: a change with when it happened, and a post with the number it took. */
 export type BoardEvent = BoardChange & { at: number; id?: number };
 
-/** A session's claim on a Board task, which lapses at `until` unless renewed. */
+/** An interactive session's claim on a Board task, which holds it until the session marks it done or exits. */
 export interface BoardClaim {
 	sessionId: string;
 	at: number;
-	until: number;
 }
 
-/** The session auto-start opened on a Board task since it last became ready; `sessionId` is `null` when the start failed. */
+/** The session auto-start opened on a Board task since it last became ready, which owns it; `sessionId` is `null` when the start failed. */
 export interface BoardStart {
 	sessionId: string | null;
 	at: number;
@@ -54,14 +51,15 @@ export interface BoardStart {
 
 /** A grey line of a Board thread, which the Board writes, not a person or a session. */
 export type BoardNote =
-	| { kind: "started"; sessionId: string }
+	| { kind: "started"; sessionId: string; branch?: string }
 	| { kind: "start-failed"; error: string }
 	| { kind: "claimed"; sessionId: string }
-	| { kind: "renewed"; sessionId: string }
 	| { kind: "expired"; sessionId: string }
 	| { kind: "unclaimed"; sessionId: string | null }
 	| { kind: "woke"; sessionId: string }
-	| { kind: "done"; sessionId: string };
+	| { kind: "done"; sessionId: string }
+	| { kind: "landed"; text: string }
+	| { kind: "land-failed"; text: string };
 
 /** A reply keeps the model, thinking level, and skill picked for the session it wakes, which a session's own reply leaves out. */
 export type BoardReply = { at: number; by: BoardAuthor; text: string; launch?: BoardLaunch; editedAt?: number } | { at: number; note: BoardNote };
@@ -93,31 +91,41 @@ export interface BoardState {
 	nextId: number;
 }
 
-export type BoardStatus = { kind: "done" } | { kind: "claimed"; sessionId: string; until: number } | { kind: "waiting"; on: number } | { kind: "ready" };
+export type BoardStatus = { kind: "done" } | { kind: "claimed"; sessionId: string } | { kind: "waiting"; on: number } | { kind: "ready" };
 
 export const emptyBoard = (): BoardState => ({ tasks: [], nextId: 1 });
 
 const findTask = (state: BoardState, id: number): BoardTask | undefined => state.tasks.find(task => task.id === id);
 
-/** Where Board task `task` stands: done, claimed, waiting on the first Board task it needs that is not done, or ready. */
+/** Where Board task `task` stands: done, held by the session that claimed it or was started on it, waiting on the first Board task it needs that is not done, or ready. */
 export function statusOf(state: BoardState, task: BoardTask): BoardStatus {
 	if (task.doneAt !== null) return { kind: "done" };
-	if (task.claim) return { kind: "claimed", sessionId: task.claim.sessionId, until: task.claim.until };
+	const holder = holderOf(task);
+	if (holder !== null) return { kind: "claimed", sessionId: holder };
 	const on = task.needs.find(id => findTask(state, id)?.doneAt === null);
 	return on === undefined ? { kind: "ready" } : { kind: "waiting", on };
 }
 
+/** The session that holds `task`: the one that claimed it, else the one started on it; `null` when none does. */
+export const holderOf = (task: BoardTask): string | null => task.claim?.sessionId ?? task.start?.sessionId ?? null;
+
 /** The Board tasks that are ready and have no session started on them: auto-start opens one session on each. */
 export const unstartedReady = (state: BoardState): BoardTask[] => state.tasks.filter(task => task.start === null && statusOf(state, task).kind === "ready");
 
-/** The Board tasks whose lease, or whose start's unclaimed wait, ran out by `now`. */
-export const lapsed = (state: BoardState, now: number): BoardTask[] =>
-	state.tasks.filter(task => task.doneAt === null && (task.claim ? task.claim.until <= now : task.start !== null && task.start.at + LEASE_MS <= now));
+/** The branch the sessions on `task` work on, as the last start recorded it; `null` when none did, such as in a directory outside git. */
+export const branchOf = (task: BoardTask): string | null => task.replies.flatMap(entry => ("note" in entry && entry.note.kind === "started" && entry.note.branch ? [entry.note.branch] : [])).at(-1) ?? null;
+
+/** The reply that asks the server to merge a done Board task's branch, as the suggestion a session offers reads. */
+export const MERGE_REPLY = "Merge on main";
+
+/** Whether the user's reply `text` on done Board task `task` is a bare {@link MERGE_REPLY} the server lands itself, keeping the task done, rather than a request a new session takes. */
+export const landsOnReply = (task: BoardTask, by: BoardAuthor, text: string): boolean =>
+	task.doneAt !== null && by.kind === "user" && branchOf(task) !== null && text.trim().replace(/\.$/, "").toLowerCase() === MERGE_REPLY.toLowerCase();
 
 /**
  * The session a reply on `task` by `by` wakes: the claimer, else the session started on it, else the thread's author
  * when a session wrote it; never the replier itself. A done Board task wakes nobody: a reply from the user reopens it,
- * and a new session starts on its thread.
+ * and a new session starts on its thread, unless it is a bare {@link MERGE_REPLY}, which the server lands.
  */
 export function wakeTarget(task: BoardTask, by: BoardAuthor): string | null {
 	if (task.doneAt !== null) return null;
@@ -132,7 +140,7 @@ export const startedOn = (task: BoardTask): string[] => task.replies.flatMap(ent
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 
 /** Why `state` refuses `change`, or `null` when it takes it. */
-export function refusal(state: BoardState, change: BoardChange, now: number): string | null {
+export function refusal(state: BoardState, change: BoardChange): string | null {
 	if (change.op === "post") {
 		if (!oneLine(change.title)) return "A Board task needs a title.";
 		if (!change.workspace.trim()) return "A Board task needs a workspace.";
@@ -153,14 +161,14 @@ export function refusal(state: BoardState, change: BoardChange, now: number): st
 		case "claim":
 			if (status.kind === "done") return `Board task #${task.id} is done.`;
 			if (status.kind === "waiting") return `Board task #${task.id} waits on #${status.on}, which is not done.`;
-			if (status.kind === "claimed") return status.sessionId === change.sessionId ? null : `Board task #${task.id} is claimed by session ${status.sessionId} for ${Math.max(0, Math.ceil((status.until - now) / 60_000))} more minutes.`;
+			if (status.kind === "claimed") return status.sessionId === change.sessionId ? null : `Board task #${task.id} is held by session ${status.sessionId}.`;
 			return null;
-		case "renew":
 		case "done":
 			if (status.kind === "done") return `Board task #${task.id} is done.`;
 			return status.kind === "claimed" && status.sessionId === change.sessionId ? null : `This session holds no claim on Board task #${task.id}; claim it first.`;
 		case "start":
 		case "woke":
+		case "land":
 			return null;
 		case "expire":
 			return status.kind === "done" ? `Board task #${task.id} is done.` : null;
@@ -197,8 +205,10 @@ export function fold(state: BoardState, event: BoardEvent): BoardState {
 				...state,
 				tasks: edit(event.task, task => {
 					const replied = { ...task, replies: [...task.replies, { at, by: event.by, text: event.text.trim(), ...(event.launch ? { launch: event.launch } : {}) }] };
-					// The user's reply on a done Board task reopens it, so a new session starts on its thread with the launch the reply picked.
-					return task.doneAt !== null && event.by.kind === "user" ? { ...replied, doneAt: null, start: null, launch: event.launch ?? task.launch } : replied;
+					if (landsOnReply(task, event.by, event.text)) return replied;
+					// The user's reply on a done Board task, or on one whose session failed to start, reopens it, so a new session starts on its thread with the launch the reply picked.
+					const reopens = event.by.kind === "user" && (task.doneAt !== null || task.start?.sessionId === null);
+					return reopens ? { ...replied, doneAt: null, start: null, launch: event.launch ?? task.launch } : replied;
 				}),
 			};
 		case "edit": {
@@ -215,9 +225,7 @@ export function fold(state: BoardState, event: BoardEvent): BoardState {
 			};
 		}
 		case "claim":
-			return { ...state, tasks: edit(event.task, task => note({ ...task, claim: { sessionId: event.sessionId, at, until: at + LEASE_MS } }, { kind: "claimed", sessionId: event.sessionId })) };
-		case "renew":
-			return { ...state, tasks: edit(event.task, task => note({ ...task, claim: task.claim && { ...task.claim, until: at + LEASE_MS } }, { kind: "renewed", sessionId: event.sessionId })) };
+			return { ...state, tasks: edit(event.task, task => note({ ...task, claim: { sessionId: event.sessionId, at } }, { kind: "claimed", sessionId: event.sessionId })) };
 		case "done": {
 			const tasks = edit(event.task, task => {
 				const closed = note({ ...task, claim: null, doneAt: at }, { kind: "done", sessionId: event.sessionId });
@@ -228,18 +236,31 @@ export function fold(state: BoardState, event: BoardEvent): BoardState {
 		case "start":
 			return {
 				...state,
-				tasks: edit(event.task, task => note({ ...task, start: { sessionId: event.sessionId, at } }, event.sessionId === null ? { kind: "start-failed", error: event.error ?? "It did not start." } : { kind: "started", sessionId: event.sessionId })),
+				tasks: edit(event.task, task =>
+					note(
+						{ ...task, start: { sessionId: event.sessionId, at } },
+						event.sessionId === null ? { kind: "start-failed", error: event.error ?? "It did not start." } : { kind: "started", sessionId: event.sessionId, ...(event.branch ? { branch: event.branch } : {}) },
+					),
+				),
 			};
 		case "woke":
 			return { ...state, tasks: edit(event.task, task => note(task, { kind: "woke", sessionId: event.sessionId })) };
 		case "expire":
 			return { ...state, tasks: edit(event.task, task => note({ ...task, claim: null, start: null }, task.claim ? { kind: "expired", sessionId: task.claim.sessionId } : { kind: "unclaimed", sessionId: task.start?.sessionId ?? null })) };
+		case "land":
+			// A merge that failed reopens its Board task, so a new session starts on the thread, which ends on why.
+			return {
+				...state,
+				tasks: edit(event.task, task =>
+					event.landed ? note(task, { kind: "landed", text: event.text }) : note({ ...task, ...(task.doneAt !== null ? { doneAt: null, start: null } : {}) }, { kind: "land-failed", text: event.text }),
+				),
+			};
 	}
 }
 
 /** `state` with `change` applied at `now`, as the server appends it, or why it refuses. */
 export function applyChange(state: BoardState, change: BoardChange, now: number): { ok: BoardState; event: BoardEvent } | { error: string } {
-	const refused = refusal(state, change, now);
+	const refused = refusal(state, change);
 	if (refused !== null) return { error: refused };
 	const event: BoardEvent = change.op === "post" ? { ...change, at: now, id: state.nextId } : { ...change, at: now };
 	return { ok: fold(state, event), event };
@@ -316,20 +337,29 @@ export function parseChange(value: unknown, server = true): BoardChange | null {
 			const reply = value.reply === undefined ? undefined : Number.isSafeInteger(value.reply) && (value.reply as number) >= 0 ? (value.reply as number) : null;
 			return by && reply !== null && isId(value.task) && isText(value.text, MAX_TEXT) ? { op: "edit", by, task: value.task, ...(reply === undefined ? {} : { reply }), text: value.text } : null;
 		}
+		// A `renew` line, from when a claim held a lease, reads as no event: the lease is gone, and the claim holds on its own.
 		case "claim":
-		case "renew":
-			return isId(value.task) && isText(value.sessionId, 200) && value.sessionId ? { op: value.op, task: value.task, sessionId: value.sessionId } : null;
+			return isId(value.task) && isText(value.sessionId, 200) && value.sessionId ? { op: "claim", task: value.task, sessionId: value.sessionId } : null;
 		case "done":
 			return isId(value.task) && isText(value.sessionId, 200) && value.sessionId && (value.text === undefined || isText(value.text, MAX_TEXT))
 				? { op: "done", task: value.task, sessionId: value.sessionId, ...(typeof value.text === "string" ? { text: value.text } : {}) }
 				: null;
 		case "start":
 			if (!server || !isId(value.task) || !(value.sessionId === null || isText(value.sessionId, 200))) return null;
-			return { op: "start", task: value.task, sessionId: value.sessionId as string | null, ...(typeof value.error === "string" ? { error: value.error } : {}) };
+			return {
+				op: "start",
+				task: value.task,
+				sessionId: value.sessionId as string | null,
+				...(typeof value.error === "string" ? { error: value.error } : {}),
+				...(isText(value.branch, 200) && value.branch ? { branch: value.branch } : {}),
+				...(isText(value.worktree, 4096) && value.worktree ? { worktree: value.worktree } : {}),
+			};
 		case "woke":
 			return server && isId(value.task) && isText(value.sessionId, 200) ? { op: "woke", task: value.task, sessionId: value.sessionId } : null;
 		case "expire":
 			return server && isId(value.task) ? { op: "expire", task: value.task } : null;
+		case "land":
+			return server && isId(value.task) && typeof value.landed === "boolean" && isText(value.text, MAX_TEXT) ? { op: "land", task: value.task, landed: value.landed, text: value.text } : null;
 		default:
 			return null;
 	}

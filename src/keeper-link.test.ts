@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { attachKeeper, type KeeperLink, listKeepers, startKeeper } from "./keeper-link";
@@ -14,8 +14,14 @@ import type { RpcClient } from "./omp/rpc";
  * `call` a host tool call of tool `frame.tool`, and `big` one over omp's 1 MB line limit, which it writes as `rpc_chunk`s
  * as omp does. `job` starts a background job and `exit` exits. `get_state` reports, as `sessionName`, what it heard: how
  * often it negotiated, the answers, the host tool results, and the job's pid. Started with `v1`, it offers protocol 1 only.
+ * Ended by its input closing or by SIGTERM, it writes which into `ended` beside it, as omp records a normal or a killed exit.
  */
 const FAKE_OMP = `
+import { writeFileSync } from "node:fs";
+process.on("SIGTERM", () => {
+	writeFileSync(import.meta.dir + "/ended", "SIGTERM");
+	process.exit(143);
+});
 const heard = { negotiations: 0, answers: [], tools: [], job: null };
 const out = frame => process.stdout.write(JSON.stringify(frame) + "\\n");
 if (process.argv[2] === "fail") {
@@ -61,6 +67,9 @@ for await (const chunk of Bun.stdin.stream()) {
 		else reply({});
 	}
 }
+writeFileSync(import.meta.dir + "/ended", "input closed");
+// As omp ends once it disposed the session, while its background job runs on.
+process.exit(0);
 `;
 
 const dirs: string[] = [];
@@ -213,7 +222,7 @@ describe("session keeper", () => {
 		expect(alive(link.process.pid)).toBe(true);
 	});
 
-	test("End session stops omp, the background jobs it started, and its keeper, and leaves no files", async () => {
+	test("End session closes omp's input, so omp exits as from a quit, and stops the background jobs it started, and its keeper, leaving no files", async () => {
 		const dir = scratch();
 		const link = await start(dir);
 		const { client } = await drive(link);
@@ -223,7 +232,8 @@ describe("session keeper", () => {
 		await client.stop();
 		expect(alive(link.process.pid)).toBe(false);
 		expect(alive(job ?? 0)).toBe(false);
-		await eventually(() => readdirSync(dir).filter(name => name !== "omp.ts").length === 0);
+		expect(readFileSync(join(dir, "ended"), "utf8")).toBe("input closed");
+		await eventually(() => readdirSync(dir).filter(name => name !== "omp.ts" && name !== "ended").length === 0);
 		expect(Bun.spawnSync(["pgrep", "-f", join(dir, "s1.sock")]).stdout.toString()).toBe("");
 	});
 

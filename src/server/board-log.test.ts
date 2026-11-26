@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyChange, type BoardChange, type BoardState, emptyBoard, LEASE_MS, lapsed, parseChange, readLog, startedOn, statusOf, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
+import { applyChange, type BoardChange, type BoardState, branchOf, emptyBoard, parseChange, readLog, startedOn, statusOf, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
 import { BoardLog } from "./board-log";
 
 const WS = "/work/app";
@@ -42,43 +42,46 @@ describe("the Board's projection", () => {
 		expect(task(state, 1).replies.at(-1)).toEqual({ at: 4, by: session("a"), text: "Shipped." });
 	});
 
-	test("it refuses a claim on a waiting, claimed, or done Board task, and a post that needs one that does not exist", () => {
+	test("it refuses a claim on a waiting, held, or done Board task, done from a session that holds none, and a post that needs one that does not exist", () => {
 		const state = play([
 			[0, { op: "post", by: user, workspace: WS, title: "One" }],
 			[0, { op: "post", by: user, workspace: WS, title: "Two", needs: [1] }],
 			[1, { op: "claim", sessionId: "a", task: 1 }],
 		]);
 		expect(applyChange(state, { op: "claim", sessionId: "b", task: 2 }, 2)).toEqual({ error: "Board task #2 waits on #1, which is not done." });
-		expect(applyChange(state, { op: "claim", sessionId: "b", task: 1 }, 2)).toEqual({ error: "Board task #1 is claimed by session a for 15 more minutes." });
-		expect(applyChange(state, { op: "renew", sessionId: "b", task: 1 }, 2)).toEqual({ error: "This session holds no claim on Board task #1; claim it first." });
+		expect(applyChange(state, { op: "claim", sessionId: "b", task: 1 }, 2)).toEqual({ error: "Board task #1 is held by session a." });
+		expect(applyChange(state, { op: "done", sessionId: "b", task: 1 }, 2)).toEqual({ error: "This session holds no claim on Board task #1; claim it first." });
 		expect(applyChange(state, { op: "post", by: user, workspace: WS, title: "Three", needs: [9] }, 2)).toEqual({ error: "There is no Board task #9 to wait on." });
 		const done = play([[3, { op: "done", sessionId: "a", task: 1 }]], state);
 		expect(applyChange(done, { op: "claim", sessionId: "b", task: 1 }, 4)).toEqual({ error: "Board task #1 is done." });
 	});
 
-	test("a lease lapses 15 minutes after the claim or its last renewal, and expiring it makes the Board task ready to start again", () => {
+	test("the session started on a Board task holds it without claiming, and marks it done; expiring it makes the Board task ready to start again", () => {
 		let state = play([
 			[0, { op: "post", by: user, workspace: WS, title: "One" }],
-			[0, { op: "start", task: 1, sessionId: "a" }],
-			[10, { op: "claim", sessionId: "a", task: 1 }],
+			[1, { op: "start", task: 1, sessionId: "a", branch: "board/1", worktree: "/work/app-wt/board-1" }],
 		]);
-		expect(lapsed(state, 10 + LEASE_MS - 1)).toEqual([]);
-		state = play([[5000, { op: "renew", sessionId: "a", task: 1 }]], state);
-		expect(lapsed(state, 10 + LEASE_MS)).toEqual([]);
-		expect(lapsed(state, 5000 + LEASE_MS).map(each => each.id)).toEqual([1]);
-		state = play([[5000 + LEASE_MS, { op: "expire", task: 1 }]], state);
+		expect(statusOf(state, task(state, 1))).toEqual({ kind: "claimed", sessionId: "a" });
+		expect(branchOf(task(state, 1))).toBe("board/1");
+		expect(applyChange(state, { op: "claim", sessionId: "b", task: 1 }, 2)).toEqual({ error: "Board task #1 is held by session a." });
+		const finished = play([[2, { op: "done", sessionId: "a", task: 1 }]], state);
+		expect(statusOf(finished, task(finished, 1))).toEqual({ kind: "done" });
+		state = play([[2, { op: "expire", task: 1 }]], state);
 		expect(statusOf(state, task(state, 1))).toEqual({ kind: "ready" });
 		expect(unstartedReady(state).map(each => each.id)).toEqual([1]);
-		expect(task(state, 1).replies.at(-1)).toEqual({ at: 5000 + LEASE_MS, note: { kind: "expired", sessionId: "a" } });
+		expect(task(state, 1).replies.at(-1)).toEqual({ at: 2, note: { kind: "unclaimed", sessionId: "a" } });
 	});
 
-	test("a started session that never claims lapses too", () => {
-		const state = play([
-			[0, { op: "post", by: user, workspace: WS, title: "One" }],
-			[0, { op: "start", task: 1, sessionId: "a" }],
-		]);
-		expect(unstartedReady(state)).toEqual([]);
-		expect(lapsed(state, LEASE_MS).map(each => each.id)).toEqual([1]);
+	test("a renew line from when claims held a lease reads as no event", () => {
+		const state = readLog(
+			[
+				JSON.stringify({ op: "post", by: user, workspace: WS, title: "One", at: 0, id: 1 }),
+				JSON.stringify({ op: "claim", sessionId: "a", task: 1, at: 1 }),
+				JSON.stringify({ op: "renew", sessionId: "a", task: 1, at: 2 }),
+			].join("\n"),
+		);
+		expect(task(state, 1).claim).toEqual({ sessionId: "a", at: 1 });
+		expect(task(state, 1).replies).toEqual([{ at: 1, note: { kind: "claimed", sessionId: "a" } }]);
 	});
 
 	test("a reply wakes the claimer, else the started session or a session author, never the replier, and nobody once done", () => {
@@ -103,7 +106,6 @@ describe("the Board's projection", () => {
 		const done = play([
 			[0, { op: "post", by: user, workspace: WS, title: "One" }],
 			[1, { op: "start", task: 1, sessionId: "first" }],
-			[2, { op: "claim", sessionId: "first", task: 1 }],
 			[3, { op: "done", sessionId: "first", task: 1, text: "Committed.\n\nSuggestions:\n1. Merge on main" }],
 		]);
 		expect(unstartedReady(done)).toEqual([]);
@@ -114,6 +116,34 @@ describe("the Board's projection", () => {
 		expect(unstartedReady(reopened).map(each => each.id)).toEqual([1]);
 		expect(task(reopened, 1).launch).toEqual(launch);
 		expect(startedOn(task(reopened, 1))).toEqual(["first"]);
+	});
+
+	test("a bare Merge on main on a done Board task with a branch keeps it done; a failed merge reopens it, a landed one does not", () => {
+		const done = play([
+			[0, { op: "post", by: user, workspace: WS, title: "One" }],
+			[1, { op: "start", task: 1, sessionId: "first", branch: "board/1", worktree: "/work/app-wt/board-1" }],
+			[2, { op: "done", sessionId: "first", task: 1, text: "Committed.\n\nSuggestions:\n1. Merge on main" }],
+		]);
+		const asked = play([[3, { op: "reply", by: user, task: 1, text: " merge on main. " }]], done);
+		expect(statusOf(asked, task(asked, 1))).toEqual({ kind: "done" });
+		const more = play([[3, { op: "reply", by: user, task: 1, text: "Rename it, then merge on main" }]], done);
+		expect(statusOf(more, task(more, 1))).toEqual({ kind: "ready" });
+		const landed = play([[4, { op: "land", task: 1, landed: true, text: "Landed abc." }]], asked);
+		expect(statusOf(landed, task(landed, 1))).toEqual({ kind: "done" });
+		expect(task(landed, 1).replies.at(-1)).toEqual({ at: 4, note: { kind: "landed", text: "Landed abc." } });
+		const failed = play([[4, { op: "land", task: 1, landed: false, text: "Not landed: bun test failed." }]], asked);
+		expect(unstartedReady(failed).map(each => each.id)).toEqual([1]);
+		expect(task(failed, 1).replies.at(-1)).toEqual({ at: 4, note: { kind: "land-failed", text: "Not landed: bun test failed." } });
+	});
+
+	test("the user's reply on a Board task whose session failed to start starts it again", () => {
+		const failed = play([
+			[0, { op: "post", by: user, workspace: WS, title: "One" }],
+			[1, { op: "start", task: 1, sessionId: null, error: "No worktree" }],
+		]);
+		expect(unstartedReady(failed)).toEqual([]);
+		const replied = play([[2, { op: "reply", by: user, task: 1, text: "Try again" }]], failed);
+		expect(unstartedReady(replied).map(each => each.id)).toEqual([1]);
 	});
 
 	test("a reply keeps the launch picked for the session it wakes", () => {
@@ -127,6 +157,9 @@ describe("the Board's projection", () => {
 	test("the server's own changes never come from a page or a tool", () => {
 		expect(parseChange({ op: "expire", task: 1 }, false)).toBeNull();
 		expect(parseChange({ op: "start", task: 1, sessionId: "a" }, false)).toBeNull();
+		expect(parseChange({ op: "land", task: 1, landed: true, text: "Landed." }, false)).toBeNull();
+		expect(parseChange({ op: "land", task: 1, landed: true, text: "Landed." })).toEqual({ op: "land", task: 1, landed: true, text: "Landed." });
+		expect(parseChange({ op: "renew", task: 1, sessionId: "a" }, false)).toBeNull();
 		expect(parseChange({ op: "claim", task: 1, sessionId: "a" }, false)).toEqual({ op: "claim", task: 1, sessionId: "a" });
 	});
 });
