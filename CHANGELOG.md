@@ -5,7 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
-- The Board looks calmer: reply counts and unread counts use the app's own colors instead of bright blue, names drop the **SESSION** tag and use one size, the open Board task is marked in gray instead of yellow, and the last reply's time no longer turns into "View thread" on hover.
+- The Board looks calmer: reply counts and unread counts use the app's own colors instead of bright blue, names drop the **SESSION** tag and use one size, the open Board task is marked in gray instead of yellow, the last reply's time no longer turns into "View thread" on hover, and messages line up with the Board's title.
 - An empty Board reads "Each message here becomes a Board task, and a session starts working on it", its message box reads "Message <Workspace> to start a session", and the Board shows gray placeholder rows while it loads.
 - Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its unread count comes back, counting from that reply, until you open the thread again.
 - A Board task's message in the channel has **Mark unread** too, which counts its whole thread as unread again.

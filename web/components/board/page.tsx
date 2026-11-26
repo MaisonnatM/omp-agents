@@ -186,7 +186,7 @@ export function dayLabel(at: number): string {
 /** The day's line across the messages, with its name in a pill, as Slack splits a channel by day. */
 function DayDivider({ at }: { at: number }) {
 	return (
-		<div role="separator" aria-label={dayLabel(at)} className="relative my-2 flex items-center px-5">
+		<div role="separator" aria-label={dayLabel(at)} className="relative my-2 flex items-center px-6">
 			<span className="h-px flex-1 bg-border" />
 			<span className="rounded-full border border-border bg-background px-3 py-0.5 text-xs font-medium text-muted-foreground">{dayLabel(at)}</span>
 			<span className="h-px flex-1 bg-border" />
@@ -197,7 +197,7 @@ function DayDivider({ at }: { at: number }) {
 /** The channel's stand-in while the Board loads: three message rows of avatar and text bars. */
 function BoardLoading() {
 	return (
-		<div role="status" className="flex min-h-0 flex-1 flex-col justify-end gap-5 px-5 py-6">
+		<div role="status" className="flex min-h-0 flex-1 flex-col justify-end gap-5 px-6 py-6">
 			<span className="sr-only">Loading the Board</span>
 			{[280, 420, 340].map(width => (
 				<div key={width} className="flex gap-2">
@@ -214,7 +214,7 @@ function BoardLoading() {
 
 function ChannelIntro({ name }: { name: string }) {
 	return (
-		<div className="flex flex-col gap-1 px-5 pb-4">
+		<div className="flex flex-col gap-1 px-6 pb-4">
 			<h2 className="flex items-center gap-1 text-lg font-semibold">
 				<IconHashtag aria-hidden className="size-5 text-muted-foreground" />
 				{name}
@@ -279,7 +279,7 @@ function AuthorName({ by, sessions, state, workspace }: { by: BoardAuthor; sessi
 /** One message row: avatar, name, and time, or for a grouped one only the time on hover in the avatar's place. */
 function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted = false, toolbar, children }: { by: BoardAuthor; at: number; sessions: KnownSessions; state: BoardState; workspace: string; grouped: boolean; highlighted?: boolean; toolbar?: ReactNode; children: ReactNode }) {
 	return (
-		<div className={cn("group/message relative flex gap-2 px-5 hover:bg-accent/40", grouped ? "py-0.5" : "pt-2 pb-1", highlighted && "bg-accent hover:bg-accent")}>
+		<div className={cn("group/message relative flex gap-2 px-6 hover:bg-accent/40", grouped ? "py-0.5" : "pt-2 pb-1", highlighted && "bg-accent hover:bg-accent")}>
 			<div className="flex w-9 shrink-0 justify-end">
 				{grouped ? (
 					<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="pt-0.5 text-xs text-muted-foreground tabular-nums opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100">
@@ -300,7 +300,7 @@ function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted =
 				)}
 				{children}
 			</div>
-			{toolbar && <div className="invisible absolute -top-4 right-5 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 shadow-sm group-focus-within/message:visible group-hover/message:visible">{toolbar}</div>}
+			{toolbar && <div className="invisible absolute -top-4 right-6 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 shadow-sm group-focus-within/message:visible group-hover/message:visible">{toolbar}</div>}
 		</div>
 	);
 }

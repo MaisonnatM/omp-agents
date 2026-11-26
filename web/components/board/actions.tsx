@@ -115,7 +115,7 @@ function Target({ item, className, label, children }: { item: Described; classNa
 /** One session's actions, under its last reply and aligned with the reply's text: a row per action with its company mark and name, the verb as its hover text, and an arrow when it opens. */
 export function SessionActions({ actions }: { actions: BoardAction[] }) {
 	return (
-		<ul aria-label="What the session did" className="flex flex-col items-start pt-0.5 pr-5 pb-1 pl-14">
+		<ul aria-label="What the session did" className="flex flex-col items-start pt-0.5 pr-6 pb-1 pl-15">
 			{actions.map(describe).map(item => (
 				<li key={item.key} className="max-w-full">
 					<Target item={item} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[13px]" label={`${item.verb} ${item.title}`}>
