@@ -25,6 +25,18 @@ const finish = (id: number): string =>
 		"3. Call end_session; your committed branch stays.",
 	].join("\n");
 
+/**
+ * Keeps a Board thread a conversation: a session builds only what the user plainly asked for, and otherwise replies
+ * first with what it understood and what it would do, which the user answers before any work starts.
+ */
+const converse = (id: number): string =>
+	[
+		"The thread is a conversation with the user, not a work order: talk before you build.",
+		"Build right away only when the user's last message names the exact step, such as \"Merge on main\" or a suggestion you offered.",
+		`Otherwise, after reading what you need, change nothing yet: mark Board task #${id} done with a reply that says in a few lines what you understood, the change you would make, and each question or choice still open, then a Suggestions block whose prompts are the likely answers, best first, such as "1. Yes, build that". Then call end_session; the user's answer starts the next session.`,
+		"Do the same when the user's reply says you missed the point: restate what you now understand and ask, instead of building another guess.",
+	].join("\n");
+
 const authorName = (by: BoardAuthor): string => (by.kind === "user" ? "The user" : `Session ${by.sessionId}`);
 
 /** What a session on a reopened Board task learns of the rounds before it: who worked on it, and the thread, which ends on what to do now. */
@@ -54,14 +66,15 @@ export const startPrompt = (task: BoardTask): string =>
 		`<board-task id="${task.id}">`,
 		`This session was started to do Board task #${task.id}. First claim it with the board tool (action claim, task ${task.id}), which also shows its Board thread.`,
 		...earlierRounds(task),
-		"The claim holds a 15-minute lease: renew it while you work. Reply on the thread only to ask what you cannot settle yourself.",
+		"The claim holds a 15-minute lease: renew it while you work.",
+		converse(task.id),
 		finish(task.id),
 		"</board-task>",
 	].join("\n");
 
 /** What the session a reply is for reads: it answers or does the follow-up, then finishes as a started session does. */
 export const wakePrompt = (task: BoardTask, by: BoardAuthor, text: string): string =>
-	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nWhen it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}); when it asks for more work, do it.\n${finish(task.id)}`;
+	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nWhen it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}); when it asks for more work, do it.\n${converse(task.id)}\n${finish(task.id)}`;
 
 /** What the session reads after the user edited one of their messages, which stopped its turn: the message's new text replaces the old. */
 export const editPrompt = (task: BoardTask, text: string): string =>
