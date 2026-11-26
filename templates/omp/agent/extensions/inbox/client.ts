@@ -19,7 +19,8 @@ export function readJson(path: string): unknown {
 
 /** One inbox, whose changes are `T`: `leave` one for the dashboard, or read those `waiting` for it. */
 export interface Inbox<T> {
-	leave(change: T): void;
+	/** Leaves `change` and returns the path of its file, which the dashboard deletes once it takes it, or moves to `<path>.invalid` when it refuses it. */
+	leave(change: T): string;
 	/** The changes the dashboard has not applied yet, oldest first, as their tools left them; a file that is not a JSON object is left out. */
 	waiting(): T[];
 }
@@ -37,8 +38,10 @@ export function inbox<T extends object>(dir: string): Inbox<T> {
 				lastStamp = Math.max(Date.now(), lastStamp + 1);
 				const name = `${lastStamp}-${randomUUID()}`;
 				const temp = join(dir, `${name}.tmp`);
+				const path = join(dir, `${name}.json`);
 				writeFileSync(temp, JSON.stringify(change));
-				renameSync(temp, join(dir, `${name}.json`));
+				renameSync(temp, path);
+				return path;
 			} catch (error) {
 				throw new Error(`Cannot leave the change for the dashboard: ${error instanceof Error ? error.message : String(error)}`);
 			}

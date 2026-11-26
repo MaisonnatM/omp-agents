@@ -2,7 +2,7 @@
  * **Check out** on a pull request's details: its branch in a worktree of its own with a new session on it, or in the
  * checkout the page knows through `gh pr checkout`. Neither moves uncommitted work or a branch with commits of its own.
  */
-import { git, holderOf } from "./git";
+import { git, worktreeOnBranch } from "./git";
 import { run, runChecked } from "./proc";
 import { assertWorkspaceOf, headOf, type PullRequestHead } from "./pull-request-head";
 import { type CheckedOutPullRequest, type PullRequestCheckout, pullRequestUrl } from "./shared/github";
@@ -30,7 +30,7 @@ async function checkOutHere(request: PullRequestCheckout, head: PullRequestHead)
 async function checkOutInWorktree(request: PullRequestCheckout, head: PullRequestHead, start: StartSession): Promise<CheckedOutPullRequest> {
 	const { cwd } = request;
 	const branch = head.fork ? `pr-${request.number}/${head.ref}` : head.ref;
-	const holder = await holderOf(cwd, branch);
+	const holder = await worktreeOnBranch(cwd, branch);
 	if (holder?.main) throw new Error("This PR branch is already checked out in the main repo. Use In this repository, or switch the main repo off that branch before creating a worktree session.");
 	if (!holder) {
 		try {

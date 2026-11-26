@@ -16,6 +16,7 @@ It calls `forgetReadFiles` first, which resets omp's process-wide capability cac
 - Every project `settings` item is a piece, since a settings key can name a command, an extension, or a shell.
 - Every MCP server is a piece, a URL server too, since its headers and auth can run commands.
 - Language server configs are the readable files of omp's `configFileSources` stack for `lsp`, the one omp's LSP loader reads, that sit in `cwd` or in a project config directory `getConfigDirPaths` names.
+- The land config, `.omp/land.json` at the checkout's top, is a piece when present, since the Board's checkout runs its `setup` and "Merge on main" its `setup` and `checks` with no session to ask; `boardCheckout` and `landBoardBranch` in `src/server/board-checkout.ts` admit the checkout before either.
 Skills, agents, rules, markdown commands, and context files are prompt text and never pieces.
 
 A piece's `id` is opaque and names one piece: its path from `top`, the realpath of the checkout's top, with `/` separators, or the absolute realpath for a file outside it, or `mcp:<name>` for an MCP server.

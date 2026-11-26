@@ -12,7 +12,7 @@ import { activityControl } from "../../activity";
 import type { CoreData } from "../module-views";
 import { type KnownSessions, sessionLabel } from "../../labels";
 import type { BoardRoute } from "./module";
-import { Avatar, clock, dayLabel, folder } from "./page";
+import { Avatar, clock, dayLabel, folder } from "./messages";
 import { type BoardHit, type BoardScope, type BoardSearch, matchRanges, scopeOf, searchBoard, snippet } from "./search";
 import { hashForBoard } from "./sidebar";
 

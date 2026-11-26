@@ -3,7 +3,7 @@ import { IconChevronDownSmall, IconFolder1, IconFolderOpen, IconPin, IconUserGro
 import { useState } from "react";
 import { revealDetailsTab } from "../../details-tabs";
 import type { Workspace } from "../../../src/shared/workspaces";
-import { type BoardState, type BoardTask, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import type { BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { activityControl } from "../../activity";
 import { folderName, type KnownSessions, sessionLabel } from "../../labels";
@@ -13,20 +13,21 @@ import { hashForBots, hashForPage, type PageHash } from "../../routing";
 import { BotAvatar } from "../bots/bot-avatar";
 import { CountPill } from "../count-pill";
 import { type BoardRoute, pageView } from "./module";
+import { namedIn, readyIn, threadSession } from "./work";
 
-/** The Board's Messages address: Workspace `workspace`, Board task `thread`'s thread open, with `search`'s results shown, or its reply `reply` highlighted. */
-export const hashForBoard = (workspace: string | null, thread: number | null = null, { search = null, reply = null }: Partial<Pick<BoardRoute, "search" | "reply">> = {}): string =>
-	hashForPage({ kind: "board", workspace, view: { tab: "messages", thread }, search, reply, bots: false });
+/** The Board's Messages address: Workspace `workspace`, Board task `thread`'s thread open, with `search`'s results shown, its reply `reply` highlighted, or session `session`'s tabs in it. */
+export const hashForBoard = (workspace: string | null, thread: number | null = null, { search = null, reply = null, session = null }: Partial<Pick<BoardRoute, "search" | "reply" | "session">> = {}): string =>
+	hashForPage({ kind: "board", workspace, view: { tab: "messages", thread }, search, reply, session, bots: false });
 
 /** The Bots group's page on the Board: the cross-project Bots; a Bot of one project shows in that Workspace's Bots tab. */
-export const hashForBoardBots = (): string => hashForPage({ kind: "board", workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, bots: true });
+export const hashForBoardBots = (): string => hashForPage({ kind: "board", workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, session: null, bots: true });
 
 /** Links in Workspace `workspace`'s tabs: a Bot, project, or pull request page opens in the Board tab that shows it, any other page at its own address. */
 export const boardPageHash =
 	(workspace: string | null): PageHash =>
 	page => {
 		const view = pageView(page);
-		return hashForPage(view ? { kind: "board", workspace, view, search: null, reply: null, bots: false } : page);
+		return hashForPage(view ? { kind: "board", workspace, view, search: null, reply: null, session: null, bots: false } : page);
 	};
 
 /**
@@ -45,25 +46,14 @@ export function boardWorkspaces(state: BoardState, sidebar: readonly Workspace[]
 	return { workspaces, open: open === null ? null : (known.get(open) ?? null) };
 }
 
-/** The sessions Board task `task` names: who posted it, replied to it, was started on it, or claimed it. */
-function namedIn(task: BoardTask): string[] {
-	const ids: string[] = [];
-	if (task.by.kind === "session") ids.push(task.by.sessionId);
-	for (const entry of task.replies) {
-		if ("by" in entry && entry.by.kind === "session") ids.push(entry.by.sessionId);
-		if ("note" in entry && "sessionId" in entry.note && entry.note.sessionId) ids.push(entry.note.sessionId);
-	}
-	return ids;
-}
-
 /** The Board thread's open tabs, kept across threads. */
 export const THREAD_TABS = "omp-agents.board-thread-tabs";
 
-/** The Board's address for session `sessionId` in Workspace `workspace`: the latest Board thread whose replies wake it, which shows its conversation, else the latest that names it. */
+/** The Board's address for session `sessionId` in Workspace `workspace`: the latest Board thread whose replies wake it, else the latest that names it, showing that session's tabs. */
 export function hashForBoardSession(state: BoardState, workspace: string, sessionId: string): string {
 	const tasks = state.tasks.filter(task => task.workspace === workspace).reverse();
-	const task = tasks.find(each => wakeTarget(each, { kind: "user" }) === sessionId) ?? tasks.find(each => namedIn(each).includes(sessionId));
-	return hashForBoard(workspace, task?.id ?? null);
+	const task = tasks.find(each => threadSession(each, null) === sessionId) ?? tasks.find(each => namedIn(each).includes(sessionId));
+	return task ? hashForBoard(workspace, task.id, { session: sessionId }) : hashForBoard(workspace);
 }
 
 /** Shows the session's conversation tab in the Board thread the address it goes with opens. */
@@ -101,7 +91,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 				<SidebarMenu aria-label="Board workspaces" className="gap-px">
 					{workspaces.map(workspace => {
 						const inIt = state.tasks.filter(task => task.workspace === workspace.cwd);
-						const ready = inIt.filter(task => statusOf(state, task).kind === "ready").length;
+						const ready = readyIn(state, workspace.cwd);
 						const ids = [...new Set(inIt.flatMap(namedIn))]
 							.map(id => ({ id, ...sessionLabel(id, sessions) }))
 							.filter(row => row.host);

@@ -6,7 +6,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { commonDir, git, holderOf } from "./git";
+import { commonDir, git, worktreeOnBranch } from "./git";
 import { run, type RunResult } from "./proc";
 import { assertWorkspaceOf, headOf, type PullRequestHead } from "./pull-request-head";
 import { SerialLane } from "./serial-lane";
@@ -67,7 +67,7 @@ async function rebaseBranch(cwd: string, branches: PullRequestHead, number: numb
 	if (await isAncestor(cwd, origin(base), old)) return { kind: "current", branch: head, onto: base };
 	onStep("rebasing");
 
-	const holder = await holderOf(cwd, head);
+	const holder = await worktreeOnBranch(cwd, head);
 	const local = holder?.head ?? (await commitOf(cwd, `refs/heads/${head}`));
 	if (local && !(await isAncestor(cwd, local, old))) throw new Error(`Local branch \`${head}\` has commits pull request #${number} does not. Push or drop them before rebasing it.`);
 

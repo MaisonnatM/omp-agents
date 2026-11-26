@@ -3,7 +3,7 @@ status: accepted
 date: 2026-11-24
 decision-makers: Maxence Maisonnat
 supersedes:
-  - 2026-12-01-a-project-is-a-board-channel
+  - 2026-11-23-a-project-is-a-board-channel
   - 2026-11-23-board-messages-wake-the-sessions-they-are-for
 ---
 
@@ -14,7 +14,7 @@ We gain one less store, socket protocol, wake path, and agent tool to keep worki
 
 ## Context
 
-Since `2026-12-01-a-project-is-a-board-channel`, a project was a Board channel: its plan steps were task threads, its log the channel's messages, and agents changed it through the `board` tool.
+Since `2026-11-23-a-project-is-a-board-channel`, a project was a Board channel: its plan steps were task threads, its log the channel's messages, and agents changed it through the `board` tool.
 The Board also woke sessions and Bots on mentions, started a session on a new thread, and posted each session's questions and finished turns in `#sessions` or its project's channel.
 Projects worked the same before the Board held them, on `project-list.json`, `project-inbox/`, and the starter kit's `project_list` and `project_update` tools.
 

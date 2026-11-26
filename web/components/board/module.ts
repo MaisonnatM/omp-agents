@@ -25,12 +25,13 @@ type PageView<K extends PageTab = PageTab> = K extends PageTab ? { tab: K; page:
 /** What a Workspace's Board shows: its Board tasks with Board task `thread`'s Board thread open beside them, its settings on the section `section` names, the first for `null`, its memory, or the page `page` another tab shows, such as one Bot's. */
 export type BoardView = { tab: "messages"; thread: number | null } | { tab: "settings"; section: string | null } | { tab: "memory" } | PageView;
 
-/** The Board page: Workspace `workspace`'s view, the first Workspace's for `null`; on Messages, `search`'s results in place of the Board tasks, and reply `reply` of the open thread highlighted. With `bots`, the Bots group's page instead: every Bot, whatever its Workspace. */
+/** The Board page: Workspace `workspace`'s view, the first Workspace's for `null`; on Messages, `search`'s results in place of the Board tasks, reply `reply` of the open thread highlighted, and session `session`'s tabs in the open thread, the one a reply wakes for `null`. With `bots`, the Bots group's page instead: every Bot, whatever its Workspace. */
 export interface BoardRoute {
 	workspace: string | null;
 	view: BoardView;
 	search: BoardSearch | null;
 	reply: number | null;
+	session: string | null;
 	bots: boolean;
 }
 
@@ -105,6 +106,7 @@ export type BoardControlId =
 	| "board.thread.tab.thread"
 	| "board.thread.tab.session"
 	| "board.session.open"
+	| "board.task.close"
 	| "board.search"
 	| "board.search.scope"
 	| "board.search.clear"
@@ -120,11 +122,11 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	about: "Board tasks you and your sessions post for each other in a workspace; a session starts on each one once it is ready.",
 	offNote: "While the Board is off, sessions it starts or wakes keep running, and the board tool still works.",
 	listsItself: true,
-	home: { workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, bots: false },
-	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace, `#board/<tab>?workspace=<cwd>` another tab, `#board/settings/<section>?workspace=<cwd>` one of its settings, and `#board/<page>?workspace=<cwd>`, for `#<page>` a Bot's, project's, or pull request's address, that page in the tab its kind names, such as `#board/bots/<id>`; on Messages, `q` searches in the `in` scope and `reply` highlights a reply of the thread. `#board?space=bots` opens the Bots group's page, every Bot. */
+	home: { workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, session: null, bots: false },
+	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace, `#board/<tab>?workspace=<cwd>` another tab, `#board/settings/<section>?workspace=<cwd>` one of its settings, and `#board/<page>?workspace=<cwd>`, for `#<page>` a Bot's, project's, or pull request's address, that page in the tab its kind names, such as `#board/bots/<id>`; on Messages, `q` searches in the `in` scope, `reply` highlights a reply of the thread, and `session` shows that session's tabs in it. `#board?space=bots` opens the Bots group's page, every Bot. */
 	address: {
 		parse: (rest, query, pages) => {
-			if (query.get("space") === "bots") return { workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, bots: true };
+			if (query.get("space") === "bots") return { workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, session: null, bots: true };
 			const view = parseView(rest, pages);
 			const thread = view.tab === "messages" ? view.thread : null;
 			const q = view.tab === "messages" ? (query.get("q")?.trim() ?? "") : "";
@@ -134,6 +136,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 				view,
 				search: q ? { query: q, scope: scopeOf(query.get("in"), thread) } : null,
 				reply: thread !== null && reply !== null && /^\d+$/.test(reply) ? Number(reply) : null,
+				session: thread !== null ? query.get("session") || null : null,
 				bots: false,
 			};
 		},
@@ -147,6 +150,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 				if (route.search.scope !== "workspace") params.set("in", route.search.scope);
 			}
 			if (route.reply !== null) params.set("reply", String(route.reply));
+			if (route.session !== null) params.set("session", route.session);
 			return params.size === 0 ? null : params.toString();
 		},
 	},
@@ -176,6 +180,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		{ id: "board.thread.tab.thread", label: "Board thread Thread tab", area: "Board" },
 		{ id: "board.thread.tab.session", label: "Board thread Session tab", area: "Board" },
 		{ id: "board.session.open", label: "Board session link, in the sidebar or a thread", area: "Board" },
+		{ id: "board.task.close", label: "Board task Close task button, which marks an open Board task done and ends its session", area: "Board" },
 		{ id: "board.search", label: "Board search field", area: "Board" },
 		{ id: "board.search.scope", label: "Board search scope menu", area: "Board" },
 		{ id: "board.search.clear", label: "Board search close button", area: "Board" },
