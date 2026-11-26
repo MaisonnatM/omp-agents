@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- Notifications now appear at the top center of the window, and every one, including those still working, has a close button.
 - The Board's tabs are back under the Workspace's name: Messages, Bots, Pull requests, Memory, Projects, and Settings.
 - Board threads no longer suggest ending the session, which a Board session does by itself.
 - A Board thread now ends with an **Actions** card listing what its sessions did, the Linear issues they saved, the branches they worked on, and the pull requests they opened, so you see it before you merge.
