@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- A Board Workspace's **Projects** tab now lists its projects in a resizable column with search, **All projects**, and **New project**, as the **Bots** tab does; a project you pick opens on the right, beside the list.
 - Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its blue unread count comes back, counting from that reply, until you open the thread again.
 - A Board task's message in the channel has **Mark unread** too, which counts its whole thread as unread again.
 - **Notifications** and **Settings** in the Board's sidebar now open with the sidebar still on the Board, instead of switching it to Sessions.
