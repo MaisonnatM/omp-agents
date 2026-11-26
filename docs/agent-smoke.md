@@ -59,20 +59,16 @@ omp's own `browser` is turned off for now (`browser.enabled = false`); eval has 
 Every page tool takes a `pageId`; `list_pages` names it, and the first page is `1`, which the kit's `chrome-devtools-page` extension fills in when a call leaves it out.
 Chrome starts at 800×600, below the layout's desktop breakpoints, so call `resize_page` with `width: 1920, height: 1080` before screenshots.
 
-The page first loads without a token and says to open the omp agents app; seed `localStorage` with `pageAccess(token)` and reload it.
-Print the entries from the JS eval kernel:
+The page first loads without a token and says to open the omp agents app; sign it in without the token, or anything derived from it, ever showing in a tool's output, since transcripts stay on disk.
+Write the sign-in script, which prints only its path:
 
-```js
-const { pageAccess } = await import("<worktree>/src/server/auth.ts");
-const token = (await Bun.file(`${process.env.HOME}/.config/omp-agents/token`).text()).trim(); // or the smoke server's $XDG_CONFIG_HOME/omp-agents/token
-JSON.stringify(pageAccess(token));
+```sh
+bun <worktree>/scripts/smoke-sign-in.ts [--token <token>] [--out <path>]
 ```
 
-Then `navigate_page` to `http://127.0.0.1:<port>/`, and `evaluate_script` with that JSON pasted in:
-
-```js
-() => { for (const [k, v] of Object.entries(<entries JSON>)) localStorage.setItem(k, v); location.reload(); }
-```
+It writes `tmp/smoke/sign-in.js`, readable by you alone, which puts `pageAccess(token)` into `localStorage` and reloads the page; `--token` defaults to the token file the server reads, so against a smoke server run it with that server's `XDG_CONFIG_HOME`.
+Then `navigate_page` to `http://127.0.0.1:<port>/`, and `evaluate_script` with `sourcePath` set to the printed path.
+Never print the token or `pageAccess`'s entries, and never paste them into `evaluate_script`'s `function`.
 
 Check the result with `take_snapshot` or `take_screenshot`; `list_console_messages` and `list_network_requests` show page errors and failed calls, and `performance_start_trace` with `reload: true, autoStop: true` measures load.
 

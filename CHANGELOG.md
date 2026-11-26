@@ -5,6 +5,11 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- **Merge on main** on a Board task now merges right away from the server, without starting a session; a session starts only if the merge fails.
+- Each Board task now has its own branch, `board/<id>`, and every session on it starts in that branch's folder, so no session has to look for it.
+- A Board session ends itself when it marks its task done, and no longer renews a 15-minute hold on it. Marking done first runs the quick merge checks, so a missing changelog line or an unexplained test edit is fixed by the session that made it.
+- Screenshot checks sign in to the page without printing your access token into the session.
+- An ended session now reads as finished in the archive instead of interrupted.
 - Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its blue unread count comes back, counting from that reply, until you open the thread again.
 - A Board task's message in the channel has **Mark unread** too, which counts its whole thread as unread again.
 - **Notifications** and **Settings** in the Board's sidebar now open with the sidebar still on the Board, instead of switching it to Sessions.

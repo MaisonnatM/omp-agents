@@ -19,6 +19,7 @@ import type { SourceControl } from "../source-control";
 import type { Worktrees } from "../worktrees";
 import { configAt } from "../../templates/omp/agent/extensions/land/gate";
 import { AutoContinue, occupiedBy } from "./auto-continue";
+import { boardCheckout, landBoardBranch } from "./board-checkout";
 import { BotInbox } from "./bot-inbox";
 import type { Bots } from "./bots";
 import type { BotsFile } from "./bots-file";
@@ -160,6 +161,14 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 			const status = sessions.bySessionId(sessionId)?.row().status;
 			return status !== undefined && status !== "idle";
 		},
+		alive: sessionId => sessions.bySessionId(sessionId) !== undefined,
+		async end(sessionId) {
+			const live = sessions.bySessionId(sessionId);
+			if (live) await deps.endLive(live);
+		},
+		// In the checkout chain, so a worktree removal running meanwhile neither races the add nor removes what it added.
+		checkout: (workspace, branch) => worktrees.checkout(() => boardCheckout(workspace, branch)),
+		land: landBoardBranch,
 		owner: ownerHeld,
 		now: Date.now,
 	});

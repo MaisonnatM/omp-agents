@@ -11,7 +11,7 @@ import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
 import { AppMark } from "../app-mark";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
-import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -742,7 +742,7 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 	return <DetailsSidebarFrame label={label} storageKey={THREAD_TABS} defaultTab="thread" cwd={row?.cwd ?? null} tabs={tabs} trailing={close} />;
 }
 
-/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs; each reply's **Mark unread** passes how many replies come before it. The Board's notes, such as a claim or a lapsed lease, stay out: the thread shows only what was said. */
+/** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs; each reply's **Mark unread** passes how many replies come before it. Of the Board's notes only the merges it ran show, between the replies; the rest, such as a claim or a start, stay out. */
 function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChange, onMarkUnread, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onMarkUnread: (from: number) => void; children: ReactNode }) {
 	const work = workOf(state, task, sessions);
 	const replies = said(task);
@@ -777,10 +777,11 @@ function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChan
 							<span className="h-px flex-1 bg-border" />
 						</div>
 						<ol className="flex flex-col">
-							{replies.map((entry, position) => {
+							{task.replies.map((entry, index) => {
+								if ("note" in entry) return entry.note.kind === "landed" || entry.note.kind === "land-failed" ? <li key={index}><MergeNote note={entry.note} /></li> : null;
+								const position = replies.indexOf(entry);
 								const grouped = continues(previous, entry);
 								previous = entry;
-								const index = task.replies.indexOf(entry);
 								const done = entry.by.kind === "session" && lastReply.get(entry.by.sessionId) === index ? actions.get(entry.by.sessionId) : undefined;
 								return (
 									<li key={index}>
@@ -833,6 +834,16 @@ function ScrollToReply({ reply }: { reply: number }) {
 		scrollToMessage(`reply-${reply}`, { align: "center" });
 	}, [reply, scrollToMessage]);
 	return null;
+}
+
+/** A merge the Board ran for the user's "Merge on main", as a line of its thread: what landed, or why it did not, which reopens the Board task. */
+function MergeNote({ note }: { note: Extract<BoardNote, { kind: "landed" | "land-failed" }> }) {
+	return (
+		<div className="px-5 py-2 text-[13px]">
+			<div className={cn("font-medium", note.kind === "land-failed" && "text-destructive")}>{note.kind === "landed" ? "The Board merged this on main" : "The Board's merge failed; a new session takes it"}</div>
+			<div className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">{note.text}</div>
+		</div>
+	);
 }
 
 /** The thread's `@` menu offers sessions only, so a reply can point its session at another. */

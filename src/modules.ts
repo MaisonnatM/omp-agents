@@ -47,6 +47,14 @@ export interface ModuleRunCore {
 	wake(sessionId: string, text: string, launch?: { model: ModelOption | null; thinking: string | null; skill: string | null }, interrupt?: boolean): Promise<{ resumed: boolean }>;
 	/** Whether session `sessionId` runs here and is mid-turn or waits on a question, rather than idle or gone. */
 	working(sessionId: string): boolean;
+	/** Whether session `sessionId` runs here, working or idle, rather than gone. */
+	alive(sessionId: string): boolean;
+	/** Ends session `sessionId` as **End session** does, removing the worktree it worked in; nothing when it no longer runs. */
+	end(sessionId: string): Promise<void>;
+	/** The worktree of `workspace`'s repository on `branch`, made ready for a session; `null` when `workspace` is outside git. */
+	checkout(workspace: string, branch: string): Promise<string | null>;
+	/** Lands the branch checked out at `dir` on the repository's target branch with `.omp/land.json`'s checks; `text` is the result in words. */
+	land(dir: string, sessionId: string | undefined): Promise<{ landed: boolean; text: string }>;
 	/** Whether this server runs the unattended work, the one that may start and wake sessions. */
 	owner(): boolean;
 	now(): number;
