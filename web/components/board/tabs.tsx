@@ -15,6 +15,7 @@ import { BotsNav } from "../bots/bots-nav";
 import { BotsView } from "../bots/bots-view";
 import { ProjectMemoryTab } from "../memory/project-memory";
 import { ProjectsPage } from "../projects/page";
+import { ProjectsNav } from "../projects/projects-nav";
 import { PullRequestsPage } from "../pull-requests/pull-requests-page";
 import { PageListColumn, useWidth } from "../page-list";
 import { SettingsNav } from "../settings/settings-nav";
@@ -105,15 +106,17 @@ function TabPage({ view, workspace, core, disabled }: { view: Exclude<BoardView,
 			return <ProjectMemoryTab repo={workspace} pinned />;
 		case "projects":
 			return (
-				<ProjectsPage
-					route={view.page}
-					core={core}
-					state={slice.projects}
-					empty="No projects in this Workspace yet"
-					workspace={workspace ?? undefined}
-					disabled={disabled}
-					onChange={change => changeModule("projects", change)}
-				/>
+				<ListedTab page={view.page} list={<ProjectsNav state={slice.projects} openId={view.page.open} disabled={disabled} workspace={workspace ?? undefined} />}>
+					<ProjectsPage
+						route={view.page}
+						core={core}
+						state={slice.projects}
+						empty="No projects in this Workspace yet"
+						workspace={workspace ?? undefined}
+						disabled={disabled}
+						onChange={change => changeModule("projects", change)}
+					/>
+				</ListedTab>
 			);
 		case "settings":
 			return <WorkspaceSettings workspace={workspace} workspaces={core.workspaces} section={view.section} />;

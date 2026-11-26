@@ -10,6 +10,7 @@ The dashboard shows the same lines in Settings › What's new.
 - A Board session ends itself when it marks its task done, and no longer renews a 15-minute hold on it. Marking done first runs the quick merge checks, so a missing changelog line or an unexplained test edit is fixed by the session that made it.
 - Screenshot checks sign in to the page without printing your access token into the session.
 - An ended session now reads as finished in the archive instead of interrupted.
+- A Board Workspace's **Projects** tab now lists its projects in a resizable column with search, **All projects**, and **New project**, as the **Bots** tab does; a project you pick opens on the right, beside the list.
 - Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its blue unread count comes back, counting from that reply, until you open the thread again.
 - A Board task's message in the channel has **Mark unread** too, which counts its whole thread as unread again.
 - **Notifications** and **Settings** in the Board's sidebar now open with the sidebar still on the Board, instead of switching it to Sessions.
