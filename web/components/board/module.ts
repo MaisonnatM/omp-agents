@@ -54,6 +54,7 @@ function viewRest(view: BoardView): string | null {
 
 export type BoardControlId =
 	| "board.workspace"
+	| "board.tab"
 	| "board.workspace.fold"
 	| "board.bots"
 	| "board.task.open"
@@ -122,6 +123,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		rows: [],
 	},
 	controls: [
+		{ id: "board.tab", label: "Board tab across the top of a Workspace", area: "Board" },
 		{ id: "board.workspace", label: "Board sidebar workspace row", area: "Board" },
 		{ id: "board.workspace.fold", label: "Board sidebar workspace chevron, folds its sessions", area: "Board" },
 		{ id: "board.bots", label: "Board sidebar Bot group row, folds it", area: "Board" },

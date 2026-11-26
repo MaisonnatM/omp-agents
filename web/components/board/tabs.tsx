@@ -1,6 +1,7 @@
-/** Every Board tab but Messages, reached by its address: another page's content kept to the Workspace. */
+/** The tabs across a Workspace's Board, as across a Slack channel, and every tab but Messages: another page's content kept to the Workspace. */
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { useMemo } from "react";
+import { activityControl } from "../../activity";
 import type { WebModuleId } from "../../modules";
 import { botRows } from "../../bots-model";
 import { pullRequestsScope, pullRequestsStore } from "../../reads";
@@ -13,10 +14,35 @@ import { ProjectMemoryTab } from "../memory/project-memory";
 import { ProjectsPage } from "../projects/page";
 import { PullRequestsPage } from "../pull-requests/pull-requests-page";
 import { SettingsPage } from "../settings/settings-page";
-import { BOARD_TABS, type BoardTabDef, type BoardView } from "./module";
+import { BOARD_TABS, type BoardTab, type BoardTabDef, type BoardView } from "./module";
+
+const TAB = "inline-flex h-9 shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent text-sm font-medium text-muted-foreground transition-colors hover:text-foreground aria-selected:border-foreground aria-selected:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
 
 /** The tabs whose module is on; a tab showing a module's page goes while that module is off. */
 export const boardTabsOn = (off: ReadonlySet<WebModuleId>): BoardTabDef[] => BOARD_TABS.filter(each => each.module === null || !off.has(each.module));
+
+/** The row of tabs under the Workspace's name, underlined on the header's rule as under a Slack channel's; it scrolls sideways in a narrow column. The rule is an inset shadow the selected tab's underline covers, not a border a tab overlaps with a negative margin: that 1px overflow let a click scroll the row down a pixel, so the rule flickered. */
+export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: readonly BoardTabDef[]; workspace: string | null }) {
+	return (
+		<TabsPrimitive.Tabs
+			value={tab}
+			onValueChange={next => {
+				const picked = tabs.find(each => each.id === next);
+				if (picked) location.hash = hashForPage({ kind: "board", workspace, view: picked.id === "messages" ? { tab: "messages", thread: null } : picked.id === "settings" ? { tab: "settings", section: null } : { tab: picked.id }, search: null, reply: null, bots: false });
+			}}
+			activation="manual"
+		>
+			<TabsPrimitive.TabsList aria-label="Board tabs" className="flex gap-4 overflow-x-auto px-6 shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] max-phone:px-3">
+				{tabs.map(({ id, label, icon: Icon }) => (
+					<TabsPrimitive.TabsTab key={id} value={id} className={TAB} {...activityControl("board.tab")}>
+						<Icon aria-hidden className="size-4 shrink-0" />
+						{label}
+					</TabsPrimitive.TabsTab>
+				))}
+			</TabsPrimitive.TabsList>
+		</TabsPrimitive.Tabs>
+	);
+}
 
 /** The sessions, Bots, and projects of Workspace `cwd`; a session belongs by its Workspace, a Bot by its directory, a project by the Workspace it was made in, or, made on the Projects page, by a session of it that ran here. */
 function workspaceSlice(core: CoreData, cwd: string | null) {

@@ -39,7 +39,7 @@ import { sessionOverviewTab, sessionWorkTabs, useOpenTabOnNew, useSessionWork, w
 import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../todo/links";
 import type { BoardRoute, BoardView } from "./module";
-import { boardTabsOn, WorkspaceTab } from "./tabs";
+import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
 import { boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
@@ -81,7 +81,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 	return (
 		<div className="flex h-full min-h-0 flex-1">
 			<section aria-label="Board" className="flex min-w-[360px] flex-1 flex-col">
-				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name}>
+				<Header leading={<IconHashtag aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title={name} ruled={false}>
 					{openWorkspace && view.tab === "messages" && (
 						<BoardSearchField
 							key={`${route.search?.query ?? ""}|${route.search?.scope ?? ""}`}
@@ -93,6 +93,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 						/>
 					)}
 				</Header>
+				<ChannelTabs tab={view.tab} tabs={tabs} workspace={open} />
 				{view.tab === "messages" && route.search ? (
 					<SearchResults state={state} route={route} workspace={openWorkspace} core={core} />
 				) : view.tab === "messages" ? (
