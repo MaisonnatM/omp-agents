@@ -1,5 +1,5 @@
 import { IconMagnifyingGlass } from "central-icons";
-import { memo, type ReactNode, useMemo } from "react";
+import { memo, type ReactNode, useMemo, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";
@@ -86,7 +86,8 @@ export const AppSidebar = memo(function AppSidebar({
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
 	const hasBoard = tabs.includes("board");
-	const onBoard = hasBoard && page?.kind === "board";
+	const boardRoute = useBoardSide(hasBoard ? page : null);
+	const onBoard = boardRoute !== null;
 	const pageTabs = useMemo(() => tabs.filter(tab => tab !== "board"), [tabs]);
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
@@ -122,12 +123,12 @@ export const AppSidebar = memo(function AppSidebar({
 					<SidebarGroup className="shrink-0 py-1">
 						<nav aria-label="Pages">
 							<SidebarMenu className="gap-px">
-								<NotificationsRow unread={unreadNotices} active={false} />
-								<SettingsRow route={settings} active={false} />
+								<NotificationsRow unread={unreadNotices} active={page?.kind === "notifications"} />
+								<SettingsRow route={settings} active={page?.kind === "settings"} />
 							</SidebarMenu>
 						</nav>
 					</SidebarGroup>
-					<BoardSidebar route={page} state={board} workspaces={workspaces} picked={workspace} sessions={known} bots={botList} />
+					<BoardSidebar route={boardRoute} state={board} workspaces={workspaces} picked={workspace} sessions={known} bots={botList} />
 				</>
 			) : (
 				<>
@@ -162,3 +163,13 @@ export const AppSidebar = memo(function AppSidebar({
 		</div>
 	);
 });
+
+type BoardPage = Extract<Page, { kind: "board" }>;
+
+/** The Board route the sidebar shows: `page` on the Board, the last Board route while Notifications or Settings, opened from the Board side's own rows, shows, `null` for the Sessions side. */
+function useBoardSide(page: Page | null): BoardPage | null {
+	const [last, setLast] = useState<BoardPage | null>(page?.kind === "board" ? page : null);
+	const next = page?.kind === "board" ? page : page?.kind === "notifications" || page?.kind === "settings" ? last : null;
+	if (next !== last) setLast(next);
+	return next;
+}
