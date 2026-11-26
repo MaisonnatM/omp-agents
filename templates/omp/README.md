@@ -121,7 +121,7 @@ Files, in `agent/`:
   Those links take the bare name from a skill of the same name in your own skill folders, which stays reachable under a prefixed name such as `agent/<name>`; pstack's `poteto-mode` is left out, so the kit's alias keeps that name.
 - `extensions/headless-mark.ts`: adds an `omp-agents.headless` entry to a session that `omp -p` or `omp --mode json` runs, so the omp-agents dashboard leaves those one-shot runs out of its past sessions.
 - `extensions/chrome-devtools-page.ts`: a `chrome-devtools` MCP call written to its `xd://` device without a `pageId` runs on page `1`, the first page, except `close_page` and `select_page`, whose `pageId` names the page they act on, and `list_pages` and `new_page`, which take none.
-- `extensions/project-memory.ts`: gives the omp sessions of one git repository a shared memory and news of each other's work.
+- `extensions/project-memory.ts`: gives the omp sessions of one git repository a project memory and news of each other's work.
   Before a session's first prompt it gets a brief: the repository's memory index and the last 10 landings on its default branch, each with the session that made it and that session's first prompt.
   Before a later prompt, and only when something is new, it gets a catch-up on what other sessions landed and remembered since, listing first the landings that touch files its own branch changed.
   The `project_memory` tool lists, reads, and changes the memory, decisions, facts, and lessons of one line and a body each, in batches that apply whole or not at all; a subagent can only read it.

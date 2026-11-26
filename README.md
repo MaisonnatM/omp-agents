@@ -9,7 +9,7 @@ A desktop app for every [omp](https://omp.sh) session and subagent on your machi
 omp-agents lists the sessions that run in your terminals and the ones it starts itself, streams each conversation as it happens, and lets you message, steer, interrupt, resume, or fork any of them from one window.
 It reads omp's own session files and speaks omp's own protocols through omp's installed modules, so it stays in step with the omp version you run.
 
-![The dashboard: the session list on the left, a conversation in the middle, and the session's outline on the right](docs/images/dashboard.png)
+![The dashboard: the roster of sessions on the left, a conversation in the middle, and the session's outline on the right](docs/images/dashboard.png)
 
 ## Contents
 

@@ -46,13 +46,19 @@ A merge commit skips that hook: when a merge leaves the file too large, run `bun
 A test that already exists guards behavior, so change or delete one only when that behavior changed on purpose, never to make a failing check pass.
 When you do, add a line `test-change: <reason>` to one of the branch's commit messages; the landing check `scripts/check-test-edits.ts` fails without it, and adding a new test needs none.
 
-`bun run lint` runs Biome with only the rules `biome.json` turns on, and Biome's formatter stays off.
-When the same mistake shows up a second time and a Biome rule catches it, turn that rule on rather than writing the lesson down again:
+`bun run lint` runs Biome with only the rules `biome.json` turns on, with Biome's formatter off, then `scripts/lint/run.ts`, which runs this repository's own rules, `RULES` in `scripts/lint/rules.ts`.
+Its last line is `RESULT: PASS` or `RESULT: FAIL (<what failed>)`.
+When the same mistake shows up a second time, turn it into a rule rather than writing the lesson down again:
 
-1. Look the rule up in [Biome's rule list](https://biomejs.dev/linter/rules/) and run `bunx biome lint --only=<group>/<rule>` to count its hits on today's tree.
-2. Add it to its group in `biome.json` as `"error"` only when it has a handful of hits or none, and fix those hits in the same change; `--write` fixes the ones the rule marks safe.
-3. If a hit is deliberate, put `// biome-ignore lint/<group>/<rule>: <reason>` on the line above it.
-4. Run `bun run lint`, then point the lesson's line in `LEARNINGS.md` at the rule.
+1. Use a Biome rule when one catches it: look it up in [Biome's rule list](https://biomejs.dev/linter/rules/), count its hits with `bunx biome lint --only=<group>/<rule>`, fix them, and add it to its group in `biome.json` as `"error"`.
+   A deliberate hit gets `// biome-ignore lint/<group>/<rule>: <reason>` on the line above it.
+2. Otherwise write a rule: a module under `scripts/lint/rules/` that exports a `Rule` from `scripts/lint/rule.ts`, added to `RULES`.
+   A rule may read a repository file, such as `GLOSSARY.md`, which Biome cannot.
+3. Add the rule's canary, a file that breaks it on purpose: `scripts/lint/canaries/biome/<group>/<rule>.ts` for a Biome rule, `scripts/lint/canaries/<rule id>.<ext>` for one of ours.
+   `scripts/lint/canaries.test.ts` fails a rule with no canary, a canary with no rule, and a canary its rule does not flag, so a rule that silently stops firing fails the tests.
+4. When a rule of ours has more hits than one change should fix, run `bun scripts/lint/run.ts --write` to record them in `lint-baseline.json`, and add a line `lint-baseline: <reason>` to one of the branch's commit messages.
+   The baseline counts the findings each rule may still have in each file: a count above it fails with that file's findings, a count below it fails until `--write` lowers it, and a raised count fails the landing unless a commit says why.
+5. Run `bun run lint`, then point the lesson's line in `LEARNINGS.md` at the rule.
 
 ## omp imports
 
