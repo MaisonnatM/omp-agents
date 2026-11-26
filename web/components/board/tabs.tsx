@@ -1,19 +1,23 @@
 /** The tabs across a Workspace's Board, as across a Slack channel, and every tab but Messages: another page's content kept to the Workspace. */
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
-import { useMemo } from "react";
+import { type ReactNode, useMemo, useRef } from "react";
 import { activityControl } from "../../activity";
 import type { WebModuleId } from "../../modules";
 import { botRows } from "../../bots-model";
 import { PageHashContext } from "../../page-hash";
 import { pullRequestsScope, pullRequestsStore } from "../../reads";
-import { hashForPage, type PullRequestsRoute, WORKSPACE_SECTIONS, workspaceSection } from "../../routing";
+import { COLUMN_MIN, type ListPage, listPlacement } from "../../page-list";
+import { hashForPage, type PullRequestsRoute, workspaceSection } from "../../routing";
 import { workspaceCwd } from "../../sessions";
 import { DashboardStatusContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import type { CoreData } from "../module-views";
+import { BotsNav } from "../bots/bots-nav";
 import { BotsView } from "../bots/bots-view";
 import { ProjectMemoryTab } from "../memory/project-memory";
 import { ProjectsPage } from "../projects/page";
 import { PullRequestsPage } from "../pull-requests/pull-requests-page";
+import { PageListColumn, useWidth } from "../page-list";
+import { SettingsNav } from "../settings/settings-nav";
 import { SettingsPage } from "../settings/settings-page";
 import { BOARD_TABS, type BoardTab, type BoardTabDef, type BoardView, tabView } from "./module";
 import { boardPageHash } from "./sidebar";
@@ -71,25 +75,30 @@ function TabPage({ view, workspace, core, disabled }: { view: Exclude<BoardView,
 	const { changeModule } = useDashboardActions();
 	const slice = workspaceSlice(core, workspace);
 	switch (view.tab) {
-		case "bots":
+		case "bots": {
+			const rows = slice.bots && botRows(slice.bots, core.sessions.hosts, core.botLasts);
+			const page = view.page;
 			return (
-				<BotsView
-					route={view.page}
-					rows={slice.bots && botRows(slice.bots, core.sessions.hosts, core.botLasts)}
-					routines={core.routines}
-					open={core.openBot}
-					bots={core.bots}
-					past={core.sessions.past}
-					lastHosts={core.lastHosts}
-					models={core.models}
-					workspaces={core.workspaces}
-					defaultCwd={workspace ?? core.defaultWorkspace}
-					connected={core.connected}
-					detailsOpen={core.detailsOpen}
-					onToggleDetails={core.onToggleDetails}
-					completions={core.newSessionCompletions}
-				/>
+				<ListedTab page={page} list={<BotsNav rows={rows} openId={page.target === null ? (page.adding ? null : undefined) : page.target} />}>
+					<BotsView
+						route={page}
+						rows={rows}
+						routines={core.routines}
+						open={core.openBot}
+						bots={core.bots}
+						past={core.sessions.past}
+						lastHosts={core.lastHosts}
+						models={core.models}
+						workspaces={core.workspaces}
+						defaultCwd={workspace ?? core.defaultWorkspace}
+						connected={core.connected}
+						detailsOpen={core.detailsOpen}
+						onToggleDetails={core.onToggleDetails}
+						completions={core.newSessionCompletions}
+					/>
+				</ListedTab>
 			);
+		}
 		case "pull-requests":
 			return <WorkspacePullRequests workspace={workspace} hosts={slice.hosts} past={slice.past} route={view.page} />;
 		case "memory":
@@ -130,29 +139,22 @@ const settingsHash = (workspace: string | null, section: string) => hashForPage(
 function WorkspaceSettings({ workspace, workspaces, section: named }: { workspace: string | null; workspaces: CoreData["workspaces"]; section: string | null }) {
 	const section = workspaceSection(named);
 	return (
-		<TabsPrimitive.Tabs
-			value={section}
-			onValueChange={next => {
-				const picked = WORKSPACE_SECTIONS.find(({ value }) => value === next);
-				if (picked) location.hash = settingsHash(workspace, picked.value);
-			}}
-			activation="manual"
-			orientation="vertical"
-			className="flex min-h-0 flex-1 @container/board-settings max-phone:flex-col"
-		>
-			<TabsPrimitive.TabsList aria-label="Workspace settings" className="flex w-48 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border p-2 max-phone:w-full max-phone:flex-row max-phone:overflow-x-auto max-phone:border-r-0 max-phone:border-b">
-				{WORKSPACE_SECTIONS.map(({ value, label, icon: Icon }) => (
-					<TabsPrimitive.TabsTab
-						key={value}
-						value={value}
-						className="flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm whitespace-nowrap text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-selected:bg-accent aria-selected:font-medium aria-selected:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-					>
-						<Icon aria-hidden className="size-4 shrink-0" />
-						{label}
-					</TabsPrimitive.TabsTab>
-				))}
-			</TabsPrimitive.TabsList>
+		<ListedTab page={{ kind: "settings", section }} list={<SettingsNav route={{ section }} group="workspace" hash={value => settingsHash(workspace, value)} />}>
 			<SettingsPage key={workspace ?? ""} section={section} cwd={workspace} workspaces={workspaces} scope={{ kind: "workspace", sectionHash: value => settingsHash(workspace, value) }} />
-		</TabsPrimitive.Tabs>
+		</ListedTab>
+	);
+}
+
+/** A tab's page beside its list, in the resizable column the Bots and Settings pages keep at their left; the column takes what leaves the page its floor. */
+function ListedTab({ page, list, children }: { page: ListPage; list: ReactNode; children: ReactNode }) {
+	const area = useRef<HTMLDivElement>(null);
+	const placement = listPlacement(page, false, useWidth(area));
+	return (
+		<div ref={area} className="flex min-h-0 min-w-0 flex-1">
+			<PageListColumn page={page} max={placement.at === "column" ? placement.max : COLUMN_MIN}>
+				{list}
+			</PageListColumn>
+			<div className="relative flex min-w-0 flex-1 flex-col">{children}</div>
+		</div>
 	);
 }

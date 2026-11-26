@@ -13,6 +13,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { botAsking, type BotGroup, botGroupKey, botGroupLabel, botGroupListName, botGroups, botMovesTo, type BotPlace, botSections, botsGrouped, botStatus, type BotRow } from "../../bots-model";
 import { listTime } from "../../labels";
+import { usePageHash } from "../../page-hash";
 import { hashForBots, hashForNewBot } from "../../routing";
 import { useStoredKeys } from "../../stored-state";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
@@ -43,6 +44,7 @@ interface BotsNavProps {
 
 export function BotsNav({ rows, openId }: BotsNavProps) {
 	const [query, setQuery] = useState("");
+	const to = usePageHash();
 	const [naming, setNaming] = useState<SectionNaming | null>(null);
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const [drag, setDrag] = useState<BotDrag | null>(null);
@@ -94,12 +96,12 @@ export function BotsNav({ rows, openId }: BotsNavProps) {
 					<SidebarSearch label="Filter the Bots" placeholder="Search Bots" query={query} onQuery={setQuery} />
 				</div>
 				<Tooltip content="All Bots" side="bottom">
-					<Button variant="ghost" size="icon-compact" className="shrink-0" render={<a href={hashForBots(null)} aria-label="All Bots" />}>
+					<Button variant="ghost" size="icon-compact" className="shrink-0" render={<a href={hashForBots(null, to)} aria-label="All Bots" />}>
 						<IconLayoutGrid1 />
 					</Button>
 				</Tooltip>
 				<Tooltip content="New Bot" side="bottom">
-					<Button variant="ghost" size="icon-compact" className="shrink-0" render={<a href={hashForNewBot()} aria-label="New Bot" aria-current={openId === null ? "page" : undefined} />}>
+					<Button variant="ghost" size="icon-compact" className="shrink-0" render={<a href={hashForNewBot(to)} aria-label="New Bot" aria-current={openId === null ? "page" : undefined} />}>
 						<IconPlusSmall />
 					</Button>
 				</Tooltip>
@@ -189,12 +191,13 @@ interface BotRowLinkProps {
 
 function BotRowLink({ row: { bot, host, unread, preview, at }, active, sections, onName, handle, dragging }: BotRowLinkProps) {
 	const asking = botAsking(host);
+	const to = usePageHash();
 	const when = new Date(at);
 	return (
 		<BotMenu bot={bot} sections={sections} onName={onName} render={<SidebarMenuItem {...handle} className={cn(dragging && "opacity-50")} />}>
 			<SidebarMenuButton asChild size="lg" isActive={active} className="h-auto gap-2.5 py-1.5">
 				<a
-					href={hashForBots(bot.id)}
+					href={hashForBots(bot.id, to)}
 					// The row drags, not the link's address.
 					draggable={false}
 					aria-label={`${bot.name}, ${botStatus(bot, host)}${unread ? ", unread" : ""}. ${preview}`}
