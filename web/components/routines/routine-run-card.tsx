@@ -11,6 +11,7 @@ import type { Item } from "../../../src/shared/transcript";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { hashForBotRoutine } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { durationWords, messageStatus, pastRunWords } from "../../routines-model";
 import { useMinute } from "../../use-minute";
 import { HealthIcon, INSTANT, OPEN_SPRING, TaskIcon, TRIGGER_MARKS } from "./routine-marks";
@@ -20,6 +21,7 @@ const CODE = "block rounded-md bg-muted px-2 py-1.5 font-mono text-xs leading-re
 
 /** `copy` is the fold's copy button for what the routine sent. */
 export function RoutineRunCard({ item, copy }: { item: Extract<Item, { kind: "routine" }>; copy: ReactNode }) {
+	const to = usePageHash();
 	const foldId = useId();
 	const reasonId = useId();
 	const reduceMotion = useReducedMotion() ?? false;
@@ -109,7 +111,7 @@ export function RoutineRunCard({ item, copy }: { item: Extract<Item, { kind: "ro
 								</section>
 							)}
 							<div className="flex items-center gap-2">
-								<a href={hashForBotRoutine(botId, { kind: "open", id: routine.id })} className="text-xs font-medium underline-offset-2 hover:underline">
+								<a href={hashForBotRoutine(botId, { kind: "open", id: routine.id }, to)} className="text-xs font-medium underline-offset-2 hover:underline">
 									Open routine
 								</a>
 								<span className="ml-auto flex">{copy}</span>

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups, botRoutines, botSections, botsGrouped, botStatus, type BotRow } from "../../bots-model";
 import { listTime } from "../../labels";
 import { hashForBots, hashForNewBot } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { PageFrame } from "../list-page";
 import { BotAvatar } from "./bot-avatar";
 import { BotMenu, type SectionNaming, SectionNameDialog } from "./bot-menu";
@@ -24,12 +25,13 @@ interface BotCardProps {
 }
 
 function BotCard({ row: { bot, host, unread, at }, routineCount, sections, onName }: BotCardProps) {
+	const to = usePageHash();
 	const asking = botAsking(host);
 	const tagline = jobLine(bot.job);
 	const routinesWords = routineCount === 0 ? null : routineCount === 1 ? "1 routine" : `${routineCount} routines`;
 	return (
 		<BotMenu bot={bot} sections={sections} onName={onName} render={<li />}>
-			<a href={hashForBots(bot.id)} className={cn(CARD, "h-full bg-card hover:bg-accent/50")}>
+			<a href={hashForBots(bot.id, to)} className={cn(CARD, "h-full bg-card hover:bg-accent/50")}>
 				<span className="relative">
 					<BotAvatar look={bot} size="hero" working={host?.status === "working"} asking={asking !== null} />
 					{unread && <span aria-label="Unread" className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-primary ring-2 ring-card" />}
@@ -55,9 +57,10 @@ function BotCard({ row: { bot, host, unread, at }, routineCount, sections, onNam
 }
 
 function NewBotCard() {
+	const to = usePageHash();
 	return (
 		<li>
-			<a href={hashForNewBot()} className={cn(CARD, "h-full justify-center border-dashed text-muted-foreground hover:bg-accent/50 hover:text-foreground")}>
+			<a href={hashForNewBot(to)} className={cn(CARD, "h-full justify-center border-dashed text-muted-foreground hover:bg-accent/50 hover:text-foreground")}>
 				<span className="flex size-16 items-center justify-center rounded-full border border-dashed border-current">
 					<IconPlusSmall className="size-6" />
 				</span>
@@ -75,6 +78,7 @@ interface BotsGalleryProps {
 }
 
 export function BotsGallery({ rows, routines }: BotsGalleryProps) {
+	const to = usePageHash();
 	const [naming, setNaming] = useState<SectionNaming | null>(null);
 	const bots = rows?.map(({ bot }) => bot) ?? [];
 	const sections = botSections(bots);
@@ -86,7 +90,7 @@ export function BotsGallery({ rows, routines }: BotsGalleryProps) {
 			title="Bots"
 			meta="Teammates with one conversation you come back to, a job, and a memory"
 			actions={
-				<Button size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForNewBot()} />}>New Bot</Button>
+				<Button size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForNewBot(to)} />}>New Bot</Button>
 			}
 		>
 			{rows === null ? (

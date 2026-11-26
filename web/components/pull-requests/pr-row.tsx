@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { fixOwner, type ListChange, type SectionRow, MOVES, moveAction, reason, type StackPlace, threadStarters, withReviewer } from "../../pull-requests-model";
 import { PULL_REQUEST_ACTIONS } from "../../../src/pull-request-actions";
 import { hashForPullRequests, type OpenMode, sameView } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
@@ -524,10 +525,11 @@ function openFromRow(event: MouseEvent<HTMLElement>, pr: PullRequest): void {
 
 /** The pull request's title link remains the keyboard and modifier-click target. */
 function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; targeted: boolean; className: string }) {
+	const to = usePageHash();
 	return (
 		<Tooltip content={`${pullRequestName(pr)} · ${pr.title}`}>
 			<a
-				href={hashForPullRequests(pr)}
+				href={hashForPullRequests(pr, to)}
 				// The row drags, not the link's address.
 				draggable={false}
 				aria-current={targeted ? "page" : undefined}

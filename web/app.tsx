@@ -47,6 +47,8 @@ import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { revealDetailsTab } from "./details-tabs";
 import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView } from "./routing";
+import { PageHashContext } from "./page-hash";
+import { boardPageHash } from "./components/board/sidebar";
 import type { SectionTarget } from "./section";
 import { defaultCwd, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
@@ -361,13 +363,16 @@ export function App() {
 											</Plans>
 										) : (
 											openBot && (
-												<BotDetails
-													key={openBot.bot.id}
-													open={openBot}
-													session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
-													memory={state.botMemories[openBot.bot.id] ?? ""}
-													connected={state.connected}
-												/>
+												// On a Board's Bots tab, the details' links stay in that tab.
+												<PageHashContext.Provider value={page?.kind === "board" ? boardPageHash(page.workspace) : hashForPage}>
+													<BotDetails
+														key={openBot.bot.id}
+														open={openBot}
+														session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
+														memory={state.botMemories[openBot.bot.id] ?? ""}
+														connected={state.connected}
+													/>
+												</PageHashContext.Provider>
 											)
 										)}
 									</DashboardSidebar>

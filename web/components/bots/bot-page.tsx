@@ -26,6 +26,7 @@ import { botDraftKey, useComposerDraft } from "../../composer-drafts";
 import { type Completions, useNextSuggestions, useShowConversation } from "../../pane-store";
 import { type ModelList, UNREAD } from "../../reads";
 import { hashForBotRoutine, hashForBots } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { draftOf, newDraft, type RoutineDraft } from "../../routines-model";
 import { useAction } from "../../use-action";
 import { useCompletion } from "../completion-popup";
@@ -110,11 +111,12 @@ function BotComposer({ bot, connected, starters, completions }: { bot: Bot; conn
 
 /** The editor of a routine of `bot`, new or saved; the routine opens once the server has saved it, and a refused save says why. */
 function BotRoutineEditor({ bot, initial, isNew, connected }: { bot: Bot; initial: RoutineDraft; isNew: boolean; connected: boolean }) {
+	const to = usePageHash();
 	const { request } = useDashboardActions();
 	// The server sends the new routines before it answers, so the routine is there when the page opens it.
 	const save = useAction(async (spec: RoutineSpec) => {
 		await request({ t: "routine", change: { op: "save", routine: spec } });
-		location.hash = hashForBotRoutine(bot.id, { kind: "open", id: spec.id });
+		location.hash = hashForBotRoutine(bot.id, { kind: "open", id: spec.id }, to);
 	}, "Could not save the routine");
 	return (
 		<RoutineEditor
@@ -123,7 +125,7 @@ function BotRoutineEditor({ bot, initial, isNew, connected }: { bot: Bot; initia
 			botName={bot.name}
 			connected={connected}
 			saving={save.pending}
-			onCancel={() => (location.hash = isNew ? hashForBots(bot.id) : hashForBotRoutine(bot.id, { kind: "open", id: initial.id }))}
+			onCancel={() => (location.hash = isNew ? hashForBots(bot.id, to) : hashForBotRoutine(bot.id, { kind: "open", id: initial.id }, to))}
 			onSave={spec => save.run(spec)}
 		/>
 	);
@@ -137,11 +139,12 @@ function NewBotRoutine({ bot, connected }: { bot: Bot; connected: boolean }) {
 
 /** In place of a routine the Bot does not have, deleted or never made, with the way back to the conversation. */
 function MissingRoutine({ bot }: { bot: Bot }) {
+	const to = usePageHash();
 	return (
 		<PageFrame title="No such routine" meta={`${bot.name}'s routine`}>
 			<div className="m-auto flex max-w-sm flex-col items-center gap-3 px-6 py-10 text-center text-sm text-pretty text-muted-foreground">
 				<p>{bot.name} has no routine at this address. It may have been deleted.</p>
-				<Button variant="ghost" size="compact" render={<a href={hashForBots(bot.id)} />}>Back to {bot.name}</Button>
+				<Button variant="ghost" size="compact" render={<a href={hashForBots(bot.id, to)} />}>Back to {bot.name}</Button>
 			</div>
 		</PageFrame>
 	);
@@ -166,6 +169,7 @@ interface BotPageProps {
 
 /** The Bot's header and its conversation, live, ended, or not begun, its name showing or hiding its details in the right sidebar; or the card of its routines, or the routine editor, in its place. */
 export function BotPage({ open, bots, past, lastHosts, models, workspaces, connected, detailsOpen, onToggleDetails, completions }: BotPageProps) {
+	const to = usePageHash();
 	const { bot, host, view, routines, routine, status } = open;
 	const instanceId = host?.instanceId ?? null;
 	const names = useMemo(() => new Map(bots.map(({ id, name }) => [id, name])), [bots]);
@@ -174,11 +178,11 @@ export function BotPage({ open, bots, past, lastHosts, models, workspaces, conne
 			[REMEMBER_TOOL]: { label: () => `Updated memory for ${bot.name}`, icon: IconBookmarkCheck },
 			[MESSAGE_BOT_TOOL]: {
 				label: tool => `Messaged ${(tool.to && names.get(tool.to)) ?? "a Bot"}`,
-				href: tool => (tool.to && names.has(tool.to) ? hashForBots(tool.to) : null),
+				href: tool => (tool.to && names.has(tool.to) ? hashForBots(tool.to, to) : null),
 				icon: IconSend,
 			},
 		}),
-		[bot.name, names],
+		[bot.name, names, to],
 	);
 	// A stopped conversation offers what its last reply suggested; a new Bot offers its starters.
 	const lastSuggestions = useNextSuggestions(view, false);
@@ -266,6 +270,7 @@ const randomOf = <T,>(values: readonly T[]): T => values[Math.floor(Math.random(
  * and the name while the form has none, and a Bot made with no job learns it in its first message.
  */
 export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Workspace[]; defaultCwd: string; connected: boolean }) {
+	const to = usePageHash();
 	const { changeBot } = useDashboardActions();
 	const id = useId();
 	const [draft, setDraft] = useState<NewBotDraft>(NEW_BOT_DRAFT);
@@ -285,7 +290,7 @@ export function NewBot({ workspaces, defaultCwd, connected }: { workspaces: Work
 					if (fix) return;
 					const botId = crypto.randomUUID() as BotId;
 					changeBot({ op: "save", bot: { id: botId, kind, name: name.trim(), job: job.trim(), cwd, model: null, skill: null, ...look } });
-					location.hash = hashForBots(botId);
+					location.hash = hashForBots(botId, to);
 				}}
 			>
 				<BotAvatar look={look} size="hero" />

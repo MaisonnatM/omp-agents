@@ -9,11 +9,11 @@ import { activityControl } from "../../activity";
 import { folderName } from "../../labels";
 import { type BotGroup, type BotRow, botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups } from "../../bots-model";
 import type { IconComponent } from "@/lib/icon-context";
-import { hashForBots, hashForPage } from "../../routing";
+import { hashForBots, hashForPage, type PageHash } from "../../routing";
 import { BotAvatar } from "../bots/bot-avatar";
 import { CountPill } from "../count-pill";
 import { type KnownSessions, sessionLabel } from "../todo/links";
-import type { BoardRoute } from "./module";
+import { type BoardRoute, pageView } from "./module";
 
 /** The Board's Messages address: Workspace `workspace`, Board task `thread`'s thread open, with `search`'s results shown, or its reply `reply` highlighted. */
 export const hashForBoard = (workspace: string | null, thread: number | null = null, { search = null, reply = null }: Partial<Pick<BoardRoute, "search" | "reply">> = {}): string =>
@@ -21,6 +21,14 @@ export const hashForBoard = (workspace: string | null, thread: number | null = n
 
 /** The Bots group's page on the Board: every Bot, whatever its Workspace. */
 export const hashForBoardBots = (): string => hashForPage({ kind: "board", workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, bots: true });
+
+/** Links in Workspace `workspace`'s tabs: a Bot, project, or pull request page opens in the Board tab that shows it, any other page at its own address. */
+export const boardPageHash =
+	(workspace: string | null): PageHash =>
+	page => {
+		const view = pageView(page);
+		return hashForPage(view ? { kind: "board", workspace, view, search: null, reply: null, bots: false } : page);
+	};
 
 /**
  * The Workspaces the Board lists: the sidebar's, then any a Board task or `route` names, and the one it shows:
@@ -175,7 +183,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 						<SidebarMenu aria-label={botGroupListName(group)} className="ml-[15px] w-auto gap-px border-l border-border pl-1">
 							{group.rows.map(row => (
 								<SidebarMenuItem key={row.bot.id}>
-									<SidebarMenuButton size="short" title={row.bot.cwd} onClick={go(hashForBots(row.bot.id))}>
+									<SidebarMenuButton size="short" title={row.bot.cwd} onClick={go(hashForBots(row.bot.id, boardPageHash(row.bot.cwd)))}>
 										<BotAvatar look={row.bot} size="inline" working={row.host?.status === "working"} asking={botAsking(row.host) !== null} />
 										<span className="min-w-0 flex-1 truncate">{row.bot.name}</span>
 									</SidebarMenuButton>

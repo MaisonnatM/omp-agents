@@ -6,6 +6,7 @@ import type { Bot } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
 import { activityControl } from "../../activity";
 import { hashForBotRoutine, hashForBots } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { useMinute } from "../../use-minute";
 import { PageFrame } from "../list-page";
 import { RoutineRow, stepIndex } from "./routine-row";
@@ -29,6 +30,7 @@ interface RoutinesCardProps {
 }
 
 export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardProps) {
+	const to = usePageHash();
 	const now = useMinute();
 	const runningHere = routines.filter(runsHere).length;
 	return (
@@ -36,7 +38,7 @@ export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardP
 			title={bot.name}
 			meta="Routines"
 			actions={
-				<Button variant="ghost" size="compact" leadingIcon={IconArrowLeft} render={<a href={hashForBots(bot.id)} />}>Back to {bot.name}</Button>
+				<Button variant="ghost" size="compact" leadingIcon={IconArrowLeft} render={<a href={hashForBots(bot.id, to)} />}>Back to {bot.name}</Button>
 			}
 		>
 			<div className="px-4 py-6">
@@ -50,7 +52,7 @@ export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardP
 								{runningHere} of {routines.length} on schedule
 							</p>
 						</div>
-						<Button {...activityControl("bots.routine.new")} variant="outline" size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForBotRoutine(bot.id, { kind: "new" })} />}>New routine</Button>
+						<Button {...activityControl("bots.routine.new")} variant="outline" size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForBotRoutine(bot.id, { kind: "new" }, to)} />}>New routine</Button>
 					</header>
 					{routines.length === 0 ? (
 						<p className="px-4 py-8 text-center text-sm text-muted-foreground">No routines yet. New routine makes one.</p>

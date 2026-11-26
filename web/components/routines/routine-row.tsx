@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { hashForBotRoutine } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import {
 	durationWords,
 	nextRunWords,
@@ -140,6 +141,7 @@ interface RoutineRowProps {
 }
 
 export function RoutineRow({ routine, botName, open, connected, now }: RoutineRowProps) {
+	const to = usePageHash();
 	const detailsId = useId();
 	const reduceMotion = useReducedMotion() ?? false;
 	const { request, send } = useDashboardActions();
@@ -156,7 +158,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 	const toggle = (): void => {
 		// Opened afresh, the row shows the latest run until a tick picks another.
 		if (!open) setPickedAt(null);
-		location.hash = hashForBotRoutine(botId, open ? { kind: "list" } : { kind: "open", id });
+		location.hash = hashForBotRoutine(botId, open ? { kind: "list" } : { kind: "open", id }, to);
 	};
 	const clickRow = (event: MouseEvent<HTMLDivElement>): void => {
 		if (!(event.target as Element).closest(ROW_CONTROLS)) toggle();

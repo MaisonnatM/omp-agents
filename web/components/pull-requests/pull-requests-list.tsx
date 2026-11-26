@@ -35,6 +35,7 @@ import { type RebaseHooks, type RebaseJob, rebasePullRequest, rebasePullRequests
 import type { PolledEntry } from "../../polled-store";
 import { pullRequestsStore, writePullRequest } from "../../reads";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
+import { usePageHash } from "../../page-hash";
 import { sectionId } from "../../section";
 import { useShortcuts } from "../../shortcuts";
 import { type DragItem, NO_DRAG, useDragOrder } from "../../use-drag-order";
@@ -66,6 +67,7 @@ function foldsOf(grouping: PullRequestGrouping, groups: readonly ListGroup[], pr
  * would, even in a repository you hid. A key that has nothing to act on keeps its usual meaning.
  */
 export function usePullRequestKeys({ poll, groups, display, agent, route, onActionsOpenChange }: PullRequests, isFolded: (key: string) => boolean): void {
+	const to = usePageHash();
 	const { start } = useDashboardActions();
 	const { target } = route;
 	const shown = useMemo(() => shownPullRequests(display.grouping, groups, isFolded), [display.grouping, groups, isFolded]);
@@ -77,7 +79,7 @@ export function usePullRequestKeys({ poll, groups, display, agent, route, onActi
 			const at = current();
 			if (at < 0) return false;
 			const next = shown[at + by];
-			if (next) location.hash = hashForPullRequests(next);
+			if (next) location.hash = hashForPullRequests(next, to);
 			return true;
 		}
 		return stepRows(shown, pr => rowElement(pr), by);

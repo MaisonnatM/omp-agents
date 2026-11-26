@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- A Bot, a project, or a pull request you open from a Board Workspace's tab now opens inside that tab, with the Workspace and its tabs still showing, instead of jumping to the Sessions side's page. Its links, a Bot's routines and a pull request's files included, stay in the tab, and a Bot in the Board sidebar opens in its own Workspace's **Bots** tab.
 - A Board session now talks before it builds. Unless your message names the exact step, such as "Merge on main", it first replies in the thread with what it understood, the change it would make, and its questions, and starts work only once you answer.
 - Behind the scenes: every lint rule now has a sample file it must flag, so a rule that quietly stops working fails the checks, and a new rule can start with its old findings listed and only ever shrink them.
 - Notifications now appear at the top center of the window, and every one, including those still working, has a close button.

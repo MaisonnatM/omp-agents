@@ -4,17 +4,19 @@ import { useMemo } from "react";
 import { activityControl } from "../../activity";
 import type { WebModuleId } from "../../modules";
 import { botRows } from "../../bots-model";
+import { PageHashContext } from "../../page-hash";
 import { pullRequestsScope, pullRequestsStore } from "../../reads";
-import { hashForPage, WORKSPACE_SECTIONS, workspaceSection } from "../../routing";
+import { hashForPage, type PullRequestsRoute, WORKSPACE_SECTIONS, workspaceSection } from "../../routing";
 import { workspaceCwd } from "../../sessions";
 import { DashboardStatusContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import type { CoreData } from "../module-views";
-import { BotsGallery } from "../bots/bots-gallery";
+import { BotsView } from "../bots/bots-view";
 import { ProjectMemoryTab } from "../memory/project-memory";
 import { ProjectsPage } from "../projects/page";
 import { PullRequestsPage } from "../pull-requests/pull-requests-page";
 import { SettingsPage } from "../settings/settings-page";
-import { BOARD_TABS, type BoardTab, type BoardTabDef, type BoardView } from "./module";
+import { BOARD_TABS, type BoardTab, type BoardTabDef, type BoardView, tabView } from "./module";
+import { boardPageHash } from "./sidebar";
 
 const TAB = "inline-flex h-9 shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent text-sm font-medium text-muted-foreground transition-colors hover:text-foreground aria-selected:border-foreground aria-selected:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
 
@@ -28,7 +30,7 @@ export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: rea
 			value={tab}
 			onValueChange={next => {
 				const picked = tabs.find(each => each.id === next);
-				if (picked) location.hash = hashForPage({ kind: "board", workspace, view: picked.id === "messages" ? { tab: "messages", thread: null } : picked.id === "settings" ? { tab: "settings", section: null } : { tab: picked.id }, search: null, reply: null, bots: false });
+				if (picked) location.hash = hashForPage({ kind: "board", workspace, view: tabView(picked.id), search: null, reply: null, bots: false });
 			}}
 			activation="manual"
 		>
@@ -55,21 +57,47 @@ function workspaceSlice(core: CoreData, cwd: string | null) {
 	return { hosts, past, bots, projects };
 }
 
-/** A tab other than Messages: the page it names, kept to the Workspace. */
+/** A tab other than Messages: the page it names, kept to the Workspace; a Bot, project, or pull request it opens shows in the tab. */
 export function WorkspaceTab({ view, workspace, core, disabled }: { view: Exclude<BoardView, { tab: "messages" }>; workspace: string | null; core: CoreData; disabled: boolean }) {
+	const to = useMemo(() => boardPageHash(workspace), [workspace]);
+	return (
+		<PageHashContext.Provider value={to}>
+			<TabPage view={view} workspace={workspace} core={core} disabled={disabled} />
+		</PageHashContext.Provider>
+	);
+}
+
+function TabPage({ view, workspace, core, disabled }: { view: Exclude<BoardView, { tab: "messages" }>; workspace: string | null; core: CoreData; disabled: boolean }) {
 	const { changeModule } = useDashboardActions();
 	const slice = workspaceSlice(core, workspace);
 	switch (view.tab) {
 		case "bots":
-			return <BotsGallery rows={slice.bots && botRows(slice.bots, core.sessions.hosts, core.botLasts)} routines={core.routines} />;
+			return (
+				<BotsView
+					route={view.page}
+					rows={slice.bots && botRows(slice.bots, core.sessions.hosts, core.botLasts)}
+					routines={core.routines}
+					open={core.openBot}
+					bots={core.bots}
+					past={core.sessions.past}
+					lastHosts={core.lastHosts}
+					models={core.models}
+					workspaces={core.workspaces}
+					defaultCwd={workspace ?? core.defaultWorkspace}
+					connected={core.connected}
+					detailsOpen={core.detailsOpen}
+					onToggleDetails={core.onToggleDetails}
+					completions={core.newSessionCompletions}
+				/>
+			);
 		case "pull-requests":
-			return <WorkspacePullRequests workspace={workspace} hosts={slice.hosts} past={slice.past} />;
+			return <WorkspacePullRequests workspace={workspace} hosts={slice.hosts} past={slice.past} route={view.page} />;
 		case "memory":
 			return <ProjectMemoryTab repo={workspace} pinned />;
 		case "projects":
 			return (
 				<ProjectsPage
-					route={{ open: null }}
+					route={view.page}
 					core={core}
 					state={slice.projects}
 					empty="No projects in this Workspace yet"
@@ -84,14 +112,14 @@ export function WorkspaceTab({ view, workspace, core, disabled }: { view: Exclud
 }
 
 /** The Pull requests page read for Workspace `workspace` rather than the sidebar's scope: it polls that Workspace's pull requests while it shows, and its rows, details, and changes read that entry. */
-function WorkspacePullRequests({ workspace, hosts, past }: { workspace: string | null; hosts: CoreData["sessions"]["hosts"]; past: CoreData["sessions"]["past"] }) {
+function WorkspacePullRequests({ workspace, hosts, past, route }: { workspace: string | null; hosts: CoreData["sessions"]["hosts"]; past: CoreData["sessions"]["past"]; route: PullRequestsRoute }) {
 	const status = useDashboardStatus();
 	const scope = pullRequestsScope(workspace);
 	pullRequestsStore.usePolling(scope);
 	const scoped = useMemo(() => ({ ...status, pullRequestsScope: scope, scope: { workspace } }), [status, scope, workspace]);
 	return (
 		<DashboardStatusContext.Provider value={scoped}>
-			<PullRequestsPage hosts={hosts} past={past} route={{ target: null }} />
+			<PullRequestsPage hosts={hosts} past={past} route={route} />
 		</DashboardStatusContext.Provider>
 	);
 }

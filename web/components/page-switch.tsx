@@ -22,8 +22,7 @@ import { NewSession } from "./new-session";
 import { NotificationsPage } from "./notices";
 
 import { PaneGrid } from "./pane-grid";
-import { BotPage, NewBot } from "./bots/bot-page";
-import { BotsGallery } from "./bots/bots-gallery";
+import { BotsView } from "./bots/bots-view";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
@@ -113,7 +112,28 @@ export const PageSwitch = memo(function PageSwitch({
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	if (page && isModulePage(page)) {
 		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
-		const core = { routines, bots, botLasts, projects: modules.projects, todos: userTodos, listed, workspace, workspaces, onPickWorkspace: pickWorkspace, hosts: visible.hosts, models, sessions: { hosts, past }, section: sectionTarget, newSessionCompletions };
+		const core = {
+			routines,
+			bots,
+			botLasts,
+			projects: modules.projects,
+			todos: userTodos,
+			listed,
+			workspace,
+			workspaces,
+			onPickWorkspace: pickWorkspace,
+			hosts: visible.hosts,
+			models,
+			sessions: { hosts, past },
+			section: sectionTarget,
+			newSessionCompletions,
+			openBot,
+			lastHosts,
+			defaultWorkspace,
+			connected,
+			detailsOpen: rightOpen,
+			onToggleDetails: () => toggleSidebar("right"),
+		};
 		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
 	}
 	switch (page?.kind) {
@@ -172,29 +192,25 @@ export const PageSwitch = memo(function PageSwitch({
 				/>
 			);
 
-		case "bots": {
-			if (page.target === null) {
-				if (page.adding) return <NewBot workspaces={workspaces} defaultCwd={defaultWorkspace} connected={connected} />;
-				return <BotsGallery rows={bots === null ? null : botRows(bots, hosts, botLasts)} routines={routines} />;
-			}
-			if (!openBot) return <p className="m-auto text-sm text-muted-foreground">{bots === null ? "Loading the Bots…" : "No Bot has this address. It may have been deleted."}</p>;
+		case "bots":
 			return (
-				// Keyed by the Bot, so another Bot's page starts with its own drafts.
-				<BotPage
-					key={openBot.bot.id}
+				<BotsView
+					route={page}
+					rows={bots === null ? null : botRows(bots, hosts, botLasts)}
+					routines={routines}
 					open={openBot}
-					bots={bots ?? []}
-					detailsOpen={rightOpen}
-					onToggleDetails={() => toggleSidebar("right")}
+					bots={bots}
 					past={past}
 					lastHosts={lastHosts}
 					models={models}
 					workspaces={workspaces}
+					defaultCwd={defaultWorkspace}
 					connected={connected}
+					detailsOpen={rightOpen}
+					onToggleDetails={() => toggleSidebar("right")}
 					completions={newSessionCompletions}
 				/>
 			);
-		}
 		case "notifications":
 			return <NotificationsPage notices={notices} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.

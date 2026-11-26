@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { lineCommentsBlocked } from "../../../pull-requests-model";
 import { useRead } from "../../../reads";
 import { hashForPullRequestFiles } from "../../../routing";
+import { usePageHash } from "../../../page-hash";
 import { type DiffReview, DiffReviewContext } from "../../changes/diff-review";
 import { useCollapsedFiles } from "../../changes/diff-stack";
 import { useDashboardActions, useDashboardStatus } from "../../dashboard-context";
@@ -25,6 +26,7 @@ interface CodeProps {
 
 /** The **Code** tab of one pull request; its parent keys it on the pull request, so another one starts it afresh. */
 export function Code({ pr, detail, placement, path, version }: CodeProps) {
+	const to = usePageHash();
 	const [requested, setRequested] = useState<string | null>(null);
 	const [sidebarPath, setSidebarPath] = useState<string | null>(null);
 	const [retry, setRetry] = useState(0);
@@ -87,7 +89,7 @@ export function Code({ pr, detail, placement, path, version }: CodeProps) {
 								key={commit ?? "all"}
 								files={files}
 								path={placement === "page" ? path : sidebarPath}
-								{...(placement === "page" ? { hrefFor: (file: string) => hashForPullRequestFiles(pr, file) } : { onPick: setSidebarPath })}
+								{...(placement === "page" ? { hrefFor: (file: string) => hashForPullRequestFiles(pr, file, to) } : { onPick: setSidebarPath })}
 								fileUrl={file => `/api/pull-request/file?${query}&path=${encodeURIComponent(file)}`}
 								version={String(version ?? 0)}
 								treeOpen={preferences.treeOpen}

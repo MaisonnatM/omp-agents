@@ -1,7 +1,8 @@
 /** The Board module's page half, which `WEB_MODULES` in `web/modules.ts` lists; its components are in this folder. See docs/architecture/board.md. */
 import { IconBrain, IconBubble2, IconBubbleText, IconFlag1, IconPullRequest, IconRobot, IconSettingsGear1 } from "central-icons";
 import { applyChange, type BoardChange, type BoardState } from "../../../templates/omp/agent/extensions/board/log";
-import type { StoredPageModule } from "../../modules";
+import type { PageAddresses, StoredPageModule } from "../../modules";
+import type { Page } from "../../routing";
 import { type BoardSearch, scopeOf } from "./search";
 
 /** The tabs across the top of a Workspace's Board, as across a Slack channel: its Board tasks, then what else the Workspace holds; `module` names the module whose page a tab shows, which hides the tab while it is off. */
@@ -17,8 +18,12 @@ export const BOARD_TABS = [
 export type BoardTab = (typeof BOARD_TABS)[number]["id"];
 export type BoardTabDef = (typeof BOARD_TABS)[number];
 
-/** What a Workspace's Board shows: its Board tasks with Board task `thread`'s Board thread open beside them, its settings on the section `section` names, the first for `null`, or another tab. */
-export type BoardView = { tab: "messages"; thread: number | null } | { tab: "settings"; section: string | null } | { tab: Exclude<BoardTab, "messages" | "settings"> };
+/** The tabs that show another page, a Bot's, a project's, or a pull request's, kept to the Workspace: each tab's id is that page's kind. */
+type PageTab = "bots" | "pull-requests" | "projects";
+type PageView<K extends PageTab = PageTab> = K extends PageTab ? { tab: K; page: Extract<Page, { kind: K }> } : never;
+
+/** What a Workspace's Board shows: its Board tasks with Board task `thread`'s Board thread open beside them, its settings on the section `section` names, the first for `null`, its memory, or the page `page` another tab shows, such as one Bot's. */
+export type BoardView = { tab: "messages"; thread: number | null } | { tab: "settings"; section: string | null } | { tab: "memory" } | PageView;
 
 /** The Board page: Workspace `workspace`'s view, the first Workspace's for `null`; on Messages, `search`'s results in place of the Board tasks, and reply `reply` of the open thread highlighted. With `bots`, the Bots group's page instead: every Bot, whatever its Workspace. */
 export interface BoardRoute {
@@ -31,24 +36,60 @@ export interface BoardRoute {
 
 export const boardTab = (id: BoardTab) => BOARD_TABS.find(each => each.id === id)!;
 
-/** The view the address's rest names: a number is a Board thread, `settings/<section>` a settings section, else a tab, Messages for an unknown one. */
-function parseView(rest: string | null): BoardView {
+/** The Workspace tab that shows `page`, `null` for a page no tab shows. */
+export function pageView(page: Page): PageView | null {
+	switch (page.kind) {
+		case "bots":
+			return { tab: "bots", page };
+		case "pull-requests":
+			return { tab: "pull-requests", page };
+		case "projects":
+			return { tab: "projects", page };
+		default:
+			return null;
+	}
+}
+
+/** Tab `tab` as it opens: Messages with no thread, the first settings section, or the list its page starts on. */
+export function tabView(tab: BoardTab): BoardView {
+	switch (tab) {
+		case "messages":
+			return { tab, thread: null };
+		case "settings":
+			return { tab, section: null };
+		case "memory":
+			return { tab };
+		case "bots":
+			return { tab, page: { kind: "bots", target: null, adding: false } };
+		case "pull-requests":
+			return { tab, page: { kind: "pull-requests", target: null } };
+		case "projects":
+			return { tab, page: { kind: "projects", open: null } };
+	}
+}
+
+/** The view the address's rest names: a number is a Board thread, `settings/<section>` a settings section, `<tab>/<more>` the page `#<tab>/<more>` names in that tab, Messages for an unknown one. */
+function parseView(rest: string | null, pages: PageAddresses): BoardView {
 	if (rest !== null && /^\d+$/.test(rest)) return { tab: "messages", thread: Number(rest) };
 	const [head, section = null] = rest?.split("/") ?? [];
 	const tab = BOARD_TABS.find(each => each.id === head)?.id ?? "messages";
 	if (tab === "messages") return { tab, thread: null };
 	if (tab === "settings") return { tab, section: section || null };
-	return { tab };
+	if (tab === "memory") return { tab };
+	const page = pages.page(`#${rest}`);
+	return (page && pageView(page)) || tabView(tab);
 }
 
-function viewRest(view: BoardView): string | null {
+function viewRest(view: BoardView, pages: PageAddresses): string | null {
 	switch (view.tab) {
 		case "messages":
 			return view.thread === null ? null : String(view.thread);
 		case "settings":
 			return view.section === null ? "settings" : `settings/${view.section}`;
-		default:
+		case "memory":
 			return view.tab;
+		default:
+			return pages.hash(view.page).slice(1);
 	}
 }
 
@@ -79,11 +120,11 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	offNote: "While the Board is off, sessions it starts or wakes keep running, and the board tool still works.",
 	listsItself: true,
 	home: { workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, bots: false },
-	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace, `#board/<tab>?workspace=<cwd>` another tab, and `#board/settings/<section>?workspace=<cwd>` one of its settings; on Messages, `q` searches in the `in` scope and `reply` highlights a reply of the thread. `#board?space=bots` opens the Bots group's page, every Bot. */
+	/** `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace, `#board/<tab>?workspace=<cwd>` another tab, `#board/settings/<section>?workspace=<cwd>` one of its settings, and `#board/<page>?workspace=<cwd>`, for `#<page>` a Bot's, project's, or pull request's address, that page in the tab its kind names, such as `#board/bots/<id>`; on Messages, `q` searches in the `in` scope and `reply` highlights a reply of the thread. `#board?space=bots` opens the Bots group's page, every Bot. */
 	address: {
-		parse: (rest, query) => {
+		parse: (rest, query, pages) => {
 			if (query.get("space") === "bots") return { workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, bots: true };
-			const view = parseView(rest);
+			const view = parseView(rest, pages);
 			const thread = view.tab === "messages" ? view.thread : null;
 			const q = view.tab === "messages" ? (query.get("q")?.trim() ?? "") : "";
 			const reply = query.get("reply");
@@ -95,7 +136,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 				bots: false,
 			};
 		},
-		rest: route => (route.bots ? null : viewRest(route.view)),
+		rest: (route, pages) => (route.bots ? null : viewRest(route.view, pages)),
 		query: route => {
 			const params = new URLSearchParams();
 			if (route.bots) params.set("space", "bots");
