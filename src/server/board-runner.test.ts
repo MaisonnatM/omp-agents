@@ -22,6 +22,7 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 	const events: BoardEvent[] = [];
 	const starts: { cwd: string; prompt: string; task: string }[] = [];
 	const wakes: { sessionId: string; text: string; interrupt: boolean }[] = [];
+	const wakesBegun: string[] = [];
 	const alive = new Set<string>();
 	const ended: string[] = [];
 	const lands: { workspace: string; branch: string; sessionId: string | undefined }[] = [];
@@ -43,6 +44,7 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 			return { sessionId };
 		},
 		async wake(sessionId, text, _launch, interrupt = false) {
+			wakesBegun.push(text);
 			await holds.waking;
 			wakes.push({ sessionId, text, interrupt });
 			return { resumed: stopped.has(sessionId) };
@@ -77,6 +79,7 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 		events,
 		starts,
 		wakes,
+		wakesBegun,
 		alive,
 		ended,
 		lands,
@@ -407,6 +410,7 @@ describe("BoardRunner", () => {
 		board.apply({ op: "reply", by: { kind: "user" }, task: 1, text: "Two" });
 		await settle();
 		expect(board.wakes).toEqual([]);
+		expect(board.wakesBegun).toHaveLength(1);
 		waking.open();
 		await settle();
 		await settle();

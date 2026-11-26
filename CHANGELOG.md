@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- The Board's tests now catch it if two quick replies to a stopped session ever start waking it at the same time again.
 - Bots are gone. Each routine now belongs to one Workspace, and every run posts a Board task there, so a fresh session does the work on its own branch and you can merge it from the Board.
 - A routine whose last Board task is still open replies on it instead of posting a new one.
 - A run that finds nothing to report closes its Board task quietly, without a notification.
