@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-26
 
 - Behind the scenes: an eval run now stops when a task's hidden tests could not run, such as with Docker down, instead of scoring every run after it as the model's failure.
+- The comment count on each Pull requests row now counts only unresolved review threads, and hides when none are left open.
 - Opening a Board thread from the message list now always shows its Thread tab first, not the session's conversation.
 - The Board no longer starts a second session on a task while the session working on it is still busy. Under heavy load a session could miss renewing its claim, and the Board then kept starting new sessions on the same task, about 30 for one task, each stopping because another held it.
 - Each Workspace in the Board sidebar now has a chevron that hides or shows the Board sessions listed under it; clicking the Workspace's name still opens its Board.
