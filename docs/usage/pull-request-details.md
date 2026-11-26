@@ -48,6 +48,7 @@
   Click the status icon to open the checks popover: checks needing attention come first, then running checks, then completed checks.
   **Show all** reveals completed checks when other checks are failing or running, and **Show less** hides them again.
   Each row names its status and links to the check run through **Details** when GitHub provides a link.
+  A failed check says why under its name: the first error it reported, such as a failing test's message, else its title or summary; hover for the whole line.
   In a narrow panel the checks label hides, but the status icon's accessible name keeps the summary.
 - Cmd+F opens a find bar over the tab bar's right end, on the Pull requests page and in the details docked beside its list, but not in a session's **PRs** sidebar, where Cmd+F finds in the conversation.
   It finds text in the header and the open tab, highlights every match, counts them, and steps through them with Enter and Shift+Enter, scrolling the tab to each; Esc closes it.

@@ -517,7 +517,7 @@ describe("parseDetailAnswer", () => {
 		]);
 	});
 
-	test("lists failing checks first, an unfinished run as pending, and a commit status by its context, beside GitHub's rollup", () => {
+	test("lists failing checks first with why each failed, an unfinished run as pending, and a commit status by its context, beside GitHub's rollup", () => {
 		const { checkRuns, checks, unresolved } = parseDetailAnswer(
 			answer({
 				commits: {
@@ -531,8 +531,21 @@ describe("parseDetailAnswer", () => {
 											{ name: "lint", status: "COMPLETED", conclusion: "SUCCESS", detailsUrl: "https://ci.example/lint" },
 											{ name: "docs", status: "COMPLETED", conclusion: "SKIPPED", detailsUrl: null },
 											{ name: "build", status: "IN_PROGRESS", conclusion: null, detailsUrl: null },
-											{ context: "deploy", state: "ERROR", targetUrl: "https://ci.example/deploy" },
-											{ name: "test", status: "COMPLETED", conclusion: "TIMED_OUT", detailsUrl: null },
+											{ context: "deploy", state: "ERROR", targetUrl: "https://ci.example/deploy", description: "Deploy failed" },
+											{
+												name: "test",
+												status: "COMPLETED",
+												conclusion: "TIMED_OUT",
+												detailsUrl: null,
+												title: "Run timed out",
+												annotations: {
+													nodes: [
+														{ annotationLevel: "FAILURE", title: "", message: "Process completed with exit code 1." },
+														{ annotationLevel: "WARNING", title: "Node 16 is deprecated", message: "" },
+														{ annotationLevel: "FAILURE", title: "error: expect(received).toBe(expected)", message: "\n      at load (src/a.ts:1:2)" },
+													],
+												},
+											},
 										],
 									},
 								},
@@ -546,8 +559,8 @@ describe("parseDetailAnswer", () => {
 		expect(checks).toBe("failing");
 		expect(unresolved).toEqual({ count: 0, exact: true, bots: 0 });
 		expect(checkRuns).toEqual([
-			{ name: "deploy", state: "failing", url: "https://ci.example/deploy" },
-			{ name: "test", state: "failing", url: null },
+			{ name: "deploy", state: "failing", url: "https://ci.example/deploy", reason: "Deploy failed" },
+			{ name: "test", state: "failing", url: null, reason: "error: expect(received).toBe(expected)" },
 			{ name: "build", state: "pending", url: null },
 			{ name: "lint", state: "passing", url: "https://ci.example/lint" },
 			{ name: "docs", state: "skipped", url: null },
