@@ -7,6 +7,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 - A Board Workspace's **Projects** tab now lists its projects in a resizable column with search, **All projects**, and **New project**, as the **Bots** tab does; a project you pick opens on the right, beside the list.
 - Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its blue unread count comes back, counting from that reply, until you open the thread again.
+- The Board looks calmer: reply counts and unread counts use the app's own colors instead of bright blue, names drop the **SESSION** tag and use one size, the open Board task is marked in gray instead of yellow, the last reply's time no longer turns into "View thread" on hover, and messages line up with the Board's title.
+- An empty Board reads "Each message here becomes a Board task, and a session starts working on it", its message box reads "Message <Workspace> to start a session", and the Board shows gray placeholder rows while it loads.
+- Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its unread count comes back, counting from that reply, until you open the thread again.
 - A Board task's message in the channel has **Mark unread** too, which counts its whole thread as unread again.
 - **Notifications** and **Settings** in the Board's sidebar now open with the sidebar still on the Board, instead of switching it to Sessions.
 - The Board's **Bots** page and its sidebar group now list only the Bots that work across projects, those whose folder holds your projects, such as `~/code`. A Bot that belongs to one project shows in that project's **Bots** tab on the Board.
