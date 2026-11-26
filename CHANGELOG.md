@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-26
+
+- Opening a Board thread from the message list now always shows its Thread tab first, not the session's conversation.
+
 ## 2026-11-25
 
 - A Board thread summary now shows omp's mark once, however many sessions replied, instead of one identical mark per session.
