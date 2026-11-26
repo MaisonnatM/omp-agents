@@ -126,10 +126,18 @@ export class BoardRunner implements ModuleRun {
 		for (const task of ready) if (!this.#starting.has(task.id)) void this.#start(task);
 	}
 
-	/** Returns each lapsed claim, or start nobody claimed, to ready, which starts a new session on it. */
+	/**
+	 * Returns each lapsed claim, or start nobody claimed, to ready, which starts a new session on it. A Board task whose
+	 * session still runs a turn or waits on a question stays its own: under load a session misses its renewal, and
+	 * expiring it then started a second session on the same work, again and again.
+	 */
 	async sweep(): Promise<void> {
 		if (!this.#core.owner()) return;
-		for (const task of lapsed(this.#state(), this.#core.now())) this.#change({ op: "expire", task: task.id });
+		for (const task of lapsed(this.#state(), this.#core.now())) {
+			const holder = task.claim?.sessionId ?? task.start?.sessionId ?? null;
+			if (holder !== null && this.#core.working(holder)) continue;
+			this.#change({ op: "expire", task: task.id });
+		}
 	}
 
 	async #start(task: BoardTask): Promise<void> {
