@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-26
+
+- Behind the scenes: an eval run now stops when a task's hidden tests could not run, such as with Docker down, instead of scoring every run after it as the model's failure.
+
 ## 2026-11-25
 
 - A Board thread summary now shows omp's mark once, however many sessions replied, instead of one identical mark per session.
