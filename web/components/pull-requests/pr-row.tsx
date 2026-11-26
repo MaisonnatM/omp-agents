@@ -269,15 +269,16 @@ function ReviewPicker({ options, review: { shown, send } }: { options: PullReque
 	);
 }
 
-/** How many comments and review threads the pull request holds, as GitHub's list shows it, opening its latest comments on hover; nothing when it has none. */
+/** How many review threads on the pull request are still unresolved, opening its latest comments on hover; nothing when none are. */
 function ConversationCount({ pr }: { pr: PullRequestSummary }) {
-	if (pr.conversations === 0) return null;
-	const label = `${pr.conversations} ${pr.conversations === 1 ? "conversation" : "conversations"}`;
+	const open = pr.unresolved.count;
+	if (open === 0) return null;
+	const label = `${open} unresolved ${open === 1 ? "conversation" : "conversations"}`;
 	return (
 		<ConversationPeek pr={pr}>
 			<span role="img" aria-label={label} tabIndex={0} className="flex shrink-0 items-center gap-0.5 rounded-sm text-xs tabular-nums text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
 				<IconBubbleText className="size-3.5" />
-				{pr.conversations}
+				{open}
 			</span>
 		</ConversationPeek>
 	);
