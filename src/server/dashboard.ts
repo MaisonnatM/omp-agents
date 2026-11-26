@@ -536,6 +536,10 @@ export class Dashboard {
 				for (const message of withdrawn) await session.prompt(null, message.text, message.images, "followUp");
 				return { resumed: !live };
 			},
+			working: sessionId => {
+				const status = sessions.bySessionId(sessionId)?.row().status;
+				return status !== undefined && status !== "idle";
+			},
 			owner: () => ownerLock.held,
 			now: Date.now,
 		});

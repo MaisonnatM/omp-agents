@@ -45,6 +45,8 @@ export interface ModuleRunCore {
 	 * `text`. `resumed` says whether it had stopped.
 	 */
 	wake(sessionId: string, text: string, launch?: { model: ModelOption | null; thinking: string | null; skill: string | null }, interrupt?: boolean): Promise<{ resumed: boolean }>;
+	/** Whether session `sessionId` runs here and is mid-turn or waits on a question, rather than idle or gone. */
+	working(sessionId: string): boolean;
 	/** Whether this server runs the unattended work, the one that may start and wake sessions. */
 	owner(): boolean;
 	now(): number;

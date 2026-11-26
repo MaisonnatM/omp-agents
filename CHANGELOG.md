@@ -7,6 +7,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 - Behind the scenes: an eval run now stops when a task's hidden tests could not run, such as with Docker down, instead of scoring every run after it as the model's failure.
 - Opening a Board thread from the message list now always shows its Thread tab first, not the session's conversation.
+- The Board no longer starts a second session on a task while the session working on it is still busy. Under heavy load a session could miss renewing its claim, and the Board then kept starting new sessions on the same task, about 30 for one task, each stopping because another held it.
 
 ## 2026-11-25
 

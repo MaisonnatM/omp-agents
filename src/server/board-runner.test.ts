@@ -4,7 +4,7 @@ import type { ModuleRunCore } from "../modules";
 import { BoardRunner } from "./board-runner";
 
 /** A runner over an in-memory Board, with the sessions it started and the wakes it sent. */
-function harness({ owner = true, stopped = new Set<string>() } = {}) {
+function harness({ owner = true, stopped = new Set<string>(), working = new Set<string>() } = {}) {
 	let state: BoardState = emptyBoard();
 	let now = 1000;
 	let next = 0;
@@ -27,6 +27,7 @@ function harness({ owner = true, stopped = new Set<string>() } = {}) {
 			wakes.push({ sessionId, text, interrupt });
 			return { resumed: stopped.has(sessionId) };
 		},
+		working: sessionId => working.has(sessionId),
 		owner: () => owner,
 		now: () => now,
 	};
@@ -149,6 +150,34 @@ describe("BoardRunner", () => {
 		await settle();
 		expect(board.starts).toHaveLength(2);
 		expect(board.state().tasks[0]?.start?.sessionId).toBe("s2");
+	});
+
+	test("the sweep leaves a lapsed claim to its session while that session still works, then frees it once the session goes idle", async () => {
+		const working = new Set(["s1"]);
+		const board = harness({ working });
+		board.runner.changed();
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "First" });
+		await settle();
+		board.apply({ op: "claim", sessionId: "s1", task: 1 });
+		board.tick(LEASE_MS);
+		await board.runner.sweep();
+		await settle();
+		expect(board.starts).toHaveLength(1);
+		working.delete("s1");
+		await board.runner.sweep();
+		await settle();
+		expect(board.starts).toHaveLength(2);
+	});
+
+	test("the sweep leaves an unclaimed start to its session while that session still works", async () => {
+		const board = harness({ working: new Set(["s1"]) });
+		board.runner.changed();
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "First" });
+		await settle();
+		board.tick(LEASE_MS);
+		await board.runner.sweep();
+		await settle();
+		expect(board.starts).toHaveLength(1);
 	});
 
 	test("a server that does not run the unattended work starts and wakes nothing", async () => {
