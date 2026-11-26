@@ -244,9 +244,17 @@ async function workSource(cwd: string, name: string, mainBranch: string | null):
 	const listed = await run(["git", "-C", cwd, "ls-remote", "--exit-code", "--heads", "origin", `refs/heads/${name}`], opts);
 	// `--exit-code` exits 2 when origin answers without the branch.
 	if (listed.code !== 0 && listed.code !== 2) throw new Error(`Cannot reach origin: ${listed.stderr.trim() || `git ls-remote exited ${listed.code}`}`);
-	const base = listed.code === 0 ? name : (await runChecked(["git", "-C", cwd, "rev-parse", "--abbrev-ref", "origin/HEAD"])).trim().replace(/^origin\//, "");
+	const base = listed.code === 0 ? name : await originDefault(cwd, mainBranch);
 	await runChecked(["git", "-C", cwd, "fetch", "--quiet", "origin", `+refs/heads/${base}:refs/remotes/origin/${base}`], opts);
 	return { track: listed.code === 0, ref: `origin/${base}` };
+}
+
+/** The branch origin's HEAD names, else the main worktree's branch `mainBranch`, since a repository whose origin was added rather than cloned has no `origin/HEAD`. */
+async function originDefault(cwd: string, mainBranch: string | null): Promise<string> {
+	const head = await run(["git", "-C", cwd, "rev-parse", "--abbrev-ref", "origin/HEAD"]);
+	if (head.code === 0) return head.stdout.trim().replace(/^origin\//, "");
+	if (!mainBranch) throw new Error("origin has no HEAD branch, and the main worktree has no branch checked out.");
+	return mainBranch;
 }
 
 /**
