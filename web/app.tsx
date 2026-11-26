@@ -4,7 +4,6 @@ import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
-import { BotDetails } from "./components/bots/bot-details";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import { HeaderTabs } from "./components/header-tabs";
 import {
@@ -38,7 +37,6 @@ import { subjectOf } from "./components/subject";
 import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
-import { botRows } from "./bots-model";
 import { routeOf } from "./dashboard-state";
 import { useOpenPullRequest } from "./open-pull-request";
 import { UNREAD } from "./reads";
@@ -46,8 +44,6 @@ import { onArtifactOpen, onArtifactsReveal } from "./artifact-requests";
 import { onReviewRequest } from "./review-pages";
 import { revealDetailsTab } from "./details-tabs";
 import { hashForLayout, hashForPage, hashForRoute, hashForView, type OpenMode, sameView } from "./routing";
-import { PageHashContext } from "./page-hash";
-import { boardPageHash } from "./components/board/sidebar";
 import type { SectionTarget } from "./section";
 import { defaultCwd, type WindowScope, workspaceSession, workspaceSwitch } from "./sessions";
 import { useSidebarTabs } from "./sidebar-tabs";
@@ -70,7 +66,7 @@ const NO_PROJECTS: readonly Project[] = [];
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeModule, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
+	const { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeModule, changePins, trustAndStart, dismissTrust } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -86,7 +82,7 @@ export function App() {
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
-	useAttention(state, openBot?.view ?? null, send);
+	useAttention(state, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const [goalEditor, setGoalEditor] = useState<{ instanceId: string; focus: "objective" | "budget" } | null>(null);
 	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
@@ -94,9 +90,7 @@ export function App() {
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
 	const { absent: absentTabs, shown: tabs } = useSidebarTabs();
 	const settings = useSettingsRoute(page);
-	const botList = useMemo(() => (state.bots === null ? null : botRows(state.bots, state.hosts, state.botLasts)), [state.bots, state.hosts, state.botLasts]);
-	const latestBot = botList?.[0]?.bot.id ?? null;
-	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, latestBot, navigate, show });
+	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, navigate, show });
 	const known = useMemo(() => ({ hosts: state.hosts, past: state.past }), [state.hosts, state.past]);
 	const maximized = layout.maximized && !page;
 	const address = page ? hashForPage(page) : hashForLayout(layout);
@@ -194,7 +188,7 @@ export function App() {
 		listed: sessions.listed,
 		view: focused.view,
 		absentTabs,
-		hasDetails: detailsView !== null || openBot !== null,
+		hasDetails: detailsView !== null,
 		openPullRequest: openPullRequest.state.kind === "ready" ? openPullRequest.run : null,
 		setGoal: focusedGoal ? () => editGoal(focusedGoal.instanceId, "objective") : null,
 		palette: overlays.palette,
@@ -212,8 +206,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeModule, changeBot, end: endHost, openFile: setOpenedFile, editGoal, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeModule, changeBot, endHost, setOpenedFile, editGoal, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeModule, end: endHost, openFile: setOpenedFile, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeModule, endHost, setOpenedFile, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -232,18 +226,7 @@ export function App() {
 	const pageArea = useRef<HTMLDivElement>(null);
 	const pageAreaWidth = useWidth(pageArea);
 	const placement = listPage && listPlacement(listPage, sidebars.panels.left.floating, pageAreaWidth);
-	const pageList = useMemo(
-		() =>
-			listPage && (
-				<PageList
-					page={listPage}
-					botList={botList}
-					sectionTarget={sectionTarget}
-					onSectionTarget={setSectionTarget}
-				/>
-			),
-		[listPage, botList, sectionTarget],
-	);
+	const pageList = useMemo(() => listPage && <PageList page={listPage} sectionTarget={sectionTarget} onSectionTarget={setSectionTarget} />, [listPage, sectionTarget]);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const unreadNotices = useMemo(() => state.notices.filter(notice => !notice.read).length, [state.notices]);
 
@@ -269,7 +252,6 @@ export function App() {
 										tabs={tabs}
 										board={state.modules.board}
 										known={known}
-										botList={botList}
 										list={placement?.at === "sidebar" ? pageList : null}
 										settings={settings}
 										unreadNotices={unreadNotices}
@@ -279,7 +261,7 @@ export function App() {
 									<SidebarFoot usage={state.usage} />
 								</DashboardSidebar>
 								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} />
-								<SidebarInset className={cn("inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5", (detailsView || openBot) && sidebars.panels.right.open && !sidebars.panels.right.floating && "rounded-r-none border-r-0")}>
+								<SidebarInset className={cn("inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5", detailsView && sidebars.panels.right.open && !sidebars.panels.right.floating && "rounded-r-none border-r-0")}>
 									<div ref={pageArea} className="flex min-h-0 flex-1">
 										{listPage && placement?.at === "column" && (
 											<PageListColumn page={listPage} max={placement.max}>
@@ -302,9 +284,6 @@ export function App() {
 																	models={state.models}
 																	modules={state.modules}
 																	routines={state.routines}
-																	bots={state.bots}
-																	botLasts={state.botLasts}
-																	openBot={openBot}
 																	workspaceList={state.workspaceList}
 																	trustedProjects={state.trustedProjects}
 																	newSessionCompletions={state.newSessionCompletions}
@@ -333,45 +312,29 @@ export function App() {
 									</div>
 									<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 								</SidebarInset>
-								{(detailsView || openBot) && (
+								{detailsView && (
 									<DashboardSidebar side="right" className="[grid-area:details]" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")} address={address}>
-										{detailsView ? (
-											// The **Subagent** tab draws a conversation, which reads the same settings the panes do.
-											<Plans value={state.usage?.plans ?? NO_PLANS}>
-												<ActivityVisibility.Provider value={display.activityVisibility}>
-													<ToolsExpanded value={display.toolsExpanded}>
-														<MentionListsContext.Provider value={mentionLists}>
-															<SessionDetails
-																key={hashForView(detailsView)}
-																view={detailsView}
-																working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
-																cwd={focused.cwd ?? null}
-																hosts={visible.hosts}
-																sessionId={focused.sessionId}
-																host={focused.host ?? null}
-																lastHost={focused.lastHost}
-																row={focused.row ?? null}
-																models={(detailsView.kind === "live" && state.models.get(detailsView.instanceId)) || UNREAD}
-																workspaces={workspaces}
-															/>
-														</MentionListsContext.Provider>
-													</ToolsExpanded>
-												</ActivityVisibility.Provider>
-											</Plans>
-										) : (
-											openBot && (
-												// On a Board's Bots tab, the details' links stay in that tab.
-												<PageHashContext.Provider value={page?.kind === "board" ? boardPageHash(page.workspace) : hashForPage}>
-													<BotDetails
-														key={openBot.bot.id}
-														open={openBot}
-														session={openBot.host ?? state.past.find(({ sessionId }) => sessionId === openBot.bot.sessionId) ?? null}
-														memory={state.botMemories[openBot.bot.id] ?? ""}
-														connected={state.connected}
-													/>
-												</PageHashContext.Provider>
-											)
-										)}
+										<Plans value={state.usage?.plans ?? NO_PLANS}>
+											<ActivityVisibility.Provider value={display.activityVisibility}>
+												<ToolsExpanded value={display.toolsExpanded}>
+													<MentionListsContext.Provider value={mentionLists}>
+														<SessionDetails
+															key={hashForView(detailsView)}
+															view={detailsView}
+															working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
+															cwd={focused.cwd ?? null}
+															hosts={visible.hosts}
+															sessionId={focused.sessionId}
+															host={focused.host ?? null}
+															lastHost={focused.lastHost}
+															row={focused.row ?? null}
+															models={(detailsView.kind === "live" && state.models.get(detailsView.instanceId)) || UNREAD}
+															workspaces={workspaces}
+														/>
+													</MentionListsContext.Provider>
+												</ToolsExpanded>
+											</ActivityVisibility.Provider>
+										</Plans>
 									</DashboardSidebar>
 								)}
 								{refused && <ProjectTrustDialog key={refused.reqId} ask={refused.trust} connected={state.connected} onTrust={() => trustAndStart(refused)} onCancel={() => dismissTrust(refused.reqId)} />}

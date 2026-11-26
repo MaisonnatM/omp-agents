@@ -121,13 +121,12 @@ describe("shownViews", () => {
 	const layout = { panes: [a, b], focus: 1, maximized: false };
 
 	test("shows every pane, or only the focused one while it is maximized", () => {
-		expect(shownViews({ cover: null, layout }, null)).toEqual([a, b]);
-		expect(shownViews({ cover: null, layout: { ...layout, maximized: true } }, null)).toEqual([b]);
+		expect(shownViews({ cover: null, layout })).toEqual([a, b]);
+		expect(shownViews({ cover: null, layout: { ...layout, maximized: true } })).toEqual([b]);
 	});
 
-	test("shows no pane under a page or a session link, which opens another session over them, but a Bot's page shows its conversation", () => {
-		expect(shownViews({ cover: { kind: "page", page: { kind: "notifications" } }, layout }, null)).toEqual([]);
-		expect(shownViews({ cover: { kind: "session", sessionId: "s-c" }, layout }, null)).toEqual([]);
-		expect(shownViews({ cover: { kind: "page", page: { kind: "bots", target: "bot", routine: null } }, layout }, a)).toEqual([a]);
+	test("shows no pane under a page or a session link, which opens another session over them", () => {
+		expect(shownViews({ cover: { kind: "page", page: { kind: "notifications" } }, layout })).toEqual([]);
+		expect(shownViews({ cover: { kind: "session", sessionId: "s-c" }, layout })).toEqual([]);
 	});
 });

@@ -1,4 +1,4 @@
-/** Number, percent, and dollar formatters for the Settings analytics tab, its provider trends, and a Bot's Usage. */
+/** Number, percent, and dollar formatters for the Settings analytics tab, its provider trends, and the plan usage. */
 
 export const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 export const full = new Intl.NumberFormat("en-US");

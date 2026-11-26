@@ -5,6 +5,12 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- Bots are gone. Each routine now belongs to one Workspace, and every run posts a Board task there, so a fresh session does the work on its own branch and you can merge it from the Board.
+- A routine whose last Board task is still open replies on it instead of posting a new one.
+- A run that finds nothing to report closes its Board task quietly, without a notification.
+- Each Workspace on the Board has a Routines tab, in place of the Bots tab, where you make and edit its routines and pick their model.
+- Your Bots' routines moved to their Workspaces, each carrying its Bot's job and memory in its prompt. The Bots gallery, Bot designer, PR shepherd, and Bot messages are removed.
+- Any session can now create and edit the routines of its own Workspace.
 - On Pull requests, a pull request whose only failing checks wait on someone's approval, such as a workflow GitHub holds for approval or a `human-review` gate, now shows an **Approval** badge under Waiting on others instead of **Fix CI**.
 - The Todo page is gone, along with its list, the todo picker in new sessions, todo links in messages, and the todo tool sessions used to add items to it. Settings › Sync no longer carries a todo list.
 - A new branch or Board task in a repository whose origin was added by hand, not cloned, now starts from its main branch instead of failing with a git usage message.

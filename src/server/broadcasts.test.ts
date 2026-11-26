@@ -3,11 +3,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { flushJsonFiles } from "../fs";
-import type { BotId } from "../shared/bots";
 import type { ServerMsg } from "../shared/protocol";
 import type { PastSession, RosterHost } from "../shared/sessions";
 import { Broadcasts } from "./broadcasts";
-import { BotsFile } from "./bots-file";
 import { ListRegistry } from "./list-registry";
 import { PinsFile } from "./pins-file";
 import { PreferencesFile } from "./preferences-file";
@@ -50,7 +48,6 @@ function setup(initial: PastSession[]) {
 	const pins = new PinsFile(join(dir, "pins.json"));
 	const preferences = new PreferencesFile(join(dir, "preferences.json"));
 	const reviewDrafts = new ReviewDraftsFile(join(dir, "review-drafts.json"));
-	const bots = new BotsFile(join(dir, "bots.json"));
 	const lists = new ListRegistry({
 		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
 		scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, 1000) },
@@ -68,7 +65,6 @@ function setup(initial: PastSession[]) {
 		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
 		preferences: { msg: () => ({ t: "preferences", values: preferences.value }), apply: change => preferences.apply(change) },
 		"review-drafts": { msg: () => ({ t: "review-drafts", list: reviewDrafts.value.drafts }), apply: change => reviewDrafts.apply(change.op === "add-finding" ? { ...change, at: 0 } : change) },
-		bots: { msg: () => ({ t: "bots", bots: bots.value, memories: {}, lasts: {} }), apply: change => bots.apply(change, "2026-01-01T00:00:00.000Z") },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
 		jobs: { msg: () => ({ t: "jobs", jobs: {} }) },
@@ -204,7 +200,6 @@ describe("registered whole-list broadcasts", () => {
 		expect(lists.apply("pins", { op: "unpin", sessionIds: ["missing"] }, peer)).toBe(false);
 		expect(lists.apply("preferences", { op: "set", key: "omp-agents.split-columns", value: "0.4" }, peer)).toBe(false);
 		expect(lists.apply("review-drafts", { op: "discard", pr: { owner: "o", repo: "r", number: 1 } }, peer)).toBe(false);
-		expect(lists.apply("bots", { op: "remove", id: "missing" as BotId }, peer)).toBe(false);
 		expect(lists.applyModule("sport", [{ op: "remove-log", id: "missing" }], peer)).toBe(false);
 		expect(lists.applyModule("projects", { op: "leave", sessionId: "missing" }, peer)).toBe(false);
 		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices" && msg.t !== "merges" && msg.t !== "jobs" && !(msg.t === "module" && msg.id === "board")));

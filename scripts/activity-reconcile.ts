@@ -49,7 +49,6 @@ const EXPECTED: Record<string, number> = {
 	"view:home": 2,
 	"view:settings/analytics": 1,
 	"view:todo": 1,
-	"view:bots": 1,
 	"view:new": 1,
 	// Each palette opening is the switcher's shortcut.
 	"command:switcher": 2,
@@ -75,7 +74,7 @@ async function runCommand(page: Page, title: string): Promise<void> {
 async function script(page: Page): Promise<void> {
 	await page.goto(`${base}/`);
 	await page.waitForTimeout(1_500);
-	for (const hash of ["#settings/analytics", "#todo", "#bots", "#"]) {
+	for (const hash of ["#settings/analytics", "#todo", "#"]) {
 		await page.evaluate(next => (location.hash = next), hash);
 		await page.waitForTimeout(500);
 	}

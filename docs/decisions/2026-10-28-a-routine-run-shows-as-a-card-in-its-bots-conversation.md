@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-26-bots-retire-into-workspace-routines-that-post-board-tasks
 date: 2026-10-28
 decision-makers: Maxence
 ---

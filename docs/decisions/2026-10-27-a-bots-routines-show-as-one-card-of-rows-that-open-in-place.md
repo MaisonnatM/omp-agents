@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-26-bots-retire-into-workspace-routines-that-post-board-tasks
 date: 2026-10-27
 decision-makers: Maxence Maisonnat, agent
 ---
@@ -39,7 +40,7 @@ The page runs in a narrow window as often as a wide one.
 
 ## Confirmation
 
-`web/routines-model.test.ts` holds the countdown, past-run, strip, and cadence words and shapes, `web/routing.test.ts` and `web/bots-model.test.ts` the card's address and what the page shows for it, and `web/activity.test.ts` its view.
+`web/routines-model.test.ts` holds the countdown, past-run, strip, and cadence words and shapes, `web/routing.test.ts` and the Bots model's test, since retired, the card's address and what the page shows for it, and `web/activity.test.ts` its view.
 Review checks that `web/components/routines/routines-card.tsx` is what `#bots/<id>/routines` and `#bots/<id>/routines/<routine id>` render.
 
 ## Revisit when

@@ -6,7 +6,6 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { isNotificationSound, type DesktopBridge, type NotificationSound } from "../src/shared/desktop-bridge";
 import type { ClientMsg } from "../src/shared/protocol";
-import type { View } from "../src/shared/sessions";
 import { type Attention, attend, needsYou, shownViews, unreadShown } from "./attention";
 import type { DashboardState } from "./dashboard-state";
 import { useStoredState } from "./stored-state";
@@ -66,8 +65,8 @@ function subscribeFocus(change: () => void): () => void {
 	};
 }
 
-/** Keeps the Dock badge, the notifications, and the read turns in step with the roster; `botConversation` is the conversation an open Bot's page shows. */
-export function useAttention(state: DashboardState, botConversation: View | null, send: (msg: ClientMsg) => void): void {
+/** Keeps the Dock badge, the notifications, and the read turns in step with the roster. */
+export function useAttention(state: DashboardState, send: (msg: ClientMsg) => void): void {
 	const { hosts, connected, layout, cover } = state;
 	const { on, turns, sound, soundWhenFocused } = useSessionNotifications();
 	const focused = useSyncExternalStore(subscribeFocus, () => document.hasFocus());
@@ -85,7 +84,7 @@ export function useAttention(state: DashboardState, botConversation: View | null
 		else if (soundWhenFocused) playSound(sound);
 	}, [hosts]);
 
-	const shown = useMemo(() => shownViews({ cover, layout }, botConversation), [botConversation, cover, layout]);
+	const shown = useMemo(() => shownViews({ cover, layout }), [cover, layout]);
 	useEffect(() => {
 		if (focused) for (const instanceId of unreadShown(hosts, shown)) send({ t: "read", instanceId });
 	}, [focused, hosts, shown, send]);

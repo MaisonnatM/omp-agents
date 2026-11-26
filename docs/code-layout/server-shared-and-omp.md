@@ -9,16 +9,13 @@
   `session-controls.ts` holds the context actions, compaction and advisor state, goal slots and changes, their socket parsers, and the composer's `/goal` translation.
   `agents.ts` holds the discovered-agent new-session preview, model-resolution states, override selectors and their guard, and the one `AGENT_SETTINGS` table of Settings › Agents' owned ids.
   `storage.ts` holds cleanup steps, parsed requests, the native report subset, sandbox plans and results, package cache plans and results, all twelve editable rule ids, and the shared `CleanupBusy` refusal; `storage.test.ts` checks the phase allowlist and sandbox request bounds.
-  `transcript.ts` also holds `PromptAuthor` and `promptAuthor`, which distinguish the user's text, hidden dashboard prompts, and stamped routine messages, and `skillInvocation`, a `/skill:` prompt as typed, which every reader and writer of one joins with.
-  The transcript, trajectory, queued rows, withdrawn messages, live title's `/rename`, and past title use that classification, so a routine is never presented as the user's own prompt.
-  `routine-message.ts` holds `RoutineMessage`, the snapshot of what one routine run sent, `routineMessageText`, its body and trailing JSON stamp, `readRoutineMessage`, its checked decoder, `taskOf`, its prompt or command task, and `taskText`, that task's prompt or command as text.
-  `bot-message.ts` holds `BotMessage`, a message one Bot sent another, with the sender's id and its name as of the send, `botMessageText`, its body and trailing JSON stamp, and `readBotMessage`, its checked decoder; `promptAuthor` in `transcript.ts` reads it after a routine's stamp.
-  Both stamp through `stamp.ts`: `stampedText` writes a body and its trailing stamp line, and `readStamped` reads the last stamp line back with a decoder of its own.
-  `transcript.ts` also holds `PromptItem` and `isPrompt`, the items that open a turn: a user's prompt, a routine's message, or a Bot message.
+  `transcript.ts` also holds `PromptAuthor` and `promptAuthor`, which tell the user's text from hidden dashboard prompts, and `skillInvocation`, a `/skill:` prompt as typed, which every reader and writer of one joins with.
+  The transcript, trajectory, queued rows, withdrawn messages, live title's `/rename`, and past title use that classification, so a dashboard prompt is never presented as the user's own.
+  `transcript.ts` also holds `PromptItem` and `isPrompt`, the user's prompt that opens a turn.
   `transcript.ts` also holds `MEDIA_FILE_TYPES` and `mediaUrl`, the `GET /api/media` address of an image or video on this computer, which the media tree and the media section build; a path in agent text builds it with its session lookup through `mediaFileUrl` in `web/file-paths.ts`.
   `mcp-servers.ts` holds the rows and bodies of Settings › MCP servers, and `mcp-catalog.ts` the catalog of remote servers it offers.
   `mcp-status.ts` holds `McpRemoteStatus` and `McpTool`, where omp stands with a remote MCP server, which an integration's `McpConnection` in `accounts.ts` and a server's `McpServerStatus` in `mcp-servers.ts` both build on.
-  `newSessionRequest` in `sessions.ts` builds a new-session start with every option not given defaulted, for the socket's parser, a Bot's first message, and their tests.
+  `newSessionRequest` in `sessions.ts` builds a new-session start with every option not given defaulted, for the socket's parser and its tests.
   `SessionFacts` in `sessions.ts` declares a session's pull requests, /ship stage, worktree, and branch once, and `RosterHost` and `PastSession` extend it.
   `parseNewSessionRequest` there checks one, with `parseImages`, `parseModel`, `parseThinking`, and `parseSkill`, for the socket's `start` and a start kept in `scheduled.json`; `parsePullRequest` in `github.ts` checks a pull request's owner, repository, and number.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.

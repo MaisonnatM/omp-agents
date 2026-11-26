@@ -14,7 +14,7 @@ export function parseProjectTrust(value: unknown): ProjectTrust | null {
 	return entries.every(([root, hashes]) => root.startsWith("/") && isHashes(hashes)) ? Object.fromEntries(entries) as ProjectTrust : null;
 }
 
-/** The error a start or a move refused for untrusted code fails with: all a bot, a schedule, the shepherd, or a move gets, and what the page shows under the start. */
+/** The error a start or a move refused for untrusted code fails with: all a routine's Board task, a schedule, or a move gets, and what the page shows under the start. */
 export const untrustedText = (ask: TrustAsk): string =>
 	`The agent code in ${ask.rootDisplay} is not trusted yet; a session started there from the dashboard asks you to review and trust it.`;
 

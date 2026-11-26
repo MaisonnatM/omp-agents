@@ -5,7 +5,6 @@ import { basename, dirname, join } from "node:path";
 import { canonicalJson } from "./json";
 import { runChecked } from "./proc";
 import { isDue, type RoutineSpec } from "./routines";
-import { BotsFile } from "./server/bots-file";
 import type { ListKind } from "./server/list-registry";
 import { PreferencesFile } from "./server/preferences-file";
 import { ProcessSettingsFile } from "./server/process-settings-file";
@@ -14,7 +13,6 @@ import { ProjectsFile } from "./server/projects-file";
 import { WorkspacesFile } from "./server/workspaces-file";
 import { applyLocal, localPath, mergeFile, mergeJson, planSync, portablePath, portableText, readLocal, SettingsSync, type SyncStore, sourceControlStore, syncStores } from "./settings-sync";
 import { missingGithubRepo, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncStoreId } from "./shared/settings-sync";
-import { type BotId, parseBotId } from "./shared/bots";
 import { SourceControl } from "./source-control";
 
 // Two machines syncing through a real repository start about 110 git processes; a land check's full-suite load pushed that past 5 seconds.
@@ -41,7 +39,7 @@ const text = (value: string) => ({ text: value, executable: false });
 /** Stores that read `values`, `{}` for the rest, and take whatever sync writes. */
 const fixedStores = (values: Partial<Record<SyncStoreId, unknown>> = {}): Record<SyncStoreId, SyncStore> => {
 	const store = (id: SyncStoreId): SyncStore => ({ read: () => values[id] ?? {}, parse: value => ({ ok: value }), write: () => {} });
-	return { "source-control": store("source-control"), preferences: store("preferences"), workspaces: store("workspaces"), bots: store("bots"), projects: store("projects") };
+	return { "source-control": store("source-control"), preferences: store("preferences"), workspaces: store("workspaces"), routines: store("routines"), projects: store("projects") };
 };
 
 describe("what syncs", () => {
@@ -81,7 +79,7 @@ describe("what syncs", () => {
 			"omp/skills/alpha/run.sh": { text: "#!/bin/sh\n", executable: true },
 			"dashboard/source-control.json": text('{\n\t"cleanUp": true,\n\t"on": false,\n\t"repos": {}\n}\n'),
 			"dashboard/preferences.json": text("{}\n"),
-			"dashboard/bots.json": text("{}\n"),
+			"dashboard/routines.json": text("{}\n"),
 			"dashboard/projects.json": text("{}\n"),
 		});
 		expect(skipped.sort((a, b) => a.path.localeCompare(b.path))).toEqual([
@@ -219,6 +217,14 @@ test("saved sync settings that exclude an item this version lacks, such as notes
 	expect(sync.answer().settings).toEqual({ remote: "/tmp/r.git", branch: "main", excluded: ["workspaces"] });
 });
 
+test("saved sync settings that exclude the Bots, which carried the routines, load excluding the routines", () => {
+	const dir = scratch();
+	const file = join(dir, "settings-sync.json");
+	put(file, JSON.stringify({ settings: { remote: "/tmp/r.git", branch: "main", excluded: ["bots"] }, last: null }));
+	const sync = new SettingsSync(file, join(dir, "repo.git"), { omp: dir, home: dir, stores: fixedStores() });
+	expect(sync.answer().settings.excluded).toEqual(["routines"]);
+});
+
 /** One machine: its home, omp's directory, the dashboard's files, the lists a sync rewrote, and its settings sync on `remote`. */
 function machine(root: string, remote: string) {
 	const home = join(root, "home");
@@ -231,9 +237,7 @@ function machine(root: string, remote: string) {
 		preferences: new PreferencesFile(config("preferences.json")),
 		processes: new ProcessSettingsFile(config("processes.json")),
 		workspaces: new WorkspacesFile(config("workspaces.json")),
-		bots: new BotsFile(config("bots.json")),
-		botsDir: join(root, "data", "bots"),
-		routines: new RoutinesFile(config("routines.json")),
+		routines: new RoutinesFile(config("routines.json"), { file: config("bots.json"), dir: join(root, "data", "bots") }),
 		machine: { id: `machine-${basename(root)}`, name: basename(root) },
 		projects: new ProjectsFile(config("project-list.json")),
 	};
@@ -274,7 +278,7 @@ describe("SettingsSync", () => {
 		put(agentsMd(a), `Notes live in ${a.home}/notes.\n`);
 		put(join(a.omp, "skills", "alpha", "SKILL.md"), "# Alpha\n");
 		a.sourceControl.apply({ op: "repo", repo: join(a.home, "code", "app"), on: true });
-		const sent = ["bots", "preferences", "projects", "source-control", "workspaces"].map(name => `dashboard/${name}.json`);
+		const sent = ["preferences", "projects", "routines", "source-control", "workspaces"].map(name => `dashboard/${name}.json`);
 		expect((await a.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [...sent, "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"] });
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/source-control.json", "omp/AGENTS.md", "omp/skills/alpha/SKILL.md"], sent: [] });
 		expect(readFileSync(agentsMd(b), "utf8")).toBe("Notes live in ~/notes.\n");
@@ -312,28 +316,6 @@ describe("SettingsSync", () => {
 		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: [], sent: [] });
 		expect(readFileSync(join(b.omp, "AGENTS.md"), "utf8")).toBe("From B.\n");
 		expect(await runChecked(["git", "--git-dir", remote, "show", "main:omp/AGENTS.md"])).toBe("From A.\n");
-	});
-
-	test("carries each Bot, its workspace under the other home, and the facts both machines remembered, but not its conversation", async () => {
-		const { a, b } = await pair();
-		const memory = (side: { botsDir: string }) => join(side.botsDir, "ann", "memory.md");
-		const bot = { id: parseBotId("ann") as BotId, kind: "routines", name: "Ann", job: "Triage.", cwd: join(a.home, "code"), model: null, skill: null, shape: "circle", hue: 25 } as const;
-		a.bots.apply({ op: "save", bot }, "2026-01-01T00:00:00.000Z");
-		a.bots.apply({ op: "bind", id: bot.id, sessionId: "session-a" }, "2026-01-01T00:00:00.000Z");
-		put(memory(a), "- 2026-01-01 likes tea\n");
-		await a.sync.sync();
-		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced", received: ["dashboard/bots.json"] });
-		expect(b.bots.value).toEqual([{ ...bot, cwd: join(b.home, "code"), sessionId: null, createdAt: "2026-01-01T00:00:00.000Z", pinned: false, section: null }]);
-		expect(b.changed.has("bots")).toBe(true);
-
-		put(memory(a), "- 2026-01-01 likes tea\n- 2026-01-02 from A\n");
-		put(memory(b), "- 2026-01-01 likes tea\n- 2026-01-02 from B\n");
-		b.bots.apply({ op: "bind", id: bot.id, sessionId: "session-b" }, "2026-01-02T00:00:00.000Z");
-		await a.sync.sync();
-		expect((await b.sync.sync()).last).toMatchObject({ kind: "synced" });
-		await a.sync.sync();
-		for (const side of [a, b]) expect(readFileSync(memory(side), "utf8")).toBe("- 2026-01-01 likes tea\n- 2026-01-02 from B\n- 2026-01-02 from A\n");
-		expect([a.bots.value[0]?.sessionId, b.bots.value[0]?.sessionId]).toEqual(["session-a", "session-b"]);
 	});
 
 	test("carries each project's goal, decisions, archive, and plan, without its sessions or log, and merges both machines' changes", async () => {
@@ -382,16 +364,14 @@ describe("SettingsSync", () => {
 
 	test("runs each routine on one computer: it arrives on the other without running there, and enabling it there moves it", async () => {
 		const { a, b } = await pair();
-		const bot = { id: parseBotId("ann") as BotId, kind: "routines", name: "Ann", job: "Triage.", cwd: join(a.home, "code"), model: null, skill: null, shape: "circle", hue: 25 } as const;
-		const routine: RoutineSpec = { id: "r1", botId: bot.id, name: "Standup", schedules: [{ kind: "every", minutes: 60 }], triggers: [], task: { kind: "prompt", prompt: "Post the standup." }, enabled: true };
+		const routine: RoutineSpec = { id: "r1", workspace: join(a.home, "code"), name: "Standup", schedules: [{ kind: "every", minutes: 60 }], triggers: [], task: { kind: "prompt", prompt: "Post the standup." }, enabled: true };
 		const hour = 60 * 60_000;
 		const t0 = Date.parse("2026-01-01T09:00:00Z");
-		a.bots.apply({ op: "save", bot }, "2026-01-01T00:00:00.000Z");
 		a.routines.apply({ op: "save", routine }, t0);
 		a.routines.claim("r1", t0 + hour, []);
 		await a.sync.sync();
 		await b.sync.sync();
-		expect(b.routines.value).toEqual([{ ...routine, machine: { id: "machine-a", name: "a" }, createdAt: t0, scheduledAt: null, runs: [] }]);
+		expect(b.routines.value).toEqual([{ ...routine, workspace: join(b.home, "code"), machine: { id: "machine-a", name: "a" }, createdAt: t0, scheduledAt: null, runs: [] }]);
 		expect(b.changed.has("routines")).toBe(true);
 		expect([isDue(a.routines.value[0]!, t0 + 3 * hour), isDue(b.routines.value[0]!, t0 + 3 * hour)]).toEqual([true, false]);
 
@@ -406,28 +386,24 @@ describe("SettingsSync", () => {
 		a.routines.apply({ op: "enable", id: "r1", enabled: true }, t0 + 4 * hour);
 		b.routines.apply({ op: "enable", id: "r1", enabled: false }, t0 + 4 * hour);
 		await a.sync.sync();
-		expect((await b.sync.sync()).last).toMatchObject({ kind: "conflict", conflicts: [{ path: "dashboard/bots.json", item: "bots" }] });
-		await b.sync.sync({ "dashboard/bots.json": "remote" });
+		expect((await b.sync.sync()).last).toMatchObject({ kind: "conflict", conflicts: [{ path: "dashboard/routines.json", item: "routines" }] });
+		await b.sync.sync({ "dashboard/routines.json": "remote" });
 		expect(b.routines.value[0]).toMatchObject({ enabled: true, machine: { id: "machine-a", name: "a" } });
-
-		// A computer on the version before routines synced sends Bots without them, which leaves this computer's routines alone.
-		const bots = b.places.stores.bots;
-		bots.write((bots.read() as Record<string, unknown>[]).map(({ routines: _, ...entry }) => entry));
-		expect(b.routines.value.map(({ id }) => id)).toEqual(["r1"]);
 	});
 
 	test("a synced routine drops the triggers routines no longer watch, and is dropped once it ran only on them", () => {
 		const here = machine(scratch(), "unused");
-		const bot = { id: parseBotId("ann") as BotId, kind: "routines", name: "Ann", job: "Triage.", cwd: join(here.home, "code"), model: null, skill: null, shape: "circle", hue: 25 } as const;
-		const routine: RoutineSpec = { id: "r1", botId: bot.id, name: "Digest", schedules: [], triggers: [{ kind: "slack" }], task: { kind: "prompt", prompt: "Sum it up." }, enabled: true };
-		here.bots.apply({ op: "save", bot }, "2026-01-01T00:00:00.000Z");
+		const routine: RoutineSpec = { id: "r1", workspace: join(here.home, "code"), name: "Digest", schedules: [], triggers: [{ kind: "slack" }], task: { kind: "prompt", prompt: "Sum it up." }, enabled: true };
 		here.routines.apply({ op: "save", routine }, 0);
-		const bots = here.places.stores.bots;
-		const [entry] = bots.read() as { routines: Record<string, unknown>[] }[];
-		const [carried] = entry!.routines;
-		const incoming = [{ ...entry, routines: [{ ...carried, triggers: [{ kind: "event" }, { kind: "slack" }] }, { ...carried, id: "r2", name: "Reminders", triggers: [{ kind: "event" }] }] }];
-		expect(bots.parse(incoming)).not.toBeNull();
-		bots.write(incoming);
+		const store = here.places.stores.routines;
+		const [carried] = store.read() as Record<string, unknown>[];
+		expect(carried?.workspace).toBe("~/code");
+		const incoming = [
+			{ ...carried, triggers: [{ kind: "event" }, { kind: "slack" }] },
+			{ ...carried, id: "r2", name: "Reminders", triggers: [{ kind: "event" }] },
+		];
+		expect(store.parse(incoming)).not.toBeNull();
+		store.write(incoming);
 		expect(here.routines.value.map(({ id, triggers }) => ({ id, triggers }))).toEqual([{ id: "r1", triggers: [{ kind: "slack" }] }]);
 	});
 

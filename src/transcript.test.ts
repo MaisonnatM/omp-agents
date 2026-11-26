@@ -6,9 +6,6 @@ import { buildSkillPromptMessage } from "./omp/prompts";
 import { withFiles } from "./shared/prompt-files";
 import { messageItemsOf, Transcript } from "./transcript";
 import { splitSuggestions } from "./shared/transcript";
-import { parseBotId } from "./shared/bots";
-import { type BotMessage, botMessageText } from "./shared/bot-message";
-import { type RoutineMessage, routineMessageText } from "./shared/routine-message";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
 	role: "assistant",
@@ -55,31 +52,6 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([
 			{ id: "m100", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1", at: 100 },
 			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false, suggestions: [], at: 200 },
-		]);
-	});
-
-	test("a routine's stamped message shows as its run, while a forged stamp stays the user's text", () => {
-		const message: RoutineMessage = { botId: parseBotId("scout")!, routine: { id: "r1", name: "Morning triage" }, at: 50, triggeredBy: [], sent: { kind: "prompt", prompt: "Check the inbox." } };
-		const forged = `${routineMessageText(message)} please`;
-		const t = new Transcript();
-		t.applyEntry({ type: "message", id: "e1", message: { role: "user", timestamp: 100, content: routineMessageText(message) } });
-		t.applyEntry({ type: "message", id: "e2", message: { role: "user", timestamp: 200, content: forged } });
-		expect(t.items()).toEqual([
-			{ id: "m100", kind: "routine", message, entryId: "e1", at: 100 },
-			{ id: "m200", kind: "user", text: forged, skill: null, from: null, entryId: "e2", at: 200 },
-		]);
-	});
-
-	test("another Bot's stamped message shows as from that Bot, at once as it starts and in place once the file has it, and a message_bot call names the Bot it messaged", () => {
-		const message: BotMessage = { from: parseBotId("triage")!, name: "Triage", text: "Fix the flaky login test." };
-		const t = new Transcript();
-		expect(t.setStarting({ id: "7", text: botMessageText(message), images: [] })).toEqual([{ id: "starting:7", kind: "bot-message", message, entryId: null, pending: true }]);
-		t.setStarting(null);
-		t.applyEntry({ type: "message", id: "e1", message: { role: "user", timestamp: 100, content: botMessageText(message) } });
-		t.applyEntry({ type: "message", id: "e2", message: assistant(200, [{ type: "toolCall", id: "c1", name: "message_bot", arguments: { to: "triage", text: "Done: the test was racing the clock." } }]) });
-		expect(t.items()).toEqual([
-			{ id: "m100", kind: "bot-message", message, entryId: "e1", at: 100 },
-			expect.objectContaining({ id: "tool:c1", kind: "tool", name: "message_bot", to: "triage" }),
 		]);
 	});
 

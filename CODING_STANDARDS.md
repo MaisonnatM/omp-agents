@@ -29,7 +29,7 @@ Each line is one `- ` bullet on one line, in plain text, with no Markdown format
 Only those bullets under a day heading show; the title and the prose under it do not.
 
 - Write for someone who uses the dashboard but doesn't code.
-  Say what they can now do or see, or what got better or was fixed: "You can …", "The Bots tab now …", "Fixed: …".
+  Say what they can now do or see, or what got better or was fixed: "You can …", "The Routines tab now …", "Fixed: …".
 - Name things by the words on screen, such as a button's label or a tab's name, never by a file, function, API, commit, branch, or pull request number.
 - Use no jargon, such as "endpoint", "socket", "refactor", "typecheck", "migration", "props", or "worktree", unless the screen shows that word.
 - Write short sentences, one idea per line, each ending with a period.

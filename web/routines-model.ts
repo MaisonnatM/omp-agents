@@ -1,6 +1,7 @@
-/** What a Bot's page says about its routines, and the editor's form and how it becomes a routine to save. */
+/** What the Routines tab says about a Workspace's routines, and the editor's form and how it becomes a routine to save. */
 import {
 	MAX_COMMAND_LENGTH,
+	MAX_PROMPT_LENGTH,
 	MAX_ROUTINE_RUNS,
 	nextDueAt,
 	runsHere,
@@ -16,9 +17,8 @@ import {
 	type TriggerKind,
 	type Weekday,
 } from "../src/routines";
-import type { BotId } from "../src/shared/bots";
+import type { BoardLaunch } from "../templates/omp/agent/extensions/board/log";
 import { minutesOfTimeInput, timeInputValue } from "../src/shared/days";
-import type { Item } from "../src/shared/transcript";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
@@ -176,18 +176,21 @@ function commandWords(command: CommandRun): string {
 	}
 }
 
-/** A run's result: `Sent to the Bot, 2 errors`, the parts that apply, or how its command stands. */
+/** A run's result: `Posted Board task #12, 2 errors`, the parts that apply, or how its command stands. */
 export function runWords(run: RoutineRun): string {
 	const { outcome } = run;
-	if (outcome.kind === "command") return commandWords(outcome.run);
-	if (outcome.kind === "sending") return "Sending…";
+	if (outcome.kind === "command") return outcome.task === undefined ? commandWords(outcome.run) : `${commandWords(outcome.run)}, posted Board task #${outcome.task}`;
+	if (outcome.kind === "sending") return "Posting…";
 	const parts = [
-		outcome.kind === "sent" && "Sent to the Bot",
+		outcome.kind === "posted" && `Posted Board task #${outcome.task}`,
 		run.errors.length > 0 && `${run.errors.length} ${run.errors.length === 1 ? "error" : "errors"}`,
 		outcome.kind === "queued" && "Queued",
 	].filter(part => part !== false);
-	return parts.length > 0 ? parts.join(", ") : "Nothing sent";
+	return parts.length > 0 ? parts.join(", ") : "Nothing posted";
 }
+
+/** The Board task a run posted or replied on, `null` for none. */
+export const runTask = ({ outcome }: RoutineRun): number | null => (outcome.kind === "posted" ? outcome.task : outcome.kind === "command" ? (outcome.task ?? null) : null);
 
 /** How a run went, for its dot: `failed` once it has an error, which a command that did not succeed records. */
 export type RunHealth = "ok" | "failed" | "running" | "waiting";
@@ -201,7 +204,7 @@ export function runHealth({ outcome, errors }: RoutineRun): RunHealth {
 			return "running";
 		case "failed":
 			return "failed";
-		case "sent":
+		case "posted":
 			return "ok";
 		case "command":
 			return commandHealth(outcome.run);
@@ -211,18 +214,6 @@ export function runHealth({ outcome, errors }: RoutineRun): RunHealth {
 function commandHealth(command: CommandRun): RunHealth {
 	if (command.phase === "running") return "running";
 	return command.phase === "exited" ? exitStatus(command.code).health : "failed";
-}
-
-/**
- * How a routine's message in its Bot's conversation stands, for its card: `Sending…` until omp records it, how its
- * command ended, how the shell ran a `!` prompt, else `Sent`.
- */
-export function messageStatus({ message, pending, shell }: Extract<Item, { kind: "routine" }>): { health: RunHealth; words: string } {
-	if (pending) return { health: "waiting", words: "Sending…" };
-	if (message.sent.kind === "command") return { health: commandHealth(message.sent.run), words: commandWords(message.sent.run) };
-	if (shell?.cancelled) return { health: "failed", words: "Cancelled" };
-	if (shell && shell.code !== null) return exitStatus(shell.code);
-	return { health: "ok", words: "Sent" };
 }
 
 /** Each health as the count of a routine's runs says it. */
@@ -253,7 +244,7 @@ export function runDuration({ outcome }: RoutineRun): number | null {
 /** Dollars as the page shows a cost: cents under $10, whole dollars above, and `<$0.01` for a cost under a cent. */
 const dollars = (cost: number): string => (cost > 0 && cost < 0.005 ? "<$0.01" : `$${cost.toFixed(cost < 10 ? 2 : 0)}`);
 
-/** What a run's Bot turn spent, such as `12.3k tokens · $0.04`. */
+/** What a run's session spent, such as `12.3k tokens · $0.04`. */
 export const usageWords = ({ tokens, cost }: RunUsage): string =>
 	`${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(tokens).toLowerCase()} tokens · ${dollars(cost)}`;
 
@@ -300,33 +291,36 @@ export type CommandPostChoice = "every" | CommandPost;
  */
 export interface RoutineDraft {
 	id: string;
-	/** The Bot the routine belongs to, which the editor never changes. */
-	botId: BotId;
+	/** The Workspace whose Board the routine posts on. */
+	workspace: string;
 	name: string;
 	enabled: boolean;
 	task: RoutineTask["kind"];
 	prompt: string;
 	command: string;
-	/** When the command posts its output to the Bot: every run, only failures, or failures and changed output. */
+	/** The instructions the Board task carries above the command's report. */
+	commandPrompt: string;
+	/** When the command posts its report: every run, only failures, or failures and changed output. */
 	post: CommandPostChoice;
-	/** Whether a message run restarts the Bot's idle conversation first. */
-	freshConversation: boolean;
+	/** The model and thinking the Board task's session starts with; `null` for the Board's defaults. */
+	launch: BoardLaunch | null;
 	schedules: ScheduleDraft[];
 	triggers: TriggerKind[];
 }
 
-/** A new routine's form for Bot `botId`: a prompt on weekdays at 9:00. */
-export function newDraft(id: string, botId: BotId): RoutineDraft {
+/** A new routine's form for Workspace `workspace`: a prompt on weekdays at 9:00. */
+export function newDraft(id: string, workspace: string): RoutineDraft {
 	return {
 		id,
-		botId,
+		workspace,
 		name: "",
 		enabled: true,
 		task: "prompt",
 		prompt: "",
 		command: "",
+		commandPrompt: "",
 		post: "every",
-		freshConversation: true,
+		launch: null,
 		schedules: [blankSchedule()],
 		triggers: [],
 	};
@@ -345,7 +339,7 @@ function scheduleDraft(schedule: Schedule): ScheduleDraft {
 
 /** `routine`'s form, its other task's fields at their defaults. */
 export function draftOf(routine: Routine): RoutineDraft {
-	const draft = newDraft(routine.id, routine.botId);
+	const draft = newDraft(routine.id, routine.workspace);
 	const { task } = routine;
 	return {
 		...draft,
@@ -354,28 +348,41 @@ export function draftOf(routine: Routine): RoutineDraft {
 		task: task.kind,
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
 		command: task.kind === "command" ? task.command : draft.command,
+		commandPrompt: task.kind === "command" ? (task.prompt ?? "") : draft.commandPrompt,
 		post: task.kind === "command" ? (task.post ?? "every") : "every",
-		freshConversation: routine.freshConversation === true,
+		launch: routine.launch ?? null,
 		schedules: routine.schedules.map(scheduleDraft),
 		triggers: routine.triggers.map(({ kind }) => kind),
 	};
 }
 
+/** `text` too long for a prompt: what to fix, else `null`. */
+const promptTooLong = (what: string, text: string): string | null =>
+	text.length > MAX_PROMPT_LENGTH ? `Shorten ${what} to ${MAX_PROMPT_LENGTH.toLocaleString("en-US")} characters or fewer.` : null;
+
 /** The routine `draft` saves, or what to fix first. */
 export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string } {
 	const name = draft.name.trim();
 	if (!name) return { fix: "Name the routine." };
+	if (!draft.workspace) return { fix: "Pick the Workspace it posts in." };
 	let task: RoutineTask;
 	switch (draft.task) {
-		case "prompt":
-			if (!draft.prompt.trim()) return { fix: "Write the message the Bot gets." };
-			task = { kind: "prompt", prompt: draft.prompt.trim() };
+		case "prompt": {
+			const prompt = draft.prompt.trim();
+			if (!prompt) return { fix: "Write the instructions the Board task carries." };
+			const long = promptTooLong("the instructions", prompt);
+			if (long) return { fix: long };
+			task = { kind: "prompt", prompt };
 			break;
+		}
 		case "command": {
 			const command = draft.command.trim();
 			if (!command) return { fix: "Write the command to run." };
 			if (command.length > MAX_COMMAND_LENGTH) return { fix: `Shorten the command to ${MAX_COMMAND_LENGTH.toLocaleString("en-US")} characters or fewer.` };
-			task = draft.post === "every" ? { kind: "command", command } : { kind: "command", command, post: draft.post };
+			const prompt = draft.commandPrompt.trim();
+			const long = promptTooLong("the instructions", prompt);
+			if (long) return { fix: long };
+			task = { kind: "command", command, ...(draft.post === "every" ? {} : { post: draft.post }), ...(prompt ? { prompt } : {}) };
 			break;
 		}
 		default: {
@@ -391,8 +398,8 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	}
 	if (schedules.length === 0 && draft.triggers.length === 0) return { fix: "Add a schedule or a trigger." };
 	const triggers = TRIGGER_KINDS.filter(kind => draft.triggers.includes(kind)).map(kind => ({ kind }));
-	const spec: RoutineSpec = { id: draft.id, botId: draft.botId, name, enabled: draft.enabled, task, schedules, triggers };
-	return { ok: draft.freshConversation ? { ...spec, freshConversation: true } : spec };
+	const spec: RoutineSpec = { id: draft.id, workspace: draft.workspace, name, enabled: draft.enabled, task, schedules, triggers };
+	return { ok: draft.launch ? { ...spec, launch: draft.launch } : spec };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */
@@ -452,8 +459,8 @@ export function cadenceOf(schedules: readonly Schedule[]): CompactSchedule | nul
 /** `current` switched to `cadence`, at the defaults when the routine was custom. */
 export const withCadence = (current: CompactSchedule | null, cadence: Cadence): CompactSchedule => ({ ...(current ?? DEFAULT_COMPACT), cadence });
 
-/** `routine` to save with `schedule` in place of all its schedules, keeping its triggers and whether each run starts a new conversation. */
-export function specWithSchedule({ id, botId, name, enabled, task, triggers, freshConversation }: Routine, schedule: Schedule): RoutineSpec {
-	const spec: RoutineSpec = { id, botId, name, enabled, task, schedules: [schedule], triggers };
-	return freshConversation ? { ...spec, freshConversation } : spec;
+/** `routine` to save with `schedule` in place of all its schedules, keeping its triggers and launch. */
+export function specWithSchedule({ id, workspace, name, enabled, task, triggers, launch }: Routine, schedule: Schedule): RoutineSpec {
+	const spec: RoutineSpec = { id, workspace, name, enabled, task, schedules: [schedule], triggers };
+	return launch ? { ...spec, launch } : spec;
 }

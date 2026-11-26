@@ -206,7 +206,7 @@ function SearchResult({ hit, query, words, sessions, workspace }: { hit: BoardHi
 				<Avatar by={by} sessions={sessions} />
 				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 					<span className="flex min-w-0 items-baseline gap-2">
-						<span className="truncate text-sm font-semibold">{by.kind === "user" ? "You" : sessionLabel(by.sessionId, sessions).name}</span>
+						<span className="truncate text-sm font-semibold">{by.kind === "user" ? "You" : by.kind === "routine" ? by.name : sessionLabel(by.sessionId, sessions).name}</span>
 						<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="shrink-0 text-xs text-muted-foreground tabular-nums">
 							{clock(at)}
 						</time>

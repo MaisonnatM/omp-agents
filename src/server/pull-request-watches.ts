@@ -22,7 +22,7 @@ import {
 	repoKey,
 	samePullRequest,
 } from "../shared/github";
-import type { RosterHost, StartRequest } from "../shared/sessions";
+import type { RosterHost } from "../shared/sessions";
 import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
 import type { SessionJoin } from "./start";
 
@@ -181,8 +181,6 @@ export interface PullRequestWatchesDeps {
 	file: PullRequestWatchesFile;
 	/** The live sessions' roster rows, which give the caller's current session id. */
 	hosts(): RosterHost[];
-	/** Whether `request` starts a Bot's conversation, which gets no watch tool. */
-	isBot(request: StartRequest): boolean;
 	/** Sends `text` to session `sessionId` as a follow-up, resuming it when it ended. */
 	wake(sessionId: string, text: string): Promise<void>;
 	/** Whether this server wakes sessions: only the one that owns the unattended work does. */
@@ -213,9 +211,9 @@ export class PullRequestWatches {
 		return this.#deps.file.value.find(watch => samePullRequest(watch.pr, pr))?.sessionId ?? null;
 	}
 
-	/** How `request` joins the server as session `instanceId`: with its own watch tool, unless it starts a Bot's conversation. */
-	join(request: StartRequest, instanceId: string): SessionJoin {
-		return { rpc: this.#deps.isBot(request) ? PLAIN_LAUNCH : { ...PLAIN_LAUNCH, tools: [this.#toolFor(instanceId)] }, attach() {} };
+	/** How session `instanceId` joins the server: with its own watch tool. */
+	join(instanceId: string): SessionJoin {
+		return { rpc: { ...PLAIN_LAUNCH, tools: [this.#toolFor(instanceId)] }, attach() {} };
 	}
 
 	/**

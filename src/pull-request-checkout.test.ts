@@ -106,7 +106,6 @@ describe("in a separate worktree", () => {
 				projectId: null,
 				taskId: null,
 				reviewDraft: false,
-				bot: null,
 				private: false,
 				reachOwner: false,
 			},

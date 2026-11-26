@@ -14,7 +14,7 @@ TypeScript slash commands are the exception: yours wins, and omp logs the clash.
 
 Extensions, hooks, tools, TypeScript slash commands, MCP servers, settings, and language server settings are code, or start code, with your permissions.
 Before the dashboard starts a session in a project with any of these, it checks that you trusted each piece.
-A new session, a fork, a resume, a pull request checkout, and a Bot's, routine's, or scheduled send's start all check.
+A new session, a fork, a resume, a pull request checkout, and a Board task's or scheduled send's start all check.
 Skills, agents, rules, markdown commands, and context files are prompt text, so a project with only those never asks.
 
 When a piece is untrusted, the start does not happen and the **Trust this project's agent code?** dialog opens.
@@ -24,7 +24,7 @@ It names the project folder and lists each piece with its kind, its path or MCP 
 
 **Trust and start** records every listed piece and sends the start again.
 **Cancel** closes the dialog and leaves the start's error showing.
-A start nobody is watching, such as a Bot's routine, a scheduled send, or the pull request shepherd, fails with a message naming the folder; start a session there from the dashboard to review and trust its code.
+A start nobody is watching, such as a routine's Board task or a scheduled send, fails with a message naming the folder; start a session there from the dashboard to review and trust its code.
 
 Trust belongs to the project's main checkout, so a linked worktree of a trusted repository shares its decision.
 A pull request checked out into a worktree that adds or edits a piece still asks, because only the exact pieces you approved are trusted.

@@ -10,11 +10,9 @@
 import { isObject, str } from "./json";
 import { imagesOf, textOf, toolSummary, UNREAD_LINE } from "./session-entries";
 import { type ArtifactSave, parseArtifactSave } from "./shared/artifacts";
-import { type BotId, MESSAGE_BOT_TOOL, parseBotId } from "./shared/bots";
 import { type PromptFile, splitFiles } from "./shared/prompt-files";
 import type { PromptImage } from "./shared/sessions";
-import type { RoutineMessage } from "./shared/routine-message";
-import { isPrompt, type Item, type PromptItem, promptAuthor, skillInvocation, splitSuggestions } from "./shared/transcript";
+import { isPrompt, type Item, type PromptItem, promptAuthor, splitSuggestions } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -59,33 +57,9 @@ function unwrapSkill(prompt: string): { text: string; skill: string | null } {
 	return match ? { text: match[2]?.trim() ?? "", skill: match[1]! } : { text: prompt, skill: null };
 }
 
-/**
- * The item a prompt shows as, `skill` the one it invoked: the dashboard's, a routine's, another Bot's, or the user's as
- * typed, with attached files apart from its text.
- */
+/** The item a prompt shows as, `skill` the one it invoked: the dashboard's, or the user's as typed, with attached files apart from its text. */
 function promptItem(id: string, { text, skill }: { text: string; skill: string | null }, rest: { from: string | null; entryId: string | null; images?: string[]; pending?: true }): SentItem {
-	const author = promptAuthor(text);
-	const pending = rest.pending ? { pending: true as const } : {};
-	switch (author.kind) {
-		case "dashboard":
-			return { id, kind: "dashboard", text, entryId: rest.entryId };
-		case "routine":
-			return { id, kind: "routine", message: withSkill(author.message, skill), entryId: rest.entryId, ...pending };
-		case "bot-message":
-			return { id, kind: "bot-message", message: author.message, entryId: rest.entryId, ...pending };
-		case "user":
-			return { id, kind: "user", ...typed(text), skill, ...rest };
-		default: {
-			const unhandled: never = author;
-			return unhandled;
-		}
-	}
-}
-
-/** A routine's message with the skill omp invoked for it, which its prompt names as it was sent. */
-function withSkill(message: RoutineMessage, skill: string | null): RoutineMessage {
-	if (skill === null || message.sent.kind !== "prompt") return message;
-	return { ...message, sent: { kind: "prompt", prompt: skillInvocation(skill, message.sent.prompt) } };
+	return promptAuthor(text).kind === "dashboard" ? { id, kind: "dashboard", text, entryId: rest.entryId } : { id, kind: "user", ...typed(text), skill, ...rest };
 }
 
 /** `prompt` without the files the composer attached after it, which `files` holds when there are any. */
@@ -125,12 +99,6 @@ function artifactSave(toolName: unknown, isError: unknown, details: unknown): { 
 	return artifact ? { artifact } : {};
 }
 
-/** The Bot a `message_bot` call's arguments `args` name; absent for any other call. */
-function recipient(toolName: unknown, args: unknown): { to?: BotId } {
-	const to = toolName === MESSAGE_BOT_TOOL && isObject(args) ? parseBotId(args.to) : null;
-	return to ? { to } : {};
-}
-
 /** Whether two field values are equal, primitives by value and lists or records by contents. */
 function sameValue(a: unknown, b: unknown): boolean {
 	if (a === b) return true;
@@ -145,13 +113,12 @@ function sameItem(a: Item, b: Item): boolean {
 	return keys.length === Object.keys(y).length && keys.every(key => sameValue(x[key], y[key]));
 }
 
-/** A prompt, a routine's or another Bot's message, or a reply as the transcript shows it. */
+/** A prompt or a reply as the transcript shows it. */
 export type MessageItem = PromptItem | Extract<Item, { kind: "assistant" }>;
 
 /**
- * The prompts, routine and Bot messages and replies one session-file entry holds, as a fold of the whole file shows
- * them, without a prompt the dashboard sent in the user's place; a reader that wants only the user's words, as the
- * conversation search does, leaves the routine and Bot messages out. Their ids and text
+ * The prompts and replies one session-file entry holds, as a fold of the whole file shows
+ * them, without a prompt the dashboard sent in the user's place. Their ids and text
  * come from the entry alone (its message's timestamp, else its own id), so one entry folded by itself names them the
  * same, without the thinking, tool calls, and order a whole fold keeps.
  */
@@ -264,7 +231,7 @@ export class Transcript {
 			case "message_end":
 				return this.#applyLive(message, false);
 			case "tool_execution_start":
-				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running", recipient(event.toolName, event.args));
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running");
 			case "tool_execution_end":
 				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", artifactSave(event.toolName, event.isError, isObject(event.result) ? event.result.details : undefined));
 			case "agent_end":
@@ -349,14 +316,8 @@ export class Transcript {
 				if (callId) this.#settled.add(`tool:${callId}`);
 				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", { ...imagesOf(message.content), ...artifactSave(message.toolName, message.isError, message.details) });
 			}
-			case "bashExecution": {
-				// omp runs a `!` prompt's text without its `!`, so putting it back makes the text the one the routine sent:
-				// a stamped run then reads as that routine's message, whose prompt is `!ls` as the routine holds it.
-				const author = promptAuthor(`!${str(message.command) ?? ""}`);
-				if (author.kind !== "routine") return this.#upsert({ id: key, kind: "user", text: shellRun(message), skill: null, from: null, entryId: null });
-				const shell = { output: str(message.output) ?? "", code: typeof message.exitCode === "number" ? message.exitCode : null, cancelled: message.cancelled === true };
-				return this.#upsert({ id: key, kind: "routine", message: author.message, entryId: null, shell });
-			}
+			case "bashExecution":
+				return this.#upsert({ id: key, kind: "user", text: shellRun(message), skill: null, from: null, entryId: null });
 			default:
 				return [];
 		}
@@ -373,7 +334,7 @@ export class Transcript {
 			} else if (block.type === "thinking" && typeof block.thinking === "string" && block.thinking) {
 				changed.push(...this.#upsert({ id: `${key}:${index}`, kind: "thinking", text: block.thinking, streaming }));
 			} else if (block.type === "toolCall") {
-				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined, recipient(block.name, block.arguments)));
+				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined));
 			}
 		});
 		if (!streaming && (message.stopReason === "error" || message.stopReason === "aborted")) {
@@ -388,7 +349,7 @@ export class Transcript {
 		name: string | undefined,
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
-		result: { to?: BotId; artifact?: ArtifactSave } = {},
+		result: { artifact?: ArtifactSave } = {},
 	): Item[] {
 		if (!callId || this.#settled.has(`tool:${callId}`)) return [];
 		return this.#upsertTool(callId, name, summary, status, result);
@@ -400,7 +361,7 @@ export class Transcript {
 		name: string | undefined,
 		summary: string | undefined,
 		status: ToolItem["status"] | undefined,
-		result: { images?: string[]; to?: BotId; artifact?: ArtifactSave } = {},
+		result: { images?: string[]; artifact?: ArtifactSave } = {},
 	): Item[] {
 		if (!callId) return [];
 		const id = `tool:${callId}`;

@@ -79,7 +79,7 @@ async function untilTaken<T>(taken: (state: BoardState) => T | null): Promise<T 
 	}
 }
 
-const who = (by: BoardAuthor, me: string): string => (by.kind === "user" ? "the user" : by.sessionId === me ? "this session" : `session ${by.sessionId}`);
+const who = (by: BoardAuthor, me: string): string => (by.kind === "user" ? "the user" : by.kind === "routine" ? `routine "${by.name}"` : by.sessionId === me ? "this session" : `session ${by.sessionId}`);
 const clock = (at: number): string => new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
 function statusText(state: BoardState, task: BoardTask, me: string): string {
@@ -124,6 +124,7 @@ export default function boardExtension(pi: ExtensionAPI) {
 		text: z.string().max(MAX_TEXT).optional().describe("post: the details; reply: the reply; done: the message the user reads in the thread, the outcome or your question. Markdown, shown rendered: a short lead line, then bullets or a numbered list, one point per item, with `code` for paths and commands; never one long paragraph. done ends with a Suggestions block: a line \"Suggestions:\", then one to three numbered prompts the user may pick, best first"),
 		labels: z.record(z.string().max(40), z.string().max(80)).optional().describe("post: key=value labels, such as area=web"),
 		needs: z.array(z.number().int().positive()).max(20).optional().describe("post: the Board tasks that must be done before this one is ready"),
+		quiet: z.boolean().optional().describe("done: true when a routine's run found nothing worth reporting; the text is then one line, and the user gets no notification"),
 		workspace: z.string().optional().describe("post, list: the Workspace's directory; defaults to this session's; list takes all for every Workspace"),
 	});
 	pi.registerTool({
@@ -135,7 +136,8 @@ export default function boardExtension(pi: ExtensionAPI) {
 			"Commit your work on that branch; land or merge only when the user's last message asks for it.",
 			"Reply on the thread only to ask something while you work. When you finish, or need the user's answer before you go on, mark the Board task done once, with the message the user reads: done ends the session after this turn and makes the Board tasks that need it ready.",
 			"When the branch has commits its target lacks and the repository has .omp/land.json, done first runs that file's quick checks on the committed branch, and is refused with their output when one fails: fix the cause, commit, and mark it done again.",
-			"The user's reply on a done Board task starts a new session on it; a reply on one that is not done reaches its session, and wakes it if it stopped.",
+			"The user's reply on a done Board task starts a new session on it; a reply on one that is not done reaches its session, and wakes it if it stopped. A routine's run posts a Board task, or replies on its own Board task while that is not done.",
+			"Mark a routine's Board task done with quiet true, and one line, when its run found nothing worth reporting.",
 			"Claim is only for an interactive session that takes a Board task by hand.",
 		].join(" "),
 		parameters: input,
@@ -178,7 +180,7 @@ export default function boardExtension(pi: ExtensionAPI) {
 					change = { op: "claim", sessionId: me, task: id };
 					break;
 				case "done":
-					change = { op: "done", sessionId: me, task: id, ...(args.text ? { text: args.text } : {}) };
+					change = { op: "done", sessionId: me, task: id, ...(args.text ? { text: args.text } : {}), ...(args.quiet ? { quiet: true } : {}) };
 					break;
 			}
 			const refused = refusal(state, change);

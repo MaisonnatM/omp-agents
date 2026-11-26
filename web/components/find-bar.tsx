@@ -12,7 +12,7 @@ import { activityControl } from "../activity";
 import { findMatches } from "../find-matches";
 import { chordLabel, useShortcuts } from "../shortcuts";
 
-/** Whether the transcript sits in the focused pane, the one Cmd+F searches; a Bot's page has one, so it defaults to yes. */
+/** Whether the transcript sits in the focused pane, the one Cmd+F searches; a transcript outside the panes has none, so it defaults to yes. */
 export const PaneFocused = createContext(true);
 
 /** The `::highlight()` names `web/globals.css` paints. One find bar shows at a time: each closes when its part of the page leaves focus. */

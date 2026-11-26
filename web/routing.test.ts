@@ -1,18 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { hashForSession, type RosterHost, type View } from "../src/shared/sessions";
+import type { RoutineRoute } from "./components/board/module";
 import type { StartOp } from "./starts";
 import {
-	type BotRoutineRoute,
 	adjacentSession,
 	closePane,
 	endSession,
-	hashForBots,
-	hashForNewBot,
 	hashForPullRequests,
 	hashForLayout,
 	hashForNewSession,
 	hashForPullRequestFiles,
-	hashForBotRoutine,
+	hashForRoutines,
 	hashForSettings,
 	hashForView,
 	type Layout,
@@ -119,27 +117,19 @@ describe("layout hash", () => {
 		expect(routeFromHash("#pull-requests/acme/web.app/6596/filesx")).toEqual({ kind: "page", page: { kind: "pull-requests", target: null } });
 	});
 
-	test("the bots hash opens the New Bot form, one Bot, its routines card with or without one open, a routine's editor, or a new routine's, and no bots or old routines hash is read as a page", () => {
+	test("the Routines tab's hash opens its card, one routine, its editor, or a new routine's, and a bare routines hash is read as no page", () => {
 		const id = "3f2a9c1e-7b4d-4e8a-9f61-0c2d5e8b7a14";
-		const bots = (routine: BotRoutineRoute | null): Route => ({ kind: "page", page: { kind: "bots", target: "a b", routine } });
-		expect(hashForBots(null)).toBe("#bots");
-		expect(hashForNewBot()).toBe("#bots/new");
-		expect(hashForBots("a b")).toBe("#bots/a%20b");
-		expect(routeFromHash("#bots")).toEqual({ kind: "page", page: { kind: "bots", target: null, adding: false } });
-		expect(routeFromHash("#bots/new")).toEqual({ kind: "page", page: { kind: "bots", target: null, adding: true } });
-		expect(routeFromHash("#bots/a%20b")).toEqual(bots(null));
+		const W = "workspace=%2Fw";
+		const routines = (routine: RoutineRoute): Route => ({ kind: "page", page: { kind: "board", workspace: "/w", view: { tab: "routines", routine }, search: null, reply: null } });
 		for (const routine of [{ kind: "list" }, { kind: "open", id }, { kind: "edit", id }, { kind: "new" }] as const) {
-			expect(routeFromHash(hashForBotRoutine("a b", routine))).toEqual(bots(routine));
+			expect(routeFromHash(hashForRoutines("/w", routine))).toEqual(routines(routine));
 		}
-		expect(hashForBotRoutine("a b", { kind: "list" })).toBe("#bots/a%20b/routines");
-		expect(hashForBotRoutine("a b", { kind: "open", id })).toBe(`#bots/a%20b/routines/${id}`);
-		expect(hashForBotRoutine("a b", { kind: "edit", id })).toBe(`#bots/a%20b/routines/${id}/edit`);
-		expect(hashForBotRoutine("a b", { kind: "new" })).toBe("#bots/a%20b/routines/new");
-		expect(routeFromHash(`#bots/a%20b/routines/`)).toEqual(bots(null));
-		expect(routeFromHash(`#bots/a%20b/routines/new/edit`)).toEqual(bots(null));
-		expect(routeFromHash(`#bots/a%20b/routines/${id}/runs`)).toEqual(bots(null));
-		expect(routeFromHash(`#bots/a%20b/runs/${id}`)).toEqual(bots(null));
-		expect(routeFromHash("#botsx").kind).toBe("panes");
+		expect(hashForRoutines("/w")).toBe(`#board/routines?${W}`);
+		expect(hashForRoutines("/w", { kind: "open", id })).toBe(`#board/routines/${id}?${W}`);
+		expect(hashForRoutines("/w", { kind: "edit", id })).toBe(`#board/routines/${id}/edit?${W}`);
+		expect(hashForRoutines("/w", { kind: "new" })).toBe(`#board/routines/new?${W}`);
+		expect(routeFromHash(`#board/routines/%zz?${W}`)).toEqual(routines({ kind: "list" }));
+		expect(routeFromHash(`#board/routines/${id}/%zz?${W}`)).toEqual(routines({ kind: "list" }));
 		expect(routeFromHash(`#routines/${id}`).kind).toBe("panes");
 	});
 
@@ -161,8 +151,6 @@ describe("layout hash", () => {
 
 	test("a malformed percent-escape names nothing instead of throwing: the page opens without its target, and its pane drops", () => {
 		const page = (page: Page): Route => ({ kind: "page", page });
-		expect(routeFromHash("#bots/%zz")).toEqual(page({ kind: "bots", target: null, adding: false }));
-		expect(routeFromHash("#bots/b1/routines/%zz")).toEqual(page({ kind: "bots", target: "b1", routine: null }));
 		expect(routeFromHash("#new/%E0?project=p1")).toEqual(page({ kind: "new", cwd: null, projectId: "p1" }));
 		expect(routeFromHash("#pull-requests/acme/web/1/files/%E0")).toEqual(page({ kind: "pull-requests", target: { owner: "acme", repo: "web", number: 1 }, files: { path: null } }));
 		expect(routeFromHash("#session/%E0")).toEqual({ kind: "panes", layout: { panes: [], focus: 0, maximized: false } });

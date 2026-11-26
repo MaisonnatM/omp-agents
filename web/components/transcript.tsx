@@ -3,7 +3,6 @@ import { IconAiBotHead, IconArrowCornerDownLeft, IconArrowRotateCounterClockwise
 import type { IconComponent } from "@/lib/icon-context";
 import { createContext, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../../src/shared/sessions";
-import { taskText } from "../../src/shared/routine-message";
 import type { PromptFile } from "../../src/shared/prompt-files";
 import { type Item, skillInvocation } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
@@ -34,14 +33,11 @@ import { revealed, useReveal } from "../message-reveal";
 import { type Block, EMPTY_TRANSCRIPT, type ForkPoint, type GroupItem, replacingPrompt, resendOf, type ToolItem, transcriptModel, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
-import { type ToolChipLabels, ToolChipsContext } from "./tool-chips";
 import { ArtifactCard } from "./artifact-card";
 import { AttachedFileDialog } from "./file-dialog";
 import { PromptFileChips } from "./prompt-file-chips";
 import { ImageViewer } from "./media-viewer";
 import { AGENT_PRESET, MessageMarkdown, SESSION_AGENT_PRESET, SESSION_PROMPT_PRESET } from "./message-markdown";
-import { RoutineRunCard } from "./routines/routine-run-card";
-import { BotMessageCard } from "./bots/bot-message-card";
 import { PromptHistory } from "./prompt-history";
 import { FindBar, PaneFocused } from "./find-bar";
 import { TranscriptMinimap } from "./transcript-minimap";
@@ -117,9 +113,6 @@ export const ActivityVisibility = createContext<ActivityVisibility>({
 	toggleTools: () => {},
 	toggleThinking: () => {},
 });
-
-/** Whether the transcript draws its tool and thinking groups; a Bot's page turns it off, so its conversation reads as a chat, keeping only the chips of {@link ToolChipsContext}. */
-export const ActivityShown = createContext(true);
 
 export const HIDE_TOOL_CALLS_KEY = "omp-agents.hide-tool-calls";
 export const HIDE_THINKING_KEY = "omp-agents.hide-thinking";
@@ -255,28 +248,6 @@ export const ActivityGroup = memo(function ActivityGroup({ entries, from, to }: 
 	);
 });
 
-/** A chip under an activity group for each label `chips` gives a call that finished in it, once per label; one with an address is a link to it. */
-function ToolChips({ shown }: { shown: ToolChip[] }) {
-	return shown.map(({ name, label, href, icon: Icon }) => {
-		const className = "mt-1.5 inline-flex items-center gap-1.5 self-start rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground";
-		const content = (
-			<>
-				<Icon aria-hidden className="size-3.5 shrink-0" />
-				{label}
-			</>
-		);
-		return href ? (
-			<a key={label} href={href} className={cn(className, "transition-colors hover:bg-accent hover:text-foreground")} data-tool-chip={name}>
-				{content}
-			</a>
-		) : (
-			<p key={label} className={className} data-tool-chip={name}>
-				{content}
-			</p>
-		);
-	});
-}
-
 /**
  * One row of the transcript. A settled row, any row but the last, skips its layout and paint while it is off screen,
  * once the whole transcript has laid out and the row itself has laid out once, so a streamed token lays out what is on
@@ -309,50 +280,30 @@ function Row({ messageId, settled, className, children }: { messageId: string; s
 	);
 }
 
-type ToolChip = { name: string; label: string; href: string | null; icon: IconComponent };
-
-/**
- * A turn's work group, with a chip for each label `chips` gives a call that finished in it and a card for each artifact
- * it saved. Memoized on its block, so a token leaves a settled group as it is.
- */
-const ActivityRow = memo(function ActivityRow({ block, settled, shown, chips, view, artifacts, shownArtifact }: {
+/** A turn's work group, with a card for each artifact it saved. Memoized on its block, so a token leaves a settled group as it is. */
+const ActivityRow = memo(function ActivityRow({ block, settled, view, artifacts, shownArtifact }: {
 	block: Extract<Block, { kind: "activity" }>;
 	settled: boolean;
-	shown: boolean;
-	chips: ToolChipLabels;
 	view: View;
 	artifacts: readonly Artifact[];
 	shownArtifact: ShownArtifact | null;
 }) {
 	const { id, entries, from, to } = block;
-	const chipsShown = useMemo(() => {
-		const byLabel = new Map<string, ToolChip>();
-		for (const entry of entries) {
-			if (entry.kind !== "tool" || entry.status !== "ok" || !Object.hasOwn(chips, entry.name)) continue;
-			const { label, href, icon } = chips[entry.name]!;
-			const text = label(entry);
-			if (!byLabel.has(text)) byLabel.set(text, { name: entry.name, label: text, href: href?.(entry) ?? null, icon });
-		}
-		return [...byLabel.values()];
-	}, [entries, chips]);
-	if (!shown && chipsShown.length === 0) return null;
 	return (
 		<Row messageId={id} settled={settled}>
-			{shown && <ActivityGroup entries={entries} from={from} to={to} />}
-			{shown &&
-				entries.filter(savedArtifact).map(item => {
-					const number = versionNumber(artifacts, item);
-					return (
-						<ArtifactCard
-							key={item.id}
-							save={item.artifact}
-							number={number}
-							showing={shownArtifact?.file === item.artifact.file && shownArtifact.number === number}
-							onOpen={() => openArtifact(view, { file: item.artifact.file, version: number })}
-						/>
-					);
-				})}
-			<ToolChips shown={chipsShown} />
+			<ActivityGroup entries={entries} from={from} to={to} />
+			{entries.filter(savedArtifact).map(item => {
+				const number = versionNumber(artifacts, item);
+				return (
+					<ArtifactCard
+						key={item.id}
+						save={item.artifact}
+						number={number}
+						showing={shownArtifact?.file === item.artifact.file && shownArtifact.number === number}
+						onOpen={() => openArtifact(view, { file: item.artifact.file, version: number })}
+					/>
+				);
+			})}
 		</Row>
 	);
 });
@@ -497,28 +448,8 @@ interface TranscriptProps {
 /** A prompt or a reply: the user's and the agent's words. */
 type MessageItem = Extract<Item, { kind: "user" | "assistant" }>;
 
-type RoutineItem = Extract<Item, { kind: "routine" }>;
-
 /** What a message's copy button copies: a skill prompt as the user typed it, not the skill's text. `item.text` is the reply with its suggestions block already split off, so the body it renders is uniform. */
 const copyText = (item: MessageItem): string => (item.kind === "user" && item.skill ? skillInvocation(item.skill, item.text) : item.text);
-
-/** A routine's message, as its card. Memoized on the item, so a streamed token leaves it as it is. */
-const RoutineRow = memo(function RoutineRow({ item, settled }: { item: RoutineItem; settled: boolean }) {
-	return (
-		<Row messageId={item.id} settled={settled}>
-			<RoutineRunCard item={item} copy={<CopyButton text={taskText(item.message)} label={item.message.sent.kind === "command" ? "Copy command" : "Copy prompt"} />} />
-		</Row>
-	);
-});
-
-/** Another Bot's message, as its card. Memoized on the item, so a streamed token leaves it as it is. */
-const BotMessageRow = memo(function BotMessageRow({ item, settled }: { item: Extract<Item, { kind: "bot-message" }>; settled: boolean }) {
-	return (
-		<Row messageId={item.id} settled={settled}>
-			<BotMessageCard message={item.message} />
-		</Row>
-	);
-});
 
 interface MessageRowProps {
 	item: MessageItem;
@@ -698,8 +629,6 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
 	const here = fork && sameView(fork.op.view, view) ? fork : null;
 	const revealId = useReveal(view);
-	const toolChips = useContext(ToolChipsContext);
-	const activityShown = useContext(ActivityShown);
 	const { scrollToMessage } = useMessageScroller();
 	// The command palette opened this view at a match. Scroll once the whole transcript has loaded, a frame after the
 	// scroller places it at its end, so that placement does not undo the scroll. The reveal ends when the scroll lands,
@@ -723,8 +652,6 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 				</Row>
 			);
 		}
-		if (item.kind === "routine") return <RoutineRow key={item.id} item={item} settled={settled} />;
-		if (item.kind === "bot-message") return <BotMessageRow key={item.id} item={item} settled={settled} />;
 		const point = forks.get(item.id);
 		const edit = editing?.item.id === item.id ? editing : null;
 		return (
@@ -774,12 +701,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 						>
 							{visibleBlocks.map((block, index) => {
 								const settled = index < visibleBlocks.length - 1;
-								if (block.kind === "activity") {
-									const row = <ActivityRow key={block.id} block={block} settled={settled} shown={activityShown} chips={toolChips} view={view} artifacts={artifacts} shownArtifact={shownArtifact} />;
-									if (activityShown) return row;
-									// A Bot's page draws no groups, so the messages written between tool calls show as messages.
-									return [...block.entries.flatMap(entry => (entry.kind === "assistant" ? [itemRow(entry, settled)] : [])), row];
-								}
+								if (block.kind === "activity") return <ActivityRow key={block.id} block={block} settled={settled} view={view} artifacts={artifacts} shownArtifact={shownArtifact} />;
 								return itemRow(block.item, settled);
 							})}
 							{loaded && items.length === 0 && !working && !editing && empty}

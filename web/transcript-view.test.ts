@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import type { ArtifactSave, Sha256 } from "../src/shared/artifacts";
-import { parseBotId } from "../src/shared/bots";
-import type { RoutineMessage } from "../src/shared/routine-message";
 import type { Item } from "../src/shared/transcript";
 import { type Block, nextSuggestions, resendOf, type TranscriptModel, transcriptModel, withEditedPrompt } from "./transcript-view";
 
@@ -191,8 +189,8 @@ describe("outline", () => {
 
 	test("groups each prompt with its turn's final reply and counts the turn's tools and failures", () => {
 		expect(outline(items, false)).toEqual([
-			{ id: "p1", prompt: "Fix it", skill: null, routine: null, botMessage: null, nudge: null, reply: { id: "r1b", text: "Fixed." }, tools: 2, failed: 1, running: false },
-			{ id: "p2", prompt: "Ship it", skill: null, routine: null, botMessage: null, nudge: null, reply: { id: "r2", text: "Shipping" }, tools: 0, failed: 0, running: false },
+			{ id: "p1", prompt: "Fix it", skill: null, nudge: null, reply: { id: "r1b", text: "Fixed." }, tools: 2, failed: 1, running: false },
+			{ id: "p2", prompt: "Ship it", skill: null, nudge: null, reply: { id: "r2", text: "Shipping" }, tools: 0, failed: 0, running: false },
 		]);
 	});
 
@@ -357,7 +355,6 @@ describe("a model built from the one before", () => {
 	});
 
 	test("matches the model built from scratch through random appends, replacements, removals, and working flips", () => {
-		const message: RoutineMessage = { botId: parseBotId("scout")!, routine: { id: "r", name: "Triage" }, at: 1, triggeredBy: [], sent: { kind: "prompt", prompt: "Check the inbox." } };
 		for (const seed of [1, 2, 3, 4, 5]) {
 			let state = seed;
 			// mulberry32: a small seeded generator, so a failure replays.
@@ -371,7 +368,7 @@ describe("a model built from the one before", () => {
 			let next = 0;
 			const item = (): Item => {
 				const id = `i${next++}`;
-				const kind = pick(["user", "user", "routine", "dashboard", "assistant", "assistant", "thinking", "tool", "tool", "notice"] as const);
+				const kind = pick(["user", "user", "dashboard", "assistant", "assistant", "thinking", "tool", "tool", "notice"] as const);
 				switch (kind) {
 					case "user":
 						return {
@@ -383,8 +380,6 @@ describe("a model built from the one before", () => {
 							entryId: pick([`e-${id}`, `e-${id}`, null]),
 							...(random() < 0.2 ? { images: ["/p.png"] } : {}),
 						};
-					case "routine":
-						return { id, kind: "routine", message, entryId: pick([`e-${id}`, null]) };
 					case "dashboard":
 						return { id, kind: "dashboard", text: "[omp-agents] Project update.", entryId: `e-${id}` };
 					case "assistant":

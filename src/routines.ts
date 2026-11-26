@@ -1,6 +1,6 @@
 /** The rules of routines: when one is due, how a change edits the list, and which routine the page and `routines.json` may hold. */
+import { type BoardLaunch, parseLaunch } from "../templates/omp/agent/extensions/board/log";
 import { fields, isNonEmpty, isNumber, isObject, isSafeInteger, isString, nullable, oneOf, parseAll, type Parsed } from "./json";
-import { type BotId, parseBotId } from "./shared/bots";
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -33,17 +33,20 @@ export interface TriggerEvent {
 export const MAX_TRIGGER_EVENTS = 10;
 export const MAX_TRIGGER_DETAIL = 2_000;
 
-/** What a run does in its Bot: the Bot's model, skill, and workspace apply to both. */
+/**
+ * What a run posts as a Board task in the routine's Workspace, which a session then works on; a run replies on the
+ * routine's own Board task instead while that is not done.
+ */
 export type RoutineTask =
-	/** `prompt` sent into the Bot's conversation, as if you wrote it there. */
+	/** `prompt` is the Board task's text, with what the routine's triggers saw. */
 	| { kind: "prompt"; prompt: string }
-	/** `command` through `sh -c` in the Bot's workspace, with no omp session; what it printed is then posted into the Bot's conversation:
+	/** `command` through `sh -c` in the Workspace, with no omp session; its report, below `prompt` when there is one, is then posted:
 	 * with `post: "failures"` only when it did not exit 0, and with `post: "changes"` also when it exited 0 with output other than the
-	 * last run's, so a check wakes the Bot only on news. No `post` posts every run.
+	 * last run's, so a check posts only on news. No `post` posts every run.
 	 */
-	| { kind: "command"; command: string; post?: CommandPost };
+	| { kind: "command"; command: string; post?: CommandPost; prompt?: string };
 
-/** When a command run posts its output to the Bot, beside every run. */
+/** When a command run posts its report as a Board task, beside every run. */
 export const COMMAND_POSTS = ["failures", "changes"] as const;
 export type CommandPost = (typeof COMMAND_POSTS)[number];
 
@@ -64,15 +67,15 @@ export type CommandRun =
 	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
 
 /**
- * Where a claimed run stands: `queued` until a tick starts it, then `sending` while its prompt goes into the Bot's
- * conversation, `sent` into conversation `sessionId` once it went, or its `command`. A run that started nothing is
- * `failed`, with its `errors` saying why; so is one a stopped server left `sending`, which the next server fails.
+ * Where a claimed run stands: `queued` until a tick starts it, then `sending` while it posts, `posted` once it posted
+ * Board task `task` or replied on it, or its `command`, with the Board task its report went to, if it posted. A run
+ * that started nothing is `failed`, with its `errors` saying why; so is one a stopped server left `sending`.
  */
 export type RoutineOutcome =
 	| { kind: "queued" }
 	| { kind: "sending" }
-	| { kind: "sent"; sessionId: string }
-	| { kind: "command"; run: CommandRun }
+	| { kind: "posted"; task: number }
+	| { kind: "command"; run: CommandRun; task?: number }
 	| { kind: "failed" };
 
 export interface RoutineRun {
@@ -81,11 +84,11 @@ export interface RoutineRun {
 	errors: string[];
 	/** What the routine's triggers saw that started this run; empty for a run a schedule or **Run now** started. */
 	triggeredBy: TriggerEvent[];
-	/** What the Bot's turn that answered a prompt run spent, once that turn ended; left out before then and for a command run. */
+	/** What the session on the run's Board task spent on it, once that turn ended; left out before then and for a run that posted nothing. */
 	usage?: RunUsage;
 }
 
-/** What a Bot's turn spent: its tokens, input, output, and cache together, and its cost in dollars as the provider priced it. */
+/** What a session's turn spent: its tokens, input, output, and cache together, and its cost in dollars as the provider priced it. */
 export interface RunUsage {
 	tokens: number;
 	cost: number;
@@ -93,22 +96,19 @@ export interface RunUsage {
 
 export const isRunUsage = fields<RunUsage>({ tokens: isNumber, cost: isNumber });
 
-/** A Bot's routine: on its schedules, or when its triggers see something happen, a run sends a prompt into the Bot's conversation or runs a command in its workspace. */
+/** A Workspace's routine: on its schedules, or when its triggers see something happen, a run posts a Board task in the Workspace, or runs a command there. */
 export interface Routine {
 	id: string;
-	/** The Bot the routine belongs to; deleting the Bot deletes the routine. */
-	botId: BotId;
+	/** The Workspace it posts to and runs its command in: a repository's main checkout, or a directory outside git. */
+	workspace: string;
+	/** The model and thinking level of the sessions on its Board tasks; left out for omp's defaults. */
+	launch?: BoardLaunch;
 	name: string;
 	/** Empty when the routine runs only on its triggers. It has at least one schedule or trigger. */
 	schedules: Schedule[];
 	triggers: Trigger[];
 	task: RoutineTask;
 	enabled: boolean;
-	/**
-	 * Whether a prompt run first restarts the Bot's conversation, as **Restart** does, so its prompt opens a new one;
-	 * only while that conversation is idle, else the prompt follows up in it. Left out when off; command runs ignore it.
-	 */
-	freshConversation?: boolean;
 	/** The other computer it runs on while enabled, as Settings sync carried it; `null` while it runs on this one or is off. */
 	machine: RoutineMachine | null;
 	createdAt: number;
@@ -137,15 +137,8 @@ export type RoutineChange =
 	/** Claims a run now, whatever the schedule says. */
 	| { op: "run-now"; id: string };
 
-/** The changes a Bot makes to its own routines through its `save_routine` and `delete_routine` tools. */
-export type BotRoutineChange = Extract<RoutineChange, { op: "save" | "remove" }>;
-
-/** What a Bot's routine tools ask of the server: one change from `botId`, the Bot that asks; a save's routine must have that same `botId`. */
-export interface BotRoutineRequest {
-	botId: BotId;
-	change: BotRoutineChange;
-}
-
+/** A routine's prompt: the longest one it saves, a command's included. */
+export const MAX_PROMPT_LENGTH = 20_000;
 /** A command routine's command: the longest one a routine saves, how long it may run while the Mac is awake, and how much of its output a run keeps. */
 export const MAX_COMMAND_LENGTH = 10_000;
 export const COMMAND_TIMEOUT_MS = 600_000;
@@ -208,11 +201,10 @@ export const watchedKinds = (routines: readonly Routine[]): TriggerKind[] => TRI
 /** Whether `routine` already holds every field the page edits of `spec`. */
 export function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 	return (
-		routine.botId === spec.botId &&
+		routine.workspace === spec.workspace &&
 		routine.name === spec.name &&
 		routine.enabled === spec.enabled &&
-		(routine.freshConversation ?? false) === (spec.freshConversation ?? false) &&
-		JSON.stringify([routine.schedules, routine.triggers, routine.task]) === JSON.stringify([spec.schedules, spec.triggers, spec.task])
+		JSON.stringify([routine.launch ?? null, routine.schedules, routine.triggers, routine.task]) === JSON.stringify([spec.launch ?? null, spec.schedules, spec.triggers, spec.task])
 	);
 }
 
@@ -324,15 +316,19 @@ function parseTriggers(value: unknown): Parsed<Trigger[]> {
 	return { ok: triggers };
 }
 
+const isPrompt = (value: unknown): value is string => isNonEmpty(value) && value.length <= MAX_PROMPT_LENGTH;
+
 function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 	if (!isObject(value)) return null;
 	switch (value.kind) {
 		case "prompt":
-			return isNonEmpty(value.prompt) ? { ok: { kind: "prompt", prompt: value.prompt } } : null;
-		case "command":
-			if (!isNonEmpty(value.command) || value.command.length > MAX_COMMAND_LENGTH) return null;
-			if (value.post === undefined) return { ok: { kind: "command", command: value.command } };
-			return isCommandPost(value.post) ? { ok: { kind: "command", command: value.command, post: value.post } } : null;
+			return isPrompt(value.prompt) ? { ok: { kind: "prompt", prompt: value.prompt } } : null;
+		case "command": {
+			const { command, post, prompt } = value;
+			if (!isNonEmpty(command) || command.length > MAX_COMMAND_LENGTH) return null;
+			if ((post !== undefined && !isCommandPost(post)) || (prompt !== undefined && prompt !== "" && !isPrompt(prompt))) return null;
+			return { ok: { kind: "command", command, ...(post === undefined ? {} : { post }), ...(isNonEmpty(prompt) ? { prompt } : {}) } };
+		}
 		default:
 			return null;
 	}
@@ -340,20 +336,19 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 
 /**
  * A routine as the page saves it and `routines.json` keeps it, or `null` when a field is missing, of the wrong type, or
- * out of range, or when it has neither a schedule nor a trigger; other fields drop.
+ * out of range, or when it has neither a schedule nor a trigger; other fields drop. Its Workspace is an absolute path.
  */
 export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	if (!isObject(value)) return null;
-	const { id, name, enabled, freshConversation } = value;
-	const botId = parseBotId(value.botId);
+	const { id, name, enabled, workspace } = value;
+	const launch = parseLaunch(value.launch);
 	const schedules = parseSchedules(value.schedules);
 	const triggers = parseTriggers(value.triggers);
 	const task = parseRoutineTask(value.task);
-	if (!isNonEmpty(id) || !botId || !isNonEmpty(name) || typeof enabled !== "boolean" || !schedules || !triggers || !task) return null;
-	if (freshConversation !== undefined && typeof freshConversation !== "boolean") return null;
+	if (!isNonEmpty(id) || !isNonEmpty(workspace) || !workspace.startsWith("/") || !isNonEmpty(name) || typeof enabled !== "boolean" || launch === null || !schedules || !triggers || !task) return null;
 	if (schedules.ok.length === 0 && triggers.ok.length === 0) return null;
-	const spec: RoutineSpec = { id, botId, name, schedules: schedules.ok, triggers: triggers.ok, task: task.ok, enabled };
-	return { ok: freshConversation ? { ...spec, freshConversation } : spec };
+	const spec: RoutineSpec = { id, workspace, name, schedules: schedules.ok, triggers: triggers.ok, task: task.ok, enabled };
+	return { ok: launch ? { ...spec, launch } : spec };
 }
 
 /**
@@ -364,22 +359,4 @@ export function parseKeptRoutineSpec(value: Record<string, unknown>): Parsed<Rou
 	const spec = parseRoutineSpec(value);
 	if (spec) return spec;
 	return Array.isArray(value.triggers) && value.triggers.some(isRetiredTrigger) ? { dropped: "ran only on triggers routines no longer watch" } : null;
-}
-
-/** A request a Bot's routine tools leave for the server, with the same limits as a routine the page saves, or `null`. */
-export function parseBotRoutineRequest(value: unknown): Parsed<BotRoutineRequest> {
-	if (!isObject(value) || !isObject(value.change)) return null;
-	const botId = parseBotId(value.botId);
-	const { change } = value;
-	if (!botId) return null;
-	switch (change.op) {
-		case "save": {
-			const routine = parseRoutineSpec(change.routine);
-			return routine ? { ok: { botId, change: { op: "save", routine: routine.ok } } } : null;
-		}
-		case "remove":
-			return isNonEmpty(change.id) ? { ok: { botId, change: { op: "remove", id: change.id } } } : null;
-		default:
-			return null;
-	}
 }

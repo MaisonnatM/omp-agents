@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Routine, RoutineOutcome } from "../../../src/routines";
-import type { BotId } from "../../../src/shared/bots";
 import { type DashboardActions, DashboardActionsContext } from "../dashboard-context";
 import { RoutineRow } from "./routine-row";
 
@@ -11,7 +10,7 @@ const NOW = Date.parse("2026-10-05T09:00:00Z");
 function runNowButton(outcome: RoutineOutcome): string {
 	const routine: Routine = {
 		id: "r1",
-		botId: "scout" as BotId,
+		workspace: "/w",
 		name: "Notes",
 		schedules: [],
 		triggers: [],
@@ -24,7 +23,7 @@ function runNowButton(outcome: RoutineOutcome): string {
 	};
 	const html = renderToStaticMarkup(
 		<DashboardActionsContext.Provider value={{ request: async () => {}, send: () => {} } as unknown as DashboardActions}>
-			<RoutineRow routine={routine} botName="Scout" open={false} connected now={NOW} />
+			<RoutineRow routine={routine} open={false} connected now={NOW} />
 		</DashboardActionsContext.Provider>,
 	);
 	const button = html.match(/<button[^>]*aria-label="Run Notes now"[^>]*>/)?.[0];

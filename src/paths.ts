@@ -38,17 +38,11 @@ export const unreadFile = join(configDir, "unread", `${portFromEnv()}.json`);
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
-/** Where a Bot's `save_routine` and `delete_routine` tools leave their changes to its routines, one JSON file each, so the server stays the only writer of {@link routinesFile}. */
-export const routineInboxDir = join(configDir, "routine-inbox");
 /** The id Settings sync gives this computer, so a routine another computer runs names it apart from this one, beside {@link tokenFile}. */
 export const machineFile = join(configDir, "machine.json");
-/** The Bots: each one's name, job, workspace, and conversation, beside {@link tokenFile}. */
+/** The retired Bots' file, which the routines' migration reads once and renames to `bots.json.migrated`, beside {@link tokenFile}. */
 export const botsFile = join(configDir, "bots.json");
-/** Where a Bot's `set_job` tool leaves the job it gives itself, one JSON file each, so the server stays the only writer of {@link botsFile}. */
-export const botInboxDir = join(configDir, "bot-inbox");
-/** Where a PR shepherd Bot's `fix_pull_request` and `queue_merge` tools leave their requests, one JSON file each. */
-export const shepherdInboxDir = join(configDir, "shepherd-inbox");
-/** Each Bot's `<id>/memory.md`, which its own session writes, in the dashboard's data directory. */
+/** Each retired Bot's `<id>/memory.md`, which the routines' migration folds into its routines' prompts, in the dashboard's data directory. */
 export const botsDir = join(dataDir, "bots");
 /**
  * Where this port's private sessions keep everything omp writes for them, one `<instance id>` directory each, as {@link keepersDir} is per port.

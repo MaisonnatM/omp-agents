@@ -1,5 +1,5 @@
-/** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it, each Workspace folding its sessions with a chevron, then the Bots under the Bots tab's own groups (Pinned, each section, Other Bots), each a collapsible group like the Sessions workspaces. */
-import { IconChevronDownSmall, IconFolder1, IconFolderOpen, IconPin, IconUserGroup } from "central-icons";
+/** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it, each Workspace folding its sessions with a chevron. */
+import { IconChevronDownSmall, IconFolder1, IconFolderOpen } from "central-icons";
 import { useState } from "react";
 import { revealDetailsTab } from "../../details-tabs";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -7,26 +7,20 @@ import { type BoardState, type BoardTask, statusOf, wakeTarget } from "../../../
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { activityControl } from "../../activity";
 import { folderName, type KnownSessions, sessionLabel } from "../../labels";
-import { type BotGroup, type BotRow, botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups, crossProject } from "../../bots-model";
-import type { IconComponent } from "@/lib/icon-context";
-import { hashForBots, hashForPage, type PageHash } from "../../routing";
-import { BotAvatar } from "../bots/bot-avatar";
+import { hashForPage, type PageHash } from "../../routing";
 import { CountPill } from "../count-pill";
 import { type BoardRoute, pageView } from "./module";
 
 /** The Board's Messages address: Workspace `workspace`, Board task `thread`'s thread open, with `search`'s results shown, or its reply `reply` highlighted. */
 export const hashForBoard = (workspace: string | null, thread: number | null = null, { search = null, reply = null }: Partial<Pick<BoardRoute, "search" | "reply">> = {}): string =>
-	hashForPage({ kind: "board", workspace, view: { tab: "messages", thread }, search, reply, bots: false });
+	hashForPage({ kind: "board", workspace, view: { tab: "messages", thread }, search, reply });
 
-/** The Bots group's page on the Board: the cross-project Bots; a Bot of one project shows in that Workspace's Bots tab. */
-export const hashForBoardBots = (): string => hashForPage({ kind: "board", workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, bots: true });
-
-/** Links in Workspace `workspace`'s tabs: a Bot, project, or pull request page opens in the Board tab that shows it, any other page at its own address. */
+/** Links in Workspace `workspace`'s tabs: a project or pull request page opens in the Board tab that shows it, any other page at its own address. */
 export const boardPageHash =
 	(workspace: string | null): PageHash =>
 	page => {
 		const view = pageView(page);
-		return hashForPage(view ? { kind: "board", workspace, view, search: null, reply: null, bots: false } : page);
+		return hashForPage(view ? { kind: "board", workspace, view, search: null, reply: null } : page);
 	};
 
 /**
@@ -69,7 +63,6 @@ export function hashForBoardSession(state: BoardState, workspace: string, sessio
 /** Shows the session's conversation tab in the Board thread the address it goes with opens. */
 export const revealSessionTab = () => revealDetailsTab(THREAD_TABS, "session", "thread");
 export const revealThreadTab = () => revealDetailsTab(THREAD_TABS, "thread", "thread");
-const GROUP_ICONS: Record<BotGroup["kind"], IconComponent> = { pinned: IconPin, section: IconFolder1, rest: IconUserGroup };
 
 const go = (hash: string) => () => {
 	location.hash = hash;
@@ -81,11 +74,9 @@ interface BoardSidebarProps {
 	workspaces: readonly Workspace[];
 	picked: string | null;
 	sessions: KnownSessions;
-	/** `null` until the server sends the Bots. */
-	bots: readonly BotRow[] | null;
 }
 
-export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessions, bots }: BoardSidebarProps) {
+export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessions }: BoardSidebarProps) {
 	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
 	const toggle = (key: string) => setCollapsed(prev => {
 		const next = new Set(prev);
@@ -105,7 +96,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 						const ids = [...new Set(inIt.flatMap(namedIn))]
 							.map(id => ({ id, ...sessionLabel(id, sessions) }))
 							.filter(row => row.host);
-						const current = !route.bots && workspace.cwd === open?.cwd;
+						const current = workspace.cwd === open?.cwd;
 						const name = folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay;
 						const foldKey = `workspace:${workspace.cwd}`;
 						const folded = collapsed.has(foldKey);
@@ -162,37 +153,6 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 						);
 					})}
 				</SidebarMenu>
-			</SidebarGroup>
-			<SidebarGroup collapsible open={!collapsed.has("bots")} onOpenChange={() => toggle("bots")}>
-				<SidebarGroupLabel>Bots</SidebarGroupLabel>
-				<div>
-			{bots !== null && botGroups(bots.filter(row => crossProject(row.bot, sidebar))).map(group => {
-				const key = botGroupKey(group);
-				return (
-					<SidebarGroup
-						key={key}
-						className="py-0"
-						collapsible
-						open={!collapsed.has(key)}
-						onOpenChange={() => toggle(key)}
-					>
-						<SidebarGroupLabel icon={GROUP_ICONS[group.kind]} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
-							{botGroupLabel(group)}
-						</SidebarGroupLabel>
-						<SidebarMenu aria-label={botGroupListName(group)} className="ml-[15px] w-auto gap-px border-l border-border pl-1">
-							{group.rows.map(row => (
-								<SidebarMenuItem key={row.bot.id}>
-									<SidebarMenuButton size="short" title={row.bot.cwd} onClick={go(hashForBots(row.bot.id, boardPageHash(row.bot.cwd)))}>
-										<BotAvatar look={row.bot} size="inline" working={row.host?.status === "working"} asking={botAsking(row.host) !== null} />
-										<span className="min-w-0 flex-1 truncate">{row.bot.name}</span>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroup>
-				);
-			})}
-				</div>
 			</SidebarGroup>
 		</SidebarContent>
 	);

@@ -3,7 +3,6 @@ import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { type ReactNode, useMemo, useRef } from "react";
 import { activityControl } from "../../activity";
 import type { WebModuleId } from "../../modules";
-import { botRows } from "../../bots-model";
 import { PageHashContext } from "../../page-hash";
 import { pullRequestsScope, pullRequestsStore } from "../../reads";
 import { COLUMN_MIN, type ListPage, listPlacement } from "../../page-list";
@@ -11,9 +10,8 @@ import { hashForPage, type PullRequestsRoute, workspaceSection } from "../../rou
 import { workspaceCwd } from "../../sessions";
 import { DashboardStatusContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import type { CoreData } from "../module-views";
-import { BotsNav } from "../bots/bots-nav";
-import { BotsView } from "../bots/bots-view";
 import { ProjectMemoryTab } from "../memory/project-memory";
+import { RoutinesTab } from "../routines/routines-tab";
 import { ProjectsPage } from "../projects/page";
 import { ProjectsNav } from "../projects/projects-nav";
 import { PullRequestsPage } from "../pull-requests/pull-requests-page";
@@ -35,7 +33,7 @@ export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: rea
 			value={tab}
 			onValueChange={next => {
 				const picked = tabs.find(each => each.id === next);
-				if (picked) location.hash = hashForPage({ kind: "board", workspace, view: tabView(picked.id), search: null, reply: null, bots: false });
+				if (picked) location.hash = hashForPage({ kind: "board", workspace, view: tabView(picked.id), search: null, reply: null });
 			}}
 			activation="manual"
 		>
@@ -51,18 +49,17 @@ export function ChannelTabs({ tab, tabs, workspace }: { tab: BoardTab; tabs: rea
 	);
 }
 
-/** The sessions, Bots, and projects of Workspace `cwd`; a session belongs by its Workspace, a Bot by its directory, a project by the Workspace it was made in, or, made on the Projects page, by a session of it that ran here. */
+/** The sessions and projects of Workspace `cwd`; a session belongs by its Workspace, a project by the Workspace it was made in, or, made on the Projects page, by a session of it that ran here. */
 function workspaceSlice(core: CoreData, cwd: string | null) {
 	const here = <Row extends { cwd: string; workspace: Parameters<typeof workspaceCwd>[0]["workspace"] }>(rows: Row[]): Row[] => rows.filter(row => workspaceCwd(row) === cwd);
 	const hosts = here(core.sessions.hosts);
 	const past = here(core.sessions.past);
 	const ran = new Set([...hosts, ...past].map(row => row.sessionId));
-	const bots = core.bots && core.bots.filter(bot => bot.cwd === cwd);
 	const projects = core.projects && { projects: core.projects.projects.filter(project => (project.workspace === undefined ? project.sessionIds.some(id => ran.has(id)) : project.workspace === cwd)) };
-	return { hosts, past, bots, projects };
+	return { hosts, past, projects };
 }
 
-/** A tab other than Messages: the page it names, kept to the Workspace; a Bot, project, or pull request it opens shows in the tab. */
+/** A tab other than Messages: the page it names, kept to the Workspace; a project or pull request it opens shows in the tab. */
 export function WorkspaceTab({ view, workspace, core, disabled }: { view: Exclude<BoardView, { tab: "messages" }>; workspace: string | null; core: CoreData; disabled: boolean }) {
 	const to = useMemo(() => boardPageHash(workspace), [workspace]);
 	return (
@@ -76,30 +73,8 @@ function TabPage({ view, workspace, core, disabled }: { view: Exclude<BoardView,
 	const { changeModule } = useDashboardActions();
 	const slice = workspaceSlice(core, workspace);
 	switch (view.tab) {
-		case "bots": {
-			const rows = slice.bots && botRows(slice.bots, core.sessions.hosts, core.botLasts);
-			const page = view.page;
-			return (
-				<ListedTab page={page} list={<BotsNav rows={rows} openId={page.target === null ? (page.adding ? null : undefined) : page.target} />}>
-					<BotsView
-						route={page}
-						rows={rows}
-						routines={core.routines}
-						open={core.openBot}
-						bots={core.bots}
-						past={core.sessions.past}
-						lastHosts={core.lastHosts}
-						models={core.models}
-						workspaces={core.workspaces}
-						defaultCwd={workspace ?? core.defaultWorkspace}
-						connected={core.connected}
-						detailsOpen={core.detailsOpen}
-						onToggleDetails={core.onToggleDetails}
-						completions={core.newSessionCompletions}
-					/>
-				</ListedTab>
-			);
-		}
+		case "routines":
+			return <RoutinesTab workspace={workspace ?? core.defaultWorkspace} route={view.routine} routines={core.routines} workspaces={core.workspaces} connected={core.connected} />;
 		case "pull-requests":
 			return <WorkspacePullRequests workspace={workspace} hosts={slice.hosts} past={slice.past} route={view.page} />;
 		case "memory":
@@ -136,7 +111,7 @@ function WorkspacePullRequests({ workspace, hosts, past, route }: { workspace: s
 	);
 }
 
-const settingsHash = (workspace: string | null, section: string) => hashForPage({ kind: "board", workspace, view: { tab: "settings", section }, search: null, reply: null, bots: false });
+const settingsHash = (workspace: string | null, section: string) => hashForPage({ kind: "board", workspace, view: { tab: "settings", section }, search: null, reply: null });
 
 /** Settings kept to the Workspace, with no workspace picker: its sections down the left, the one the address names at the right. */
 function WorkspaceSettings({ workspace, workspaces, section: named }: { workspace: string | null; workspaces: CoreData["workspaces"]; section: string | null }) {
@@ -148,7 +123,7 @@ function WorkspaceSettings({ workspace, workspaces, section: named }: { workspac
 	);
 }
 
-/** A tab's page beside its list, in the resizable column the Bots and Settings pages keep at their left; the column takes what leaves the page its floor. */
+/** A tab's page beside its list, in the resizable column the Projects and Settings pages keep at their left; the column takes what leaves the page its floor. */
 function ListedTab({ page, list, children }: { page: ListPage; list: ReactNode; children: ReactNode }) {
 	const area = useRef<HTMLDivElement>(null);
 	const placement = listPlacement(page, false, useWidth(area));

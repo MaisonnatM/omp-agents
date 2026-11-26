@@ -29,16 +29,10 @@ export interface WindowScope {
 export const isPrivateHost = (host: RosterHost | null | undefined): boolean => host?.source === "dashboard" && host.private;
 
 /**
- * The sessions the sidebar, the palette, and the pages list: none in a temporary directory, none counting in a hidden workspace,
- * and none in `botSessions`, a Bot's conversation, which only its Bot's page shows.
+ * The sessions the sidebar, the palette, and the pages list: none in a temporary directory and none counting in a hidden workspace.
  */
-export function discoverableSessions(
-	hosts: RosterHost[],
-	past: PastSession[],
-	hidden: ReadonlySet<string>,
-	botSessions: ReadonlySet<string>,
-): { hosts: RosterHost[]; past: PastSession[] } {
-	const shown = (row: RosterHost | PastSession): boolean => discoverableCwd(row.cwd, hidden) && !hidden.has(workspaceCwd(row)) && !botSessions.has(row.sessionId);
+export function discoverableSessions(hosts: RosterHost[], past: PastSession[], hidden: ReadonlySet<string>): { hosts: RosterHost[]; past: PastSession[] } {
+	const shown = (row: RosterHost | PastSession): boolean => discoverableCwd(row.cwd, hidden) && !hidden.has(workspaceCwd(row));
 	return { hosts: hosts.filter(shown), past: past.filter(shown) };
 }
 

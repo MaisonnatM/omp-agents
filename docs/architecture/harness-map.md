@@ -35,7 +35,7 @@ flowchart TD
   agent --> skills["skills/, agents/, commands/"]
   agent --> mcp["mcp.json"]
   agent --> plugins["plugins/<br/>marketplace plugins"]
-  args --> dash["Dashboard extensions<br/>session visuals, bots, sport, designer, shepherd"]
+  args --> dash["Dashboard extensions<br/>session visuals, sport"]
   args --> host["Host tools<br/>move_session, wait_for_session, save_review_draft"]
   start --> project["Workspace<br/>AGENTS.md, .omp/, project skills"]
 ```
@@ -73,11 +73,11 @@ Only the server that holds the owner lock runs the unattended work, and sessions
 flowchart LR
   subgraph sessions["omp sessions"]
     kit["Starter kit extensions<br/>end-session"]
-    dashx["Dashboard extensions<br/>bots, routines, shepherds"]
+    dashx["Dashboard extensions<br/>sport"]
   end
   subgraph inboxes["~/.config/omp-agents/*-inbox/"]
     i1["end-inbox"]
-    i2["bot-inbox, routine-inbox, shepherd-inbox,<br/>sport-inbox"]
+    i2["sport-inbox"]
   end
   kit -->|writes a file| i1
   dashx -->|writes a file| i2

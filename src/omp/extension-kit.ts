@@ -1,9 +1,5 @@
-/** What every omp-agents extension shares: the part of omp's extension API it uses, its flags, and the `remember` tool's Markdown memory. */
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { errorText } from "../json";
-import { readTail } from "../read-tail";
-import { MAX_FACT_LENGTH, MAX_MEMORY_BYTES, REMEMBER_TOOL } from "../shared/bots";
+/** What every omp-agents extension shares: the part of omp's extension API it uses and its flags. */
+import { readFileSync } from "node:fs";
 
 interface ToolResult {
 	content: { type: "text"; text: string }[];
@@ -93,42 +89,3 @@ export function readText(path: string): string {
 }
 
 export const reply = (text: string): ToolResult => ({ content: [{ type: "text", text }], details: undefined });
-
-/** The memory at `path` as a system prompt carries it: its newest facts, after a note when older ones were cut, or `Nothing yet.` */
-export function memoryLines(path: string): string[] {
-	let memory: { text: string; cut: boolean } | null = null;
-	try {
-		memory = readTail(path, MAX_MEMORY_BYTES);
-	} catch {
-		// An unreadable memory leaves this turn without it rather than stopping it.
-	}
-	return [...(memory?.cut ? ["(Older memory was cut to keep this prompt short; only the newest facts follow.)"] : []), memory?.text.trim() || "Nothing yet."];
-}
-
-/**
- * The `remember` tool, the one writer of a Markdown memory: each fact is a dated `- YYYY-MM-DD <fact>` line. `memoryPath`
- * names the file for the session calling it, or throws why it has none.
- */
-export function rememberTool(pi: ExtensionApi, description: string, memoryPath: (ctx: ToolContext) => Promise<string>): ExtensionTool<{ fact: string }> {
-	return {
-		name: REMEMBER_TOOL,
-		label: "Remember",
-		description,
-		parameters: pi.typebox.Type.Object({ fact: pi.typebox.Type.String({ description: "The fact, as one short sentence.", maxLength: MAX_FACT_LENGTH }) }),
-		loadMode: "essential",
-		approval: "write",
-		async execute(_toolCallId, { fact }, _signal, _onUpdate, ctx) {
-			const path = await memoryPath(ctx);
-			const line = fact.replace(/\s+/g, " ").trim();
-			if (!line) throw new Error("fact is empty.");
-			if (line.length > MAX_FACT_LENGTH) throw new Error(`fact is ${line.length} characters; keep it to one short sentence of at most ${MAX_FACT_LENGTH}.`);
-			try {
-				mkdirSync(dirname(path), { recursive: true });
-				appendFileSync(path, `- ${new Date().toISOString().slice(0, 10)} ${line}\n`);
-			} catch (error) {
-				throw new Error(`Cannot write the memory: ${errorText(error)}`);
-			}
-			return reply(`Remembered: ${line}`);
-		},
-	};
-}

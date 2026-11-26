@@ -1,6 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { applyRoutine, isDue, nextRunAt, parseRoutineSpec, type Routine, type RoutineSpec, type Schedule, watchedKinds } from "./routines";
-import type { BotId } from "./shared/bots";
+import { applyRoutine, isDue, MAX_PROMPT_LENGTH, nextRunAt, parseRoutineSpec, type Routine, type RoutineSpec, type Schedule, watchedKinds } from "./routines";
 
 // Weekly slots are local wall-clock times; Paris has both DST changes in the dates below.
 const savedTz = process.env.TZ;
@@ -18,7 +17,7 @@ const evening: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour:
 
 const spec: RoutineSpec = {
 	id: "r1",
-	botId: "scout" as BotId,
+	workspace: "/work/webapp",
 	name: "Notes",
 	schedules: [weekdays],
 	triggers: [],
@@ -35,17 +34,20 @@ describe("parseRoutineSpec", () => {
 		expect(parseRoutineSpec({ ...spec, preset: "minimal", cwd: "/work", skill: "ship" })).toEqual({ ok: spec });
 	});
 
-	test("refuses a routine without a valid Bot, an hour past 23, a weekday past Saturday, and a fractional interval", () => {
-		const { botId: _botId, ...orphan } = spec;
-		expect(parseRoutineSpec(orphan)).toBeNull();
-		expect(parseRoutineSpec({ ...spec, botId: "../scout" })).toBeNull();
+	test("refuses a routine without an absolute Workspace, an hour past 23, a weekday past Saturday, and a fractional interval", () => {
+		const { workspace: _workspace, ...homeless } = spec;
+		expect(parseRoutineSpec(homeless)).toBeNull();
+		expect(parseRoutineSpec({ ...spec, workspace: "work/webapp" })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, botId: "scout" })).toEqual({ ok: spec });
 		expect(parseRoutineSpec({ ...spec, schedules: [{ ...weekdays, time: { hour: 24, minute: 0 } }] })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, schedules: [{ ...weekdays, days: [7] }] })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, schedules: [{ kind: "every", minutes: 1.5 }] })).toBeNull();
 		expect(parseRoutineSpec("routine")).toBeNull();
 	});
 
-	test("takes a prompt or a command, and refuses a blank one or the old Bot task", () => {
+	test("takes a prompt or a command, and refuses a blank one, one past the limit, or the old Bot task", () => {
+		expect(parseRoutineSpec({ ...spec, task: { kind: "prompt", prompt: "x".repeat(MAX_PROMPT_LENGTH) } })).not.toBeNull();
+		expect(parseRoutineSpec({ ...spec, task: { kind: "prompt", prompt: "x".repeat(MAX_PROMPT_LENGTH + 1) } })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, task: { kind: "command", command: "git worktree prune" } })?.ok.task).toEqual({ kind: "command", command: "git worktree prune" });
 		expect(parseRoutineSpec({ ...spec, task: { kind: "prompt", prompt: " " } })).toBeNull();
 		expect(parseRoutineSpec({ ...spec, task: { kind: "bot", botId: "scout", prompt: "Post the standup." } })).toBeNull();
@@ -60,12 +62,16 @@ describe("parseRoutineSpec", () => {
 		expect(parseRoutineSpec({ ...spec, task: { ...quiet, post: true } })).toBeNull();
 	});
 
-	test("keeps freshConversation when true, leaves it out when false or missing, and refuses another type", () => {
-		expect(parseRoutineSpec({ ...spec, freshConversation: true })?.ok.freshConversation).toBe(true);
-		expect(parseRoutineSpec(parseRoutineSpec({ ...spec, freshConversation: true })?.ok)?.ok.freshConversation).toBe(true);
-		expect(parseRoutineSpec({ ...spec, freshConversation: false })?.ok).not.toHaveProperty("freshConversation");
-		expect(parseRoutineSpec(spec)?.ok).not.toHaveProperty("freshConversation");
-		expect(parseRoutineSpec({ ...spec, freshConversation: "yes" })).toBeNull();
+	test("a command task keeps its prompt, and refuses one past the limit", () => {
+		const command = { kind: "command", command: "./report.sh", prompt: "Say what changed." } as const;
+		expect(parseRoutineSpec({ ...spec, task: command })?.ok.task).toEqual(command);
+		expect(parseRoutineSpec({ ...spec, task: { ...command, prompt: "x".repeat(MAX_PROMPT_LENGTH + 1) } })).toBeNull();
+	});
+
+	test("keeps the launch its Board tasks start with, and leaves it out when missing", () => {
+		const launch = { model: { provider: "anthropic", id: "claude-opus" }, thinking: "high", skill: null } as const;
+		expect(parseRoutineSpec({ ...spec, launch })?.ok.launch).toEqual(launch);
+		expect(parseRoutineSpec(spec)?.ok).not.toHaveProperty("launch");
 	});
 
 	test("takes triggers in place of schedules, drops a kind routines no longer watch, and refuses neither, a trigger that is not one, and a kind twice", () => {

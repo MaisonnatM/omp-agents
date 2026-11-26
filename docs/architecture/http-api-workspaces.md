@@ -30,7 +30,7 @@ The preview reads the status with executable-mode detection forced on, and refus
 A missing directory is removed with `git worktree remove`, which drops only that registration.
 `Worktrees.remove` logs each checkout it removes as `omp-agents: removed the worktree <path> for <who asked>`: `Settings › Worktrees`, `ended session <id>`, or `releasing branch <branch>`.
 A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.
-Starts that create no worktree, such as a resume or a Bot's session, stay parallel and wait only while a removal runs.
+Starts that create no worktree, such as a resume, stay parallel and wait only while a removal runs.
 
 `WorktreeOccupants` supplies named, located directories and unresolved repository scopes to `Worktrees`.
 It protects each live session's default directory and reported worktree, plus each resident subagent's native default directory.

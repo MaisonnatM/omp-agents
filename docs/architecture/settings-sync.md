@@ -2,13 +2,12 @@
 
 `SettingsSync` in `src/settings-sync.ts` keeps the portable settings the same on several machines through one branch of a Git remote.
 What is portable is data, `SYNC_ITEMS` in `src/shared/settings-sync.ts`: omp's `config.yml`, `AGENTS.md`, and `APPEND_SYSTEM.md`, the `skills`, `rules`, `agents`, and `commands` trees of omp's agent directory, and the dashboard's stores, each under its path in the repository (`omp/…` and `dashboard/…`).
-The stores are the source control settings, the preferences, the workspace list, the Bots, and the projects, each a `SyncStore` that `syncStores` builds over the server's own file.
-The Bots store carries each Bot of `bots.json` without its `sessionId`, with its `cwd` as a `~` path, its `memory.md` as `memory`, one entry per line, so facts two machines remembered merge entry by entry, and its routines as `routines`; a Bot arriving keeps this machine's session id for it, else none.
-Each carried routine is the routine of `routines.json` without its `botId`, `runs`, and `scheduledAt`, which stay on the machine that ran them, and with `enabled` and `machine` folded into `runsOn`: the machine that runs it, `{ id, name }`, or `null` while it is paused, so the carried form cannot hold a routine enabled on no machine, and two machines changing it conflict.
+The stores are the source control settings, the preferences, the workspace list, the routines, and the projects, each a `SyncStore` that `syncStores` builds over the server's own file.
+The routines store carries each routine of `routines.json` with its `workspace` as a `~` path, and without its `runs` and `scheduledAt`, which stay on the machine that ran them, and with `enabled` and `machine` folded into `runsOn`: the machine that runs it, `{ id, name }`, or `null` while it is paused, so the carried form cannot hold a routine enabled on no machine, and two machines changing it conflict.
 `thisMachine` names this machine: an id that `machine.json` beside the access token keeps, made on first use since a Mac's name can change, and its host name.
 On the way in, a `runsOn` naming this machine becomes `machine: null`, which runs here, and any other machine stays in `machine`, where `runsHere` in `src/routines.ts` keeps it from running.
-The store writes the Bots, then `routines.json` in its own order with new routines last, each keeping the runs and `scheduledAt` this machine had, and a sync that rewrote the Bots makes the `Dashboard` read every Bot's memory again.
-A Bot entry without `routines`, from a machine on the version before routines synced, keeps this machine's routines of that Bot, since that machine drops them from the remote.
+The store writes `routines.json` in its own order with new routines last, each keeping the runs and `scheduledAt` this machine had.
+A remote's `dashboard/bots.json`, from a version before routines moved to the Board, is no longer read, and saved settings that excluded `bots`, which carried the routines then, load excluding `routines`.
 The projects store carries each project of `project-list.json` as `portableProjects` in `src/project-sync.ts` gives it: its id, name, goal, decisions, `createdAt`, `archivedAt`, and `steps`, each with its id, text, `done`, and `parentId`.
 `withProjects` gives the list with exactly the carried projects, each keeping this machine's `sessionIds` and log, and the store writes it through `ProjectsFile.replace`.
 A project's sessions and log stay on the machine, since they name its sessions.

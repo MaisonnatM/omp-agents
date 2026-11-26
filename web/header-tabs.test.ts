@@ -73,24 +73,24 @@ describe("visitHeaderTab", () => {
 
 describe("each tab's own Back and Forward", () => {
 	test("Back and Forward move through what the tab on screen showed and leave the other tabs as they are", () => {
-		const row = browse(["#notifications", "#bots", "+#new", "#sport"]);
+		const row = browse(["#notifications", "#memory", "+#new", "#sport"]);
 		const back = walk(select(row, 0), -1);
 		expect(stepHeaderTab(select(row, 0), -1)?.go).toBe("#notifications");
 		expect(shown(back)).toEqual(["*#notifications", "#sport"]);
 		expect(back.tabs[1]).toBe(row.tabs[1]);
-		expect(shown(walk(back, 1))).toEqual(["*#bots", "#sport"]);
-		expect(shown(walk(select(row, 1), -1))).toEqual(["#bots", "*#new"]);
+		expect(shown(walk(back, 1))).toEqual(["*#memory", "#sport"]);
+		expect(shown(walk(select(row, 1), -1))).toEqual(["#memory", "*#new"]);
 	});
 
 	test("Back stops at the first entry of a tab, and Forward at the last", () => {
-		const row = browse(["#notifications", "#bots"]);
+		const row = browse(["#notifications", "#memory"]);
 		expect(stepHeaderTab(row, 1)).toBeNull();
 		expect(stepHeaderTab(walk(row, -1), -1)).toBeNull();
 		expect(stepHeaderTab(browse(["#notifications", "+#new"]), -1)).toBeNull();
 	});
 
 	test("going somewhere after Back drops what Forward would show, as a browser does", () => {
-		const row = browse(["#sport"], walk(browse(["#notifications", "#bots"]), -1));
+		const row = browse(["#sport"], walk(browse(["#notifications", "#memory"]), -1));
 		expect(stepHeaderTab(row, 1)).toBeNull();
 		expect(shown(walk(row, -1))).toEqual(["*#notifications"]);
 	});
@@ -110,9 +110,9 @@ describe("each tab's own Back and Forward", () => {
 	});
 
 	test("a replace changes the entry on screen and keeps the tab's Back and Forward, as a page that picks what it opens does", () => {
-		const row = browse(["#notifications", "#bots", "#sport"]);
-		const replaced = browse(["=#bots/a"], walk(row, -1));
-		expect(shown(replaced)).toEqual(["*#bots/a"]);
+		const row = browse(["#notifications", "#memory", "#sport"]);
+		const replaced = browse(["=#memory/a"], walk(row, -1));
+		expect(shown(replaced)).toEqual(["*#memory/a"]);
 		expect(shown(walk(replaced, -1))).toEqual(["*#notifications"]);
 		expect(shown(walk(replaced, 1))).toEqual(["*#sport"]);
 	});
@@ -147,7 +147,7 @@ describe("closeHeaderTab", () => {
 	});
 
 	test("closing the last tab leaves a new one on New session, with no history", () => {
-		const closed = closeHeaderTab(browse(["#notifications", "#bots"]), "t0", "fresh");
+		const closed = closeHeaderTab(browse(["#notifications", "#memory"]), "t0", "fresh");
 		expect(closed.row.tabs).toEqual([{ id: "fresh", hash: NEW_TAB_HASH, back: [], forward: [] }]);
 		expect(closed.go).toBe(NEW_TAB_HASH);
 	});
@@ -171,8 +171,8 @@ describe("reopenHeaderTab", () => {
 	});
 
 	test("a reopened tab keeps its own Back and Forward", () => {
-		const walked = walk(browse(["#sport", "#bots"], row), -1);
-		expect(shown(walk(reopen(close(walked, "t2")), -1, 1, 1))).toEqual(["#pull-requests", "#notifications", "*#bots"]);
+		const walked = walk(browse(["#sport", "#memory"], row), -1);
+		expect(shown(walk(reopen(close(walked, "t2")), -1, 1, 1))).toEqual(["#pull-requests", "#notifications", "*#memory"]);
 	});
 
 	test("reopens the closed tabs latest first, each where it was", () => {
@@ -257,10 +257,10 @@ describe("duplicateHeaderTab", () => {
 	});
 
 	test("the copy starts with the tab's Back and Forward, then keeps its own", () => {
-		const walked = walk(browse(["#sport", "#bots"], row), -1);
+		const walked = walk(browse(["#sport", "#memory"], row), -1);
 		const copy = browse(["#notifications"], duplicateHeaderTab(walked, "t2", "copy")!.row);
 		expect(shown(walk(copy, -1, -1))).toEqual(["#pull-requests", "#notifications", "#sport", "*#past/a"]);
-		expect(shown(walk(select(copy, 2), 1))).toEqual(["#pull-requests", "#notifications", "*#bots", "#notifications"]);
+		expect(shown(walk(select(copy, 2), 1))).toEqual(["#pull-requests", "#notifications", "*#memory", "#notifications"]);
 	});
 
 	test("puts the unpinned copy of a pinned tab first of the others", () => {
@@ -286,9 +286,9 @@ describe("pinHeaderTab", () => {
 	});
 
 	test("pinning a tab keeps its Back and Forward", () => {
-		const pinned = pinHeaderTab(walk(browse(["#sport", "#bots"], row), -1), "t2", true);
+		const pinned = pinHeaderTab(walk(browse(["#sport", "#memory"], row), -1), "t2", true);
 		expect(shown(walk(pinned, -1))).toEqual(["*^#past/a", "#pull-requests", "#notifications"]);
-		expect(shown(walk(pinned, 1))).toEqual(["*^#bots", "#pull-requests", "#notifications"]);
+		expect(shown(walk(pinned, 1))).toEqual(["*^#memory", "#pull-requests", "#notifications"]);
 	});
 
 	test("a reorder keeps the pinned tabs first", () => {
@@ -306,8 +306,8 @@ describe("storing", () => {
 	});
 
 	test("keeps each tab's history, also a closed tab's, so a reopened tab has it", () => {
-		const row = close(visitHeaderTab(walk(browse(["#notifications", "#bots", "#sport"]), -1), NEW_TAB_HASH, "new-tab", "n"), "t0");
-		expect(row.closed[0]?.tab).toMatchObject({ hash: "#bots", back: ["#notifications"], forward: ["#sport"] });
+		const row = close(visitHeaderTab(walk(browse(["#notifications", "#memory", "#sport"]), -1), NEW_TAB_HASH, "new-tab", "n"), "t0");
+		expect(row.closed[0]?.tab).toMatchObject({ hash: "#memory", back: ["#notifications"], forward: ["#sport"] });
 		expect(decodeHeaderTabs(encodeHeaderTabs(row))).toEqual(row);
 	});
 

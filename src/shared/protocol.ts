@@ -1,7 +1,6 @@
 /** The messages the dashboard socket carries between the server and the page. */
 import type { Routine, RoutineChange } from "../routines";
 import type { ActivityEvent } from "./activity-event";
-import type { Bot, BotChange, BotId, BotLast } from "./bots";
 import type { DictationEvent } from "./dictation";
 import type { BackgroundJob } from "./jobs";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
@@ -52,8 +51,6 @@ export type ServerMsg =
 	| ModuleMsg
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
-	/** Every Bot, whole, the newest of what each remembers, within `MAX_MEMORY_BYTES`, and the last words of its conversation, sent when a socket opens, after every change, and as each turn of a Bot's conversation starts and ends. */
-	| { t: "bots"; bots: Bot[]; memories: Record<BotId, string>; lasts: Record<BotId, BotLast | null> }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
 	| { t: "scheduled"; sends: ScheduledSend[] }
 	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
@@ -140,8 +137,6 @@ export type ClientMsg =
 	| ModuleChangeMsg
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
 	| { t: "routine"; change: RoutineChange }
-	/** Create, edit, or remove a Bot, or send one a message; every socket then gets the Bots as they are after. */
-	| { t: "bot"; change: BotChange }
 	/** Schedule a message or a session start, cancel one, take one back to edit, or send one now; every socket then gets the scheduled sends as they are after. */
 	| { t: "schedule"; change: ScheduledChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */

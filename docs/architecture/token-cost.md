@@ -62,8 +62,6 @@ Cache writes by cause, from consecutive requests of one session:
   `pr_description` and `project_memory` stay, since subagents call them.
 - **`skill://Poteto Mode` no longer fails 37 times per 14 days.** pstack renamed its skill `poteto-mode`, and the kit's alias still told agents the old name; it now says that `skill://poteto-mode` opens pstack's file.
 - **The baseline is one command.** `scripts/token-audit/report.ts` prints every table above, and `scripts/token-audit/dump-request.ts` writes each request omp sends so the report can size it.
-- **A Bot's system prompt no longer changes from turn to turn.** The Bot extension used to put the Bot's name, job, memory, routines, and the other Bots in the system prompt, read again each turn, so every `remember` or saved routine rewrote the cached head of the next request.
-  The system prompt now holds only rules that are the same for every Bot, and the changing part comes as a hidden message sent only when it changed and again after compaction; see [Bots](bots.md).
 
 ## Proposals
 

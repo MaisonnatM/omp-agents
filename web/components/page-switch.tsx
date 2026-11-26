@@ -1,6 +1,5 @@
 import { memo } from "react";
 import { newSessionRequest } from "../../src/shared/sessions";
-import { botRows, type OpenBot } from "../bots-model";
 import { NEW_DRAFT_KEY } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
 import { isModulePage } from "../modules";
@@ -20,7 +19,6 @@ import { NewSession } from "./new-session";
 import { NotificationsPage } from "./notices";
 
 import { PaneGrid } from "./pane-grid";
-import { BotsView } from "./bots/bots-view";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
@@ -28,14 +26,12 @@ import { useScheduleSend } from "./scheduled";
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "modules" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "modules" | "routines" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
 >;
 
 interface PageSwitchProps extends PageState {
 	/** The page covering the panes; `null` while the panes show. */
 	page: Page | null;
-	/** The Bot whose page is open, `null` on any other page, while the Bots load, or for a Bot that is gone. */
-	openBot: OpenBot | null;
 	/** The new session under way or failed, if there is one. */
 	newStart: StartOf<"new"> | null;
 	scope: WorkspaceScope;
@@ -64,9 +60,6 @@ export const PageSwitch = memo(function PageSwitch({
 	models,
 	modules,
 	routines,
-	bots,
-	botLasts,
-	openBot,
 	workspaceList,
 	trustedProjects,
 	newSessionCompletions,
@@ -94,8 +87,6 @@ export const PageSwitch = memo(function PageSwitch({
 		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
 		const core = {
 			routines,
-			bots,
-			botLasts,
 			projects: modules.projects,
 			listed,
 			workspace,
@@ -106,12 +97,8 @@ export const PageSwitch = memo(function PageSwitch({
 			sessions: { hosts, past },
 			section: sectionTarget,
 			newSessionCompletions,
-			openBot,
-			lastHosts,
 			defaultWorkspace,
 			connected,
-			detailsOpen: rightOpen,
-			onToggleDetails: () => toggleSidebar("right"),
 		};
 		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
 	}
@@ -149,25 +136,6 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		case "pull-requests":
 			return <PullRequestsPage hosts={visible.hosts} past={visible.past} route={page} />;
-		case "bots":
-			return (
-				<BotsView
-					route={page}
-					rows={bots === null ? null : botRows(bots, hosts, botLasts)}
-					routines={routines}
-					open={openBot}
-					bots={bots}
-					past={past}
-					lastHosts={lastHosts}
-					models={models}
-					workspaces={workspaces}
-					defaultCwd={defaultWorkspace}
-					connected={connected}
-					detailsOpen={rightOpen}
-					onToggleDetails={() => toggleSidebar("right")}
-					completions={newSessionCompletions}
-				/>
-			);
 		case "notifications":
 			return <NotificationsPage notices={notices} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.

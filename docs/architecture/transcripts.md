@@ -43,17 +43,7 @@ Every transcript comes from the session files on this machine, not from a networ
 - A user message whose text starts with `[omp-agents]` (`DASHBOARD_PROMPT_PREFIX` in `src/shared/transcript.ts`), as an older version's project updates did, is a prompt the dashboard sent in the user's place.
   The transcript folds it into a `dashboard` item, never a pending one, which the page renders as nothing but counts as a turn's prompt: the reply before it keeps its copy and fork buttons, the user's prompt before it is no longer the editable last prompt, and a reply before it suggests nothing.
   `messageItemsOf` leaves it out, so the conversation search skips it and the trajectory folds it as an `omp-agents` injection into the turn before it; it titles no session, neither through the `/rename` a dashboard session sends after its first prompt nor as a past session's first prompt, and the composer's queued rows leave it out.
-- `promptAuthor` in `src/shared/transcript.ts` distinguishes the user's text, dashboard injections, and messages with a valid routine stamp from `src/shared/routine-message.ts`.
-  A routine message folds into an `Item` of kind `routine`, holding its `RoutineMessage` snapshot, `entryId`, optional `pending`, and optional `shell` output, exit code, and cancellation state for an omp `bashExecution` from a `!` prompt.
-  Skill expansion restores `/skill:<name>` on the snapshot's prompt, so the card and copy action retain the invocation rather than the expanded skill text.
-  `RoutineRunCard` in `web/components/routines/routine-run-card.tsx` renders the snapshot without consulting today's routine definition or run history.
-  A routine item opens a turn, separates activity groups, and appears in the minimap under its saved routine name and task.
-  Chat history lists only the user's prompts and excludes routine turns.
-  A routine item has no prompt edit or fork action of its own, but a reply before it can fork at its `entryId` when available.
-  Routine prompts do not appear in the composer's queued rows or its withdrawn messages, and do not trigger automatic `/rename`.
-  A past session whose first message is a routine uses the saved routine name as its fallback title.
-  `messageItemsOf` includes routine items for the trajectory, session facts, and Bot previews, while conversation search explicitly excludes them.
-  The trajectory reconstructs the stamped message with `routineMessageText`, and a Bot's sidebar preview attributes its prompt or command to the saved routine name instead of the user.
+- `promptAuthor` in `src/shared/transcript.ts` tells the user's text from a dashboard injection.
 - The same read folds each line into the view's changed files as well, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file.
   The view's socket topic carries them as `work` messages: the whole list with the transcript, then only the files each later read changed, which the page puts in place by path.
   A subagent's view folds its own file, so it shows its own changes.

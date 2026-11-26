@@ -185,6 +185,20 @@ describe("LiveSessions", () => {
 		expect(unread()).toEqual({ at: 3_000, reply: "Fixed PR #12." });
 	});
 
+	test("a turn is quiet only when its session marked a routine's Board task done quietly since the turn started", () => {
+		const quietDones: [string, number][] = [["s-i1", 5_000]];
+		const sessions = new LiveSessions(() => {}, undefined, unreadIn(), undefined, (sessionId, since) => quietDones.some(([id, at]) => id === sessionId && at >= since));
+		sessions.add(liveSession("i1"), null);
+		sessions.add(liveSession("i2"), null);
+		expect([sessions.quietTurn("i1"), sessions.quietTurn("i2")]).toEqual([true, false]);
+		const now = spyOn(Date, "now").mockReturnValue(6_000);
+		sessions.turnStarted("i1");
+		expect(sessions.quietTurn("i1")).toBe(false);
+		quietDones.push(["s-i1", 6_500]);
+		expect(sessions.quietTurn("i1")).toBe(true);
+		now.mockRestore();
+	});
+
 	test("an unread turn comes back after a restart for a session that survived it, and only when the next server restores it", () => {
 		const path = unreadIn();
 		const first = registry(path, "i-kept", "i-gone");

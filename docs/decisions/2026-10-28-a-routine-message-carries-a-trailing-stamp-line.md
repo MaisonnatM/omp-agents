@@ -20,7 +20,7 @@ A routine keeps its last 10 runs only.
 
 ## Options considered
 
-- A trailing `#` stamp line, read by `readRoutineMessage` in `src/shared/routine-message.ts`.
+- A trailing `#` stamp line, read by `readRoutineMessage` in the routine message module, since retired.
   It keeps `/skill:`, the pinned skill and `!` working, since `#` is a shell comment, and holds the run's name, time, triggers and command end, so the card never looks the run up.
   It was chosen.
 - A delivery record per send, joined by an id omp writes on the native message.

@@ -4,7 +4,7 @@
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconBubbleWideNotification, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconPencil, IconRobot, IconUser } from "central-icons";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconBubbleWideNotification, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconPencil, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { type PastSession, type PromptImage, type RosterHost, type Stop, stopOf, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -12,7 +12,7 @@ import { Header, HeaderTitleShown } from "../page-header";
 import { AppMark } from "../app-mark";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CountPill } from "../count-pill";
-import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
+import { BOARD_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import { Badge } from "@/components/ui/badge";
@@ -42,15 +42,13 @@ import { sessionOverviewTab, sessionWorkTabs, useOpenTabOnNew, useSessionWork, w
 import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../../labels";
 import type { BoardRoute, BoardView } from "./module";
-import { PageHashContext } from "../../page-hash";
 import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
-import { boardPageHash, boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
+import { boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
-import { botRows, crossProject } from "../../bots-model";
-import { BotsGallery } from "../bots/bots-gallery";
 import { boardActions, SessionActions } from "./actions";
 import { MergeNote } from "./merge-note";
+import { RoutineAuthorName, RoutineAvatar, RoutineIds } from "./routine-author";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -60,25 +58,19 @@ interface BoardPageProps {
 	onChange: (change: BoardChange) => Promise<void>;
 }
 
-export function BoardPage({ route, core, state, disabled, onChange }: BoardPageProps) {
+export function BoardPage(props: BoardPageProps) {
+	return (
+		<RoutineIds routines={props.core.routines}>
+			<BoardChannel {...props} />
+		</RoutineIds>
+	);
+}
+
+function BoardChannel({ route, core, state, disabled, onChange }: BoardPageProps) {
 	useMinute();
 	const [off] = useModulesOff();
 	const searchField = useRef<BoardSearchFieldHandle>(null);
 	if (state === null) return <BoardLoading />;
-	if (route.bots)
-		return (
-			<section aria-label="Bots" className="flex min-h-0 min-w-[360px] flex-1 flex-col">
-				<Header leading={<IconRobot aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title="Bots" />
-				<HeaderTitleShown.Provider value={false}>
-					<div className="flex min-h-0 flex-1">
-						{/* Each Bot opens in its own Workspace's Bots tab. */}
-						<PageHashContext.Provider value={page => boardPageHash(page.kind === "bots" && page.target !== null ? (core.bots?.find(bot => bot.id === page.target)?.cwd ?? null) : null)(page)}>
-							<BotsGallery rows={core.bots && botRows(core.bots.filter(bot => crossProject(bot, core.workspaces)), core.sessions.hosts, core.botLasts)} routines={core.routines} />
-						</PageHashContext.Provider>
-					</div>
-				</HeaderTitleShown.Provider>
-			</section>
-		);
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
 	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";
@@ -164,7 +156,7 @@ export const folder = (display: string): string => display.split("/").filter(Boo
 /** Slack starts a later message from the same author within five minutes of the last one without its avatar and name. */
 const GROUP_MS = 5 * 60_000;
 
-const authorKey = (by: BoardAuthor): string => (by.kind === "user" ? "user" : by.sessionId);
+const authorKey = (by: BoardAuthor): string => (by.kind === "user" ? "user" : by.kind === "routine" ? `routine:${by.routineId}` : by.sessionId);
 
 function continues(previous: { at: number; by: BoardAuthor }, next: { at: number; by: BoardAuthor }): boolean {
 	return authorKey(previous.by) === authorKey(next.by) && next.at - previous.at < GROUP_MS && sameDay(previous.at, next.at);
@@ -252,10 +244,11 @@ function YourAvatar({ size, box }: { size: "message" | "summary"; box: string })
 	);
 }
 
-/** The author's square picture: yours for you, omp's mark for a session. */
+/** The author's square picture: yours for you, a routine's loop for a routine, omp's mark for a session. */
 export function Avatar({ by, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
 	const box = size === "message" ? "size-9 rounded-lg text-sm" : "size-6 rounded-md text-[11px]";
 	if (by.kind === "user") return <YourAvatar size={size} box={box} />;
+	if (by.kind === "routine") return <RoutineAvatar size={size} box={box} />;
 	return (
 		<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-muted", box)}>
 			<AppMark className={size === "message" ? "size-5" : "size-3.5"} />
@@ -263,9 +256,10 @@ export function Avatar({ by, size = "message" }: { by: BoardAuthor; sessions: Kn
 	);
 }
 
-/** The author's name: yours, or for a session "omp agent" then the session's title, which opens its conversation in its Board thread. */
+/** The author's name: yours; a routine's name; or for a session "omp agent" then the session's title, which opens its conversation in its Board thread. */
 function AuthorName({ by, sessions, state, workspace }: { by: BoardAuthor; sessions: KnownSessions; state: BoardState; workspace: string }) {
 	if (by.kind === "user") return <span className="text-sm font-semibold">You</span>;
+	if (by.kind === "routine") return <RoutineAuthorName routineId={by.routineId} name={by.name} workspace={workspace} />;
 	const title = sessionLabel(by.sessionId, sessions).name;
 	return (
 		<span className="flex min-w-0 items-baseline gap-1.5">
@@ -338,7 +332,7 @@ function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 	);
 }
 
-/** A row under a Board task still in work, in the thread summary's style: who works on it and how it stands, as a Slack bot shows it is thinking; it opens the thread with its Thread tab in front. */
+/** A row under a Board task still in work, in the thread summary's style: who works on it and how it stands, as Slack shows someone typing; it opens the thread with its Thread tab in front. */
 function WorkingLine({ work, sessions, href }: { work: Work; sessions: KnownSessions; href: string }) {
 	const sessionId = work.kind === "starting" ? null : work.sessionId;
 	return (
@@ -355,11 +349,11 @@ function WorkingLine({ work, sessions, href }: { work: Work; sessions: KnownSess
 	);
 }
 
-/** A Board task's or reply's text as Markdown, with single line breaks kept, as a Bot's message shows; `(edited)` after it once its author edited it, as Slack marks one. */
+/** A Board task's or reply's text as Markdown, with single line breaks kept; `(edited)` after it once its author edited it, as Slack marks one. */
 function BoardText({ text, editedAt }: { text: string; editedAt?: number }) {
 	return (
 		<div className="max-w-conversation min-w-0 text-sm leading-relaxed">
-			<MessageMarkdown text={text} preset={BOT_MESSAGE_PRESET} />
+			<MessageMarkdown text={text} preset={BOARD_MESSAGE_PRESET} />
 			{editedAt !== undefined && (
 				<span title={`Edited ${new Date(editedAt).toLocaleString()}`} className="text-xs text-muted-foreground">
 					(edited)
@@ -497,8 +491,16 @@ const useSeen = (): Record<string, number> =>
 		},
 		() => seen,
 	);
-/** Replies past the ones seen that someone else wrote: the unread count, as Slack's thread pill. */
-const unreadOf = (task: BoardTask, seenCount: number | undefined): number => said(task).slice(seenCount ?? 0).filter(reply => reply.by.kind !== "user").length;
+/** Replies past the ones seen that someone else wrote: the unread count, as Slack's thread pill. The line a session leaves with a quiet done, having found nothing to report, counts for nothing. */
+const unreadOf = (task: BoardTask, seenCount: number | undefined): number => {
+	const quiet = new Set(
+		task.replies.filter((entry, index) => {
+			const before = task.replies[index - 1];
+			return "by" in entry && before !== undefined && "note" in before && before.note.kind === "done" && before.note.quiet === true;
+		}),
+	);
+	return said(task).slice(seenCount ?? 0).filter(reply => reply.by.kind !== "user" && !quiet.has(reply)).length;
+};
 
 function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onChange }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const replies = said(task);

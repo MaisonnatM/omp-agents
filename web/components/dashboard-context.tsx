@@ -22,7 +22,6 @@ export interface DashboardActions {
 	dismissStart: Dashboard["dismissStart"];
 	openNewSession: Dashboard["openNewSession"];
 	changeModule: Dashboard["changeModule"];
-	changeBot: Dashboard["changeBot"];
 	/**
 	 * End running session `instanceId`, then move its panes along once the server ended it; a failure shows as a toast.
 	 * Resolves `true` once the server ended it, `false` when it was already ending or could not end.

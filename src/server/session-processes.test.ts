@@ -229,7 +229,7 @@ describe("SessionProcessWatch", () => {
 		expect(stopped).toEqual([]);
 	});
 
-	test("a session the idle session stop leaves alone never ends: one started in a terminal, a private one, or a Bot's", async () => {
+	test("a session the idle session stop leaves alone never ends: one started in a terminal or a private one", async () => {
 		const { state, stopped, tickAt } = computer([]);
 		state.minutes = null;
 		state.sessions = [{ ...A, stopsWhenIdle: false }, { ...B, status: "idle", stopsWhenIdle: false }];

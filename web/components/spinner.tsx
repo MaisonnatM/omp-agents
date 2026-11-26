@@ -21,7 +21,7 @@ export function Spinner({ size, strokeWidth = 1.5, label, className }: Pick<Cent
 				strokeWidth={strokeWidth}
 				strokeLinecap="round"
 				pathLength="100"
-				className="motion-safe:animate-[spinner-move_2s_linear_infinite,spinner-dash_4s_ease-in-out_infinite] motion-safe:[stroke-dasharray:15_85] motion-reduce:animate-[bot-pulse_1.6s_ease-in-out_infinite]"
+				className="motion-safe:animate-[spinner-move_2s_linear_infinite,spinner-dash_4s_ease-in-out_infinite] motion-safe:[stroke-dasharray:15_85] motion-reduce:animate-[glyph-pulse_1.6s_ease-in-out_infinite]"
 			/>
 		</svg>
 	);

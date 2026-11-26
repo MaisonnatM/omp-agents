@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: deprecated
 date: 2026-11-09
 decision-makers: Maxence Maisonnat
 supersedes: 2026-11-08-sessions-waiting-on-subagents-get-their-own-group

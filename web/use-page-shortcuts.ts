@@ -108,7 +108,6 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (page?.kind === "pull-requests" && !page.target) return;
 				latest.current.showTab("pull-requests");
 			},
-			bots: goToTab("bots"),
 			sessions: () => {
 				if (!latest.current.page) return;
 				latest.current.showTab("sessions");

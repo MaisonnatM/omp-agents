@@ -1,11 +1,19 @@
+/** A routine's editor: its name, Workspace, model, task, schedules, and triggers, saved together. */
 import { type ReactNode, useId, useState } from "react";
 import { COMMAND_TIME_LIMIT, type RoutineSpec, TRIGGER_KINDS, type TriggerKind, type Weekday } from "../../../src/routines";
+import { selectorOf } from "../../../src/shared/models";
+import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { blankSchedule, type CommandPostChoice, dayName, type EveryUnit, type RoutineDraft, type ScheduleDraft, specOf, TRIGGER_WORDS, WEEK, WEEKDAYS } from "../../routines-model";
+import { useDraftModelSelection } from "../../use-draft-model";
+import { useSkills } from "../../use-skills";
 import { PageFrame } from "../list-page";
 import { Field, FIELD, TEXT_AREA } from "../form-field";
+import { ModelPicker } from "../model-picker";
+import { SkillPicker } from "../skill-picker";
+import { DirectoryPicker } from "../workspace-picker";
 
 const UNITS: EveryUnit[] = ["minutes", "hours", "days"];
 
@@ -15,11 +23,11 @@ const TRIGGER_HINTS: Record<TriggerKind, string> = {
 	"pull-request": "One of yours, or one waiting on your review, comes to need you: a review, failing checks, a conflict, comments to address, or ready to merge.",
 };
 
-/** The editor's choices of when a command posts its output, with what each means. */
+/** The editor's choices of when a command posts its report, with what each means. */
 const COMMAND_POST_CHOICES: { value: CommandPostChoice; label: string; hint: string }[] = [
-	{ value: "every", label: "Every run", hint: "Each run starts a turn." },
-	{ value: "failures", label: "Only when it fails", hint: "A run that exits 0 keeps its output in the run list and starts no turn." },
-	{ value: "changes", label: "When it fails or its output changes", hint: "A run that exits 0 with the same output as the last run starts no turn, so a check wakes the Bot only on news." },
+	{ value: "every", label: "Every run", hint: "Each run posts a Board task." },
+	{ value: "failures", label: "Only when it fails", hint: "A run that exits 0 keeps its output in the run list and posts nothing." },
+	{ value: "changes", label: "When it fails or its output changes", hint: "A run that exits 0 with the same output as the last run posts nothing, so a check reaches the Board only on news." },
 ];
 
 /** One choice of a radio group, with the controls it enables under it. */
@@ -129,8 +137,8 @@ function ScheduleEditor({
 interface RoutineEditorProps {
 	initial: RoutineDraft;
 	isNew: boolean;
-	/** The name of the Bot the routine belongs to. */
-	botName: string;
+	/** The Workspaces the routine may post in. */
+	workspaces: Workspace[];
 	connected: boolean;
 	/** A save is on its way to the server. */
 	saving: boolean;
@@ -138,11 +146,11 @@ interface RoutineEditorProps {
 	onCancel: () => void;
 }
 
-/** A Bot's routine: its name, task, schedules, and triggers, saved together. */
-export function RoutineEditor({ initial, isNew, botName, connected, saving, onSave, onCancel }: RoutineEditorProps) {
+export function RoutineEditor({ initial, isNew, workspaces, connected, saving, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
 	const [tried, setTried] = useState(false);
 	const id = useId();
+	const models = useDraftModelSelection(draft.workspace || initial.workspace, { model: initial.launch?.model ?? null, thinking: initial.launch?.thinking ?? null });
 	const set = <K extends keyof RoutineDraft>(key: K, value: RoutineDraft[K]): void => setDraft(current => ({ ...current, [key]: value }));
 	const setSchedule = (index: number, schedule: ScheduleDraft): void =>
 		setDraft(current => ({ ...current, schedules: current.schedules.map((item, i) => (i === index ? schedule : item)) }));
@@ -150,10 +158,17 @@ export function RoutineEditor({ initial, isNew, botName, connected, saving, onSa
 		setDraft(current => ({ ...current, schedules: current.schedules.filter((_, i) => i !== index) }));
 	const toggleTrigger = (kind: TriggerKind): void =>
 		setDraft(current => ({ ...current, triggers: current.triggers.includes(kind) ? current.triggers.filter(item => item !== kind) : [...current.triggers, kind] }));
-	const result = specOf(draft);
+	const skills = useSkills(draft.workspace || initial.workspace);
+	const levelsKnown = models.levels !== null && models.picker.list.error === null;
+	const savedModel = initial.launch?.model ?? null;
+	const sameModel = (models.model && selectorOf(models.model)) === (savedModel && selectorOf(savedModel));
+	const thinking = levelsKnown || !sameModel ? models.thinking : (initial.launch?.thinking ?? null);
+	const skill = draft.launch?.skill ?? null;
+	const launch = models.model || thinking || skill ? { model: models.model, thinking, skill } : null;
+	const result = specOf({ ...draft, launch });
 
 	return (
-		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta={`${botName}'s routine, which runs on a schedule or a trigger while the dashboard runs`}>
+		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta="Posts a Board task in its Workspace on a schedule or a trigger while the dashboard runs">
 			<form
 				className="mx-auto w-full max-w-2xl space-y-6 px-6 py-6"
 				onSubmit={event => {
@@ -173,18 +188,31 @@ export function RoutineEditor({ initial, isNew, botName, connected, saving, onSa
 					/>
 				</Field>
 
+				<Field label="Workspace" hint="Its Board gets the routine's Board tasks, and a command runs in its main checkout.">
+					<div className="flex items-center gap-2">
+						<DirectoryPicker cwd={draft.workspace} workspaces={workspaces} disabled={!connected} side="bottom" onPick={cwd => set("workspace", cwd)} />
+					</div>
+				</Field>
+
+				<Field label="Model" hint="The session that takes each Board task starts on this model and effort, with this skill.">
+					<div className="flex flex-wrap items-center gap-2">
+						<ModelPicker {...models.picker} disabled={!connected} />
+						<SkillPicker label="Skill" skills={skills} value={skill} onPick={next => set("launch", { model: null, thinking: null, ...draft.launch, skill: next })} />
+					</div>
+				</Field>
+
 				<Field label="Task">
 					<div className="space-y-3">
-						<Choice name={`${id}-task`} checked={draft.task === "prompt"} label="Send a message" onCheck={() => set("task", "prompt")}>
+						<Choice name={`${id}-task`} checked={draft.task === "prompt"} label="Post instructions" onCheck={() => set("task", "prompt")}>
 							<textarea
-								aria-label="Message"
+								aria-label="Instructions"
 								value={draft.prompt}
 								rows={4}
 								placeholder="Summarize yesterday's commits on main."
 								onChange={event => set("prompt", event.target.value)}
 								className={TEXT_AREA}
 							/>
-							<p className="text-xs text-muted-foreground">Each run sends this into {botName}'s conversation, as if you wrote it there.</p>
+							<p className="text-xs text-muted-foreground">Each run posts these as a Board task, with what a trigger saw, and a session takes it. While the routine's last Board task is open, a run replies on it.</p>
 						</Choice>
 						<Choice name={`${id}-task`} checked={draft.task === "command"} label="Run a command" onCheck={() => set("task", "command")}>
 							<textarea
@@ -198,11 +226,18 @@ export function RoutineEditor({ initial, isNew, botName, connected, saving, onSa
 								onChange={event => set("command", event.target.value)}
 								className="w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							/>
-							<p className="text-xs text-muted-foreground">
-								Runs with sh in {botName}'s workspace, without an omp session, and stops after {COMMAND_TIME_LIMIT}. Its output goes into {botName}'s conversation.
-							</p>
+							<p className="text-xs text-muted-foreground">Runs with sh in the Workspace's main checkout, without an omp session, and stops after {COMMAND_TIME_LIMIT}. Its report goes into a Board task.</p>
+							<textarea
+								aria-label="Command instructions"
+								value={draft.commandPrompt}
+								rows={3}
+								placeholder="Fix what failed, then mark the task done."
+								onChange={event => set("commandPrompt", event.target.value)}
+								className={TEXT_AREA}
+							/>
+							<p className="text-xs text-muted-foreground">Optional. The Board task carries these above the command's report.</p>
 							<fieldset className="space-y-1.5 text-sm">
-								<legend className="mb-1">Post the output to {botName}</legend>
+								<legend className="mb-1">Post the report</legend>
 								{COMMAND_POST_CHOICES.map(({ value, label, hint }) => (
 									<label key={value} className="flex items-start gap-2">
 										<input type="radio" name={`${draft.id}-post`} checked={draft.post === value} onChange={() => set("post", value)} className="mt-0.5 size-4 shrink-0 accent-current" />
@@ -214,20 +249,6 @@ export function RoutineEditor({ initial, isNew, botName, connected, saving, onSa
 								))}
 							</fieldset>
 						</Choice>
-						<label className="flex items-start gap-2 text-sm">
-							<input
-								type="checkbox"
-								checked={draft.freshConversation}
-								onChange={event => set("freshConversation", event.target.checked)}
-								className="mt-0.5 size-4 shrink-0 accent-current"
-							/>
-							<span className="space-y-0.5">
-								<span className="block">New conversation each run</span>
-								<span className="block text-xs text-muted-foreground">
-									Each run that posts to {botName} restarts its conversation first, so the post opens a new one. While {botName} is busy, it joins the current conversation.
-								</span>
-							</span>
-						</label>
 					</div>
 				</Field>
 

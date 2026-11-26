@@ -49,7 +49,7 @@ export interface WatchedSession {
 	status: HostStatus;
 	/** Its main agent only waits on a subagent that still runs or on a scheduled check, which the idle session stop counts as busy. */
 	waitsOnWork: boolean;
-	/** The idle session stop may end it: a session this server started that is neither private nor a Bot's conversation. */
+	/** The idle session stop may end it: a session this server started that is not private. */
 	stopsWhenIdle: boolean;
 }
 
@@ -73,7 +73,7 @@ export interface SessionProcessWatchDeps {
 	/** Stops each process that still runs under the start time it is listed with. */
 	stopProcesses(processes: Processes): Promise<void>;
 	sessions(): WatchedSession[];
-	/** Ends live session `instanceId` as a Bot's idle stop does: its omp stops, its worktree stays, and it becomes a past session. */
+	/** Ends live session `instanceId`: its omp stops, its worktree stays, and it becomes a past session. */
 	endSession(instanceId: string): Promise<void>;
 	/** When omp last wrote live session `instanceId`'s file, which starts its idle clock when this server first sees it settled; `null` with no file. */
 	lastWrittenAt(instanceId: string): number | null;

@@ -67,7 +67,7 @@ interface ConversationProps {
 	focused: boolean;
 	/** The workspaces, as {@link listWorkspaces} lists them, which the directory picker offers. */
 	workspaces: Workspace[];
-	/** Draw the session's header, with End session and its shortcut; a Bot's page draws its own, and a Bot's session never ends from the page. */
+	/** Draw the session's header, with End session and its shortcut; a Board thread's Session tab and the details sidebar draw none. */
 	header: boolean;
 	/** The composer's placeholder while the session waits on a message, in place of "Message this session…". */
 	placeholder?: string;

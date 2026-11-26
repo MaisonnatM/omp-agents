@@ -2,9 +2,7 @@
  * Pure transforms from the server's `items` messages to what a transcript renders: its blocks, its outline, and the
  * facts its rows, its minimap, and its chat history read, as one {@link TranscriptModel}.
  */
-import type { RoutineTask } from "../src/routines";
 import { promptTitle } from "../src/shared/prompt-files";
-import { taskOf, taskText } from "../src/shared/routine-message";
 import { isPrompt, type Item, type PromptItem } from "../src/shared/transcript";
 import type { ActionState } from "./use-action";
 
@@ -29,7 +27,7 @@ export type Block =
 	| { kind: "item"; item: Exclude<Item, ActivityItem | DashboardItem> }
 	| { kind: "activity"; id: string; entries: GroupItem[]; from: number | null; to: number | null };
 
-/** Whether `item` opens a turn: a prompt, the user's, one a routine or another Bot sent, or one the dashboard sent in their place, which shows nothing. */
+/** Whether `item` opens a turn: a prompt, or one the dashboard sent in the user's place, which shows nothing. */
 export const opensTurn = (item: Item): item is Opener => isPrompt(item) || item.kind === "dashboard";
 
 const blockKey = (block: Block): string => (block.kind === "activity" ? block.id : block.item.id);
@@ -105,14 +103,10 @@ export function resendOf<E>(edit: E | null, resend: ActionState<[E, string]>): {
 export interface OutlineTurn {
 	/** The prompt's item id. */
 	id: string;
-	/** The prompt's text, or for a prompt that carried only images, how many it carried: `2 images`; a routine's prompt or command; another Bot's message. */
+	/** The prompt's text, or for a prompt that carried only images, how many it carried: `2 images`. */
 	prompt: string;
 	/** The skill the prompt invoked; `null` for any other prompt. */
 	skill: string | null;
-	/** The routine that sent the prompt, as of the send; `null` for any other prompt. */
-	routine: { name: string; task: RoutineTask } | null;
-	/** The name of the Bot that sent the prompt, as of the send; `null` for any other prompt. */
-	botMessage: string | null;
 	/**
 	 * A prompt of a few words that only lets the agent carry on: `approve`, such as `go`, accepts the reply before it as a
 	 * plan; `resume`, such as `continue`, picks up work the turn before stopped. `null` for any other prompt.
@@ -172,7 +166,7 @@ export interface TranscriptImage {
 }
 
 /** What an outline turn takes from its prompt; `nudge` as it reads in any turn but the first, which nudges nothing. */
-type TurnHead = Pick<OutlineTurn, "id" | "prompt" | "skill" | "routine" | "botMessage" | "nudge">;
+type TurnHead = Pick<OutlineTurn, "id" | "prompt" | "skill" | "nudge">;
 
 /**
  * The items from one prompt up to the next, or before the first prompt, with what the transcript reads from them. A
@@ -193,7 +187,7 @@ interface Segment {
 }
 
 /**
- * The items of one outline turn, from a prompt the user or a routine sent up to the next such prompt, or the items before
+ * The items of one outline turn, from a prompt the user sent up to the next such prompt, or the items before
  * the first one, which make no turn. Its segments split it at the prompts the dashboard sent. No activity group crosses
  * from one region into the next, since the prompt that opens a region is a block of its own.
  */
@@ -215,7 +209,7 @@ export interface TranscriptModel {
 	/**
 	 * Fork points by item id. A prompt forks at itself. A turn's last reply forks at the next prompt, keeping the whole
 	 * turn; earlier replies in the turn, a reply still streaming, and a reply no forkable prompt follows have none. A prompt
-	 * a routine or the dashboard sent has no fork point of its own, but a reply before it forks there.
+	 * the dashboard sent has no fork point of its own, but a reply before it forks there.
 	 */
 	forks: ReadonlyMap<string, ForkPoint>;
 	/**
@@ -229,7 +223,7 @@ export interface TranscriptModel {
 	images: readonly TranscriptImage[];
 	/**
 	 * The prompt a double-click edits: the last one, once omp has saved it. omp resends an edit as text alone, so a skill
-	 * prompt or one that carried images or files is not editable. None after a prompt a routine or the dashboard sent,
+	 * prompt or one that carried images or files is not editable. None after a prompt the dashboard sent,
 	 * which an edit of the user's prompt before it would drop.
 	 */
 	editable: { itemId: string; entryId: string } | null;
@@ -255,9 +249,6 @@ const TURN_EQUAL: FieldEqual<OutlineTurn> = {
 	id: same,
 	prompt: same,
 	skill: same,
-	// A turn keeps the head the model before built for the same prompt, so its routine is the same object.
-	routine: same,
-	botMessage: same,
 	nudge: same,
 	reply: (a, b) => a?.id === b?.id && a?.text === b?.text,
 	tools: same,
@@ -278,18 +269,13 @@ const sameFacts = (a: Segment, b: Segment): boolean =>
 	a.images.every((image, i) => equalBy(IMAGE_EQUAL, image, b.images[i]!));
 
 function headOf(opener: Opener): TurnHead | null {
-	if (opener.kind === "routine") {
-		const { message } = opener;
-		return { id: opener.id, prompt: taskText(message), skill: null, routine: { name: message.routine.name, task: taskOf(message) }, botMessage: null, nudge: null };
-	}
-	if (opener.kind === "bot-message") return { id: opener.id, prompt: opener.message.text, skill: null, routine: null, botMessage: opener.message.name, nudge: null };
 	if (opener.kind !== "user") return null;
 	const text = opener.text.trim();
 	const images = opener.images?.length ?? 0;
 	const files = opener.files ?? [];
 	const prompt = promptTitle(text, files) || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
 	const match = !opener.skill && images === 0 && files.length === 0 ? NUDGE.exec(text) : null;
-	return { id: opener.id, prompt, skill: opener.skill, routine: null, botMessage: null, nudge: match ? (match[1] ? "resume" : "approve") : null };
+	return { id: opener.id, prompt, skill: opener.skill, nudge: match ? (match[1] ? "resume" : "approve") : null };
 }
 
 /**

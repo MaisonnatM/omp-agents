@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, jest, test } from "bun:test";
 import { fromPartial } from "@total-typescript/shoehorn";
-import type { BotId } from "../shared/bots";
-import { type AgentRow, type HostStatus, newSessionRequest, type RosterHost, type StartRequest, type UserRequest } from "../shared/sessions";
+import type { AgentRow, HostStatus, RosterHost, UserRequest } from "../shared/sessions";
 import { SessionWaits } from "./session-waits";
 
 afterEach(() => {
@@ -20,10 +19,10 @@ const state = (promise: Promise<string>) =>
 function setup() {
 	let hosts = [host("i1", "working"), host("i2", "working", { sessionName: "Build the importer" })];
 	const replies: Record<string, string> = { "s-i2": "Pushed feat/importer; tests pass." };
-	const waits = new SessionWaits({ hosts: () => hosts, reply: sessionId => replies[sessionId] ?? null, isBot: request => request.kind === "new" && request.bot !== null });
+	const waits = new SessionWaits({ hosts: () => hosts, reply: sessionId => replies[sessionId] ?? null });
 	/** Session `caller`'s turn calls the tool as call `toolCallId`. */
 	const call = (toolCallId: string, session: string, { caller = "i1", minutes = null, signal = new AbortController().signal }: { caller?: string; minutes?: number | null; signal?: AbortSignal } = {}) =>
-		waits.join(newSessionRequest("/tmp", "Hi"), caller).rpc.tools[0]!.execute({ session, timeout_minutes: minutes }, { toolCallId, signal });
+		waits.join(caller).rpc.tools[0]!.execute({ session, timeout_minutes: minutes }, { toolCallId, signal });
 	/** The live sessions' rows change to `rows`, as a roster update reports. */
 	const rows = (...rows: RosterHost[]) => {
 		hosts = rows;
@@ -33,14 +32,6 @@ function setup() {
 }
 
 describe("the wait_for_session tool", () => {
-	test("every dashboard start gets it but a Bot's conversation", () => {
-		const { waits } = setup();
-		const toolsOf = (request: StartRequest) => waits.join(request, "i1").rpc.tools.map(tool => tool.name);
-		expect(toolsOf(newSessionRequest("/tmp", "Hi"))).toEqual(["wait_for_session"]);
-		expect(toolsOf({ kind: "resume", sessionId: "s1" })).toEqual(["wait_for_session"]);
-		expect(toolsOf(newSessionRequest("/tmp", "Hi", { bot: "scout" as BotId }))).toEqual([]);
-	});
-
 	test("answers once the session's turn ends, with its last reply", async () => {
 		const { call, rows } = setup();
 		const wait = call("c1", "s-i2");

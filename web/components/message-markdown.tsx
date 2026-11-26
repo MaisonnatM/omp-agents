@@ -355,8 +355,8 @@ const remarkLineBreaks = () => (root: BreakNode) => {
 	visit(root);
 };
 
-/** A message one Bot sent another, shown in the receiving Bot's conversation: agent text whose line breaks stay. */
-export const BOT_MESSAGE_PRESET: MarkdownPreset = { ...SESSION_AGENT_PRESET, remark: [...AGENT_PRESET.remark, remarkLineBreaks] };
+/** A Board task's or reply's text: agent text whose line breaks stay. */
+export const BOARD_MESSAGE_PRESET: MarkdownPreset = { ...SESSION_AGENT_PRESET, remark: [...AGENT_PRESET.remark, remarkLineBreaks] };
 
 /**
  * Text written on GitHub, whose raw HTML renders as GitHub renders it, through rehype-sanitize's schema, which follows

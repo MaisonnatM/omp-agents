@@ -55,7 +55,7 @@ interface ViewConversationProps {
 	workspaces: Workspace[];
 	/** Header controls after the conversation's own, such as a split pane's maximize and close. */
 	actions?: ReactNode;
-	/** Draw the conversation's own header, with a past session's Resume; a Bot's page draws its own and resumes from its composer. */
+	/** Draw the conversation's own header, with a past session's Resume; a Board thread's Session tab and the details sidebar draw none. */
 	header: boolean;
 	/** The composer's placeholder while the session waits on a message. */
 	placeholder?: string;

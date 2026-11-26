@@ -4,7 +4,7 @@
  */
 import type { RpcHostTool } from "../omp/module-types/rpc";
 import { PLAIN_LAUNCH } from "../omp/rpc";
-import { type RosterHost, type StartRequest, type Stop, stopOf, type UserRequest } from "../shared/sessions";
+import { type RosterHost, type Stop, stopOf, type UserRequest } from "../shared/sessions";
 import type { SessionJoin } from "./start";
 
 export const WAIT_FOR_SESSION_TOOL = "wait_for_session";
@@ -18,8 +18,6 @@ export interface SessionWaitsDeps {
 	hosts(): RosterHost[];
 	/** The last reply in session `sessionId`'s file, of its running or last turn, `null` when it has none. */
 	reply(sessionId: string): string | null;
-	/** Whether `request` starts a Bot's conversation, which gets no wait tool. */
-	isBot(request: StartRequest): boolean;
 }
 
 export class SessionWaits {
@@ -31,9 +29,9 @@ export class SessionWaits {
 		this.#deps = deps;
 	}
 
-	/** How `request` joins the server as session `instanceId`: with its own wait tool, unless it starts a Bot's conversation. */
-	join(request: StartRequest, instanceId: string): SessionJoin {
-		return { rpc: this.#deps.isBot(request) ? PLAIN_LAUNCH : { ...PLAIN_LAUNCH, tools: [this.#toolFor(instanceId)] }, attach() {} };
+	/** How session `instanceId` joins the server: with its own wait tool. */
+	join(instanceId: string): SessionJoin {
+		return { rpc: { ...PLAIN_LAUNCH, tools: [this.#toolFor(instanceId)] }, attach() {} };
 	}
 
 	/** Session `instanceId` exited: its own waits end. */

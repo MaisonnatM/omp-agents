@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { RpcHostTool } from "../omp/module-types/rpc";
 import { PLAIN_LAUNCH } from "../omp/rpc";
 import { MAX_SCHEDULED_TEXT, type ScheduledChange } from "../shared/scheduled";
-import type { RosterHost, StartRequest } from "../shared/sessions";
+import type { RosterHost } from "../shared/sessions";
 import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
 import type { SessionJoin } from "./start";
 
@@ -18,8 +18,6 @@ const MAX_MINUTES = 7 * 24 * 60;
 export interface SessionFollowUpsDeps {
 	/** The live sessions' roster rows, which give the caller's current session id. */
 	hosts(): RosterHost[];
-	/** Whether `request` starts a Bot's conversation, which gets no follow-up tool. */
-	isBot(request: StartRequest): boolean;
 	/** Saves `change` to the scheduled sends and tells every page; false when it changed nothing. */
 	schedule(change: Extract<ScheduledChange, { op: "add" }>): boolean;
 	now(): number;
@@ -32,9 +30,9 @@ export class SessionFollowUps {
 		this.#deps = deps;
 	}
 
-	/** How `request` joins the server as session `instanceId`: with its own follow-up tool, unless it starts a Bot's conversation. */
-	join(request: StartRequest, instanceId: string): SessionJoin {
-		return { rpc: this.#deps.isBot(request) ? PLAIN_LAUNCH : { ...PLAIN_LAUNCH, tools: [this.#toolFor(instanceId)] }, attach() {} };
+	/** How session `instanceId` joins the server: with its own follow-up tool. */
+	join(instanceId: string): SessionJoin {
+		return { rpc: { ...PLAIN_LAUNCH, tools: [this.#toolFor(instanceId)] }, attach() {} };
 	}
 
 	/** The follow-up tool of session `caller`. */

@@ -327,7 +327,7 @@ export async function reattachAll(
 		sessions.add(session, null);
 		// Its turn ran when the last server stopped and ended while no server listened, so nobody heard its agent_end.
 		const ended = midTurn.has(session.sessionId) && session.status === "idle" && session.sessionFile ? endedTurn(session.sessionFile) : null;
-		if (ended) sessions.markUnread(session.instanceId, ended);
+		if (ended && !sessions.quietTurn(session.instanceId)) sessions.markUnread(session.instanceId, ended);
 		joinFor({ kind: "resume", sessionId: session.sessionId }, session.instanceId).attach(session);
 		publish();
 	}

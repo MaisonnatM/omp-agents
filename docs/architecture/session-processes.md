@@ -74,10 +74,10 @@ It is a shared `ReducerFile` and each sample reads it again, so a choice saved o
 
 Each live session also has a settled clock: the time of the last sample that saw it anything but `idle`, or `idle` while it waits on a running subagent (`awaitsSubagents` in `src/shared/sessions.ts`).
 A server that first sees a session settled starts the clock at the last write of its session file, if that is earlier, so a restart of the dashboard does not put a long-idle session's stop off by a day.
-Once the setting's hours have passed on that clock, the watch ends the session through `DashboardSession.end`, as a Bot's idle stop does: the keeper stops omp and the processes under it, and the exit reports as ended.
+Once the setting's hours have passed on that clock, the watch ends the session through `DashboardSession.end`: the keeper stops omp and the processes under it, and the exit reports as ended.
 The session then leaves the roster and shows under Past with its worktree kept, and **Resume** continues it; nothing of **End session** runs, so no worktree is removed and no auto-continue is cancelled.
 A bare signal to omp would report as an exit that was no end, and put the session under Interrupted instead.
-Only a session this server started stops so: a terminal session runs in your terminal, a private session's end deletes it, and a Bot's conversation has its own idle stop ([Bots](bots.md)).
+Only a session this server started stops so: a terminal session runs in your terminal, and a private session's end deletes it.
 See [the decision](../decisions/2026-11-16-an-idle-session-stops-its-omp-and-keeps-its-worktree.md).
 
 ## Sessions that leave the roster

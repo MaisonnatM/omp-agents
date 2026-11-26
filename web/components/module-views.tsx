@@ -5,11 +5,9 @@
 import type { ComponentType } from "react";
 import type { ModuleChanges, ModuleValues, StoredModuleId } from "../../src/modules";
 import type { Routine } from "../../src/routines";
-import type { Bot, BotId, BotLast } from "../../src/shared/bots";
 import type { ProjectList } from "../../src/shared/projects";
 import type { RosterHost } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
-import type { OpenBot } from "../bots-model";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { Completions } from "../pane-store";
 import type { ModelList } from "../reads";
@@ -24,12 +22,8 @@ import type { KnownSessions } from "../labels";
 
 /** The core's data a module's page reads but does not own. */
 export interface CoreData {
-	/** Every Bot's routines. */
+	/** Every routine, which a Board's Routines tab lists by Workspace. */
 	routines: Routine[];
-	/** The Bots, `null` until they load. */
-	bots: Bot[] | null;
-	/** Each Bot's last message, which a Board's Bots tab shows on its cards. */
-	botLasts: Readonly<Record<BotId, BotLast | null>>;
 	/** The projects, `null` until the server first sends them, which a Board's Projects tab lists. */
 	projects: ProjectList | null;
 	/** The sessions are listed, so `workspaces` holds every workspace the sidebar offers. */
@@ -50,16 +44,9 @@ export interface CoreData {
 	section: SectionTarget | null;
 	/** The server's last answer to the new-session draft's `complete`, which the Board's composer shares. */
 	newSessionCompletions: Completions | null;
-	/** The Bot a Board's Bots tab opens, `null` on any other view, while the Bots load, or for a Bot that is gone. */
-	openBot: OpenBot | null;
-	/** Each session's last roster entry, which an open Bot's ended conversation reads. */
-	lastHosts: ReadonlyMap<string, RosterHost>;
-	/** Where a new Bot starts when no Workspace picks it. */
+	/** The Workspace a Board view shows when no Workspace picks one. */
 	defaultWorkspace: string;
 	connected: boolean;
-	/** The right sidebar, which shows an open Bot's details, is open; `onToggleDetails` shows or hides it. */
-	detailsOpen: boolean;
-	onToggleDetails: () => void;
 }
 
 /** A module's list in the page column: the route its page shows, and the page section a link there last chose, which `onSection` sets. */

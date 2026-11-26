@@ -5,7 +5,7 @@
  */
 import { motion, useReducedMotion } from "framer-motion";
 import { IconCrossMedium, IconHistory } from "central-icons";
-import { type KeyboardEvent, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -96,8 +96,7 @@ export const PromptHistory = memo(function PromptHistory({ view, turns }: { view
 	return <Panel view={view} turns={turns} />;
 });
 
-function Panel({ view, turns: outline }: { view: View; turns: readonly OutlineTurn[] }) {
-	const turns = useMemo(() => outline.filter(turn => !turn.routine && !turn.botMessage), [outline]);
+function Panel({ view, turns }: { view: View; turns: readonly OutlineTurn[] }) {
 	const reduceMotion = useReducedMotion() ?? false;
 	const shape = useShape();
 	const column = useRef<HTMLOListElement>(null);

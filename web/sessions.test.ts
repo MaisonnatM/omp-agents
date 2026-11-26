@@ -10,7 +10,6 @@ const subagents = (...statuses: AgentStatus[]): AgentRow[] => statuses.map(statu
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
 const ids = (rows: { sessionId: string }[]) => rows.map(row => row.sessionId);
 const none = new Set<string>();
-const noBots = new Set<string>();
 
 describe("discoverableSessions", () => {
 	test("hides temporary roots and descendants but keeps lookalikes and directories named tmp elsewhere", () => {
@@ -31,21 +30,15 @@ describe("discoverableSessions", () => {
 		];
 		const hosts = paths.map((cwd, index) => host(`h${index}`, cwd));
 		const sessions = paths.map((cwd, index) => past(`p${index}`, cwd, index % 2 === 0));
-		const visible = discoverableSessions(hosts, sessions, none, noBots);
+		const visible = discoverableSessions(hosts, sessions, none);
 		expect(visible.hosts.map(row => row.cwd)).toEqual(["/tmp-workspace", "/private/tmp-workspace", "/home/user/tmp", "/home/user/tmp/workspace/", ""]);
 		expect(visible.past.map(row => row.cwd)).toEqual(["/tmp-workspace", "/private/tmp-workspace", "/home/user/tmp", "/home/user/tmp/workspace/", ""]);
 	});
 
 	test("a hidden workspace hides its own sessions, not those of the directories inside it", () => {
 		const hosts = [host("a", "/home/user/app"), host("b", "/home/user/app/web"), host("c", "/home/user/other")];
-		expect(discoverableSessions(hosts, [], new Set(["/home/user/app"]), noBots).hosts.map(row => row.cwd)).toEqual(["/home/user/app/web", "/home/user/other"]);
+		expect(discoverableSessions(hosts, [], new Set(["/home/user/app"])).hosts.map(row => row.cwd)).toEqual(["/home/user/app/web", "/home/user/other"]);
 		expect(workspaceSwitch("/home/user/other", "/home/user/app", new Set(["/home/user/app"]))).toBeNull();
-	});
-
-	test("a Bot's conversation leaves the session lists, live or past", () => {
-		const visible = discoverableSessions([host("bot", "/w"), host("mine", "/w")], [past("bot", "/w", false), past("old", "/w", false)], none, new Set(["bot"]));
-		expect(ids(visible.hosts)).toEqual(["mine"]);
-		expect(ids(visible.past)).toEqual(["old"]);
 	});
 
 	test("hidden sessions stay out of pinned and interrupted lists without losing saved rows", () => {
@@ -58,7 +51,7 @@ describe("discoverableSessions", () => {
 			past("interrupted", "~/workspace", true),
 			past("ended", "~/workspace", false),
 		];
-		const visible = discoverableSessions(hosts, sessions, none, noBots);
+		const visible = discoverableSessions(hosts, sessions, none);
 		const lists = sidebarSessions(
 			visible.hosts,
 			visible.past,
@@ -310,7 +303,7 @@ describe("a session in a linked worktree", () => {
 	});
 
 	test("leaves the lists with its hidden workspace", () => {
-		expect(ids(discoverableSessions([inWorktree, inMain], [], new Set(["/code/app"]), noBots).hosts)).toEqual([]);
+		expect(ids(discoverableSessions([inWorktree, inMain], [], new Set(["/code/app"])).hosts)).toEqual([]);
 	});
 });
 
