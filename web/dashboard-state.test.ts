@@ -9,7 +9,7 @@ import { refusedStart } from "./starts";
 
 const layout = (panes: View[], focus = 0): Layout => ({ panes, focus, maximized: false });
 const live = (instanceId: string): LiveView => ({ kind: "live", instanceId, agentId: null });
-const host = (instanceId: string, cwd: string): RosterHost => ({ instanceId, cwd }) as RosterHost;
+const host = (instanceId: string, cwd: string, readOnly = false): RosterHost => ({ instanceId, cwd, control: { phase: "live", readOnly } }) as RosterHost;
 const blank = (): DashboardState => initialState({ kind: "panes", layout: layout([]) });
 
 describe("dashboard state", () => {
@@ -37,6 +37,13 @@ describe("dashboard state", () => {
 		expect(untouched.hosts[1]).toBe(b);
 		const again = reduce(delta, { t: "roster", reset: true, hosts: [b], removed: [], error: null });
 		expect(again.hosts).toEqual([b]);
+	});
+
+	test("a read-only session stays off the roster until it gains control", () => {
+		const listed = reduce(blank(), { t: "roster", reset: true, hosts: [host("a", "/work"), host("b", "/watch", true)], removed: [], error: null });
+		expect(listed.hosts.map(row => row.instanceId)).toEqual(["a"]);
+		const granted = reduce(listed, { t: "roster", reset: false, hosts: [host("b", "/watch")], removed: [], error: null });
+		expect(granted.hosts.map(row => row.instanceId)).toEqual(["a", "b"]);
 	});
 
 	test("a live session's model list is kept without a pane and goes when the session leaves the roster", () => {
