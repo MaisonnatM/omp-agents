@@ -1,5 +1,5 @@
 import type { Element, ElementContent } from "hast";
-import { Fragment, memo, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentProps, Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform, type ExtraProps, type Options, type UrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
