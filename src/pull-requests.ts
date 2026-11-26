@@ -18,10 +18,10 @@ const MERGED_DAYS = 7;
 /** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
 const THREADS = 100;
 
-/** The head commit's first `first` checks, by name and state. */
-const CONTEXTS = (first: number): string => `contexts(first: ${first}) { totalCount nodes {
-	... on CheckRun { name status conclusion detailsUrl }
-	... on StatusContext { context state targetUrl }
+/** The head commit's first `first` checks, by name and state; `reasons` adds what each check reported, so a failure says why. */
+const CONTEXTS = (first: number, reasons = false): string => `contexts(first: ${first}) { totalCount nodes {
+	... on CheckRun { name status conclusion detailsUrl ${reasons ? "title summary annotations(first: 5) { nodes { annotationLevel title message } }" : ""} }
+	... on StatusContext { context state targetUrl ${reasons ? "description" : ""} }
 } }`;
 
 /** The pull request's author, its requested reviewers, and its latest reviews, which its row in the list and its details both show. */
@@ -253,7 +253,7 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 			associatedPullRequests(first: 10) { nodes { number } }
 		} } }
 		${REVIEW_FIELDS}
-		commits(last: 1) { nodes { commit { statusCheckRollup { state ${CONTEXTS(100)} } } } }
+		commits(last: 1) { nodes { commit { statusCheckRollup { state ${CONTEXTS(100, true)} } } } }
 		files(first: 100) { nodes { path additions deletions changeType } }
 		comments(last: 50) { nodes { ${COMMENT_FIELDS} } }
 		reviews(last: 50) { nodes { state submittedAt author { __typename login ${AVATAR} } body url ${REACTION_FIELDS} } }
@@ -288,15 +288,26 @@ const CHECK_ORDER: CheckRunState[] = ["failing", "pending", "passing", "skipped"
 
 const MERGE_ALLOWED: Record<MergeMethod, string> = { merge: "mergeCommitAllowed", squash: "squashMergeAllowed", rebase: "rebaseMergeAllowed" };
 
+/** GitHub Actions' closing annotation on every failed job, which says nothing a reader can act on. */
+const EXIT_CODE = /^Process completed with exit code/;
+
+/** The first line of what a check reported: its first telling failure annotation (a test runner puts the error in its title), else its title or summary, else a commit status's description. */
+function reasonOf(node: Record<string, unknown>): string | undefined {
+	const failures = nodesOf(node.annotations).flatMap(note => (isObject(note) && note.annotationLevel === "FAILURE" ? [str(note.title)?.trim() || str(note.message)?.trim()] : []));
+	const reported = [failures.find(message => message && !EXIT_CODE.test(message)), str(node.title), str(node.summary), str(node.description), failures[0]];
+	return reported.map(text => text?.trim().split("\n")[0]?.trim()).find(text => text);
+}
+
 function parseCheck(node: unknown): PullRequestCheck | null {
 	if (!isObject(node)) return null;
+	const reason = reasonOf(node);
 	const name = str(node.name);
 	if (name !== undefined) {
 		const state = node.status === "COMPLETED" ? (CHECK_RUN[str(node.conclusion) ?? ""] ?? "skipped") : "pending";
-		return { name, state, url: str(node.detailsUrl) ?? null };
+		return { name, state, url: str(node.detailsUrl) ?? null, ...(reason && { reason }) };
 	}
 	const context = str(node.context);
-	return context === undefined ? null : { name: context, state: STATUS[str(node.state) ?? ""] ?? "pending", url: str(node.targetUrl) ?? null };
+	return context === undefined ? null : { name: context, state: STATUS[str(node.state) ?? ""] ?? "pending", url: str(node.targetUrl) ?? null, ...(reason && { reason }) };
 }
 
 function lifecycleTime(value: unknown): number | null {

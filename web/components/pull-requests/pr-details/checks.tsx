@@ -23,8 +23,9 @@ const CHECKS_STATE = {
 	none: { Icon: IconRecord, color: "text-muted-foreground" },
 };
 
-function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) {
+function CheckRow({ check: { name, state, url, reason } }: { check: PullRequestCheck }) {
 	const { Icon, color, label } = CHECK_RUN[state];
+	const why = state === "failing" ? reason : undefined;
 	return (
 		<li className="col-span-full grid grid-cols-subgrid items-center text-xs">
 			<Icon aria-hidden className={cn("size-3.5 shrink-0", color)} />
@@ -33,6 +34,11 @@ function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) 
 			</Tooltip>
 			<span className="justify-self-end whitespace-nowrap text-muted-foreground">{label}</span>
 			{url && <a href={url} target="_blank" rel="noreferrer" aria-label={`Details for ${name}`} className="text-primary hover:underline">Details</a>}
+			{why && (
+				<Tooltip content={why}>
+					<p className="col-start-2 col-end-[-1] line-clamp-2 break-words text-muted-foreground">{why}</p>
+				</Tooltip>
+			)}
 		</li>
 	);
 }

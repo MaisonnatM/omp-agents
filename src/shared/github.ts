@@ -280,6 +280,8 @@ export interface PullRequestCheck {
 	name: string;
 	state: CheckRunState;
 	url: string | null;
+	/** The first line of what the check reported (a failure annotation, its title or summary, a status's description); only a pull request's details fetch it. */
+	reason?: string;
 }
 
 export interface PullRequestFile {
