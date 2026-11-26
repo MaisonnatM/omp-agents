@@ -40,6 +40,7 @@ export interface LiveUpdateDeps {
 /** Where every live session's update goes: the views, the broadcasts, the Bots, and the loops. */
 export function liveUpdateHandler(deps: LiveUpdateDeps): (instanceId: string, update: SessionUpdate) => void {
 	const { sessions, views, moves, waits, broadcasts, reviewDrafts, bots, privateSessions, interrupted, loops, autoContinue, routines } = deps;
+	// biome-ignore lint/correctness/noUnusedVariables: read by the ??= below, which Biome counts only as a write
 	let jobsPush: NodeJS.Timeout | undefined;
 	const pushJobs = (): void => {
 		jobsPush = undefined;
