@@ -5,7 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
-- A Board thread now shows what each session did right under that session's reply, instead of in one **Actions** card at the bottom, without the "Actions" heading, and with the Git, GitHub, or Linear logo on each line.
+- A Board thread now shows what each session did right under that session's reply, instead of in one **Actions** card at the bottom, without the "Actions" heading: each line is just the Git, GitHub, or Linear logo and the branch, pull request, or issue name, with what the session did with it on hover.
 - A Board session now asks first only when your message is unclear, such as when it could mean two different changes. A clear request, such as "Merge on main" or a plain "make the button blue", runs right away.
 - Behind the scenes: the agent's always-loaded instructions shrank from about 6,000 tokens to about 900. Rules only some tasks need, such as design handoff, pull-request reviews, and subagent worktrees, now live in skills that load when the task needs them.
 - Behind the scenes: a new lint rule keeps page-wide keyboard shortcuts in the one shortcut table, and the two largest source files are split under the size limit.

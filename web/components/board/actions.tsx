@@ -92,31 +92,34 @@ function describe(action: BoardAction): Described {
 }
 
 /** Wraps `children` in the action's link or button, else a plain box. */
-function Target({ item, className, children }: { item: Described; className: string; children: ReactNode }) {
+function Target({ item, className, label, children }: { item: Described; className: string; label: string; children: ReactNode }) {
 	if (item.href)
 		return (
-			<a href={item.href} target="_blank" rel="noreferrer" className={cn(className, "hover:bg-muted")}>
+			<a href={item.href} target="_blank" rel="noreferrer" title={label} aria-label={label} className={cn(className, "hover:bg-muted")}>
 				{children}
 			</a>
 		);
 	if (item.onClick)
 		return (
-			<button type="button" onClick={item.onClick} className={cn(className, "text-left hover:bg-muted")}>
+			<button type="button" onClick={item.onClick} title={label} aria-label={label} className={cn(className, "text-left hover:bg-muted")}>
 				{children}
 			</button>
 		);
-	return <div className={className}>{children}</div>;
+	return (
+		<div title={label} className={className}>
+			{children}
+		</div>
+	);
 }
 
-/** One session's actions, under its last reply and aligned with the reply's text: a row per action with its company mark, verb, and name, and an arrow when it opens. */
+/** One session's actions, under its last reply and aligned with the reply's text: a row per action with its company mark and name, the verb as its hover text, and an arrow when it opens. */
 export function SessionActions({ actions }: { actions: BoardAction[] }) {
 	return (
 		<ul aria-label="What the session did" className="flex flex-col items-start pt-0.5 pr-5 pb-1 pl-14">
 			{actions.map(describe).map(item => (
 				<li key={item.key} className="max-w-full">
-					<Target item={item} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[13px]">
+					<Target item={item} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[13px]" label={`${item.verb} ${item.title}`}>
 						<ServiceTile kind={item.kind} />
-						<span className="shrink-0 text-muted-foreground">{item.verb}</span>
 						<span className={cn("min-w-0 truncate font-medium text-foreground", item.mono && "font-mono text-xs")}>{item.title}</span>
 						{(item.href || item.onClick) && <IconSquareArrowTopRight className="size-3.5 shrink-0 text-muted-foreground" />}
 					</Target>
