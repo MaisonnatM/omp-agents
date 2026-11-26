@@ -3,8 +3,8 @@ import { isModulePage, moduleOf } from "./modules";
 import type { Page } from "./routing";
 import type { NavRow } from "./sidebar-tabs";
 
-/** The rows with no list of their own: the Pull requests and Todo pages list their views in the bar above their lists, and New session and Notifications have none. */
-const NO_LIST = ["new", "notifications", "pull-requests", "todo"] as const satisfies readonly NavRow[];
+/** The rows with no list of their own: the Pull requests page lists its views in the bar above its list, and New session and Notifications have none. */
+const NO_LIST = ["new", "notifications", "pull-requests"] as const satisfies readonly NavRow[];
 
 /** A page whose sidebar row holds a list of its own: every other tab's page and Settings; the Sessions panes have the roster instead. */
 export type ListPage = Extract<Page, { kind: Exclude<NavRow, (typeof NO_LIST)[number]> }>;

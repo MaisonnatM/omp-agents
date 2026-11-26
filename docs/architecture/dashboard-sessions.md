@@ -131,7 +131,7 @@ omp saves the prompt as that text, so `typed` in `src/transcript.ts` splits the 
 ## Private sessions
 
 A `start` with `new` and `private: true` starts a private session, one that lives exactly as long as its omp process and is deleted with everything it wrote when that process exits ([decision](../decisions/2026-11-03-a-private-session-lives-in-its-own-directory-until-its-omp-stops.md)).
-`parseNewSessionRequest` refuses a private start that names a todo, a task, or a review draft, since nothing may link to a session that leaves nothing behind.
+`parseNewSessionRequest` refuses a private start that names a task or a review draft, since nothing may link to a session that leaves nothing behind.
 `PrivateSessions` in `src/server/private-sessions.ts` makes `private-sessions/<port>/<instance id>` before omp starts, and its existence is what marks the session private, so a restart loses nothing.
 omp runs with `--session-dir` set to omp's own name for the cwd inside that directory (`sessionDirForCwd`), so its transcript, subagents, `/move`, and `/wt` all stay inside, and with `--config private.yml` from the same directory, which turns omp's memory and autolearn off and outranks the user's and the project's settings.
 A private session's file sits one directory deeper than past sessions' files are read, so the private root's watch only pokes live views, and no past list, search, or index lists it.

@@ -7,7 +7,7 @@ import { SidebarContent, SidebarGroup, SidebarMenu } from "@/components/ui/sideb
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { type BotRow, botsNeedingYou } from "../bots-model";
-import { folderName, sessionsWaiting } from "../labels";
+import { folderName, type KnownSessions, sessionsWaiting } from "../labels";
 import { withoutHidden, yourMoveCount } from "../pull-requests-model";
 import { useHiddenRepos } from "../pull-requests-state";
 import { pullRequestsStore } from "../reads";
@@ -17,7 +17,6 @@ import type { NavRow } from "../sidebar-tabs";
 import type { BoardState } from "../../templates/omp/agent/extensions/board/log";
 import { BoardSidebar } from "./board/sidebar";
 import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "./segmented-tabs";
-import type { KnownSessions } from "./todo/links";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";

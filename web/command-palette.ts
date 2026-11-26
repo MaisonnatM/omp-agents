@@ -1,12 +1,12 @@
 import { fuzzyScore } from "@ui-sdk/react/text-match";
-import { IconCmd, IconFolder1, IconTodos } from "central-icons";
+import { IconCmd, IconFolder1 } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { everyWord } from "../src/shared/every-word";
 import type { HostStatus } from "../src/shared/sessions";
 import { type Chord, type KeyEvent, pressesChord, SHORTCUTS, type Shortcut, type ShortcutHandlers, type ShortcutId } from "./shortcuts";
 
 /** A list the command palette shows: the root search, or a view an action pushed onto it. */
-export type PaletteViewId = "root" | "workspaces" | "createTodo";
+export type PaletteViewId = "root" | "workspaces";
 
 export interface PaletteView {
 	/** What the footer and the back chip name the view. */
@@ -18,9 +18,8 @@ export interface PaletteView {
 }
 
 export const PALETTE_VIEWS: Record<PaletteViewId, PaletteView> = {
-	root: { title: "omp agents", icon: IconCmd, placeholder: "Search sessions, todos, pull requests, and commands…", suggestions: 5 },
+	root: { title: "omp agents", icon: IconCmd, placeholder: "Search sessions, pull requests, and commands…", suggestions: 5 },
 	workspaces: { title: "Choose workspace", icon: IconFolder1, placeholder: "Search workspaces…", suggestions: 0 },
-	createTodo: { title: "Create todo", icon: IconTodos, placeholder: "Todo title, optionally ending in a due day or #category", suggestions: 0 },
 };
 
 export type ActionRun =
@@ -54,12 +53,12 @@ export type Accessory =
 	| { kind: "text"; text: string };
 
 /** The section an item belongs to; **Suggestions** borrows items from the others. */
-export type HomeSection = "running" | "past" | "todos" | "pullRequests" | "conversations" | "commands" | "workspaces" | "settings" | "createTodo" | "fallback";
+export type HomeSection = "running" | "past" | "pullRequests" | "conversations" | "commands" | "workspaces" | "settings";
 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `todo:<id>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `settings:<section>`, `fallback:create-todo`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `settings:<section>`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -68,7 +67,7 @@ export interface PaletteItem {
 	keywords: readonly string[];
 	icon: IconComponent;
 	accessories: readonly Accessory[];
-	/** The type label at the row's end: `Session`, `Todo`, `PR`, `Command`, `Workspace`, `Settings`. */
+	/** The type label at the row's end: `Session`, `PR`, `Command`, `Workspace`, `Settings`. */
 	kind: string;
 	/** Every action, as the action panel groups them. The first group's first action runs on Enter, so it is never empty. */
 	actions: readonly [ActionGroup, ...ActionGroup[]];
@@ -115,7 +114,7 @@ export interface PaletteState {
 }
 
 export type PaletteEvent =
-	| { type: "open"; view?: PaletteViewId }
+	| { type: "open" }
 	| { type: "close" }
 	| { type: "query"; query: string }
 	| { type: "select"; itemId: string }
@@ -138,14 +137,9 @@ const withTop = (stack: Stack, change: Partial<Frame>): Stack =>
 const pop = (state: PaletteState): PaletteState =>
 	state.stack.length > 1 ? { stack: state.stack.slice(0, -1) as [Frame, ...Frame[]], panel: null } : state;
 
-/**
- * The palette's navigation. Esc closes the action panel, then goes back a view, then clears the search, then closes the
- * palette. Opening on a view other than the root stacks it on the root, so going back from it lands on the search.
- */
+/** The palette's navigation. Esc closes the action panel, then goes back a view, then clears the search, then closes the palette. */
 export function paletteReducer(state: PaletteState | null, event: PaletteEvent): PaletteState | null {
-	if (event.type === "open") {
-		return { stack: event.view && event.view !== "root" ? [frame("root"), frame(event.view)] : [frame("root")], panel: null };
-	}
+	if (event.type === "open") return { stack: [frame("root")], panel: null };
 	if (state === null) return null;
 	switch (event.type) {
 		case "close":
@@ -223,48 +217,43 @@ export function decodeFrecency(raw: string | null): Frecency {
 
 export interface Section {
 	id: SectionId;
-	/** `null` for a section that needs no heading, as the one item of Create todo. */
-	heading: string | null;
+	heading: string;
 	items: readonly PaletteItem[];
 }
 
 /**
  * How a section lists. A `browsed` section lists with nothing typed too. A `searched` one lists only for a search, and
- * matches only an item holding every word typed, since the fuzzy match would find most of hundreds of todos for any
- * word; its most used items still lead an empty search under Suggestions. A `found` one holds what the server found
- * for the search: it lists in the order given, after the ranked sections. A `typed` one holds what the search itself
- * becomes: it matches anything and lists after every match.
+ * matches only an item holding every word typed, since the fuzzy match would find most of hundreds of pull requests for
+ * any word; its most used items still lead an empty search under Suggestions. A `found` one holds what the server found
+ * for the search: it lists in the order given, after the ranked sections.
  */
-type Listing = "browsed" | "searched" | "found" | "typed";
+type Listing = "browsed" | "searched" | "found";
 
-/** Each section's heading, `null` for none or for the fallback's, which names the search, and how it lists. */
-const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }> = {
+/** Each section's heading and how it lists. */
+const SECTIONS: Record<HomeSection, { heading: string; listing: Listing }> = {
 	running: { heading: "Running", listing: "browsed" },
 	past: { heading: "Past", listing: "browsed" },
-	todos: { heading: "Todos", listing: "searched" },
 	pullRequests: { heading: "Pull requests", listing: "searched" },
 	conversations: { heading: "In conversations", listing: "found" },
 	commands: { heading: "Commands", listing: "browsed" },
 	workspaces: { heading: "Workspaces", listing: "browsed" },
 	settings: { heading: "Settings", listing: "searched" },
-	createTodo: { heading: null, listing: "typed" },
-	fallback: { heading: null, listing: "typed" },
 };
 
 const listingOf = (section: HomeSection): Listing => SECTIONS[section].listing;
 
-/** Whether a search scores a section's items: `found` and `typed` ones list without a score. */
-const ranks = (section: HomeSection): boolean => listingOf(section) === "browsed" || listingOf(section) === "searched";
+/** Whether a search scores a section's items: `found` ones list without a score. */
+const ranks = (section: HomeSection): boolean => listingOf(section) !== "found";
 
 /** The `browsed` sections in the order an empty search lists them, after Suggestions. */
 const BROWSE_ORDER: readonly HomeSection[] = ["running", "commands", "past", "workspaces"];
 const SECTION_ORDER = Object.keys(SECTIONS) as HomeSection[];
 /** The sections a search ranks by their best match; equal ones keep {@link SECTIONS}' order. */
 const RANKED_ORDER = SECTION_ORDER.filter(ranks);
-/** The `found` sections, then the `typed` ones, which list in {@link SECTIONS}' order after the ranked ones. */
+/** The `found` sections, which list in {@link SECTIONS}' order after the ranked ones. */
 const UNRANKED_ORDER = SECTION_ORDER.filter(section => !ranks(section));
 
-const headingOf = (id: SectionId, search: string): string | null => (id === "suggestions" ? "Suggestions" : id === "fallback" ? `Use “${search}”` : SECTIONS[id].heading);
+const headingOf = (id: SectionId): string => (id === "suggestions" ? "Suggestions" : SECTIONS[id].heading);
 
 /** The fuzzy match of `search` against the item's words, times its frecency boost; 0 when it does not match. `holds` tests a `searched` item's words. */
 function matchScore(item: PaletteItem, search: string, holds: (text: string) => boolean, frecency: Frecency, now: number): number {
@@ -276,11 +265,11 @@ function matchScore(item: PaletteItem, search: string, holds: (text: string) => 
 /**
  * The sections a view lists for `query`. With nothing typed, the `suggestions` most used items lead, and leave their
  * own sections. With a search, the matches rank by the fuzzy score times frecency, within a section and section against
- * section, and what the search itself becomes, such as a todo, lists last.
+ * section, and what the server found lists last.
  */
 export function paletteSections(items: readonly PaletteItem[], query: string, frecency: Frecency, now: number, suggestions = 0): Section[] {
 	const search = query.trim();
-	const inSection = (list: readonly PaletteItem[], id: SectionId): Section => ({ id, heading: headingOf(id, search), items: list.filter(item => item.section === id) });
+	const inSection = (list: readonly PaletteItem[], id: SectionId): Section => ({ id, heading: headingOf(id), items: list.filter(item => item.section === id) });
 	const filled = (section: Section): boolean => section.items.length > 0;
 	if (!search) {
 		const suggested = items
@@ -289,7 +278,7 @@ export function paletteSections(items: readonly PaletteItem[], query: string, fr
 			.slice(0, suggestions);
 		const taken = new Set(suggested.map(item => item.id));
 		const rest = items.filter(item => !taken.has(item.id));
-		const suggestionsSection: Section = { id: "suggestions", heading: headingOf("suggestions", search), items: suggested };
+		const suggestionsSection: Section = { id: "suggestions", heading: headingOf("suggestions"), items: suggested };
 		return [suggestionsSection, ...BROWSE_ORDER.map(id => inSection(rest, id))].filter(filled);
 	}
 	const holds = everyWord(search);
@@ -298,21 +287,11 @@ export function paletteSections(items: readonly PaletteItem[], query: string, fr
 	const score = (item: PaletteItem): number => scores.get(item.id) ?? 0;
 	const ranked = RANKED_ORDER.map(id => {
 		const hits = items.filter(item => item.section === id && score(item) > 0).toSorted((a, b) => score(b) - score(a));
-		return { id, heading: headingOf(id, search), items: hits };
+		return { id, heading: headingOf(id), items: hits };
 	})
 		.filter(filled)
 		.toSorted((a, b) => score(b.items[0]!) - score(a.items[0]!));
 	return [...ranked, ...UNRANKED_ORDER.map(id => inSection(items, id)).filter(filled)];
-}
-
-/**
- * The item to highlight once `found` matches arrive, after the rest of a search listed: the first item, when the
- * highlight sits on what the search becomes, where the list leaves it while nothing else matched; `null` to leave it.
- */
-export function highlightOnFound(sections: readonly Section[], selectedId: string): string | null {
-	const selected = sections.flatMap(section => section.items).find(item => item.id === selectedId);
-	const first = sections[0]?.items[0];
-	return first && selected && first !== selected && listingOf(selected.section) === "typed" ? first.id : null;
 }
 
 export type PaletteCommand = Shortcut & { command: string };

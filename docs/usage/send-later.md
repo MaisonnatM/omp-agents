@@ -11,7 +11,7 @@
   A message that is already sending stays as it is, and **Edit** says why instead.
 - When the time comes, the message goes to the session as a follow-up while a turn runs, else as a prompt.
   A session that is no longer live resumes first, as **Resume** would.
-- A scheduled new session starts as the draft's **Start session** would: in the same directory, on the same branch choice, model, thinking level, and skill, and linked to the draft's todo.
+- A scheduled new session starts as the draft's **Start session** would: in the same directory, on the same branch choice, model, thinking level, and skill.
   It opens in no pane; it shows in the sidebar once it starts.
 - A scheduled new session opens at `#scheduled/<id>` as the new-session draft it was scheduled from: its message, directory, branch, model, thinking level, and skill.
   The header shows its time, with **Start now** and **Cancel**. Sending the message saves the edits and keeps the time, and the clock button moves it to another time.

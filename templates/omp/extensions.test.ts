@@ -159,7 +159,7 @@ if (input.subToolStart) {
 }
 `;
 
-function exercise(name: "artifact" | "ship" | "todos" | "project" | "worktree-guard" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page" | "end-session", input: object, env: Record<string, string> = {}): {
+function exercise(name: "artifact" | "ship" | "project" | "worktree-guard" | "pr-description" | "headless-mark" | "arena" | "chrome-devtools-page" | "end-session", input: object, env: Record<string, string> = {}): {
 	result: { block?: boolean; reason?: string; input?: Record<string, unknown> } | null;
 	confirmations: number;
 	valid: boolean;
@@ -1141,18 +1141,6 @@ describe("checkout ownership", () => {
 	});
 });
 
-describe("user_todo optional due date", () => {
-	test.each(["list", "add", "check"])("%s accepts an empty optional date", action => {
-		const { valid } = exercise("todos", { params: { action, text: "Review the PR", id: "todo-1", due: "" } });
-		expect(valid).toBe(true);
-	});
-
-	test.each([undefined, "2026-10-07", "2026-1-7", "tomorrow"])("date format boundary %s", due => {
-		const { valid } = exercise("todos", { params: { action: "add", text: "Review the PR", due } });
-		expect(valid).toBe(due === undefined || due === "2026-10-07");
-	});
-});
-
 describe("project_list, project_update, and the brief", () => {
 	const roots: string[] = [];
 	afterAll(() => { for (const dir of roots) rmSync(dir, { recursive: true, force: true }); });
@@ -1328,83 +1316,6 @@ describe("project_list, project_update, and the brief", () => {
 		expect(results[0]!.text).toContain("2. [ ] Backfill");
 		expect(results[1]!.text).toBeNull();
 		expect(results[3]!.text).toContain("3. [ ] Ship it");
-	});
-});
-
-describe("user_todo Workspace", () => {
-	const root = mkdtempSync(join(tmpdir(), "todos-extension-"));
-	afterAll(() => rmSync(root, { recursive: true, force: true }));
-	const env = { XDG_CONFIG_HOME: join(root, "config"), HOME: root };
-	const config = join(root, "config", "omp-agents");
-	const inbox = join(config, "todo-inbox");
-	const app = join(root, "code", "app");
-	mkdirSync(app, { recursive: true });
-	mkdirSync(config, { recursive: true });
-	writeFileSync(
-		join(config, "todos.json"),
-		JSON.stringify({ todos: [{ id: "t1", text: "Ship the release", workspace: app, children: [{ id: "c1", text: "Tag it" }] }] }),
-	);
-	const call = (params: object) => exercise("todos", { run: true, params, cwd: root }, env);
-	const left = () => (existsSync(inbox) ? readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8"))) : []);
-	const clear = () => rmSync(inbox, { recursive: true, force: true });
-
-	test("add files a todo in the session's directory unless it names another, ~ allowed, or none", () => {
-		clear();
-		call({ action: "add", text: "Here" });
-		call({ action: "add", text: "There", workspace: "~/code/app" });
-		call({ action: "add", text: "Nowhere", workspace: "" });
-		expect(left().map(change => [change.text, change.workspace])).toEqual([
-			["Here", root],
-			["There", app],
-			["Nowhere", null],
-		]);
-	});
-
-	test("a Workspace that is no directory is refused and nothing is written", () => {
-		clear();
-		const added = call({ action: "add", text: "Lost", workspace: join(root, "gone") });
-		const edited = call({ action: "edit", id: "t1", text: "Renamed", workspace: join(root, "gone") });
-		expect([added.run.isError, added.text, edited.run.isError]).toEqual([true, `Not a directory: ${join(root, "gone")}`, true]);
-		expect(left()).toEqual([]);
-	});
-
-	test("edit sets or clears a top-level todo's Workspace and refuses one under another", () => {
-		clear();
-		call({ action: "edit", id: "t1", workspace: "code" });
-		call({ action: "edit", id: "t1", workspace: "" });
-		expect(call({ action: "edit", id: "c1", workspace: app }).run.isError).toBe(true);
-		expect(left()).toEqual([
-			{ op: "set-workspace", id: "t1", workspace: join(root, "code") },
-			{ op: "set-workspace", id: "t1", workspace: null },
-		]);
-	});
-
-	test("list names each todo's Workspace by its folder", () => {
-		expect(call({ action: "list" }).text?.split("\n").slice(0, 2)).toEqual(["- Ship the release (id t1, Workspace app)", "  - Tag it (id c1)"]);
-	});
-});
-
-describe("user_todo sections", () => {
-	const root = mkdtempSync(join(tmpdir(), "todos-sections-"));
-	afterAll(() => rmSync(root, { recursive: true, force: true }));
-	const env = { XDG_CONFIG_HOME: join(root, "config"), HOME: root };
-	const config = join(root, "config", "omp-agents");
-	const inbox = join(config, "todo-inbox");
-	mkdirSync(config, { recursive: true });
-	writeFileSync(join(config, "todos.json"), JSON.stringify({ todos: [{ id: "t1", text: "Ship the release" }] }));
-	const call = (params: object) => exercise("todos", { run: true, params, cwd: root }, env);
-	const left = () => (existsSync(inbox) ? readdirSync(inbox).sort().map(name => JSON.parse(readFileSync(join(inbox, name), "utf8"))) : []);
-
-	test("add-section adds a section once, and add and edit file a todo in it before the dashboard applies it", () => {
-		const added = call({ action: "add-section", section: " Website " });
-		const again = call({ action: "add-section", section: "website" });
-		const edited = call({ action: "edit", id: "t1", section: "Website" });
-		const filed = call({ action: "add", text: "Review the page", section: "website" });
-		const [section, categorized, add] = left();
-		expect([added.run.isError, again.text, edited.run.isError, filed.text]).toEqual([false, 'The section "website" already exists.', false, `Added to the user's todo list (id ${add.id}).`]);
-		expect(section).toMatchObject({ op: "add-category", name: "Website" });
-		expect(categorized).toEqual({ op: "categorize", id: "t1", categoryId: section.id });
-		expect(add).toMatchObject({ op: "add", text: "Review the page", categoryId: section.id });
 	});
 });
 

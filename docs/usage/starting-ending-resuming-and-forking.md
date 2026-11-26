@@ -12,7 +12,7 @@
   Sending the first message starts omp there and sends it the message.
   The message stays in the composer while omp starts, and also if the start fails, with the error above it.
   A start or resume of a task another session already works on in the same repository is refused before anything is checked out: the error names that task, links the session that has it, and gives its dashboard port and directory.
-  A task is a pull request or a todo that the start names: through a quick action, a pull request URL that leads the message, or the argument of `/ship`, `/review`, or `/fix-pr`; a pull request mentioned anywhere else in the message is not one.
+  A task is a pull request that the start names: through a quick action, a pull request URL that leads the message, or the argument of `/ship`, `/review`, or `/fix-pr`; a pull request mentioned anywhere else in the message is not one.
   Reviewing a pull request is a different task from working on it, so a **Review** session can run beside the one that implements it.
   Focus or end that session first; once it ends, the task is free again.
   When omp is ready, the dashboard opens the session in the focused pane.
@@ -50,7 +50,6 @@
   While it is on, the pill fills dark, the composer gets a dark outline, and the page shows under it what ending deletes and what stays: files it changes and commits it makes stay in the project.
   A private session shows a dark **Private** chip in its sidebar row and its header.
   It ends when its omp process stops, whether through **Archive session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
-  The pill hides on a draft that starts from a todo, since nothing may link to a private session.
 - When a scheduled start's directory is in a git checkout, a branch picker sits after the directory picker; a new session's draft shows none and runs on the checked-out branch.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.
@@ -85,7 +84,7 @@
   It comes from `~/.omp/agent/extensions/end-session.ts`, which `bun run omp-template` installs.
   The tool ends the session on its first call; its description tells the agent to record a project memory first only when the session settled a decision, found a fact the code does not show, or learned a lesson.
   The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **Archive session**, not as interrupted, its worktree removed the same way.
-  The tool leaves its request as `<session id>.json` in `end-inbox/` beside `todos.json`; a message sent before the dashboard acts withdraws it, and a request waits while the dashboard is down.
+  The tool leaves its request as `<session id>.json` in `end-inbox/` beside the dashboard's access token; a message sent before the dashboard acts withdraws it, and a request waits while the dashboard is down.
 - **Resume** in a past session's header starts omp on that session's file from the dashboard, as `omp --resume <session id>` does in a terminal.
   The pane then shows the live session, which carries on in the same file and moves to the running sessions.
   A session whose omp process exited mid-turn, for example because the computer restarted, resumes too: omp records the interrupted turn first, as it does in a terminal.

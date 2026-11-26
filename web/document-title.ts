@@ -19,8 +19,6 @@ export function pageTitle(page: Page): string {
 			return "Settings";
 		case "pull-requests":
 			return page.target ? `${page.target.owner}/${page.target.repo}#${page.target.number}` : "Pull requests";
-		case "todo":
-			return "Todo";
 		case "bots":
 			if (page.target === null) return page.adding ? "New Bot" : "Bots";
 			if (page.routine === null) return "Bot";

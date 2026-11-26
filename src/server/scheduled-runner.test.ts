@@ -196,7 +196,7 @@ describe("ScheduledFile", () => {
 
 	test("a kept start reads back as a new session's start, and a file holding a send the page could not add moves aside", () => {
 		const path = scheduledPath();
-		const request = newSessionRequest("/work/app", "Review the plan", { skill: "review", todoId: "t1" });
+		const request = newSessionRequest("/work/app", "Review the plan", { skill: "review", projectId: "p1" });
 		const start: ScheduledTarget = { kind: "start", request };
 		new ScheduledFile(path).apply({ op: "add", send: { id: "a", at: T0, reset: null, target: start } }, T0);
 		expect(new ScheduledFile(path).value).toEqual([{ id: "a", at: T0, reset: null, target: start, createdAt: T0, state: { phase: "waiting" } }]);

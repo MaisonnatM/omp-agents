@@ -10,7 +10,7 @@ import type { GithubStatus } from "../../src/shared/source-control";
 import type { StarterKitInstallResult } from "../../src/shared/desktop-bridge";
 import type { CollabAutoStart, StarterKitStatus, TerminalAccess } from "../../src/shared/readiness";
 import { activityControl, record } from "../activity";
-import { appendToComposer, newDraftKey } from "../composer-drafts";
+import { appendToComposer, NEW_DRAFT_KEY } from "../composer-drafts";
 import type { Observation } from "../get-started-model";
 import type { PolledEntry } from "../polled-store";
 import { setTerminalAccess, starterKitStore } from "../reads";
@@ -351,7 +351,7 @@ const SUGGESTIONS: readonly { title: string; prompt: string }[] = [
 export function SessionStep({ sessions }: { sessions: Observation<boolean> }) {
 	const { openNewSession } = useDashboardActions();
 	const start = (prompt: string): void => {
-		appendToComposer(newDraftKey(null), prompt);
+		appendToComposer(NEW_DRAFT_KEY, prompt);
 		openNewSession();
 	};
 	return (

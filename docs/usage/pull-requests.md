@@ -22,10 +22,9 @@
   A /ship run has nine steps: ticket, plan, implementation, draft PR, interface review, thermonuclear review, ready gate, live review, and merged.
   The ticket step links the issue you named or one that matches the work, and passes without one rather than creating a ticket.
   In the plan step the agent compares up to three ways to build the change and posts the one it chose on the Linear issue, or in the PR body when there is no issue.
-  omp writes each step to its session file, and the dashboard reads those entries for running and past sessions; a todo whose linked session's run reached merged shows **Shipped**, as [Todo list](todo-list.md) says.
-- The sidebar's page list switches pages: **Pull requests**, **Bots**, **Todo**, and **Sport**, each but **Pull requests** and **Todo** with its page's own list in a column at the page's left while it is open.
+  omp writes each step to its session file, and the dashboard reads those entries for running and past sessions.
+- The sidebar's page list switches pages: **Pull requests**, **Bots**, and **Sport**, each but **Pull requests** with its page's own list in a column at the page's left while it is open.
   Click a tab or use the left and right arrow keys while a bar tab has focus to switch pages.
-  **Todo** opens your own todo list, with a tab per list and its categories under **Filter**; see [Todo list](todo-list.md).
   The sessions live in the workspace list under the page list; click one to leave a page for its pane, and each workspace counts the live sessions that wait on you.
   The command menu's **Go to sessions**, while a page shows, opens the panes, or with none open the selected workspace's live session started last, else its past session saved last.
   **Bots** lists your Bots, each with its routines; see [Bots](bots.md) and [Routines](routines.md).
@@ -125,7 +124,7 @@
 - **Filter**, the funnel at the end of the tabs' row, has a submenu per field: **Section** lists the sections, **Repository** and **Author** list their values with how many pull requests each holds, and **Created** and **Updated** keep the pull requests from the last day, 3 days, week, 2 weeks, or month.
   A repository or author you checked that lists nothing now, such as a repository you hid since, stays in its submenu with none, so you can uncheck it.
   Each field you set adds a chip under the tabs, such as **Author is MaisonnatM** or **Repository is any of 2 repositories**, whose tooltip names them; click the value to change it, or its × to drop the field, and **Clear all** drops every field once two chips show.
-  After a × the focus moves to the next chip's ×, or the previous one's, or **Filter** when no chip is left, and after **Clear all** to **Filter**; the Todo and Notifications bars do the same.
+  After a × the focus moves to the next chip's ×, or the previous one's, or **Filter** when no chip is left, and after **Clear all** to **Filter**; the Notifications bar does the same.
   The last section shown stays on.
   The author, date, and search filters apply before stacks join, so a stack keeps only the pull requests that match.
   While any filter or search is set, a repository with nothing left leaves the page, unless **Show empty sections** in **Display** is on; when nothing is left, a note names the search or the filters with a button that clears them and moves the focus to the list.

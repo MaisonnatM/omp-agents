@@ -25,7 +25,6 @@ import type { SourceControlSettings } from "./shared/source-control";
 import type { WorkspaceList } from "./shared/workspaces";
 import { parseSourceControlSettings, type SourceControl } from "./source-control";
 import { plainPath, type RepoFile, SyncRepo } from "./sync-repo";
-import type { UserTodoList } from "./user-todos-shared";
 
 /** `path` with `home` shortened to `~`, as every machine names it. */
 export const portablePath = (path: string, home: string): string => (path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path);
@@ -274,33 +273,6 @@ function partsStore(parts: Readonly<Record<string, SyncStore>>): SyncStore {
 	};
 }
 
-/** Each todo once, where the list first holds it: a todo two machines moved to two places arrives in both. */
-function todosOnce(json: unknown): unknown {
-	if (!isPlainObject(json)) return json;
-	const seen = new Set<unknown>();
-	const once = (todos: unknown): unknown =>
-		Array.isArray(todos)
-			? todos.flatMap(todo => {
-					if (!isPlainObject(todo)) return [todo];
-					if (seen.has(todo.id)) return [];
-					seen.add(todo.id);
-					return [Array.isArray(todo.children) ? { ...todo, children: once(todo.children) } : todo];
-				})
-			: todos;
-	return { ...json, todos: once(json.todos), archive: once(json.archive) };
-}
-
-/** Each top-level todo's Workspace, of the list and of the archive, named from `home`, and each todo once on the way back. */
-function todoCarriage(home: string): Carriage {
-	const workspaces = (json: unknown, path: (path: string, home: string) => string): unknown => {
-		if (!isPlainObject(json)) return json;
-		const each = (todos: unknown): unknown =>
-			Array.isArray(todos) ? todos.map(todo => (isPlainObject(todo) && typeof todo.workspace === "string" ? { ...todo, workspace: path(todo.workspace, home) } : todo)) : todos;
-		return { ...json, todos: each(json.todos), archive: each(json.archive) };
-	};
-	return { portable: json => workspaces(json, portablePath), local: json => todosOnce(workspaces(json, localPath)) };
-}
-
 /** The page's preferences, `{}` while no page has handed the server any. */
 const PAGE_VALUES: Carriage = {
 	portable: json => (isPlainObject(json) && isPlainObject(json.values) ? json.values : {}),
@@ -452,7 +424,6 @@ function projectsStore(file: SyncedFiles["projects"], changed: () => void): Sync
 /** The files sync carries beside omp's. */
 export interface SyncedFiles {
 	sourceControl: SourceControl;
-	todos: SyncedFile<UserTodoList>;
 	preferences: SyncedFile<PagePreferences | null>;
 	processes: SyncedFile<ProcessSettings>;
 	workspaces: SyncedFile<WorkspaceList>;
@@ -482,7 +453,6 @@ export function thisMachine(path: string): RoutineMachine {
 export function syncStores(files: SyncedFiles, home: string, changed: (list: ListKind) => void): Record<SyncStoreId, SyncStore> {
 	return {
 		"source-control": sourceControlStore(files.sourceControl, home),
-		todos: fileStore(files.todos, () => changed("user-todos"), todoCarriage(home)),
 		preferences: partsStore({ page: fileStore(files.preferences, () => changed("preferences"), PAGE_VALUES), processes: fileStore(files.processes) }),
 		workspaces: fileStore(files.workspaces, () => changed("workspaces"), homePaths(home)),
 		bots: botsStore(files, home, changed),
@@ -678,7 +648,7 @@ export class SettingsSync {
 		const at = Date.now();
 		const plan = planSync({ items, base, local: local.files, remote: remoteFiles, skipped: local.skipped.map(skip => skip.path), choices });
 		if (plan.conflicts) return { kind: "conflict", at, conflicts: plan.conflicts, skipped: local.skipped };
-		// A merged list may not be in the form its store keeps, such as todos to do before done, so each side gets that form.
+		// A merged list may not be in the form its store keeps, such as projects in their order, so each side gets that form.
 		for (const path of new Set([...plan.toLocal.keys(), ...plan.toRemote.keys()])) {
 			const item = itemOf(items, path);
 			const file = plan.toLocal.get(path) ?? plan.toRemote.get(path);

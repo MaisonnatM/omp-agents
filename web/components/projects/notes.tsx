@@ -5,7 +5,7 @@ import { hashForSession } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Age } from "../age";
 import { offerUndo } from "../toaster";
-import { type KnownSessions, sessionLabel } from "../todo/links";
+import { type KnownSessions, sessionLabel } from "../../labels";
 import { AddLine, Card, EmptyNote, type OnProjectChange, PROJECT_UNDO, RemoveButton } from "./parts";
 
 /** Log lines Recent activity shows until **View all**. */

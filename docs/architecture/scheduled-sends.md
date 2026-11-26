@@ -19,7 +19,7 @@ The failed write stays dirty and keeps its lock until a later flush succeeds.
 Such a claim is not delivered after a retrying flush, and remains `sending` for recovery rather than risking a duplicate.
 A message goes through `reach`, which `Dashboard` builds for this runner: the live session with that session id, else that session resumed through the same `start` the page uses.
 The runner sends it through its `prompt` as a `followUp`, a follow-up while its turn runs and a prompt otherwise.
-A start goes through `start` as the page's would, so the todo it names is linked the same way.
+A start goes through `start` as the page's would.
 A failure, such as a session that cannot resume or a start that fails, saves the error on the send, which waits for **Try again** or **Dismiss**.
 A send that a stopped server left `sending` may have reached its session, so the owner fails it at its start or takeover (`ScheduledRunner.recover`) rather than sending it again.
 

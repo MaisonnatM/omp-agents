@@ -66,7 +66,7 @@ export function DetailBar({ leading, previous, next, children, close }: { leadin
 	);
 }
 
-/** Chevron icons for {@link DetailBar} `previous` and `next`; the Todo page, Settings › Extensions, and the Sport journal use them. */
+/** Chevron icons for {@link DetailBar} `previous` and `next`; Settings › Extensions, the Sport journal, and Memory use them. */
 export const CH_PREVIOUS: BarAction["icon"] = <IconChevronTopSmall />;
 export const CH_NEXT: BarAction["icon"] = <IconChevronDownSmall />;
 export const CH_CLOSE: BarAction["icon"] = <IconCrossMedium />;
@@ -74,9 +74,9 @@ export const CH_CLOSE: BarAction["icon"] = <IconCrossMedium />;
 interface ListSplitProps {
 	/** The localStorage key that keeps the list's width. */
 	widthKey: string;
-	/** What the line that sizes the list says to a screen reader: "Resize the todo list". */
+	/** What the line that sizes the list says to a screen reader: "Resize the memory list". */
 	resizeLabel: string;
-	/** What the open item's side is called: "Open todo". */
+	/** What the open item's side is called: "Open memory". */
 	detailLabel: string;
 	empty: SplitEmpty;
 	list: ReactNode;

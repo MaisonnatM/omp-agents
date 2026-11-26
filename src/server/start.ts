@@ -49,8 +49,6 @@ export interface StartEnv {
 	onStarted(): void;
 	/** The workspace directory `cwd` counts in, asking git when it was not asked about yet. */
 	workspaceOf(cwd: string): Promise<string>;
-	/** Links todo `todoId` to session `sessionId`, which a new session started for it, and moves a todo not started yet to In Progress. */
-	linkTodo(todoId: string, sessionId: string): void;
 	/** Joins session `sessionId`, which a new session started for project `projectId`, to that project; throws when the project refuses it. */
 	joinProject(projectId: string, sessionId: string): void;
 	/** How a start, or the resume of an attached session, joins the server as session `instanceId`. */
@@ -259,8 +257,7 @@ export function createStarter(env: StartEnv): Starter & { ownersOf(request: Star
 			const cleanup = await Promise.resolve(outcome.started.discard?.()).then(() => "", error => `; ${errorText(error)}`);
 			return { ok: false, error: `omp exited as the session started.${cleanup}` };
 		}
-		// The todo links and the project joins first, so the session's first turn already knows the todo it works on and gets the project's brief.
-		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
+		// The project joins first, so the session's first turn already gets the project's brief.
 		if (request.kind === "new" && request.projectId) {
 			// A project deleted since the page asked refuses the join, and the session starts in none.
 			try {

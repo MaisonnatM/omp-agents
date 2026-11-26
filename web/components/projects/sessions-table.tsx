@@ -1,16 +1,19 @@
 /** A project's sessions in a table, running first, each with its status, the pull requests it links, and its last log line's time. */
+import type { PullRequest } from "../../../src/shared/github";
 import type { Project } from "../../../src/shared/projects";
 import { hashForSession } from "../../../src/shared/sessions";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
+import { PAGE_ICON } from "../../page-icons";
+import { hashForPullRequests } from "../../routing";
 import { Age } from "../age";
-import { type KnownSessions, TodoLinkChip } from "../todo/links";
 import { Card, EmptyNote, StatusBadge } from "./parts";
 import type { ProjectSession } from "./project-work";
 
 const HEAD = "h-9 font-medium whitespace-nowrap";
 
-export function SessionsTable({ project, rows, sessions, archived }: { project: Project; rows: ProjectSession[]; sessions: KnownSessions; archived: boolean }) {
+export function SessionsTable({ project, rows, archived }: { project: Project; rows: ProjectSession[]; archived: boolean }) {
 	return (
 		<Card title="Sessions">
 			{rows.length === 0 ? (
@@ -37,7 +40,7 @@ export function SessionsTable({ project, rows, sessions, archived }: { project: 
 						</thead>
 						<tbody>
 							{rows.map(row => (
-								<SessionRow key={row.id} row={row} lastLog={project.log.findLast(entry => entry.sessionId === row.id)?.at} sessions={sessions} />
+								<SessionRow key={row.id} row={row} lastLog={project.log.findLast(entry => entry.sessionId === row.id)?.at} />
 							))}
 						</tbody>
 					</table>
@@ -47,7 +50,23 @@ export function SessionsTable({ project, rows, sessions, archived }: { project: 
 	);
 }
 
-function SessionRow({ row: { id, name, host, pullRequests }, lastLog, sessions }: { row: ProjectSession; lastLog: string | undefined; sessions: KnownSessions }) {
+/** A pull request a session links, opening its details on the Pull requests page. */
+function PullRequestChip({ pr }: { pr: PullRequest }) {
+	const Icon = PAGE_ICON["pull-requests"];
+	return (
+		<Tooltip content={`Pull request ${pr.owner}/${pr.repo}#${pr.number}`}>
+			<a
+				href={hashForPullRequests(pr)}
+				className="inline-flex max-w-56 min-w-0 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground [&>svg]:size-3 [&>svg]:shrink-0"
+			>
+				<Icon />
+				<span className="truncate">{`${pr.repo}#${pr.number}`}</span>
+			</a>
+		</Tooltip>
+	);
+}
+
+function SessionRow({ row: { id, name, host, pullRequests }, lastLog }: { row: ProjectSession; lastLog: string | undefined }) {
 	return (
 		<tr className="relative h-10 border-b border-border/60 last:border-b-0 hover:bg-accent/50 has-[:focus-visible]:bg-accent/50">
 			<td className="px-4">
@@ -64,7 +83,7 @@ function SessionRow({ row: { id, name, host, pullRequests }, lastLog, sessions }
 				) : (
 					<div className="relative z-1 flex flex-wrap gap-1">
 						{pullRequests.map(pr => (
-							<TodoLinkChip key={`${pr.owner}/${pr.repo}#${pr.number}`} link={{ kind: "pull-request", ...pr }} sessions={sessions} />
+							<PullRequestChip key={`${pr.owner}/${pr.repo}#${pr.number}`} pr={pr} />
 						))}
 					</div>
 				)}

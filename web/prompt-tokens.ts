@@ -4,13 +4,13 @@
  */
 import { skillLabel } from "./labels";
 
-export type ChipKind = "skill" | "command" | "file" | "directory" | "pull-request" | "person" | "todo" | "session" | "annotation";
+export type ChipKind = "skill" | "command" | "file" | "directory" | "pull-request" | "person" | "session" | "annotation";
 
 export interface PromptToken {
 	kind: ChipKind;
 	/** What the chip reads. */
 	label: string;
-	/** Where it points: a file or directory path, a link, a skill or command name, or a todo or session id. */
+	/** Where it points: a file or directory path, a link, a skill or command name, or a session id. */
 	target: string;
 	start: number;
 	end: number;
@@ -59,7 +59,6 @@ const PATTERNS: readonly Pattern[] = [
 		re: /\[@([\w-]+(?:\/[\w-]+)?)\]\((https:\/\/github\.com\/(?:orgs\/[\w-]+\/teams\/[\w-]+|[\w-]+))\)/g,
 		token: m => ({ kind: "person", label: `@${m[1]}`, target: m[2] }),
 	},
-	{ re: new RegExp(String.raw`(?<![\w-])todo (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "todo", label: quoted(m[1]), target: m[2] }) },
 	{ re: new RegExp(String.raw`(?<![\w-])omp session (${STRING}) \(id ([\w-]+)\)`, "g"), token: m => ({ kind: "session", label: quoted(m[1]), target: m[2] }) },
 	{
 		re: new RegExp(String.raw`(?<![\w\x60])(\x60+)browser annotation (${STRING}) (${STRING})\1(?!\x60)`, "g"),
@@ -67,7 +66,7 @@ const PATTERNS: readonly Pattern[] = [
 	},
 	{
 		// The `@` menu's category prefixes are a query still being typed, not a path.
-		re: /(?<=^|\s)@(?!(?:file|todo|pr|person|session):)("[^"\n]+"|[^\s"]+)(?=\s|$)/g,
+		re: /(?<=^|\s)@(?!(?:file|pr|person|session):)("[^"\n]+"|[^\s"]+)(?=\s|$)/g,
 		token: m => {
 			const path = m[1].replace(/^"(.*)"$/, "$1");
 			const directory = path.endsWith("/");

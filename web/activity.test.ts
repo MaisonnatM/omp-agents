@@ -13,14 +13,12 @@ describe("viewOf", () => {
 		expect(pageView({ kind: "pull-requests", target: null })).toBe("pull-requests");
 		expect(pageView({ kind: "pull-requests", target: pr, files: null } as Page)).toBe("pull-requests/item");
 		expect(pageView({ kind: "pull-requests", target: pr, files: { path: null } } as Page)).toBe("pull-requests/files");
-		expect(pageView({ kind: "todo", list: "all", open: null })).toBe("todo");
-		expect(pageView({ kind: "todo", list: "today", open: "t1" })).toBe("todo/item");
 		expect(pageView({ kind: "bots", target: null, adding: false })).toBe("bots");
 		expect(pageView({ kind: "bots", target: null, adding: true })).toBe("bots/new");
 		expect(pageView({ kind: "bots", target: "b1", routine: null })).toBe("bots/item");
 		expect(pageView({ kind: "bots", target: "b1", routine: { kind: "list" } })).toBe("bots/routines");
 		expect(pageView({ kind: "bots", target: "b1", routine: { kind: "open", id: "r1" } })).toBe("bots/routine");
-		expect(pageView({ kind: "new", cwd: "/Users/me/code", todoId: null, projectId: null })).toBe("new");
+		expect(pageView({ kind: "new", cwd: "/Users/me/code", projectId: null })).toBe("new");
 		expect(pageView({ kind: "scheduled", id: null })).toBe("scheduled");
 		expect(pageView({ kind: "scheduled", id: "s1" })).toBe("scheduled/item");
 	});

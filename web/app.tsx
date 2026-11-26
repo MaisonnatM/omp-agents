@@ -14,7 +14,6 @@ import {
 	DashboardStatusContext,
 	MentionListsContext,
 	OpenProjectsContext,
-	UserTodosContext,
 } from "./components/dashboard-context";
 import { LinkPreviewCard } from "./components/link-preview-card";
 import { FileDialog } from "./components/file-dialog";
@@ -71,7 +70,7 @@ const NO_PROJECTS: readonly Project[] = [];
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeModule, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
+	const { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeModule, changePins, changeBot, trustAndStart, dismissTrust } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -213,8 +212,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, end: endHost, openFile: setOpenedFile, editGoal, workspaceSettings }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, changeModule, changeBot, endHost, setOpenedFile, editGoal, workspaceSettings],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeModule, changeBot, end: endHost, openFile: setOpenedFile, editGoal, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeModule, changeBot, endHost, setOpenedFile, editGoal, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -227,7 +226,7 @@ export function App() {
 		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, pullRequestNew, resumeAll }, ending: state.ending, pullRequestsScope, scope: windowScope, merges: state.merges, reviewDrafts: state.reviewDrafts }),
 		[state.connected, fork, resume, quick, pullRequestNew, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
-	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
+	const mentionLists = useMemo(() => ({ hosts: visible.hosts, past: visible.past }), [visible]);
 
 	const listPage = listPageOf(page, row);
 	const pageArea = useRef<HTMLDivElement>(null);
@@ -253,7 +252,6 @@ export function App() {
 			<DashboardStatusContext.Provider value={status}>
 				<JobsContext.Provider value={state.jobs}>
 				<ScheduledSends.Provider value={state.scheduled}>
-					<UserTodosContext.Provider value={state.userTodos}>
 					<OpenProjectsContext.Provider value={projects}>
 						<div className="flex h-svh flex-col bg-sidebar">
 							{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
@@ -302,7 +300,6 @@ export function App() {
 																	layout={layout}
 																	splits={state.splits}
 																	models={state.models}
-																	userTodos={state.userTodos}
 																	modules={state.modules}
 																	routines={state.routines}
 																	bots={state.bots}
@@ -408,14 +405,11 @@ export function App() {
 									pinned={sessions.pinned}
 									onTogglePin={sessions.togglePin}
 									unavailable={unavailable}
-									todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
-									todos={mentionLists.todos}
 								/>
 							</SidebarProvider>
 							<LinkPreviewCard />
 						</div>
 					</OpenProjectsContext.Provider>
-					</UserTodosContext.Provider>
 				</ScheduledSends.Provider>
 				</JobsContext.Provider>
 			</DashboardStatusContext.Provider>

@@ -1,5 +1,4 @@
-import { type Dispatch, type SetStateAction, useEffect, useReducer, useState } from "react";
-import { QUICK_TODO_EVENT } from "../src/server/address";
+import { type Dispatch, type SetStateAction, useReducer, useState } from "react";
 import { paletteReducer, type PaletteEvent, type PaletteState } from "./command-palette";
 import type { FileTarget } from "./file-paths";
 
@@ -12,14 +11,9 @@ export interface Overlays {
 	setOpenedFile: Dispatch<SetStateAction<FileTarget | null>>;
 }
 
-/** What is open over the page. The desktop shell's quick-capture shortcut opens the command palette on Create todo. */
+/** What is open over the page. */
 export function useOverlays(): Overlays {
 	const [palette, dispatchPalette] = useReducer(paletteReducer, null);
 	const [openedFile, setOpenedFile] = useState<FileTarget | null>(null);
-	useEffect(() => {
-		const open = (): void => dispatchPalette({ type: "open", view: "createTodo" });
-		window.addEventListener(QUICK_TODO_EVENT, open);
-		return () => window.removeEventListener(QUICK_TODO_EVENT, open);
-	}, []);
 	return { palette, dispatchPalette, openedFile, setOpenedFile };
 }

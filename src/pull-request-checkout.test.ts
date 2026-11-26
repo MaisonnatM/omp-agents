@@ -103,7 +103,6 @@ describe("in a separate worktree", () => {
 				thinking: null,
 				skill: null,
 				subject: { kind: "pull-request", pr: { owner: "acme", repo: "app", number: 7 } },
-				todoId: null,
 				projectId: null,
 				taskId: null,
 				reviewDraft: false,

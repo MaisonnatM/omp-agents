@@ -14,4 +14,4 @@ Every socket hears the preferences after each change as a `preferences` message 
 On the page, `storeOrRemove` in `web/stored-state.ts`, which every `useStoredState` setter writes through, sends a portable key's change as `set` through the sender `web/use-dashboard.ts` registers with `sendPreferencesThrough`.
 A `preferences` message with `null` makes the page send `seed` with what its localStorage holds, and any other replaces the page's values through `adoptPreferences`, which writes localStorage and the shared snapshot directly, so nothing it takes goes back to the server, and wakes only the keys whose value changed.
 `startTheme` in `web/theme.ts` applies the theme on every write of its key, so a theme that arrives from the server, or from another page, shows at once; every other key is read through `useStoredState`, or, for the pinned skill, from localStorage when a session starts.
-A change made while the socket is closed reaches no server, and the snapshot the next socket brings replaces it, as for the todos and the pins.
+A change made while the socket is closed reaches no server, and the snapshot the next socket brings replaces it, as for the pins.

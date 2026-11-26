@@ -6,7 +6,7 @@ import type { PullRequest } from "../../../src/shared/github";
 import type { SessionFacts } from "../../../src/shared/sessions";
 import { type BoardTask, startedOn } from "../../../templates/omp/agent/extensions/board/log";
 import { revealDetailsTab } from "../../details-tabs";
-import type { KnownSessions } from "../todo/links";
+import type { KnownSessions } from "../../labels";
 import { THREAD_TABS } from "./sidebar";
 
 export type BoardAction = { kind: "linear"; issue: string } | { kind: "branch"; name: string } | { kind: "pull-request"; pullRequest: PullRequest; opened: boolean };

@@ -30,7 +30,7 @@ import {
 import { errorText, isObject, num } from "../src/json";
 import { ACCESS_CHANNEL, INSTALL_STARTER_KIT_CHANNEL, isWebUrl, OPEN_DASHBOARD_CHANNEL, PICK_DIRECTORY_CHANNEL, PREVIEW_PARTITION, SIGN_IN_CHANNEL, type StarterKitInstallResult } from "../src/shared/desktop-bridge";
 import { tokenFile } from "../src/paths";
-import { dashboardHosts, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
+import { dashboardHosts, originOf, portFromEnv } from "../src/server/address";
 import { helloProof, loadToken, pageAccess } from "../src/server/auth";
 import { showAttention } from "./attention";
 import { trackBrowserGuests } from "./browser-guests";
@@ -83,9 +83,7 @@ const PRELOAD = join(app.getAppPath(), "dist", "preload.cjs");
 /** `preview-preload.ts` as `bun run build` bundles it, the preload of every webview the page attaches. */
 const PREVIEW_PRELOAD = join(app.getAppPath(), "dist", "preview-preload.cjs");
 const SEPARATOR: MenuItemConstructorOptions = { type: "separator" };
-/** Brings the window up with the command palette open on Create todo, from any app. */
-const QUICK_TODO_SHORTCUT = "Alt+Shift+CommandOrControl+T";
-/** `OMP_AGENTS_HEADLESS=1` keeps the window hidden and the app out of the Dock, without notifications, sounds, or the quick-capture shortcut, for agents' smoke checks, which drive it over CDP. */
+/** `OMP_AGENTS_HEADLESS=1` keeps the window hidden and the app out of the Dock, without notifications or sounds, for agents' smoke checks, which drive it over CDP. */
 const HEADLESS = process.env.OMP_AGENTS_HEADLESS === "1";
 
 // Each port is its own server, so each gets its own localStorage, window bounds, and single-instance lock.
@@ -490,10 +488,5 @@ if (!app.requestSingleInstanceLock()) {
 		app.dock?.setIcon(ICON);
 		shown.once("ready-to-show", () => shown.show());
 		showAttention(shown, isDashboard, reveal);
-		const quickTodo = (): void => {
-			reveal();
-			void shown.webContents.executeJavaScript(`window.dispatchEvent(new Event(${JSON.stringify(QUICK_TODO_EVENT)}))`).catch(() => {});
-		};
-		if (!globalShortcut.register(QUICK_TODO_SHORTCUT, quickTodo)) console.error(`omp-agents: another app holds ${QUICK_TODO_SHORTCUT}`);
 	});
 }

@@ -65,7 +65,7 @@ _Avoid_: Daemon, supervisor
 
 **Plan step**:
 One step of a Project's plan, ticked when done, with sub-steps one level deep, kept in the project's `steps` in `project-list.json`.
-_Avoid_: Todo, checklist item, task
+_Avoid_: Todo (omp's todo tool), checklist item, task
 
 **Project**:
 A named effort that spans sessions and workspaces, with a goal, a checklist plan, decisions, and a dated log that every session in it receives at start.
@@ -213,7 +213,7 @@ _Avoid_: Channel, chat, Slack
 
 **Board task**:
 One message on the Board that asks for work: a title, labels, and the Board tasks it needs done first; a new session starts on it once it is ready.
-_Avoid_: Task (omp's task tool), todo, ticket, issue
+_Avoid_: Task (omp's task tool), todo (omp's todo tool), ticket, issue
 
 **Board thread**:
 A Board task and the replies under it: what you and its sessions said, ending on the outcome of the session that did the work.

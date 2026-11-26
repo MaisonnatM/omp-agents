@@ -1,8 +1,7 @@
 import { memo } from "react";
 import { newSessionRequest } from "../../src/shared/sessions";
-import type { UserTodoList } from "../../src/user-todos-shared";
 import { botRows, type OpenBot } from "../bots-model";
-import { newDraftKey } from "../composer-drafts";
+import { NEW_DRAFT_KEY } from "../composer-drafts";
 import type { DashboardState } from "../dashboard-state";
 import { isModulePage } from "../modules";
 import { useModulesOff } from "../modules-off";
@@ -11,7 +10,6 @@ import type { Layout, Page } from "../routing";
 import { hashForNewSession } from "../routing";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
-import { todoCwd } from "../todo-views";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { useDashboardActions } from "./dashboard-context";
 import { EmptyHome } from "./empty-home";
@@ -26,28 +24,11 @@ import { BotsView } from "./bots/bots-view";
 import { SettingsPage } from "./settings/settings-page";
 import { ScheduledSession } from "./scheduled-session";
 import { useScheduleSend } from "./scheduled";
-import { TodoPage } from "./todo/page";
-
-/** The directory a New session draft on `page` starts in: the route's, else its todo's Workspace, else `defaultWorkspace`. */
-function newDraftCwd(page: Extract<Page, { kind: "new" }>, list: UserTodoList | null, defaultWorkspace: string): string {
-	// A directory the route names wins over the todo's Workspace, so picking another one in the draft sticks.
-	if (page.cwd !== null) return page.cwd;
-	const seed = todoSeed(list, page.todoId);
-	return seed ? todoCwd(seed, defaultWorkspace) : defaultWorkspace;
-}
-
-/** What a new session for top-level todo `todoId` starts with: its title, then its notes, and its Workspace. `null` while the list names no such todo. */
-function todoSeed(list: UserTodoList | null, todoId: string | null): { text: string; prompt: string; workspace: string | null } | null {
-	const todo = todoId === null ? undefined : list?.todos.find(({ id }) => id === todoId);
-	if (!todo) return null;
-	const body = todo.body.trim();
-	return { text: todo.text, prompt: body ? `${todo.text}\n\n${body}` : todo.text, workspace: todo.workspace };
-}
 
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "userTodos" | "modules" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "modules" | "routines" | "bots" | "botLasts" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -81,7 +62,6 @@ export const PageSwitch = memo(function PageSwitch({
 	layout,
 	splits,
 	models,
-	userTodos,
 	modules,
 	routines,
 	bots,
@@ -106,7 +86,7 @@ export const PageSwitch = memo(function PageSwitch({
 	resize,
 	toggleSidebar,
 }: PageSwitchProps) {
-	const { send, start, dismissStart, changeTodo } = useDashboardActions();
+	const { send, start, dismissStart } = useDashboardActions();
 	const scheduleSend = useScheduleSend();
 	const [modulesOff] = useModulesOff();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
@@ -117,7 +97,6 @@ export const PageSwitch = memo(function PageSwitch({
 			bots,
 			botLasts,
 			projects: modules.projects,
-			todos: userTodos,
 			listed,
 			workspace,
 			workspaces,
@@ -138,14 +117,9 @@ export const PageSwitch = memo(function PageSwitch({
 	}
 	switch (page?.kind) {
 		case "new": {
-			const seed = todoSeed(userTodos, page.todoId);
-			const cwd = newDraftCwd(page, userTodos, defaultWorkspace);
-			// Until the todo list arrives, a todo's draft is neither the plain draft nor kept, so it cannot overwrite either.
-			const pending = page.todoId !== null && userTodos === null;
+			const cwd = page.cwd ?? defaultWorkspace;
 			return (
 				<NewSession
-					// A todo's title and notes start the draft, so the draft mounts anew once the list names it.
-					key={pending ? `pending:${page.todoId}` : seed ? `todo:${page.todoId}` : "new"}
 					cwd={cwd}
 					workspaces={workspaces}
 					launch={newStart}
@@ -155,43 +129,26 @@ export const PageSwitch = memo(function PageSwitch({
 					onPickCwd={next => {
 						// A failed start's error is about the directory left behind.
 						dismissStart("new");
-						location.hash = hashForNewSession({ cwd: next, todoId: page.todoId, projectId: page.projectId });
+						location.hash = hashForNewSession({ cwd: next, projectId: page.projectId });
 					}}
-					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId, projectId: page.projectId })}
-					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId, projectId: page.projectId }) }, when)}
-					todo={seed}
+					onStart={op => start({ kind: "new", cwd, ...op, projectId: page.projectId })}
+					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, projectId: page.projectId }) }, when)}
 					projectId={page.projectId}
 					onDropProject={() => {
-						location.hash = hashForNewSession({ cwd: page.cwd, todoId: page.todoId });
+						location.hash = hashForNewSession({ cwd: page.cwd });
 					}}
-					draftKey={pending ? null : newDraftKey(seed ? page.todoId : null)}
+					draftKey={NEW_DRAFT_KEY}
 				/>
 			);
 		}
 		case "scheduled":
-			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} todoOf={todoId => todoSeed(userTodos, todoId)} />;
+			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} />;
 		case "settings":
 			return (
 				<SettingsPage section={page.section} cwd={workspace} workspaces={workspaces} scope={{ kind: "all", onPickWorkspace: pickWorkspace, workspaceList, trustedProjects }} />
 			);
 		case "pull-requests":
 			return <PullRequestsPage hosts={visible.hosts} past={visible.past} route={page} />;
-		case "todo":
-			// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
-			return (
-				<TodoPage
-					list={userTodos}
-					view={page.list}
-					openId={page.open}
-					hosts={hosts}
-					past={past}
-					disabled={!connected}
-					onChange={changeTodo}
-					newSessionCwd={defaultWorkspace}
-					workspaces={workspaces}
-				/>
-			);
-
 		case "bots":
 			return (
 				<BotsView

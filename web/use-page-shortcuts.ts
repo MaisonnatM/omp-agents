@@ -113,7 +113,6 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (!latest.current.page) return;
 				latest.current.showTab("sessions");
 			},
-			todo: goToTab("todo"),
 			...moduleGoTo,
 			restore: () => {
 				const { page, maximized, layout, show } = latest.current;

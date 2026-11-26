@@ -40,7 +40,7 @@ import type { ChangesSession } from "../overview-changes";
 import { type DetailsTab, DetailsSidebarFrame } from "../details-sidebar-frame";
 import { sessionOverviewTab, sessionWorkTabs, useOpenTabOnNew, useSessionWork, workTabOpeners } from "../session-details";
 import { newIdsOnOpen } from "../../details-tabs";
-import { type KnownSessions, sessionLabel } from "../todo/links";
+import { type KnownSessions, sessionLabel } from "../../labels";
 import type { BoardRoute, BoardView } from "./module";
 import { PageHashContext } from "../../page-hash";
 import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
@@ -612,7 +612,6 @@ function Composer({ workspace, core, disabled, onChange }: { workspace: Workspac
 				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd: workspace.cwd }, text, cursor })}
 				onPickCwd={cwd => (location.hash = hashForBoard(cwd))}
 				onStart={post}
-				todo={null}
 				projectId={null}
 				draftKey={boardDraftKey(workspace.cwd)}
 			/>
@@ -884,7 +883,6 @@ function ThreadComposer({ task, name, core, workspace, disabled, onChange, onSen
 				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd: workspace.cwd }, text, cursor })}
 				onPickCwd={() => {}}
 				onStart={reply}
-				todo={null}
 				projectId={null}
 				draftKey={boardThreadDraftKey(task.id)}
 			/>

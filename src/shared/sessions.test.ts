@@ -8,15 +8,13 @@ test("an idle session waits on a running subagent, but never on a running eval r
 	expect(awaitsSubagents({ status: "idle", turnWaits: false, agents: [evalRun] })).toBe(false);
 });
 
-test("a private start parses alone and is refused with a todo, a project, a task, or a review draft, which would outlive it", () => {
+test("a private start parses alone and is refused with a project, a task, or a review draft, which would outlive it", () => {
 	const start = { kind: "new", cwd: "/work", prompt: "Plan dinner" };
 	const review = { ...start, subject: { kind: "pull-request", pr: { owner: "acme", repo: "app", number: 7 } }, reviewDraft: true };
 	expect(parseNewSessionRequest({ ...start, private: true })?.ok.private).toBe(true);
 	expect(parseNewSessionRequest(start)?.ok.private).toBe(false);
 	expect(parseNewSessionRequest({ ...start, private: "yes" })).toBeNull();
 
-	expect(parseNewSessionRequest({ ...start, todoId: "t1" })?.ok.todoId).toBe("t1");
-	expect(parseNewSessionRequest({ ...start, todoId: "t1", private: true })).toBeNull();
 	expect(parseNewSessionRequest(start)?.ok.projectId).toBeNull();
 	expect(parseNewSessionRequest({ ...start, projectId: "p1" })?.ok.projectId).toBe("p1");
 	expect(parseNewSessionRequest({ ...start, projectId: " " })).toBeNull();

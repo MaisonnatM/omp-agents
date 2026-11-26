@@ -1,19 +1,17 @@
 import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandInput, CommandItem, CommandList } from "@ui-sdk/react/command";
 import { Dialog, DialogBackdrop, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowRotateCounterClockwise, IconArrowUp, IconCmd, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPin, IconPlusSmall, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconTodos, IconToolbox, IconWindowApp } from "central-icons";
+import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowRotateCounterClockwise, IconArrowUp, IconCmd, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPin, IconPlusSmall, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
-import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type DashboardUpdateStatus, didNotStart, shortCommit } from "../../../src/shared/dashboard-update";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
-import type { UserTodo, UserTodoCategory } from "../../../src/user-todos-shared";
 import {
 	type Accessory,
 	bumpFrecency,
 	chordAction,
 	decodeFrecency,
 	FRECENCY_KEY,
-	highlightOnFound,
 	PALETTE_VIEWS,
 	PANEL_CHORD,
 	type PaletteAction,
@@ -26,7 +24,6 @@ import {
 	primaryAction,
 	topFrame,
 } from "../../command-palette";
-import { localDay } from "../../../src/shared/days";
 import { age, ALL_WORKSPACES, folderName, hostLabel, pastLabel } from "../../labels";
 import { MODULE_LIST } from "../../modules";
 import { PAGE_ICON } from "../../page-icons";
@@ -40,7 +37,6 @@ import { sessionActions, type SessionEntry } from "../../session-actions";
 import { workspaceCwd } from "../../sessions";
 import { pressesChord, registeredHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
-import { quickAddTodo } from "../../todo-quick-add";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Kbd } from "../kbd";
 import { StatusDot } from "../status-dot";
@@ -72,7 +68,6 @@ const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	"pull-requests": PAGE_ICON["pull-requests"],
 	bots: PAGE_ICON.bots,
 	sessions: PAGE_ICON.sessions,
-	todo: PAGE_ICON.todo,
 	...Object.fromEntries(MODULE_LIST.map(({ id, tab }) => [id, tab.icon])),
 };
 
@@ -94,16 +89,12 @@ interface CommandPaletteProps {
 	onTogglePin: (sessionId: string) => void;
 	/** Commands that do nothing now, which the palette leaves out. */
 	unavailable: ReadonlySet<ShortcutId>;
-	/** The todo list's categories, which a typed `#category` files a new todo under; `null` while the list cannot be edited. */
-	todoCategories: readonly UserTodoCategory[] | null;
-	/** The todo list's top-level todos, which a search lists. */
-	todos: readonly UserTodo[];
 }
 
 /**
  * Searches running and past sessions in every workspace, the page's commands, and workspaces, and for a search
- * also the todos, the sidebar workspace's pull requests, and the settings sections; Enter runs the highlighted entry's first
- * action, ⌘K lists the rest, and what you type can become a todo. Its props hold no closure
+ * also the sidebar workspace's pull requests and the settings sections; Enter runs the highlighted entry's first
+ * action, and ⌘K lists the rest. Its props hold no closure
  * built per render, so a socket update that touches none of them skips it, and a closed palette renders and reads nothing.
  */
 export const CommandPalette = memo(function CommandPalette({ state, ...props }: CommandPaletteProps) {
@@ -123,10 +114,10 @@ const SETTINGS_ITEMS: readonly PaletteItem[] = SETTINGS_SECTIONS.filter(({ value
 	actions: [[{ id: "open", title: "Open", icon, run: { kind: "link", href: hashForSettings(value) } }]],
 }));
 
-function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, unavailable, todoCategories, todos }: CommandPaletteProps & { state: PaletteState }) {
+function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, unavailable }: CommandPaletteProps & { state: PaletteState }) {
 	// What the page's shortcuts run as the palette opens; each with a command title lists as a command.
 	const [handlers] = useState(registeredHandlers);
-	const { send, start, end, changeTodo, workspaceSettings } = useDashboardActions();
+	const { send, start, end, workspaceSettings } = useDashboardActions();
 	const { starts, ending, pullRequestsScope } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -240,7 +231,6 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 				}),
 			),
 			pushItem("command:workspace", "Choose workspace…", IconFolder1, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
-			pushItem("command:create-todo", "Create todo", IconTodos, "createTodo", ["add todo", "task"], []),
 			...updateItem(selfUpdate),
 		];
 	}, [handlers, unavailable, selfUpdate]);
@@ -266,7 +256,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 		];
 	}, [workspaces, workspace, onPickWorkspace]);
 
-	const records = useMemo((): PaletteItem[] => recordItems({ todos, pullRequestRepos }), [todos, pullRequestRepos]);
+	const records = useMemo((): PaletteItem[] => recordItems({ pullRequestRepos }), [pullRequestRepos]);
 	const conversations = useMemo(
 		(): PaletteItem[] =>
 			conversationItems(hits, hosts, past, (opened, cwd, mode, messageId) => {
@@ -277,33 +267,12 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	);
 
 	const items = useMemo((): PaletteItem[] => {
-		const createTodo = (): void => {
-			const change = todoCategories && quickAddTodo(search, todoCategories, localDay(), { workspace });
-			if (change) changeTodo(change);
-		};
-		const todoItem = (id: string, section: "fallback" | "createTodo", title: string, subtitle?: string): PaletteItem[] =>
-			todoCategories && search
-				? [
-						{
-							id,
-							section,
-							title,
-							subtitle,
-							keywords: [],
-							icon: IconTodos,
-							accessories: [],
-							kind: "Todo",
-							actions: [[{ id: "create", title: "Create todo", icon: IconTodos, run: { kind: "do", fn: createTodo } }]],
-						},
-					]
-				: [];
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
-			root: () => [...sessionItems, ...records, ...conversations, ...commandItems, ...SETTINGS_ITEMS, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`)],
+			root: () => [...sessionItems, ...records, ...conversations, ...commandItems, ...SETTINGS_ITEMS],
 			workspaces: () => workspaceItems,
-			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems, search, todoCategories, workspace, changeTodo]);
+	}, [viewId, sessionItems, records, conversations, commandItems, workspaceItems]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? sections[0]?.items[0] ?? null;
 	// A new search or view highlights its first item before it paints.
@@ -311,13 +280,6 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 		dispatch({ type: "select", itemId: sections[0]?.items[0]?.id ?? "" });
 	}, [query, viewId]);
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;
-	// Runs as the conversation matches arrive, with the sections that list them.
-	useEffect(() => {
-		const id = hits.length > 0 && selected ? highlightOnFound(sections, selected.id) : null;
-		if (id !== null) dispatch({ type: "select", itemId: id });
-	}, [hits]);
-	const empty =
-		frame.view !== "createTodo" ? "No results." : todoCategories ? "Type the todo’s title." : "Todos cannot be edited while the dashboard is disconnected.";
 
 	const run = (item: PaletteItem, action: PaletteAction): void => {
 		if (action.disabled) return;
@@ -402,7 +364,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 						/>
 					</div>
 					<div className="h-[min(26rem,60vh)] scroll-py-2 overflow-y-auto overscroll-contain px-2 pb-2">
-						<CommandEmpty className="py-16 text-center text-sm text-muted-foreground empty:hidden">{empty}</CommandEmpty>
+						<CommandEmpty className="py-16 text-center text-sm text-muted-foreground empty:hidden">No results.</CommandEmpty>
 						<CommandList>
 							{sections.map(section => (
 								<CommandGroup key={section.id} className="pt-2">

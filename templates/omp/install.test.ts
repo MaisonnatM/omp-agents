@@ -186,7 +186,7 @@ describe("omp-template --files", () => {
 		expect(readFileSync(join(agentDir, "extensions/ship.ts"), "utf8")).toBe(kitShip);
 		expect(readFileSync(join(agentDir, "extensions/land.ts"), "utf8")).toBe("installed before, then edited");
 		expect(existsSync(join(agentDir, "extensions/arena.ts"))).toBe(false);
-		expect(readFileSync(join(agentDir, "extensions/todos.ts"), "utf8")).toBe(readFileSync(join(import.meta.dir, "agent/extensions/todos.ts"), "utf8"));
+		expect(readFileSync(join(agentDir, "extensions/board.ts"), "utf8")).toBe(readFileSync(join(import.meta.dir, "agent/extensions/board.ts"), "utf8"));
 		const after = readInstalledRecord(agentDir);
 		expect(after?.files["extensions/ship.ts"]).toBe(blobId(kitShip));
 		expect(after?.files["extensions/land.ts"]).toBe(blobId("installed before"));

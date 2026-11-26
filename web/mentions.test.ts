@@ -2,41 +2,14 @@ import { describe, expect, test } from "bun:test";
 import type { Person, PullRequestSummary, Reviewer } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import type { ChangedFile, FileChange } from "../src/shared/transcript";
-import type { UserTodo, UserTodoLeaf } from "../src/user-todos-shared";
 import { completionTrigger, type MentionToken } from "./completion-trigger";
 import { fileSearch, type MentionData, mentionMenu, mentionQuery, type MenuSection } from "./mentions";
 
-const leaf = (id: string, text: string, doneAt: string | null = null): UserTodoLeaf => ({
-	id,
-	text,
-	body: "",
-	status: doneAt === null ? "todo" : "done",
-	priority: 0,
-	assignee: null,
-	doneAt,
-	due: null,
-	createdAt: null,
-});
-const todo = (id: string, text: string, fields: Partial<UserTodo> = {}): UserTodo => ({
-	...leaf(id, text),
-	categoryId: null,
-	workspace: null,
-	children: [],
-	links: [],
-	addedBy: null,
-	...fields,
-});
 const host = (sessionId: string, sessionName: string | null) => ({ sessionId, sessionName, cwdDisplay: "~/code/webapp" }) as RosterHost;
 const person = (login: string, isBot = false): Person => ({ login, avatarUrl: null, ...(isBot ? { isBot } : {}) });
 const reviewer = (login: string, isBot = false): Reviewer => ({ ...person(login, isBot), state: "requested" });
 
 const data: MentionData = {
-	todos: [
-		todo("t1", "Fix login redirect", { children: [leaf("t1a", "Write the login test"), leaf("t1b", "Ship login fix", "2026-10-01T09:00:00.000Z")] }),
-		todo("t2", "Clean up login logs", { doneAt: "2026-10-02T09:00:00.000Z" }),
-		todo("t3", 'Ask about "SSO" login'),
-		todo("t4", "Login page copy"),
-	],
 	pullRequestRepos: [
 		{
 			owner: "acme",
@@ -72,10 +45,10 @@ describe("mentionQuery", () => {
 		expect(at("Read @")).toEqual({ kind: "home" });
 		expect(at("Read @login")).toEqual({ kind: "search", words: "login" });
 		expect(at("@file:src/")).toEqual({ kind: "source", category: "file", words: "src/" });
-		expect(at("@todo:")).toEqual({ kind: "source", category: "todo", words: "" });
+		expect(at("@person:")).toEqual({ kind: "source", category: "person", words: "" });
 		expect(at("@pr:7")).toEqual({ kind: "source", category: "pull-request", words: "7" });
 		expect(at("@session:bug")).toEqual({ kind: "source", category: "session", words: "bug" });
-		expect(at('@todo:"login page')).toEqual({ kind: "source", category: "todo", words: "login page" });
+		expect(at('@pr:"login page')).toEqual({ kind: "source", category: "pull-request", words: "login page" });
 		expect(at('@"login page')).toEqual({ kind: "search", words: "login page" });
 	});
 
@@ -94,7 +67,7 @@ describe("fileSearch", () => {
 
 	test("asks nothing on home or another category", () => {
 		expect(fileSearch("See @", tokenAt("See @"))).toBeNull();
-		expect(fileSearch("See @todo:login", tokenAt("See @todo:login"))).toBeNull();
+		expect(fileSearch("See @pr:login", tokenAt("See @pr:login"))).toBeNull();
 		expect(fileSearch("See @file:", tokenAt("See @file:"))).toEqual({ text: "See @", cursor: 5 });
 	});
 });
@@ -109,7 +82,7 @@ describe("mentionMenu", () => {
 		{ path: "my notes.md", changes: [change(20)] },
 		{ path: "src/c.ts", changes: [change(10)] },
 	];
-	const categories = ["Files & Folders", "Todos", "Pull requests", "People", "Sessions"];
+	const categories = ["Files & Folders", "Pull requests", "People", "Sessions"];
 
 	test("home offers the last three files the agent changed inside its directory, then every category", () => {
 		expect(labels(menu("Read @", { changed }))).toEqual([
@@ -129,36 +102,29 @@ describe("mentionMenu", () => {
 		const home = menu("Ask @")[0].options;
 		expect(home.map(option => [option.edit.text, option.opens])).toEqual([
 			["Ask @file:", true],
-			["Ask @todo:", true],
 			["Ask @pr:", true],
 			["Ask @person:", true],
 			["Ask @session:", true],
 		]);
-		expect(home[2].edit.cursor).toBe(8);
+		expect(home[1].edit.cursor).toBe(8);
 	});
 
-	test("a search lists five files, then three matches per source, leaving out done todos and this session", () => {
+	test("a search lists five files, then three matches per source, leaving out this session", () => {
 		const files = ["a", "b", "c", "d", "e", "f"].map(name => fileItem(`src/login-${name}.ts`));
 		expect(labels(menu("@login", { files }))).toEqual([
 			["Files & Folders", ["src/login-a.ts", "src/login-b.ts", "src/login-c.ts", "src/login-d.ts", "src/login-e.ts"]],
-			["Todos", ["Fix login redirect", "Write the login test", 'Ask about "SSO" login']],
 			["Pull requests", ["Fix login"]],
 			["Sessions", ["Login bug hunt"]],
 		]);
 		expect(labels(menu("@login"))).toEqual([
-			["Todos", ["Fix login redirect", "Write the login test", 'Ask about "SSO" login']],
 			["Pull requests", ["Fix login"]],
 			["Sessions", ["Login bug hunt"]],
 		]);
 	});
 
 	test("every word must match the label or detail, in any order and any case", () => {
-		expect(labels(menu('@"LOGIN fix'))).toEqual([
-			// A subtodo's detail is its parent's title, so it matches words from either.
-			["Todos", ["Fix login redirect", "Write the login test"]],
-			["Pull requests", ["Fix login"]],
-		]);
-		expect(labels(menu('@todo:"test redirect'))).toEqual([["Todos", ["Write the login test"]]]);
+		expect(labels(menu('@"LOGIN fix'))).toEqual([["Pull requests", ["Fix login"]]]);
+		expect(labels(menu('@session:"hunt BUG'))).toEqual([["Sessions", ["Login bug hunt"]]]);
 		expect(labels(menu("@wiki:login"))).toEqual([]);
 	});
 
@@ -171,12 +137,12 @@ describe("mentionMenu", () => {
 	});
 
 	test("a prefix shows only its source, up to fifty", () => {
-		expect(labels(menu("@todo:"))).toEqual([["Todos", ["Fix login redirect", "Write the login test", 'Ask about "SSO" login', "Login page copy"]]]);
+		expect(labels(menu("@session:"))).toEqual([["Sessions", ["webapp", "Login bug hunt"]]]);
 		expect(labels(menu("@file:src", { files: [fileItem("src/")] }))).toEqual([["Files & Folders", ["src/"]]]);
 		const many = mentionMenu({
-			text: "@todo:",
-			token: tokenAt("@todo:"),
-			data: { ...data, todos: Array.from({ length: 60 }, (_, index) => todo(`t${index}`, `Todo ${index}`)) },
+			text: "@session:",
+			token: tokenAt("@session:"),
+			data: { ...data, past: Array.from({ length: 60 }, (_, index) => ({ sessionId: `p${index}`, title: `Run ${index}`, cwdDisplay: "~/code/api" }) as PastSession) },
 			composer: { sessionId: null, changed: [], categories: null },
 			files: null,
 		});
@@ -184,7 +150,6 @@ describe("mentionMenu", () => {
 	});
 
 	test("an item replaces the whole token with its reference and a space, the caret after it", () => {
-		expect(pick("Look at @todo:sso", 'Ask about "SSO" login')).toEqual({ text: 'Look at todo "Ask about \\"SSO\\" login" (id t3) ', cursor: 47 });
 		expect(pick("@pr:fix then merge", "Fix login", 7)).toEqual({ text: "[acme/webapp#7 Fix login](https://github.com/acme/webapp/pull/7)  then merge", cursor: 65 });
 		expect(pick("@session:", "webapp")).toEqual({ text: 'omp session "webapp" (id s-live) ', cursor: 33 });
 		expect(pick("@session:", "Login bug hunt")).toEqual({ text: 'omp session "Login bug hunt" (id s-old) ', cursor: 40 });

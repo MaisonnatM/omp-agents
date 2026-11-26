@@ -27,12 +27,12 @@ A `start` of kind `new` carries a `skill`, `null` for none: the draft sends the 
 Once the server knows the directory omp runs in, worktree included, `withPinnedSkill` puts `/skill:<skill> ` before the first prompt, so omp's RPC prompt invokes the skill with the prompt as its arguments.
 A directory without that skill, or a prompt that starts with `/`, keeps the prompt as typed.
 
-A `start` of kind `new` carries a `subject`, `null` for none: a quick action sends the pull request it works on, and one on a todo sends no subject and names the todo in `todoId` instead.
+A `start` of kind `new` carries a `subject`, `null` for none: a quick action sends the pull request it works on.
 `LiveSessions` keeps it by instance id, and `rows()` puts it first among the session's `pullRequests` until the session's tool calls name it, so the roster links the session to its subject from the start, before omp writes the session file.
 The link goes when the session ends.
 
 An explicit task reserves one owner per canonical repository before checkout creation or omp spawn.
-The identity comes from `taskId`, a pull-request `subject`, `todoId`, a pull request URL leading the prompt, or the argument of a leading `/ship`, `/review`, or `/fix-pr` (`taskIdentity` in `src/task-claims.ts`); a word elsewhere in the prompt, such as `#12` in prose, does not identify a task.
+The identity comes from `taskId`, a pull-request `subject`, a pull request URL leading the prompt, or the argument of a leading `/ship`, `/review`, or `/fix-pr` (`taskIdentity` in `src/task-claims.ts`); a word elsewhere in the prompt, such as `#12` in prose, does not identify a task.
 `LiveSessions.reserveTask` also matches a running session that predates claims through the pull requests its transcript names, with the same `pullRequestTask` identity.
 Another start for that identity fails with the owning session link, dashboard port, and directory rather than spawning or steering it.
 The failed `StartResult` also carries that session as `owner` (`TaskOwner`: its `~`-shortened directory, plus its instance id and name when this dashboard runs it, `here`, else the port of the dashboard that does), which a quick action's note on the page turns into **Open session** and **End it and start again** for a session here; bots, routines, and scheduled sends read only `error`.

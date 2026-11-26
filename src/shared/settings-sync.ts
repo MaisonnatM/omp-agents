@@ -5,12 +5,12 @@
 import { arrayOf, fields, type Guard, isNumber, isObject, isString, nullable, oneOf, type Parsed, tagged } from "../json";
 import { parseRemote } from "./github";
 
-export const SYNC_ITEM_IDS = ["omp-config", "omp-agents-md", "omp-append-system", "omp-skills", "omp-rules", "omp-agents", "omp-commands", "source-control", "todos", "preferences", "workspaces", "bots", "projects"] as const;
+export const SYNC_ITEM_IDS = ["omp-config", "omp-agents-md", "omp-append-system", "omp-skills", "omp-rules", "omp-agents", "omp-commands", "source-control", "preferences", "workspaces", "bots", "projects"] as const;
 export type SyncItemId = (typeof SYNC_ITEM_IDS)[number];
 export const isSyncItemId = oneOf(SYNC_ITEM_IDS);
 
 /** A store the server holds, which sync reads and writes through its `SyncStore` rather than as a file. */
-export type SyncStoreId = "source-control" | "todos" | "preferences" | "workspaces" | "bots" | "projects";
+export type SyncStoreId = "source-control" | "preferences" | "workspaces" | "bots" | "projects";
 
 /** Where an item lives on this machine: a file or a directory under omp's agent directory, or a store the server holds. */
 export type SyncSource = { kind: "omp-file"; path: string } | { kind: "omp-tree"; path: string } | { kind: "store"; store: SyncStoreId };
@@ -43,7 +43,6 @@ export const SYNC_ITEMS: readonly SyncItem[] = [
 		source: { kind: "store", store: "source-control" },
 		json: true,
 	},
-	{ id: "todos", label: "Todos", detail: "The Todo page's todos, categories, and archive", path: "dashboard/todos.json", source: { kind: "store", store: "todos" }, json: true },
 	{
 		id: "preferences",
 		label: "Preferences",

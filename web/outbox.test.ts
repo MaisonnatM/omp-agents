@@ -9,7 +9,7 @@ function socket(readyState: OutboxSocket["readyState"]) {
 	return { ws, frames };
 }
 
-const edit: ClientMsg = { t: "user-todo", change: { op: "edit-body", id: "t1", body: "typed offline" } };
+const edit: ClientMsg = { t: "edit-prompt", instanceId: "i1", entryId: "e1", text: "typed offline" };
 
 test("a write made while the socket is closed goes out after the next socket's resume and settles on its answer", async () => {
 	const closed = socket(WebSocket.CLOSED);
@@ -46,6 +46,6 @@ test("a request rejects at once while disconnected, and a write rejects with the
 	await expect(outbox.request(edit)).rejects.toThrow("Not connected to the server.");
 	current = open.ws;
 	const done = outbox.write(edit);
-	outbox.settle(0, "The todo is gone.");
-	await expect(done).rejects.toThrow("The todo is gone.");
+	outbox.settle(0, "The session is gone.");
+	await expect(done).rejects.toThrow("The session is gone.");
 });

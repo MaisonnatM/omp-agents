@@ -41,7 +41,6 @@ test("a Claude Code or Codex session neither resumes nor forks, before any omp s
 		factsFor: () => { throw new Error("A read-only resume must not inspect omp facts."); },
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
-		linkTodo: () => {},
 		joinProject: () => {},
 		admit: async () => { throw new Error("A read-only start must not take a census."); },
 		restoreWorktree: async () => { throw new Error("A read-only resume must not add a worktree back."); },
@@ -67,7 +66,6 @@ test("a private session does not fork, before any omp starts, since its copy wou
 		factsFor: () => ({ pullRequests: [], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }),
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
-		linkTodo: () => {},
 		joinProject: () => {},
 		admit: async () => {},
 		restoreWorktree: async () => {},
@@ -221,7 +219,6 @@ function claimedStarter(
 		factsFor,
 		onStarted: () => {},
 		workspaceOf: async cwd => cwd,
-		linkTodo: () => {},
 		joinProject: () => {},
 		joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 		admit,
@@ -272,7 +269,6 @@ test("a pull request fix finds the session running on it first, else the watcher
 			factsFor: () => ({ pullRequests: [], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }),
 			onStarted: () => {},
 			workspaceOf: async cwd => cwd,
-			linkTodo: () => {},
 			joinProject: () => {},
 			joinFor: () => ({ rpc: rpc.PLAIN_LAUNCH, attach: () => {} }),
 			admit: async () => {},
@@ -358,7 +354,6 @@ test("a new session for a project joins it before its first message, and starts 
 			factsFor: () => ({ pullRequests: [], worktree: null, branch: null, ship: null, issues: [], arenas: [], workspace: null, gone: false }),
 			onStarted: () => {},
 			workspaceOf: async cwd => cwd,
-			linkTodo: () => {},
 			joinProject: (projectId, sessionId) => {
 				if (refuse) throw new Error(`No project has id ${projectId}.`);
 				heard.push(`join ${projectId} ${sessionId}`);

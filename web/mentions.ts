@@ -1,21 +1,19 @@
 /** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
-import { IconBubbleText, IconRunShortcut, IconFileBend, IconFolder1, IconPullRequest, IconSparklesTwo, IconTodos, IconUser } from "central-icons";
+import { IconBubbleText, IconRunShortcut, IconFileBend, IconFolder1, IconPullRequest, IconSparklesTwo, IconUser } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { everyWord } from "../src/shared/every-word";
 import { isBotAuthor, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
-import type { UserTodo } from "../src/user-todos-shared";
 import type { MentionToken } from "./completion-trigger";
 import { isAbsolutePath } from "./file-paths";
 import { hostLabel, pastLabel } from "./labels";
 import { listedPullRequests } from "./pull-requests-model";
 
-export type CategoryId = "file" | "todo" | "pull-request" | "person" | "session";
+export type CategoryId = "file" | "pull-request" | "person" | "session";
 
 /** The page's lists that every composer shares. */
 export interface MentionLists {
-	todos: UserTodo[];
 	hosts: RosterHost[];
 	past: PastSession[];
 }
@@ -134,18 +132,6 @@ function pullRequestPeople(repos: RepoPullRequests[]): Mention[] {
 
 const CATEGORIES: readonly Category[] = [
 	{ id: "file", prefix: "file", title: "Files & Folders", icon: IconFolder1, searchLimit: 5, options: ({ files }) => files.map(completionOption) },
-	source({
-		id: "todo",
-		prefix: "todo",
-		title: "Todos",
-		icon: IconTodos,
-		list: ({ todos }) =>
-			todos.flatMap(todo =>
-				[todo, ...todo.children]
-					.filter(leaf => leaf.doneAt === null)
-					.map(leaf => ({ label: leaf.text, detail: leaf === todo ? null : todo.text, reference: `todo ${JSON.stringify(leaf.text)} (id ${leaf.id})` })),
-			),
-	}),
 	source({
 		id: "pull-request",
 		prefix: "pr",

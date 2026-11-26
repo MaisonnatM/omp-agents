@@ -1,42 +1,23 @@
-/** The todos, pull requests, and conversation matches the command palette searches, each opening where the dashboard shows it. */
+/** The pull requests and conversation matches the command palette searches, each opening where the dashboard shows it. */
 import { IconAiBotHead, IconLayoutColumn, IconUser, IconWindowApp } from "central-icons";
 import { prKey, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { ConversationHit, PastSession, RosterHost, View } from "../src/shared/sessions";
-import type { UserTodo } from "../src/user-todos-shared";
 import type { Accessory, PaletteItem } from "./command-palette";
 import { hostLabel, pastLabel } from "./labels";
 import { PAGE_ICON } from "./page-icons";
 import { listedPullRequests } from "./pull-requests-model";
-import { hashForPullRequests, hashForTodo, type OpenMode } from "./routing";
+import { hashForPullRequests, type OpenMode } from "./routing";
 import { type SessionEntry, viewOf } from "./session-actions";
 import { workspaceCwd } from "./sessions";
-import { TODO_STATUS } from "./todo-views";
 
 export interface PaletteRecords {
-	/** The todo list's top-level todos, each with its own. */
-	todos: readonly UserTodo[];
 	/** The open pull requests of the sidebar's workspace. */
 	pullRequestRepos: readonly RepoPullRequests[];
 }
 
-/** One palette item for every todo, closed ones too, and pull request; a todo under another names its parent below its title. */
-export function recordItems({ todos, pullRequestRepos }: PaletteRecords): PaletteItem[] {
-	const todoItems = todos.flatMap(todo =>
-		[todo, ...todo.children].map(
-			(leaf): PaletteItem => ({
-				id: `todo:${leaf.id}`,
-				section: "todos",
-				title: leaf.text,
-				subtitle: leaf === todo ? undefined : todo.text,
-				keywords: [],
-				icon: PAGE_ICON.todo,
-				accessories: [{ kind: "text", text: TODO_STATUS[leaf.status].label }],
-				kind: "Todo",
-				actions: [[{ id: "open", title: "Open todo", icon: PAGE_ICON.todo, run: { kind: "link", href: hashForTodo("all", leaf.id) } }]],
-			}),
-		),
-	);
-	const pullRequestItems = listedPullRequests(pullRequestRepos).map((pr): PaletteItem => {
+/** One palette item for every pull request. */
+export function recordItems({ pullRequestRepos }: PaletteRecords): PaletteItem[] {
+	return listedPullRequests(pullRequestRepos).map((pr): PaletteItem => {
 		const icon = PAGE_ICON["pull-requests"];
 		return {
 			id: `pr:${prKey(pr)}`,
@@ -55,7 +36,6 @@ export function recordItems({ todos, pullRequestRepos }: PaletteRecords): Palett
 			],
 		};
 	});
-	return [...todoItems, ...pullRequestItems];
 }
 
 /** Open `view`, whose session counts in workspace `workspace`, in the focused pane or a split, scrolled to message `messageId`. */

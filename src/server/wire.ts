@@ -59,7 +59,6 @@ import type { AskReply, CompletionScope, LiveView, StartRequest, UserAnswer, Vie
 import type { TrustChange } from "../shared/project-trust";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { isStoredModuleId, parseModuleChange, type StoredModuleId } from "../modules";
-import { parseTodoChange } from "../user-todos-parse";
 import { MAX_WORKTREE_BATCH, type WorktreeConfirmation, type WorktreeRemovalRequest, type WorktreeTarget } from "../worktrees-shared";
 
 /** The longest composer text the server completes. */
@@ -351,10 +350,6 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const { instanceId, requestId } = value;
 		const answer = parseAnswer(value.answer);
 		return typeof instanceId === "string" && typeof requestId === "string" && answer ? { ok: { t: "answer", instanceId, requestId, answer: answer.ok } } : null;
-	},
-	"user-todo"(value) {
-		const change = parseTodoChange(value.change);
-		return change && { ok: { t: "user-todo", change } };
 	},
 	"module-change"({ id, change }) {
 		const msg = isStoredModuleId(id) ? parseModuleChangeMsg(id, change) : null;

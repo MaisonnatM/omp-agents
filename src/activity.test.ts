@@ -25,7 +25,7 @@ const ROWS: ActivityRow[] = [
 		{ kind: "view", key: "home", at: DAY1 + 42 * MIN },
 	]),
 	...rowsOf(B, [
-		{ kind: "view", key: "todo", at: DAY2 },
+		{ kind: "view", key: "board", at: DAY2 },
 		{ kind: "command", key: "help", via: "palette", at: DAY2 + MIN },
 		{ kind: "view", key: "pull-requests", at: DAY2 + 2 * MIN },
 	]),
@@ -40,7 +40,7 @@ describe("foldActivity", () => {
 			{ kind: "view", key: "pull-requests", count: 2, days: 2, lastAt: DAY2 + 2 * MIN, keyboard: 0, palette: 0 },
 			{ kind: "action", key: "pin", count: 1, days: 1, lastAt: DAY1 + 8 * MIN, keyboard: 0, palette: 0 },
 			{ kind: "view", key: "settings/sync", count: 1, days: 1, lastAt: DAY1 + 9 * MIN, keyboard: 0, palette: 0 },
-			{ kind: "view", key: "todo", count: 1, days: 1, lastAt: DAY2, keyboard: 0, palette: 0 },
+			{ kind: "view", key: "board", count: 1, days: 1, lastAt: DAY2, keyboard: 0, palette: 0 },
 		]);
 	});
 
@@ -49,17 +49,17 @@ describe("foldActivity", () => {
 			{ from: "home", to: "pull-requests", count: 1 },
 			{ from: "pull-requests", to: "settings/sync", count: 1 },
 			{ from: "settings/sync", to: "home", count: 1 },
-			{ from: "todo", to: "pull-requests", count: 1 },
+			{ from: "board", to: "pull-requests", count: 1 },
 		]);
 	});
 
 	test("dwell caps each gap at five minutes and skips the background", () => {
-		// home: 1 + 1 + the last gap to now, capped at 5; pull requests: 5 of 6 + 1, then 1 on day two; settings: 1 + 2 after the return; todo: 2.
+		// home: 1 + 1 + the last gap to now, capped at 5; pull requests: 5 of 6 + 1, then 1 on day two; settings: 1 + 2 after the return; board: 2.
 		expect(foldActivity(ROWS, NOW).dwell).toEqual([
 			{ view: "home", ms: 7 * MIN },
 			{ view: "pull-requests", ms: 7 * MIN },
 			{ view: "settings/sync", ms: 3 * MIN },
-			{ view: "todo", ms: 2 * MIN },
+			{ view: "board", ms: 2 * MIN },
 		]);
 	});
 
@@ -72,7 +72,7 @@ describe("foldActivity", () => {
 
 	test("a range's rows fold alone: nothing before it counts", () => {
 		const fold = foldActivity(ROWS.filter(({ at }) => at >= DAY2), NOW);
-		expect(fold.uses.map(({ key }) => key)).toEqual(["todo", "help", "pull-requests"]);
+		expect(fold.uses.map(({ key }) => key)).toEqual(["board", "help", "pull-requests"]);
 		expect(fold.days).toEqual([{ day: "2026-10-02", activeMs: 3 * MIN, visits: 1, actions: 0 }]);
 	});
 });

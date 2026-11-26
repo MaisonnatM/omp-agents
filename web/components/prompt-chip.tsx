@@ -1,5 +1,5 @@
 /** `PromptChip`, a skill, file, pull request, or other reference in a prompt drawn as one unit, in the composer and transcript: an icon and a label in its kind's color. */
-import { IconAiBotHead, IconAt, IconConsole, IconCursorClick, IconFileText, IconFolderOpen, IconMagicWand, IconPullRequest, IconSquareCheck } from "central-icons";
+import { IconAiBotHead, IconAt, IconConsole, IconCursorClick, IconFileText, IconFolderOpen, IconMagicWand, IconPullRequest } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,6 @@ const CHIP: Record<ChipKind, { icon: IconComponent; name: string; tone: string }
 	directory: { icon: IconFolderOpen, name: "Folder", tone: "text-sky-700 dark:text-sky-400" },
 	"pull-request": { icon: IconPullRequest, name: "Pull request", tone: "text-emerald-700 dark:text-emerald-400" },
 	person: { icon: IconAt, name: "Person", tone: "text-rose-700 dark:text-rose-400" },
-	todo: { icon: IconSquareCheck, name: "Todo", tone: "text-amber-700 dark:text-amber-400" },
 	session: { icon: IconAiBotHead, name: "Session", tone: "text-lime-700 dark:text-lime-400" },
 	annotation: { icon: IconCursorClick, name: "Browser annotation", tone: "text-orange-700 dark:text-orange-400" },
 };

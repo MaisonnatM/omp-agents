@@ -49,7 +49,6 @@ export const pullRequestTask = (pr: PullRequest, review = false): string => `${r
 export function taskIdentity(request: NewSessionRequest): string | null {
 	if (request.taskId) return `task:${request.taskId}`;
 	if (request.subject) return pullRequestTask(request.subject.pr, request.reviewDraft);
-	if (request.todoId) return `todo:${request.todoId}`;
 	const prompt = request.prompt.trim();
 	const argument = /^\/(?:ship|review|fix-pr)\s+(\S+)/i.exec(prompt)?.[1] ?? prompt.split(/\s/, 1)[0] ?? "";
 	const pr = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:[/?#].*)?$/i.exec(argument);

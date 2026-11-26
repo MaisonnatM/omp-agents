@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { packageDir } from "../../src/omp/install";
 
 // The system prompt is the head of every request, cached across sessions only while its bytes stay the same.
-// Each extension that hooks `before_agent_start` runs here for two sessions that differ in id, date, prompt, and todos;
+// Each extension that hooks `before_agent_start` runs here for two sessions that differ in id, date, prompt, and project;
 // the system prompt they hand back must be the same bytes both times, and what differs must come as a message instead.
 
 const scratch = realpathSync(mkdtempSync(join(tmpdir(), "stable-prefix-")));
@@ -17,11 +17,11 @@ afterAll(() => {
 const config = join(scratch, "config", "omp-agents");
 mkdirSync(config, { recursive: true });
 writeFileSync(
-	join(config, "todos.json"),
+	join(config, "project-list.json"),
 	JSON.stringify({
-		todos: [
-			{ id: "t1", text: "Ship the release", due: "2026-11-30", links: [{ kind: "session", sessionId: "alpha" }] },
-			{ id: "t2", text: "Rotate the API key", addedBy: "beta" },
+		projects: [
+			{ id: "p1", name: "Ship the release", goal: "", steps: [], decisions: [], log: [], sessionIds: ["alpha"], createdAt: "2026-11-20T00:00:00.000Z" },
+			{ id: "p2", name: "Rotate the API key", goal: "", steps: [], decisions: [], log: [], sessionIds: ["beta"], createdAt: "2026-11-20T00:00:00.000Z" },
 		],
 	}),
 );
@@ -63,7 +63,7 @@ async function render(sessionId: string, day: string, prompt: string) {
 }
 
 test("every extension that hooks a prompt is rendered", () => {
-	expect(hooked).toEqual(["project-memory.ts", "project.ts", "todos.ts", "untrusted-reader.ts"]);
+	expect(hooked).toEqual(["project-memory.ts", "project.ts", "untrusted-reader.ts"]);
 	expect([...new Set(hooks.map(([name]) => name))]).toEqual(hooked);
 });
 

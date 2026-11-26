@@ -49,10 +49,6 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Slack.**
   Search, history, and sending in Slack from every omp session, through Slack's MCP server at `https://mcp.slack.com/mcp`.
   Save a dedicated internal Slack app in **Settings › Integrations**, then connect it.
-- **Your own todo list.**
-  Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
-  A todo links to the sessions and pull requests it is about, starts a session from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool, check off a todo once they finish its work, and edit or delete one when you ask.
-  The desktop app captures a todo from any app.
 - **Settings editor.**
   Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place, edit your workflows, the skills tagged `workflow` such as `/ship`'s, and pin a skill that every new session starts through.
 - **Plan quota.**

@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-10-30
 decision-makers: user, agent
+superseded-by: 2026-11-26-remove-the-todo-page-the-user-todo-tool-and-the-todo-store
 ---
 
 # A todo names one workspace, and the sidebar's workspace scopes the todo lists

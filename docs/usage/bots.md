@@ -43,7 +43,7 @@
   Otherwise the composer writes to the Bot: the first message starts its conversation in its workspace, and a later one resumes the same session.
   A stopped conversation's composer lists the prompts its last reply suggested, as a running one does.
   What you type there stays when you leave the page, one draft per Bot, until you send it.
-  Its `/`, `$`, and `@` menus work as in any composer, resolved in the Bot's workspace, so you can mention a file, todo, pull request, person, or session.
+  Its `/`, `$`, and `@` menus work as in any composer, resolved in the Bot's workspace, so you can mention a file, pull request, person, or session.
   Where the Bot used its `remember` tool, the conversation shows **Updated memory for** and the Bot's name, and where it messaged another Bot, **Messaged** and that Bot's name.
   A routine run card shows the routine's name, task icon, trigger logos, time, and status, with a command's duration when available.
   Open the card to read its prompt or command, any output, what started it, and the **Open routine** link.

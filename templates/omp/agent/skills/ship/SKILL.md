@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Use whenever work will produce a PR, even without "/ship": a fix, feature, or refactor, a "work on it" ticket or todo, a late "open a draft PR" request, or a rebase, CI, or review-comment follow-up. Runs grill, plan, draft PR, reviews, and live review to merge-ready.
+description: Use whenever work will produce a PR, even without "/ship": a fix, feature, or refactor, a "work on it" ticket, a late "open a draft PR" request, or a rebase, CI, or review-comment follow-up. Runs grill, plan, draft PR, reviews, and live review to merge-ready.
 metadata:
   tags: workflow
 ---
@@ -132,7 +132,6 @@ Your final reply follows the final-answer format: bold answer first, then only t
 
 ## When ship starts
 
-A todo's "Work on it" session that forbids pushing runs ship's steps up to, not including, the Draft PR step.
 When a pull request is requested later and no ship workflow exists yet, start ship then; it grills the choices the code made and resumes at the right stage.
 When the user says "no ship", call `ship_stage({stop: true})` and finish the work without the workflow.
 Subagents never open pull requests; the parent session's ship workflow does.

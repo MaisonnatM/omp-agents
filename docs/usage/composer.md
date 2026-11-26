@@ -11,7 +11,7 @@
   If the server restarted, or the page stayed disconnected for over an hour, before the server answered, the page says so, and the session's transcript shows whether the prompt took effect.
 - Each session and subagent keeps its own unsent text when you switch to another one or to a page, and when you reload, as chat apps keep a draft per conversation.
   The text is kept in the app and goes once you send it or empty the composer.
-  The new-session draft keeps its text the same way, one for the plain draft and one for each todo it starts from, until the session it starts opens.
+  The new-session draft keeps its text the same way until the session it starts opens.
   Attached files and images are not kept.
 - The new-session draft's text field takes the cursor when the page opens, once the dashboard connects, and each time its project changes, from the composer's directory picker or a workspace's **New session in** button.
 - Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**, as Cursor lists its queue.
@@ -89,17 +89,17 @@
   Type `$` to complete `/skill:<name>` skills: the list shows each skill by its name, and picking one puts its `/skill:` text in the draft, such as `/skill:poteto-mode`, so omp runs it as if you had typed it.
   A skill whose name has a space is left out, since omp cannot invoke it.
   `$` opens the list at the start of a line or after a space, and not before a digit, so a price such as `$5` stays text.
-  Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Pull requests, People, and Sessions.
-  Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@pr:`, `@person:`, or `@session:`.
+  Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Pull requests, People, and Sessions.
+  Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@pr:`, `@person:`, or `@session:`.
   People lists the authors, reviewers, and review teams of the pull requests the Pull requests page lists, without you or bots, each with the pull requests they are on, so `@person:#12` finds the people on pull request 12.
   Type `@` and a word to search everything at once: up to five files from the selected session's working directory, then up to three matches from each category.
   Every word must appear in a row's name or the detail beside it, such as a pull request's repository, in any order; quote several words, as in `@"login page` or `@pr:"login page`.
   A file inserts its path, as in omp's terminal.
-  A todo inserts its text and ID, a pull request a Markdown link, a GitHub person or team their handle linked to their GitHub page, and a session its title and ID.
-  Done todos and the session you are typing in stay out of the list.
+  A pull request inserts a Markdown link, a GitHub person or team their handle linked to their GitHub page, and a session its title and ID.
+  The session you are typing in stays out of the list.
   Use arrow keys, Tab or Enter to insert a suggestion, and Esc to close the list.
   File suggestions follow Git ignore rules in Git repositories.
-- In the composer, a skill or command at the start of the prompt, an `@` file or folder, an inserted todo, pull request, person, or session, and an annotation attached from the [Browser](browser.md) show as a chip, a single unit with an icon and a short name, such as the file's name or the pull request's title.
+- In the composer, a skill or command at the start of the prompt, an `@` file or folder, an inserted pull request, person, or session, and an annotation attached from the [Browser](browser.md) show as a chip, a single unit with an icon and a short name, such as the file's name or the pull request's title.
   A picked suggestion is a chip at once; a reference you type becomes one once you type past it or move the caret away, so `/mo` stays text while you type `/move`.
   Typing right against a chip turns it back into text, so `/move` followed by `X` reads `/moveX`.
   The arrow keys step over a chip as over one character, Backspace removes a chip whole, undo brings it back, and the prompt you send is still the text behind each chip.

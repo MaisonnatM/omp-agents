@@ -8,14 +8,14 @@ const FEATURES: Feature[] = [
 	{ kind: "command", key: "new-session", label: "New session" },
 	{ kind: "command", key: "help", label: "Help" },
 	{ kind: "command", key: "tools", label: "Toggle tool calls" },
-	{ kind: "view", key: "todo", label: "Todo" },
+	{ kind: "view", key: "bots", label: "Bots" },
 	{ kind: "view", key: "sport", label: "Sport" },
 ];
 
 const use = (kind: ActivityUse["kind"], key: string, count: number): ActivityUse => ({ kind, key, count, days: 1, lastAt: 10, keyboard: 0, palette: 0 });
 
 describe("inventory", () => {
-	const features = inventory(["/api/todo"]);
+	const features = inventory(["/api/bots"]);
 	const keys = (kind: Feature["kind"]): string[] => features.filter(feature => feature.kind === kind).map(({ key }) => key);
 
 	test("lists every view the recorder names: each of VIEWS and each settings section", () => {
@@ -32,12 +32,12 @@ describe("inventory", () => {
 describe("report", () => {
 	test("splits features into used, rarely used, and never used with their last use, leaving out uses of no feature", () => {
 		const answer = {
-			uses: [use("command", "new-session", 5), use("view", "todo", 2), use("view", "notes", 9)],
+			uses: [use("command", "new-session", 5), use("view", "bots", 2), use("view", "notes", 9)],
 			lastUsed: [{ kind: "command" as const, key: "help", at: 3 }],
 		};
 		const result = report(FEATURES, answer);
 		expect(result.used.map(({ key }) => key)).toEqual(["new-session"]);
-		expect(result.rarely.map(({ key }) => key)).toEqual(["todo"]);
+		expect(result.rarely.map(({ key }) => key)).toEqual(["bots"]);
 		expect(result.never.map(({ key, lastAt }) => [key, lastAt])).toEqual([["help", 3], ["tools", null], ["sport", null]]);
 	});
 

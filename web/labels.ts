@@ -178,4 +178,17 @@ export const hostLabel = (host: Pick<RosterHost, "sessionName" | "cwdDisplay">):
 
 export const pastLabel = (session: PastSession): string => session.title ?? folderName(session.cwdDisplay) ?? "Untitled session";
 
+/** The live and past sessions, which name a session and tell whether it still runs. */
+export interface KnownSessions {
+	hosts: RosterHost[];
+	past: PastSession[];
+}
+
+/** What session `sessionId` reads as, and its live host while it runs. */
+export function sessionLabel(sessionId: string, { hosts, past }: KnownSessions): { name: string; host: RosterHost | null } {
+	const host = hosts.find(h => h.sessionId === sessionId) ?? null;
+	const saved = host ? undefined : past.find(session => session.sessionId === sessionId);
+	return { name: host ? hostLabel(host) : saved ? pastLabel(saved) : "Session", host };
+}
+
 export const SOURCE_LABELS: Record<SessionSource, string> = { omp: "omp", "claude-code": "Claude Code", codex: "Codex" };

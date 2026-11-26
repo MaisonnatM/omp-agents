@@ -57,7 +57,6 @@ export type ShortcutId =
 	| "pull-requests"
 	| "bots"
 	| "sessions"
-	| "todo"
 	| "workspace"
 	| "nextPullRequest"
 	| "previousPullRequest"
@@ -66,16 +65,6 @@ export type ShortcutId =
 	| "giveToAgent"
 	| "copyPullRequestNumber"
 	| "copyPullRequestLink"
-	| "todoSearch"
-	| "todoNext"
-	| "todoPrevious"
-	| "todoCheck"
-	| "todoStatus"
-	| "todoPriority"
-	| "todoAssignee"
-	| "todoDue"
-	| "todoNew"
-	| "todoClose"
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
@@ -145,7 +134,6 @@ export interface Shortcut {
 const TAB_GO_TO = {
 	"pull-requests": { label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
 	bots: { label: "Go to your Bots", command: "Go to Bots", keys: [] },
-	todo: { label: "Go to your todo list", command: "Go to todo list", keys: [] },
 } satisfies { [T in Exclude<SidebarTab, WebModuleId>]: Pick<Shortcut, "label" | "command" | "keys"> };
 
 /**
@@ -356,32 +344,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "giveToAgent", category: "pull-requests", label: "Pull requests: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{ id: "copyPullRequestNumber", category: "pull-requests", label: "Open pull request: copy #N", keys: [{ chord: { key: "k", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "copyPullRequestLink", category: "pull-requests", label: "Open pull request: copy its GitHub link", keys: [{ chord: { key: ",", mod: true, shift: true }, scope: "anywhere" }] },
-	{ id: "todoSearch", category: "todo", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
-	{
-		id: "todoNext",
-		category: "todo",
-		label: "Focus the next todo, or open it while a todo is open",
-		keys: [
-			{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
-			{ chord: { key: "j" }, scope: "outside-fields" },
-		],
-	},
-	{
-		id: "todoPrevious",
-		category: "todo",
-		label: "Focus the previous todo, or open it while a todo is open",
-		keys: [
-			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
-			{ chord: { key: "k" }, scope: "outside-fields" },
-		],
-	},
-	{ id: "todoCheck", category: "todo", label: "Mark the focused or open todo Done, or a closed one Todo again", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
-	{ id: "todoStatus", category: "todo", label: "Change the focused or open todo's status", keys: [{ chord: { key: "s" }, scope: "outside-fields" }] },
-	{ id: "todoPriority", category: "todo", label: "Change the focused or open todo's priority", keys: [{ chord: { key: "p" }, scope: "outside-fields" }] },
-	{ id: "todoAssignee", category: "todo", label: "Change the focused or open todo's assignee", keys: [{ chord: { key: "a" }, scope: "outside-fields" }] },
-	{ id: "todoDue", category: "todo", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
-	{ id: "todoNew", category: "todo", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "todoClose", category: "todo", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	...MODULE_LIST.flatMap(({ id, shortcuts }) => shortcuts.rows.map((row): Shortcut => ({ ...row, category: id }))),
 	{
 		id: "nextChangedFile",
@@ -407,8 +369,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		label: "Review the focused session's changes from its first changed file, while the details sidebar shows its Overview",
 		keys: [{ chord: { key: "g", mod: true, shift: true }, scope: "anywhere" }],
 	},
-	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
-	{ id: "moveDown", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "moveUp", category: "pull-requests", label: "Move the focused repository, section, or pull request of the pull request list up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "moveDown", category: "pull-requests", label: "Move the focused repository, section, or pull request of the pull request list down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 ];
 
 const GO = "g";

@@ -1,6 +1,6 @@
 # Keyboard shortcuts
 
-The shortcuts take Capy's key for every action both apps share, follow Cursor where the window's menu leaves the key free, and add web-app navigation keys for the Pull requests page, the todo list, and other dashboard pages.
+The shortcuts take Capy's key for every action both apps share, follow Cursor where the window's menu leaves the key free, and add web-app navigation keys for the Pull requests page and other dashboard pages.
 Cmd stands for Command on macOS and Ctrl on Linux and Windows.
 Alt is Option on macOS.
 
@@ -54,27 +54,18 @@ Alt is Option on macOS.
 | . | Pull requests page, outside text fields | Open the pull request's `⋯` menu |
 | E | Pull requests page, outside text fields | Give the pull request's next move to an agent |
 | Cmd+Shift+K / Cmd+Shift+, | Pull requests page showing a PR | Copy its `#N` / GitHub link |
-| / | Todo page, outside text fields | Search the todos |
-| ↓ / ↑ or J / K | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
-| X | Todo page, outside text fields | Mark the focused or open todo Done, or a closed one Todo again |
-| S | Todo page, outside text fields | Change the focused or open todo's status |
-| P | Todo page, outside text fields | Change the focused or open todo's priority |
-| A | Todo page, outside text fields | Change the focused or open todo's assignee |
-| Shift+D | Todo page, outside text fields | Change the focused or open todo's due day |
-| C | Todo page, outside text fields | Add a todo to the Todo group |
-| Esc | Todo page, outside text fields | Close the open todo |
 | ← / → | Sport page's week, outside text fields | Open the day before or after |
 | ← / → | Sport page's demo dialog, outside text fields | Show the workout's previous or next demo |
 | ↓ / ↑ or J / K | Sport page's journal, outside text fields | Focus the next or previous session, or open it while one is open |
 | Esc | Sport page's journal, outside text fields | Close the open session |
 | Space / ← / → | Sport timer, outside text fields | Pause or resume, go back a step, or skip to the next |
-| Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
+| Alt+Shift+↑ / Alt+Shift+↓ | Pull requests page | Move the focused pull request, section, or repository up or down |
 | ↓ / ↑ or J / K | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - **Settings › Keyboard** lists the keyboard shortcuts; press `?` outside a text field to open it, and `?` there goes back to the panes.
-  It lists them in sections by category: General, Sessions, Pull requests, Todo, Sport, and Changes.
+  It lists them in sections by category: General, Sessions, Pull requests, Sport, and Changes.
   Its first line states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **Archive session**, the composer's paperclip, Stop, and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the open Sport journal session's ↑, ↓, and **×**, and the Sport demo dialog's **Précédent** and **Suivant**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar's top row and page list, the header's tabs' buttons, the workspace, model, directory, and thinking pickers, **New session**, **Archive session**, the composer's paperclip, Stop, and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open Sport journal session's ↑, ↓, and **×**, and the Sport demo dialog's **Précédent** and **Suivant**.
 - Cmd+1 through Cmd+9 go to the first through ninth header tab, even while typing, as in Capy; a number with no tab is left to the window.
   Alt+1 through Alt+9 (Option on macOS) open the first through ninth session of the sidebar's list, in the order it shows them, in the focused pane.
   The sidebar's page list takes no number keys: each tab keeps its command in the command menu.
@@ -88,9 +79,9 @@ Alt is Option on macOS.
   On a focused queued row, Cmd+Enter sends it now, Enter or F2 edits it, and Delete removes it.
   With a draft, ↑ moves the caret as usual.
 - Cmd+K opens the command menu, which searches every running and past session, in every workspace, by title, directory, or pull request, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
-  What you type also searches your todos, closed ones too, the open pull requests of the sidebar's workspace, and the sections of Settings, each under its own heading; each must hold every word typed, in any order.
+  What you type also searches the open pull requests of the sidebar's workspace and the sections of Settings, each under its own heading; each must hold every word typed, in any order.
   With nothing typed they list only under **Suggestions**, once you use one often enough.
-  A todo opens beside its list on the Todo page, and a pull request opens its details on the Pull requests page; Cmd+Enter opens a pull request on GitHub.
+  A pull request opens its details on the Pull requests page; Cmd+Enter opens it on GitHub.
   **In conversations**, under those, lists the sessions whose prompts or replies hold every word typed, up to 30, the latest active first, each by the latest such message and how many match; tool output and thinking are not searched.
   Enter opens the session scrolled to that message, and Cmd+Enter opens it in a split.
   The search button in the sidebar header opens it too.
@@ -99,18 +90,15 @@ Alt is Option on macOS.
   Enter runs the highlighted entry's main action, which opens a session in the focused pane, and Cmd+Enter runs its second, which opens a session in a split.
   A session from another workspace switches the sidebar to that workspace.
   Cmd+K inside the menu lists every action of the highlighted entry, as the session row's menu does, and you can search them; Cmd+Shift+P pins or unpins a session and Cmd+Shift+C copies its path, without opening that list.
-  **Choose workspace…** switches the sidebar's workspace, and **Create todo** asks for a todo's title; Esc or Backspace in the empty field goes back.
+  **Choose workspace…** switches the sidebar's workspace; Esc or Backspace in its empty field goes back.
   **Update dashboard**, listed when the server runs from a git checkout, names the new commits on its branch and runs [Updating omp-agents](updating-omp-agents.md).
   The bar at the bottom names where you are, what Enter does, and **Actions**, which opens the same list as Cmd+K.
   Esc closes the action list, then goes back, then clears what you typed, then closes the menu.
-  Whatever you type also offers **Create todo**, last, which adds it at the end of **All**, with no category.
-  You stay on the page you were on.
-  The title can end with a due day or a `#category`, as in [Todo list](todo-list.md).
   Cmd+Alt+↑ and Cmd+Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then the ones waiting on subagents, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   ↓ and ↑, or J and K, do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
 - Cmd+Shift+O opens the new-session draft, as **New session** at the top of the roster does.
-  S outside a text field does it too; on the Todo page, S changes a focused or open todo's status instead.
+  S outside a text field does it too.
   Cmd+T opens a new header tab on the new-session draft, as the + after the tabs does.
   Cmd+W closes the header tab on screen and leaves its session running; it does nothing when the page has no header tab, or when the tab on screen is pinned.
   Cmd+Alt+W closes every header tab but the pinned ones and the one on screen, and Ctrl+Tab and Ctrl+Shift+Tab, or Cmd+Alt+→ and Cmd+Alt+←, go to the next or previous one, wrapping around.
@@ -125,9 +113,9 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in the app.
-- **Go to pull requests** in the command menu opens the Pull requests page; C on the Todo page adds a todo.
-  **Go to sessions** goes back from the Pull requests page, the todo list, a Bot, Settings, or the new-session draft to the panes.
-  The **Todo** and **Sport** buttons in the header open those pages.
+- **Go to pull requests** in the command menu opens the Pull requests page.
+  **Go to sessions** goes back from the Pull requests page, a Bot, Settings, or the new-session draft to the panes.
+  The **Sport** button in the header opens that page.
   Cmd+, opens Settings, as the header's gear button does, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.

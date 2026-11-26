@@ -105,7 +105,6 @@
   Markdown renders as the agent's messages do, under its frontmatter's keys and values, a TSV or CSV file as a table of its first 1,000 rows, and anything else as numbered lines that wrap, colored by its type; **Show source** shows a rendered file's text.
   A path in an open Markdown file opens in the dialog's place, relative to that file.
   The dialog shows the first 1 MB of a larger file and says so; it refuses a file whose real path, past any link, has another extension, and a file that is not UTF-8.
-  A todo's notes do not open paths: a path there is plain text.
 - An image or video on this computer that a prompt or the agent's text names shows in the message: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.svg`, `.mp4`, `.m4v`, `.webm`, or `.mov`.
   Its path is found as a text file's is, and opens the file dialog with the image large or the video playing.
   Written as an image, `![alt](path)`, it shows in place and opens large on click, and a video there plays in place.
@@ -121,9 +120,9 @@
   That covers skills sent from the dashboard, from omp's terminal, and to a subagent, in live and past sessions.
   Copy copies the prompt as typed.
   File commands show their expanded text, because omp records only that.
-- A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, the todos, pull requests, and sessions the `@` menu inserted, and annotations attached from the Browser.
+- A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, the pull requests and sessions the `@` menu inserted, and annotations attached from the Browser.
   Hover a chip for the full path or title, or the start of a Browser annotation's comment and elements.
-  A todo, session, or pull request chip opens it here in the dashboard: the todo in its list, or in **Archive** once put away; a deleted todo's chip opens nothing.
+  A session or pull request chip opens it here in the dashboard.
 - A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
 - Right after a session's title, live or past, before the trajectory switch, a copy button copies the session's ID, which its tooltip names; its icon turns into a check mark for a moment.
 - **Open pull request** in the command menu acts on the focused pane's session while the panes show, and is offered while that session is running, the dashboard can prompt it, it works on a branch other than its repository's default branch, and GitHub names no pull request from that branch.

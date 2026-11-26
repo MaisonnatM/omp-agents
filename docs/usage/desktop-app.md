@@ -34,10 +34,7 @@ omp-agents runs as a desktop app: the packaged app, or `bun run desktop` from a 
   The menu takes none of the dashboard's own shortcuts, so Cmd+W closes the header tab on screen instead of the window, and Cmd+T opens a new header tab.
   Right-click in a text field for cut, copy, paste, and spelling suggestions, and on an image, such as one in the **Images** section's viewer, for **Copy Image**.
 - The window remembers its size and position.
-- The window title follows what the page shows: the focused session's name, a subagent's name ahead of its session's, `Pull requests`, `Todo`, `Settings`, `Get started`, or `New session`, then `omp agents`.
+- The window title follows what the page shows: the focused session's name, a subagent's name ahead of its session's, `Pull requests`, `Settings`, `Get started`, or `New session`, then `omp agents`.
   A session without a name reads as its workspace, and nothing open reads `omp agents`.
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
-- Alt+Shift+Cmd+T, from any app, brings the window up with the command menu's **Create todo** open, so you can type a title and press Enter to create a todo.
-  When another app holds the keys, the app logs so and the shortcut does nothing.
 - The Dock icon's badge counts the sessions waiting on you: each that asks you something, or finished a turn you have not looked at since, and goes away at none.
-  The **Todo** page's header still counts the open todos.

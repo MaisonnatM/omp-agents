@@ -1,6 +1,5 @@
 /** Sessions as the roster, the panes, and the new-session draft see them: live hosts, past sessions, views, requests, and starts. */
 import { BASE64, isNonEmpty, isObject, type Parsed } from "../json";
-import { isTodoId } from "../user-todos-parse";
 import type { BotId } from "./bot-id";
 import type { BranchChoice } from "./git";
 import { type CheckState, type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
@@ -391,8 +390,6 @@ export type StartRequest =
 			thinking: string | null;
 			skill: string | null;
 			subject: WorkItem | null;
-			/** The todo the session works on, which links to it once omp starts; `null` for none. */
-			todoId: string | null;
 			/** The project the session joins once omp starts, before its first turn reads the project's brief; `null` for none. */
 			projectId: string | null;
 			/** Explicit independent task identity; overrides the subject for intentional disjoint work. */
@@ -401,7 +398,7 @@ export type StartRequest =
 			reviewDraft: boolean;
 			/** The Bot whose conversation the session starts, which launches it with the Bot extension; only the server's `Bots` sets it, since {@link parseNewSessionRequest} never reads one. */
 			bot: BotId | null;
-			/** The session is deleted, with everything it wrote, when it ends, and omp remembers nothing of it; it works on no todo, task, or review draft. */
+			/** The session is deleted, with everything it wrote, when it ends, and omp remembers nothing of it; it works on no project, task, or review draft. */
 			private: boolean;
 			/** When a session here already owns `subject`, the prompt goes to it instead of a new session: as a follow-up while it runs, else resumed. */
 			reachOwner: boolean;
@@ -410,7 +407,7 @@ export type StartRequest =
 	| { kind: "resume"; sessionId: string };
 /** A `start` of a new session. */
 export type NewSessionRequest = Extract<StartRequest, { kind: "new" }>;
-/** A new session in `cwd` on `prompt`, with no images, branch, model, thinking level, skill, subject, or todo but those `options` name. */
+/** A new session in `cwd` on `prompt`, with no images, branch, model, thinking level, skill, or subject but those `options` name. */
 export const newSessionRequest = (cwd: string, prompt: string, options: Partial<Omit<NewSessionRequest, "kind" | "cwd" | "prompt">> = {}): NewSessionRequest => ({
 	kind: "new",
 	cwd,
@@ -421,7 +418,6 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	thinking: null,
 	skill: null,
 	subject: null,
-	todoId: null,
 	projectId: null,
 	taskId: null,
 	reviewDraft: false,
@@ -490,7 +486,7 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
  */
 export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest> {
 	if (!isObject(value) || value.kind !== "new") return null;
-	const { cwd, prompt, todoId = null, projectId = null, taskId = null, reviewDraft = false, private: isPrivate = false, reachOwner = false } = value;
+	const { cwd, prompt, projectId = null, taskId = null, reviewDraft = false, private: isPrivate = false, reachOwner = false } = value;
 	const images = parseImages(value.images);
 	const branch = parseBranchChoice(value.branch);
 	// `null` starts on omp's default model.
@@ -499,17 +495,16 @@ export function parseNewSessionRequest(value: unknown): Parsed<NewSessionRequest
 	const skill = parseSkill(value.skill);
 	const subject = parseWorkItem(value.subject);
 	if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
-	if (todoId !== null && !isTodoId(todoId)) return null;
 	if (projectId !== null && !isNonEmpty(projectId)) return null;
 	if (taskId !== null && !isNonEmpty(taskId)) return null;
 	// Only a pull request has a review draft.
 	if (typeof reviewDraft !== "boolean" || (reviewDraft && subject.ok?.kind !== "pull-request")) return null;
 	// A private session leaves nothing behind, so nothing may link to it.
-	if (typeof isPrivate !== "boolean" || (isPrivate && (todoId !== null || projectId !== null || taskId !== null || reviewDraft))) return null;
+	if (typeof isPrivate !== "boolean" || (isPrivate && (projectId !== null || taskId !== null || reviewDraft))) return null;
 	// Only a pull request has an owner to reach.
 	if (typeof reachOwner !== "boolean" || (reachOwner && subject.ok?.kind !== "pull-request")) return null;
 	return prompt.trim() || images.ok.length > 0
-		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId, projectId, taskId, reviewDraft, private: isPrivate, reachOwner }) }
+		? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, projectId, taskId, reviewDraft, private: isPrivate, reachOwner }) }
 		: null;
 }
 

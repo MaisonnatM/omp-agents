@@ -7,7 +7,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 
 ## `ui/input-message.tsx`
 
-- The text field is `PromptEditor` (`web/components/prompt-editor.tsx`), a contenteditable that shows each skill, command, file, pull request, todo, and session reference as a chip, instead of a `<textarea>`.
+- The text field is `PromptEditor` (`web/components/prompt-editor.tsx`), a contenteditable that shows each skill, command, file, pull request, and session reference as a chip, instead of a `<textarea>`.
   Its height follows `minRows` and `maxRows` in CSS, so the JS autoresize is gone.
   `textareaProps` is `editorProps`, and `editorRef` exposes the caret and focus that callers read from the textarea before.
 - `editorProps.onKeyDown`: runs first, in the capture phase, and a key it prevents goes no further, not even to the editor.

@@ -4,7 +4,8 @@ import { beginStart, dismissSettled, dropHidden, failStart, messageOf, refusedSt
 const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
 const resume = { kind: "resume", sessionId: "s1" } as const;
-const quick = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "todo", id: "t7", text: "fix", action: "work" }, skill: null } as const;
+const pr = { owner: "acme", repo: "app", number: 7 };
+const quick = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "pull-request", pr, action: "review" }, skill: null } as const;
 const ok = { ok: true, instanceId: "i1", workspace: "/tmp", prompt: null } as const;
 
 describe("starts", () => {
@@ -17,13 +18,13 @@ describe("starts", () => {
 	});
 
 	test("two quick actions in a row both wait for their answer, and each answer settles its own start", () => {
-		const other = { ...quick, subject: { kind: "todo", id: "t8", text: "fix", action: "work" } } as const;
+		const other = { ...quick, subject: { kind: "pull-request", pr: { ...pr, number: 8 }, action: "review" } } as const;
 		let starts = beginStart(beginStart(new Map(), 1, quick), 2, other);
-		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { id: "t8" } } });
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { pr: { number: 8 } } } });
 		starts = settleStart(starts, 2, ok);
-		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { id: "t7" } } });
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "starting", op: { subject: { pr: { number: 7 } } } });
 		starts = settleStart(starts, 1, { ok: false, error: "busy" });
-		expect(startOf(starts, "quick")).toMatchObject({ phase: "failed", error: "busy", op: { subject: { id: "t7" } } });
+		expect(startOf(starts, "quick")).toMatchObject({ phase: "failed", error: "busy", op: { subject: { pr: { number: 7 } } } });
 	});
 
 	test("an answer settles only a start still waiting: success removes it, failure keeps the reason", () => {
@@ -48,7 +49,7 @@ describe("starts", () => {
 	test("a failure's reason leaves with its view, a start under way stays, and a draft's failure outlives any view", () => {
 		let starts = settleStart(beginStart(new Map(), 1, resume), 1, { ok: false, error: "no file" });
 		starts = settleStart(
-			beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", images: [], branch: null, model: null, thinking: null, skill: null, todoId: null, projectId: null, private: false }),
+			beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", images: [], branch: null, model: null, thinking: null, skill: null, projectId: null, private: false }),
 			2,
 			{ ok: false, error: "not a directory" },
 		);
@@ -60,14 +61,14 @@ describe("starts", () => {
 		expect(dismissSettled(hidden, "fork")).toBe(hidden);
 	});
 
-	test("a quick action asks for a new session linked to what it works on, without the action", () => {
-		expect(messageOf(quick, 4)).toMatchObject({ t: "start", kind: "new", subject: null, todoId: "t7" });
+	test("a quick action asks for a new session on what it works on, without the action", () => {
+		expect(messageOf(quick, 4)).toMatchObject({ t: "start", kind: "new", subject: { kind: "pull-request", pr } });
 		expect(settleStart(beginStart(new Map(), 1, quick), 1, ok).size).toBe(0);
 	});
 
 	test("a new pull request asks for a new session on the change, and stays apart from the New session page's start", () => {
 		const op: StartOp = { kind: "pull-request-new", cwd: "/work", repo: "webapp", change: "Add dark mode", skill: null };
-		expect(messageOf(op, 5)).toMatchObject({ t: "start", kind: "new", cwd: "/work", subject: null, todoId: null, prompt: "Make this change in webapp on a new branch, then open a pull request for it.\n\nAdd dark mode" });
+		expect(messageOf(op, 5)).toMatchObject({ t: "start", kind: "new", cwd: "/work", subject: null, prompt: "Make this change in webapp on a new branch, then open a pull request for it.\n\nAdd dark mode" });
 		const starts = settleStart(beginStart(new Map(), 1, op), 1, { ok: false, error: "busy" });
 		expect(startOf(starts, "new")).toBeNull();
 		expect(startOf(starts, "pull-request-new")).toMatchObject({ phase: "failed", error: "busy" });

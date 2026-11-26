@@ -99,7 +99,7 @@ test("a letter key that types no ASCII letter matches by its physical key, an AS
 	expect(pressOn(true, "˚", "KeyK", { meta: true })).toEqual(["switcher"]);
 	expect(press("?", "KeyM", { shift: true })).toEqual(["help"]);
 	expect(press("?", "Slash", { shift: true })).toEqual(["help"]);
-	expect(press("/", "Digit7", { shift: true })).toEqual(["focusComposer", "todoSearch"]);
+	expect(press("/", "Digit7", { shift: true })).toEqual(["focusComposer"]);
 	expect(pressOn(true, "÷", "Slash", { meta: true, alt: true })).toEqual(["model"]);
 });
 
@@ -125,30 +125,23 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 	expect(shortcutsFor(keyEvent("Escape", "Escape"), null, false)).toEqual([
 		{ id: "restore", scope: "anywhere", key: 0 },
 		{ id: "browserRestore", scope: "anywhere", key: 0 },
-		{ id: "todoClose", scope: "outside-fields", key: 0 },
 		{ id: "sportJournalClose", scope: "outside-fields", key: 0 },
 		{ id: "memoryProjectClose", scope: "outside-fields", key: 0 },
 		{ id: "memoryBookmarksClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([{ id: "attachFiles", scope: "composer", key: 0 }]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere", key: 0 }]);
-	expect(shortcutsFor(keyEvent("/", "Slash"), null, false)).toEqual([
-		{ id: "focusComposer", scope: "outside-fields", key: 0 },
-		{ id: "todoSearch", scope: "outside-fields", key: 0 },
-	]);
+	expect(shortcutsFor(keyEvent("/", "Slash"), null, false)).toEqual([{ id: "focusComposer", scope: "outside-fields", key: 0 }]);
 	expect(shortcutsFor(keyEvent("i", "KeyI", { ctrl: true }), null, false)).toEqual([{ id: "focusComposer", scope: "anywhere", key: 1 }]);
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
-	expect(shortcutsFor(keyEvent("s", "KeyS"), null, false)).toEqual([
-		{ id: "newSession", scope: "outside-fields", key: 1 },
-		{ id: "todoStatus", scope: "outside-fields", key: 0 },
-	]);
+	expect(shortcutsFor(keyEvent("s", "KeyS"), null, false)).toEqual([{ id: "newSession", scope: "outside-fields", key: 1 }]);
 });
 
-test("↓ and ↑, or J and K, step through sessions, pull requests, todos, sport logs, memories, bookmarks, and changed files, and ↑ also takes back a queued message", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "memoryProjectNext", "memoryBookmarksNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "memoryProjectPrevious", "memoryBookmarksPrevious", "previousChangedFile"]);
-	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "sportJournalNext", "memoryProjectNext", "memoryBookmarksNext", "nextChangedFile"]);
-	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "todoPrevious", "sportJournalPrevious", "memoryProjectPrevious", "memoryBookmarksPrevious", "previousChangedFile"]);
+test("↓ and ↑, or J and K, step through sessions, pull requests, sport logs, memories, bookmarks, and changed files, and ↑ also takes back a queued message", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "sportJournalNext", "memoryProjectNext", "memoryBookmarksNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "sportJournalPrevious", "memoryProjectPrevious", "memoryBookmarksPrevious", "previousChangedFile"]);
+	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "sportJournalNext", "memoryProjectNext", "memoryBookmarksNext", "nextChangedFile"]);
+	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "sportJournalPrevious", "memoryProjectPrevious", "memoryBookmarksPrevious", "previousChangedFile"]);
 	expect(shortcutsFor(keyEvent("j", "KeyJ"), null, false).map(({ scope }) => scope)).not.toContain("anywhere");
 });
 
@@ -160,7 +153,7 @@ test("Ctrl+Shift+P pins or unpins the header tab on every platform, as in Capy, 
 	expect(press("π", "KeyP", { ctrl: true, alt: true })).toEqual(["directory"]);
 });
 
-test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+↑↓ step through sessions, Cmd+Alt+←→ and Ctrl+Tab through header tabs, and Alt+Shift+arrows move a todo", () => {
+test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+↑↓ step through sessions, Cmd+Alt+←→ and Ctrl+Tab through header tabs, and Alt+Shift+arrows move a row of the pull request list", () => {
 	expect(press("[", "BracketLeft", { ctrl: true })).toEqual(["back"]);
 	expect(press("]", "BracketRight", { ctrl: true })).toEqual(["forward"]);
 	expect(press("ArrowUp", "ArrowUp", { ctrl: true, alt: true })).toEqual(["previousSession"]);
@@ -185,7 +178,7 @@ test("the Browser's preload hands over exactly the keys of the pick mode shortcu
 	expect(keys.toSorted()).toEqual([...PICK_MODE_KEYS].toSorted());
 });
 
-test("G then W goes to a page only right after a plain G, and P picks a todo's priority", () => {
+test("G then W goes to a page only right after a plain G", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
 	// R alone switches the Browser's pick mode, and a G before it changes nothing.
 	expect(after("g", "r")).toEqual(["browserPickRegion"]);
@@ -198,8 +191,6 @@ test("G then W goes to a page only right after a plain G, and P picks a todo's p
 	expect(after(null, "w")).toEqual([]);
 	expect(after("h", "w")).toEqual([]);
 	expect(after("g", "W", { shift: true })).toEqual([]);
-	expect(after("g", "p")).toEqual(["todoPriority"]);
-	expect(after(null, "p")).toEqual(["todoPriority"]);
 	expect(after("g", "i", { ctrl: true })).toEqual(["focusComposer"]);
 	expect(shortcutsFor(keyEvent("w", "KeyW"), "g", false)).toEqual([{ id: "workspace", scope: "outside-fields", key: 0 }]);
 });
@@ -258,7 +249,7 @@ test("the newest registration tries a key first, and the first handler that take
 	const stack = createShortcutStack();
 	const calls: string[] = [];
 	stack.add(1, () => ({ nextPullRequest: () => void calls.push("app") }));
-	stack.add(3, () => ({ todoNext: () => void calls.push("page") }));
+	stack.add(3, () => ({ sportJournalNext: () => void calls.push("page") }));
 	stack.add(2, () => ({ nextChangedFile: () => void calls.push("middle") }));
 	const event = pressed("ArrowDown", "ArrowDown");
 	stack.dispatch(event, true, null);
@@ -270,14 +261,14 @@ test("a handler that declines passes the key to the registration below, and one 
 	const stack = createShortcutStack();
 	const calls: string[] = [];
 	stack.add(1, () => ({ focusComposer: () => void calls.push("app") }));
-	stack.add(2, () => ({ todoSearch: () => (calls.push("page"), false) }));
+	stack.add(2, () => ({ focusComposer: () => (calls.push("page"), false) }));
 	const event = pressed("/", "Slash");
 	stack.dispatch(event, true, null);
 	expect(calls).toEqual(["page", "app"]);
 	expect(event.defaultPrevented).toBe(true);
 	const declined = pressed("/", "Slash");
 	const empty = createShortcutStack();
-	empty.add(1, () => ({ todoSearch: () => false }));
+	empty.add(1, () => ({ focusComposer: () => false }));
 	empty.dispatch(declined, true, null);
 	expect(declined.defaultPrevented).toBe(false);
 });
@@ -286,17 +277,17 @@ test("a registration reads its handlers when the key is pressed, and removing it
 	const stack = createShortcutStack();
 	const calls: string[] = [];
 	let handlers: ShortcutHandlers = {};
-	stack.add(1, () => ({ todoNew: () => void calls.push("app") }));
+	stack.add(1, () => ({ newSession: () => void calls.push("app") }));
 	const remove = stack.add(2, () => handlers);
 	expect(stack.size).toBe(2);
-	stack.dispatch(pressed("c", "KeyC"), true, null);
+	stack.dispatch(pressed("s", "KeyS"), true, null);
 	expect(calls).toEqual(["app"]);
-	handlers = { todoNew: () => void calls.push("page") };
-	stack.dispatch(pressed("c", "KeyC"), true, null);
+	handlers = { newSession: () => void calls.push("page") };
+	stack.dispatch(pressed("s", "KeyS"), true, null);
 	expect(calls).toEqual(["app", "page"]);
 	remove();
 	expect(stack.size).toBe(1);
-	stack.dispatch(pressed("c", "KeyC"), true, null);
+	stack.dispatch(pressed("s", "KeyS"), true, null);
 	expect(calls).toEqual(["app", "page", "app"]);
 });
 
@@ -304,12 +295,12 @@ test("scope limits who runs: text fields keep their keys, chords work anywhere, 
 	const stack = createShortcutStack();
 	const calls: string[] = [];
 	stack.add(1, () => ({
-		todoNew: () => void calls.push("todo"),
+		newSession: () => void calls.push("newSession"),
 		switcher: () => void calls.push("switcher"),
 		interrupt: () => void calls.push("interrupt"),
 	}));
 	const mod = IS_MAC ? { meta: true } : { ctrl: true };
-	stack.dispatch(pressed("c", "KeyC"), false, null);
+	stack.dispatch(pressed("s", "KeyS"), false, null);
 	stack.dispatch(pressed("k", "KeyK", mod), false, null);
 	stack.dispatch(pressed("Backspace", "Backspace", { ...mod, shift: true }), true, null);
 	expect(calls).toEqual(["switcher"]);
@@ -318,8 +309,8 @@ test("scope limits who runs: text fields keep their keys, chords work anywhere, 
 test("a key something nearer already handled is left alone", () => {
 	const stack = createShortcutStack();
 	const calls: string[] = [];
-	stack.add(1, () => ({ todoNew: () => void calls.push("app") }));
-	const event = pressed("c", "KeyC");
+	stack.add(1, () => ({ newSession: () => void calls.push("app") }));
+	const event = pressed("s", "KeyS");
 	event.preventDefault();
 	stack.dispatch(event, true, null);
 	expect(calls).toEqual([]);

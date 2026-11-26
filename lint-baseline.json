@@ -2,7 +2,7 @@
 	"file-size": {
 		"src/dashboard-session.test.ts": 4,
 		"src/session-facts.test.ts": 1,
-		"templates/omp/extensions.test.ts": 8,
+		"templates/omp/extensions.test.ts": 7,
 		"web/components/board/page.tsx": 1,
 		"web/components/dithercn/black-hole.tsx": 4,
 		"web/components/dithercn/dither-globe.tsx": 1,
@@ -12,7 +12,6 @@
 		"web/lib/dither/shader.tsx": 1
 	},
 	"glossary-terms": {
-		"docs/usage/settings.md": 1,
-		"docs/usage/todo-list.md": 1
+		"docs/usage/settings.md": 1
 	}
 }

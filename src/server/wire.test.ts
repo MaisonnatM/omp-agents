@@ -98,68 +98,6 @@ describe("parseClientMsg", () => {
 		for (const change of [undefined, null, {}, { op: "set", objective: " ", tokenBudget: null }, { op: "set", objective: "ship", tokenBudget: -1 }, { op: "drop" }]) expect(msg({ t: "goal", instanceId: "i1", change })).toBeNull();
 	});
 
-	test("user-todo takes each change with the fields it needs, and drops any other field", () => {
-		const change = (value: unknown) => msg({ t: "user-todo", change: value });
-		expect(change({ op: "add", id: "a", parentId: null, afterId: "b", categoryId: "w", text: "Ship", extra: 1 })).toEqual({
-			t: "user-todo",
-			change: { op: "add", id: "a", parentId: null, afterId: "b", categoryId: "w", workspace: null, text: "Ship", body: "", due: null, links: [], addedBy: null, status: "todo", priority: 0, assignee: null, createdAt: null },
-		});
-		const pr = { kind: "pull-request", owner: "o", repo: "r", number: 3 };
-		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "Review", links: [pr], due: "2026-10-06", addedBy: "s1", status: "backlog", priority: 2, createdAt: "2026-10-05T09:00:00.000Z" })).toMatchObject({
-			change: { links: [pr], due: "2026-10-06", addedBy: "s1", status: "backlog", priority: 2, createdAt: "2026-10-05T09:00:00.000Z" },
-		});
-		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "x", links: [{ kind: "pull-request", owner: "o", repo: "r", number: 0 }] })).toBeNull();
-		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "x", due: "Friday" })).toBeNull();
-		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "x", status: "started" })).toBeNull();
-		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, workspace: "/code/app", text: "x" })).toMatchObject({ change: { workspace: "/code/app" } });
-		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, workspace: "code/app", text: "x" })).toBeNull();
-		expect(change({ op: "set-workspace", id: "a", workspace: "/code/app" })).toEqual({ t: "user-todo", change: { op: "set-workspace", id: "a", workspace: "/code/app" } });
-		expect(change({ op: "set-workspace", id: "a", workspace: null })).toEqual({ t: "user-todo", change: { op: "set-workspace", id: "a", workspace: null } });
-		expect(change({ op: "set-workspace", id: "a", workspace: "~/code/app" })).toBeNull();
-		expect(change({ op: "set-workspace", id: "a", workspace: `/${"x".repeat(4096)}` })).toBeNull();
-		expect(change({ op: "set-workspace", id: "a" })).toBeNull();
-		expect(change({ op: "set-status", id: "a", status: "canceled", at: "2026-10-05T09:00:00.000Z" })).toEqual({ t: "user-todo", change: { op: "set-status", id: "a", status: "canceled", at: "2026-10-05T09:00:00.000Z" } });
-		expect(change({ op: "set-status", id: "a", status: "done", at: "soon" })).toBeNull();
-		expect(change({ op: "set-status", id: "a", status: "closed", at: "2026-10-05T09:00:00.000Z" })).toBeNull();
-		expect(change({ op: "set-priority", id: "a", priority: 4 })).toEqual({ t: "user-todo", change: { op: "set-priority", id: "a", priority: 4 } });
-		expect(change({ op: "set-priority", id: "a", priority: 5 })).toBeNull();
-		expect(change({ op: "set-assignee", id: "a", assignee: "agent" })).toEqual({ t: "user-todo", change: { op: "set-assignee", id: "a", assignee: "agent" } });
-		expect(change({ op: "set-assignee", id: "a", assignee: null })).toEqual({ t: "user-todo", change: { op: "set-assignee", id: "a", assignee: null } });
-		expect(change({ op: "set-assignee", id: "a", assignee: "robot" })).toBeNull();
-		expect(change({ op: "set-assignee", id: "a" })).toBeNull();
-		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "x", assignee: "user" })).toMatchObject({ change: { assignee: "user" } });
-		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "x", assignee: "robot" })).toBeNull();
-		expect(change({ op: "move", id: "a", afterId: null, categoryId: "w" })).toEqual({ t: "user-todo", change: { op: "move", id: "a", afterId: null, categoryId: "w" } });
-		expect(change({ op: "link", id: "a", link: { kind: "session", sessionId: "s1" } })).toMatchObject({ change: { link: { kind: "session", sessionId: "s1" } } });
-		expect(change({ op: "link", id: "a", link: { kind: "session" } })).toBeNull();
-		expect(change({ op: "empty-archive" })).toEqual({ t: "user-todo", change: { op: "empty-archive" } });
-		expect(change({ op: "clear-done", categoryId: null })).toEqual({ t: "user-todo", change: { op: "clear-done", categoryId: null } });
-		expect(change({ op: "edit-body", id: "a", body: "# Notes\n" })).toEqual({ t: "user-todo", change: { op: "edit-body", id: "a", body: "# Notes\n" } });
-		expect(change({ op: "categorize", id: "a", categoryId: null })).toEqual({ t: "user-todo", change: { op: "categorize", id: "a", categoryId: null } });
-		expect(change({ op: "add-category", id: "w", name: "Work" })).toEqual({ t: "user-todo", change: { op: "add-category", id: "w", name: "Work" } });
-		expect(change({ op: "add-category", id: "none", name: "Work" })).toBeNull();
-		expect(change({ op: "add", id: "a", parentId: null, afterId: null, text: "Ship" })).toBeNull();
-		expect(change({ op: "clear-done" })).toBeNull();
-		expect(change({ op: "toggle", id: "a", doneAt: "2026-10-05T09:00:00.000Z" })).toBeNull();
-		expect(change({ op: "indent", id: "" })).toBeNull();
-		expect(change({ op: "edit", id: "a", text: "x".repeat(2001) })).toBeNull();
-		expect(change({ op: "edit-body", id: "a", body: "x".repeat(100_001) })).toBeNull();
-		expect(change({ op: "rename-category", id: "w", name: "  " })).toBeNull();
-		expect(change({ op: "move", id: "a" })).toBeNull();
-	});
-
-	test("restore puts back a todo of the level it names, held to the limits an add is", () => {
-		const change = (value: unknown) => msg({ t: "user-todo", change: value });
-		const leaf = { id: "a1", text: "Child", body: "", status: "todo" as const, priority: 0 as const, assignee: null, doneAt: null, due: null, createdAt: null };
-		const top = { ...leaf, id: "a", categoryId: null, workspace: null, children: [leaf], links: [], addedBy: null };
-		expect(change({ op: "restore", parentId: null, todo: top, index: 0 })).toEqual({ t: "user-todo", change: { op: "restore", parentId: null, todo: top, index: 0 } });
-		expect(change({ op: "restore", parentId: "a", todo: { ...leaf, children: [leaf] }, index: 1 })).toEqual({ t: "user-todo", change: { op: "restore", parentId: "a", todo: leaf, index: 1 } });
-		expect(change({ op: "restore", parentId: null, todo: { ...top, text: "x".repeat(2001) }, index: 0 })).toBeNull();
-		expect(change({ op: "restore", parentId: null, todo: { ...top, children: [{ ...leaf, body: "x".repeat(100_001) }] }, index: 0 })).toBeNull();
-		expect(change({ op: "restore", parentId: null, todo: { ...top, children: [{ ...leaf, id: "c".repeat(65) }] }, index: 0 })).toBeNull();
-		expect(change({ op: "restore", parentId: null, todo: top, index: -1 })).toBeNull();
-	});
-
 	test("module-change names a module, and a change for no module is refused before any module reads it", () => {
 		expect(msg({ t: "module-change", id: "no-such-module", change: [] })).toBeNull();
 		expect(msg({ t: "module-change", id: "toString", change: [] })).toBeNull();

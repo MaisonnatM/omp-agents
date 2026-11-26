@@ -26,8 +26,6 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Providers](usage/providers.md)
 - [Integrations](usage/integrations.md)
 - [MCP servers](usage/mcp-servers.md)
-- [Todo list](usage/todo-list.md)
-  - [Todos from agents](usage/todo-list.md#todos-from-agents)
 - [Projects](usage/projects.md)
 - [Board](usage/board.md)
 - [Sport](usage/sport.md)
@@ -46,7 +44,7 @@ For which file draws each part of the screen, see the [Interface map](code-layou
 - [Desktop app](usage/desktop-app.md)
 - [Limitations](usage/limitations.md)
 
-A filled button marks the main action of its surface: Send, Finish, Resume on a past session, Run now on a routine, and **Work on it** on an open todo.
+A filled button marks the main action of its surface: Send, Finish, Resume on a past session, and Run now on a routine.
 Suggested prompts, other quick actions, forking, and menu items stay quiet, so they never compete with it.
 Actions that wait for the server show a spinner or a progress label and block repeated activation until the work finishes.
 Starting a session, stopping a turn, switching model settings, resending a prompt, canceling a subagent, and running a routine use this state.

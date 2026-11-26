@@ -1,6 +1,5 @@
 /** The messages the dashboard socket carries between the server and the page. */
 import type { Routine, RoutineChange } from "../routines";
-import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ActivityEvent } from "./activity-event";
 import type { Bot, BotChange, BotId, BotLast } from "./bots";
 import type { DictationEvent } from "./dictation";
@@ -50,8 +49,6 @@ export type ServerMsg =
 	| { t: "models"; instanceId: string; models: ModelEntry[]; error: string | null }
 	/** Answers this socket's `dequeue` or `interrupt` with the messages it took back, steers before follow-ups, each queue oldest first. Nothing answers when none was still waiting. */
 	| { t: "withdrawn"; view: LiveView; reqId: number; messages: WithdrawnMessage[] }
-	/** The Todo page's list, whole, sent when a socket opens and after every change. */
-	| { t: "user-todos"; list: UserTodoList }
 	| ModuleMsg
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
@@ -140,8 +137,6 @@ export type ClientMsg =
 	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer }
 	/** Cancel a running subagent of a live session without stopping the session's turn. */
 	| { t: "cancel-agent"; view: LiveView & { agentId: string } }
-	/** Change the Todo page's list; every socket then gets the list as it is after. */
-	| { t: "user-todo"; change: UserTodoChange }
 	| ModuleChangeMsg
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
 	| { t: "routine"; change: RoutineChange }

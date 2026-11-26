@@ -11,9 +11,6 @@ SIDEBAR_TABS satisfies readonly { value: ShortcutId }[];
 
 const KEY = "omp-agents.sidebar-tabs";
 
-/** The Notes tab's id, which a layout stored before the Notes page left still names. */
-const LEGACY_NOTES_TAB = "notes";
-
 /** The user's sidebar tabs: every tab once, in the order the sidebar's page list shows them, and whether the user hid it. */
 export type TabLayout = readonly { tab: SidebarTab; hidden: boolean }[];
 
@@ -42,7 +39,6 @@ export function navRowOf(page: Page | null, absentTabs: ReadonlySet<SidebarTab>)
 /**
  * The layout stored as `raw`. It keeps each known tab once, so a stored tab of a page that left, such as Settings, Notes, Calendar, or Email, drops out.
  * A tab missing from what is stored, such as one added since, takes its default place; anything unreadable gives the default.
- * A layout that still has Todo immediately before {@link LEGACY_NOTES_TAB}, the slot it took in the old tab bar, puts Todo just before Sport.
  */
 export function decodeTabLayout(raw: string | null): TabLayout {
 	let stored: unknown;
@@ -52,8 +48,6 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 		return DEFAULT_TAB_LAYOUT;
 	}
 	if (!Array.isArray(stored)) return DEFAULT_TAB_LAYOUT;
-	const ids = stored.map(entry => (isObject(entry) ? entry.tab : undefined)).filter(id => id === LEGACY_NOTES_TAB || SIDEBAR_TABS.some(({ value }) => value === id));
-	const todoInOldSlot = ids.some((id, index) => id === "todo" && ids[index + 1] === LEGACY_NOTES_TAB);
 	const layout: { tab: SidebarTab; hidden: boolean }[] = [];
 	for (const entry of stored as unknown[]) {
 		if (!isObject(entry)) continue;
@@ -64,19 +58,7 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 	for (const [index, { value }] of SIDEBAR_TABS.entries()) {
 		if (!layout.some(kept => kept.tab === value)) layout.splice(Math.min(index, layout.length), 0, { tab: value, hidden: false });
 	}
-	return todoInOldSlot ? todoBeforeSport(layout) : layout;
-}
-
-/** `layout`, which held Todo in its old slot, with Todo moved to just before Sport. */
-function todoBeforeSport(layout: { tab: SidebarTab; hidden: boolean }[]): TabLayout {
-	const todoAt = layout.findIndex(entry => entry.tab === "todo");
-	if (todoAt < 0) return layout;
-	const todo = layout[todoAt]!;
-	const next = layout.filter((_, index) => index !== todoAt);
-	const sportAt = next.findIndex(entry => entry.tab === "sport");
-	if (sportAt < 0) return layout;
-	next.splice(sportAt, 0, todo);
-	return next;
+	return layout;
 }
 
 export const encodeTabLayout = (layout: TabLayout): string => JSON.stringify(layout);
@@ -104,7 +86,7 @@ export const shownTabs = (layout: TabLayout, absent: ReadonlySet<SidebarTab>): S
 /**
  * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
  * `absent` stays the same set until a module turns on or off, and `shown` with it until the layout changes.
- * A stored layout that differs from how it decodes, such as one naming a tab that left or {@link LEGACY_NOTES_TAB}, is stored again, so old ids leave this browser and Settings › Sync.
+ * A stored layout that differs from how it decodes, such as one naming a tab that left, is stored again, so old ids leave this browser and Settings › Sync.
  */
 export function useSidebarTabs(): {
 	layout: TabLayout;

@@ -19,7 +19,6 @@ import { BoardLog } from "./board-log";
 import { ProjectsFile } from "./projects-file";
 import { SportFile } from "./sport-file";
 import { createClientHandler, type SocketEnv } from "./socket";
-import { UserTodosFile } from "./user-todos-file";
 import { ProjectTrustFile } from "./project-trust-file";
 import { WorkspacesFile } from "./workspaces-file";
 import type { Socket, SocketData } from "./views";
@@ -43,7 +42,6 @@ function setup(initial: PastSession[]) {
 	const published: ServerMsg[] = [];
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-lists-"));
 	dirs.push(dir);
-	const todos = new UserTodosFile(join(dir, "todos.json"));
 	const sport = new SportFile(join(dir, "sport.json"));
 	const routines = new RoutinesFile(join(dir, "routines.json"));
 	const scheduled = new ScheduledFile(join(dir, "scheduled.json"));
@@ -54,7 +52,6 @@ function setup(initial: PastSession[]) {
 	const reviewDrafts = new ReviewDraftsFile(join(dir, "review-drafts.json"));
 	const bots = new BotsFile(join(dir, "bots.json"));
 	const lists = new ListRegistry({
-		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
 		scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, 1000) },
 		workspaces: {
@@ -200,7 +197,6 @@ describe("registered whole-list broadcasts", () => {
 		const { lists, published } = setup([]);
 		const replies: ServerMsg[] = [];
 		const peer = { send: (msg: ServerMsg) => void replies.push(msg) };
-		expect(lists.apply("user-todos", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("routines", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("scheduled", { op: "remove", id: "missing" }, peer)).toBe(false);
 		expect(lists.apply("workspaces", { op: "show", cwd: "/missing" }, peer)).toBe(false);

@@ -6,13 +6,12 @@ import type { Workspace } from "../../../src/shared/workspaces";
 import { type BoardState, type BoardTask, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { activityControl } from "../../activity";
-import { folderName } from "../../labels";
+import { folderName, type KnownSessions, sessionLabel } from "../../labels";
 import { type BotGroup, type BotRow, botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups, crossProject } from "../../bots-model";
 import type { IconComponent } from "@/lib/icon-context";
 import { hashForBots, hashForPage, type PageHash } from "../../routing";
 import { BotAvatar } from "../bots/bot-avatar";
 import { CountPill } from "../count-pill";
-import { type KnownSessions, sessionLabel } from "../todo/links";
 import { type BoardRoute, pageView } from "./module";
 
 /** The Board's Messages address: Workspace `workspace`, Board task `thread`'s thread open, with `search`'s results shown, or its reply `reply` highlighted. */

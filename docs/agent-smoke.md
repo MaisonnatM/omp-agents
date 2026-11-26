@@ -11,7 +11,7 @@ Service calls omit `async` and `timeout`; a readiness deadline belongs in `ready
 Finite checks use `async: true` when needed, without `name` or `ready`.
 Stop only your service with `write({path: "proc://<name>/kill"})`, omitting `content`; reading that path does not stop it.
 `kill $(lsof -ti tcp:<port>)` also kills every process connected to the port, such as another session's desktop window.
-The user's own dashboard runs routines and takes the todos agents add; a server started from an omp session (`PI_SESSION_ID` set) never runs routines, Bots, or the file inboxes, even after the user's dashboard exits.
+The user's own dashboard runs routines and the file inboxes; a server started from an omp session (`PI_SESSION_ID` set) never runs routines, Bots, or the file inboxes, even after the user's dashboard exits.
 
 Every request needs the access token, stored in `~/.config/omp-agents/token`, or `$XDG_CONFIG_HOME/omp-agents/token` when that is set; the server prints no sign-in address, and `/?token=` signs nothing in.
 The page reads the token from its origin's `localStorage`, which only the desktop window's preload fills, so a browser smoke seeds the same entries itself, `pageAccess(token)` from `src/server/auth.ts`, as [Browser smoke](#browser-smoke) shows.
@@ -30,8 +30,8 @@ Open `#new/%2Ftmp` to start one in `/tmp`, use a prompt such as `Reply with just
 
 ## Isolated state
 
-A smoke server reads and writes the user's own state: `todos.json`, `token`, and the rest under `~/.config/omp-agents`, and the settings sync's repository under the data directory.
-When a check changes that state, such as adding a todo, start the server with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (`src/paths.ts`), each a fresh `mktemp -d`.
+A smoke server reads and writes the user's own state: `routines.json`, `token`, and the rest under `~/.config/omp-agents`, and the settings sync's repository under the data directory.
+When a check changes that state, such as adding a workspace, start the server with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` (`src/paths.ts`), each a fresh `mktemp -d`.
 Its token is then in `$XDG_CONFIG_HOME/omp-agents/token`.
 The omp sessions it starts still use the user's omp directory, so they still run with the user's models and sign-ins.
 Each session's socket lives under `$XDG_CONFIG_HOME/omp-agents/sessions/<port>/`, and the server refuses a socket path past 103 bytes (`MAX_SOCKET_PATH_BYTES` in `src/keeper-link.ts`), so a smoke that starts sessions needs a short `XDG_CONFIG_HOME` such as `mktemp -d /tmp/oa-c.XXXX`; under macOS's default `$TMPDIR`, starting a session fails with "The session socket path is too long".
@@ -78,10 +78,9 @@ Besides a live session's own hash, the routes are:
 - `#past/<session id>`, `#session/<session id>`;
 - `#pull-requests`, `#pull-requests/<owner>/<repo>/<number>`, `#pull-requests/<owner>/<repo>/<number>/files`, `#pull-requests/<owner>/<repo>/<number>/files/<encoded path>`;
 - `#sport`, `#sport?day=<YYYY-MM-DD>`, `#sport/journal`, `#sport/journal?open=<log id>`, `#sport/progress`;
-- `#todo`, `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, each with `?open=<todo id>` to open a todo;
 - `#board`, `#board?workspace=<encoded dir>`, `#board/<Board task number>?workspace=<encoded dir>`;
 - `#notifications`, `#bots`, `#bots/new`, `#bots/<id>`, `#bots/<id>/routines`, `#bots/<id>/routines/<routine id>`, `#bots/<id>/routines/<routine id>/edit`, `#bots/<id>/routines/new`;
-- `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#scheduled/<send id>`;
+- `#new`, `#new/<encoded cwd>`, `#scheduled/<send id>`;
 - `#get-started`, which always opens Get started's setup dialog over the home, even after local dismissal;
 - `#settings`, `#settings/<section>`, where `<section>` is `analytics`, `activity`, `preferences`, `keyboard`, `providers`, `integrations`, `mcp-servers`, `source-control`, `workspaces`, `sync`, `phone`, `storage`, `models`, `agents`, `omp`, `omp-memory`, `files`, `extensions`, `workflows`, `decisions`, or `worktrees`.
 
@@ -155,7 +154,7 @@ Chromium is the `playwright-core` build that `~/Library/Caches/ms-playwright` ho
 The desktop shell opens a real window on the user's screen unless `OMP_AGENTS_HEADLESS=1` keeps it hidden, out of the Dock, and without notifications or sounds, so every desktop smoke sets it.
 After `bun run build` in `desktop/`, start a named service on your smoke port with `OMP_AGENTS_HEADLESS=1 PORT=<port> bun launch.ts --remote-debugging-port=<page port> --inspect=<main port>`.
 The hidden window still renders, and `Page.captureScreenshot` captures it.
-Only a check of what reaches the user's screen, such as notifications, the Dock badge, sounds, the quick-capture shortcut, window position, or full screen, runs without `OMP_AGENTS_HEADLESS`, and only once the user agrees to a window opening.
+Only a check of what reaches the user's screen, such as notifications, the Dock badge, sounds, window position, or full screen, runs without `OMP_AGENTS_HEADLESS`, and only once the user agrees to a window opening.
 Wait for its server's `The access token is in` line, or the listening line `omp-agents (omp v…) on http://127.0.0.1:<port>`, when it starts its own server.
 The window signs itself in, so it needs no token from you.
 Pick both debugging ports the same way as the smoke port, each free.
