@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- Behind the scenes: every lint rule now has a sample file it must flag, so a rule that quietly stops working fails the checks, and a new rule can start with its old findings listed and only ever shrink them.
 - The Board's tabs are back under the Workspace's name: Messages, Bots, Pull requests, Memory, Projects, and Settings.
 - Board threads no longer suggest ending the session, which a Board session does by itself.
 - Behind the scenes: an eval run now stops when a task's hidden tests could not run, such as with Docker down, instead of scoring every run after it as the model's failure.

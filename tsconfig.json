@@ -14,5 +14,6 @@
       "@/*": ["./web/*"]
     }
   },
-  "include": ["src", "web", "scripts", "templates/omp/*.ts", "desktop/*.test.ts"]
+  "include": ["src", "web", "scripts", "templates/omp/*.ts", "desktop/*.test.ts"],
+  "exclude": ["scripts/lint/canaries"]
 }
