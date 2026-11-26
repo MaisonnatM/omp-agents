@@ -7,7 +7,7 @@ import { type BoardState, type BoardTask, statusOf, wakeTarget } from "../../../
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { activityControl } from "../../activity";
 import { folderName } from "../../labels";
-import { type BotGroup, type BotRow, botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups } from "../../bots-model";
+import { type BotGroup, type BotRow, botAsking, botGroupKey, botGroupLabel, botGroupListName, botGroups, crossProject } from "../../bots-model";
 import type { IconComponent } from "@/lib/icon-context";
 import { hashForBots, hashForPage, type PageHash } from "../../routing";
 import { BotAvatar } from "../bots/bot-avatar";
@@ -19,7 +19,7 @@ import { type BoardRoute, pageView } from "./module";
 export const hashForBoard = (workspace: string | null, thread: number | null = null, { search = null, reply = null }: Partial<Pick<BoardRoute, "search" | "reply">> = {}): string =>
 	hashForPage({ kind: "board", workspace, view: { tab: "messages", thread }, search, reply, bots: false });
 
-/** The Bots group's page on the Board: every Bot, whatever its Workspace. */
+/** The Bots group's page on the Board: the cross-project Bots; a Bot of one project shows in that Workspace's Bots tab. */
 export const hashForBoardBots = (): string => hashForPage({ kind: "board", workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, bots: true });
 
 /** Links in Workspace `workspace`'s tabs: a Bot, project, or pull request page opens in the Board tab that shows it, any other page at its own address. */
@@ -167,7 +167,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessio
 			<SidebarGroup collapsible open={!collapsed.has("bots")} onOpenChange={() => toggle("bots")}>
 				<SidebarGroupLabel>Bots</SidebarGroupLabel>
 				<div>
-			{bots !== null && botGroups(bots).map(group => {
+			{bots !== null && botGroups(bots.filter(row => crossProject(row.bot, sidebar))).map(group => {
 				const key = botGroupKey(group);
 				return (
 					<SidebarGroup

@@ -4,6 +4,7 @@ import { DESIGNER_JOB, DESIGNER_NAME } from "../src/shared/bot-designer";
 import { type Bot, type BotChange, type BotId, type BotKind, type BotLast, jobLine } from "../src/shared/bots";
 import { SHEPHERD_JOB, SHEPHERD_NAME } from "../src/shared/shepherd";
 import type { RosterHost, View } from "../src/shared/sessions";
+import type { Workspace } from "../src/shared/workspaces";
 import { needsYou } from "./attention";
 import { statusLabel } from "./components/status-dot";
 import { plainMarkdown } from "../src/shared/plain-markdown";
@@ -114,6 +115,9 @@ function saidLine(last: BotLast): string {
 		}
 	}
 }
+
+/** Whether Bot `bot` works across projects: its directory holds other Workspaces, as `~/code` holds each repository. Board › Bots lists these; a Bot whose directory is one project's shows in that Workspace's Bots tab. */
+export const crossProject = (bot: Bot, workspaces: readonly Workspace[]): boolean => workspaces.some(each => each.cwd.startsWith(`${bot.cwd}/`));
 
 /** Each Bot's row, the most recent conversation first, then by name. */
 export function botRows(bots: readonly Bot[], hosts: readonly RosterHost[], lasts: Readonly<Record<BotId, BotLast | null>>): BotRow[] {
