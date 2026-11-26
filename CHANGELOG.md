@@ -7,6 +7,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 - Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its blue unread count comes back, counting from that reply, until you open the thread again.
 - A Board task's message in the channel has **Mark unread** too, which counts its whole thread as unread again.
+- **Notifications** and **Settings** in the Board's sidebar now open with the sidebar still on the Board, instead of switching it to Sessions.
 - A Board thread now shows what each session did right under that session's reply, instead of in one **Actions** card at the bottom, without the "Actions" heading: each line is just the Git, GitHub, or Linear logo and the branch, pull request, or issue name, with what the session did with it on hover.
 - A Board Workspace's **Bots** and **Settings** tabs now look like the Sessions side's pages: the Bots tab lists its Bots in a resizable column with search, and the Settings tab lists its sections with **Search settings**. The **Memory** tab now fills the width, with the open memory beside the list.
 - A Board session now asks first only when your message is unclear, such as when it could mean two different changes. A clear request, such as "Merge on main" or a plain "make the button blue", runs right away.

@@ -8,6 +8,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 
 - Under the Board tab, the sidebar lists your Workspaces; a count beside one says how many of its Board tasks are ready.
   Under each Workspace are its running sessions that posted, replied, or were started on its Board tasks; a stopped one drops out of the list, and a click opens one.
+- **Notifications** and **Settings**, above the Workspaces, open their page with the sidebar still on the Board; **Sessions** switches it back.
 - The page reads like a Slack channel: a `#` header with the Workspace's name, then its Board tasks as messages, oldest first and newest at the foot, split by day.
   Each message shows its author's picture, name, and time, its text, its `#` number, its status, and its `key=value` labels; a session's name carries a **Session** tag and opens that session.
   A later message from the same author within five minutes drops the picture and name, and shows its time on hover.
