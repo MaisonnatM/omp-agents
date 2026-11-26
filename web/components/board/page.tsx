@@ -4,12 +4,14 @@
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconBubbleWideNotification, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconPencil, IconRobot, IconUser } from "central-icons";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconBubbleWideNotification, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconPencil, IconRobot, IconUser } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { type PastSession, type PromptImage, type RosterHost, type Stop, stopOf, type View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
 import { AppMark } from "../app-mark";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CountPill } from "../count-pill";
 import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardNote, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { splitSuggestions } from "../../../src/shared/transcript";
@@ -61,7 +63,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 	useMinute();
 	const [off] = useModulesOff();
 	const searchField = useRef<BoardSearchFieldHandle>(null);
-	if (state === null) return <p className="px-6 py-6 text-sm text-muted-foreground">Loading the Board…</p>;
+	if (state === null) return <BoardLoading />;
 	if (route.bots)
 		return (
 			<section aria-label="Bots" className="flex min-h-0 min-w-[360px] flex-1 flex-col">
@@ -184,22 +186,40 @@ export function dayLabel(at: number): string {
 /** The day's line across the messages, with its name in a pill, as Slack splits a channel by day. */
 function DayDivider({ at }: { at: number }) {
 	return (
-		<div role="separator" aria-label={dayLabel(at)} className="relative my-2 flex items-center px-5">
+		<div role="separator" aria-label={dayLabel(at)} className="relative my-2 flex items-center px-6">
 			<span className="h-px flex-1 bg-border" />
-			<span className="rounded-full border border-border bg-background px-3 py-0.5 text-xs font-semibold">{dayLabel(at)}</span>
+			<span className="rounded-full border border-border bg-background px-3 py-0.5 text-xs font-medium text-muted-foreground">{dayLabel(at)}</span>
 			<span className="h-px flex-1 bg-border" />
+		</div>
+	);
+}
+
+/** The channel's stand-in while the Board loads: three message rows of avatar and text bars. */
+function BoardLoading() {
+	return (
+		<div role="status" className="flex min-h-0 flex-1 flex-col justify-end gap-5 px-6 py-6">
+			<span className="sr-only">Loading the Board</span>
+			{[280, 420, 340].map(width => (
+				<div key={width} className="flex gap-2">
+					<span aria-hidden className="size-9 shrink-0 rounded-lg bg-muted" />
+					<div className="flex flex-col gap-2 pt-1">
+						<Skeleton width={96} />
+						<Skeleton width={width} />
+					</div>
+				</div>
+			))}
 		</div>
 	);
 }
 
 function ChannelIntro({ name }: { name: string }) {
 	return (
-		<div className="flex flex-col gap-1 px-5 pb-4">
-			<h2 className="flex items-center gap-1 text-xl font-bold">
-				<IconHashtag aria-hidden className="size-5" />
+		<div className="flex flex-col gap-1 px-6 pb-4">
+			<h2 className="flex items-center gap-1 text-lg font-semibold">
+				<IconHashtag aria-hidden className="size-5 text-muted-foreground" />
 				{name}
 			</h2>
-			<p className="text-sm text-muted-foreground">This is the very beginning of the {name} Board. Each message you send here is a Board task, and a session starts on it.</p>
+			<p className="text-sm text-muted-foreground">Each message here becomes a Board task, and a session starts working on it.</p>
 		</div>
 	);
 }
@@ -242,32 +262,27 @@ export function Avatar({ by, size = "message" }: { by: BoardAuthor; sessions: Kn
 	);
 }
 
-/** The author's name: "omp agent" with a tag that says it is a session, as Slack tags an app, then the session's title, which opens its conversation in its Board thread. */
+/** The author's name: yours, or for a session "omp agent" then the session's title, which opens its conversation in its Board thread. */
 function AuthorName({ by, sessions, state, workspace }: { by: BoardAuthor; sessions: KnownSessions; state: BoardState; workspace: string }) {
-	if (by.kind === "user") return <span className="text-[15px] font-bold">You</span>;
+	if (by.kind === "user") return <span className="text-sm font-semibold">You</span>;
 	const title = sessionLabel(by.sessionId, sessions).name;
 	return (
-		<span className="flex min-w-0 items-center gap-1">
-			<span className="shrink-0 text-sm font-bold">omp agent</span>
-			<SessionTag />
-			<a {...activityControl("board.session.open")} href={hashForBoardSession(state, workspace, by.sessionId)} onClick={revealSessionTab} title={title} className="truncate text-xs text-muted-foreground hover:underline">
+		<span className="flex min-w-0 items-baseline gap-1.5">
+			<span className="shrink-0 text-sm font-semibold">omp agent</span>
+			<a {...activityControl("board.session.open")} href={hashForBoardSession(state, workspace, by.sessionId)} onClick={revealSessionTab} title={title} className="truncate text-xs text-muted-foreground hover:text-foreground hover:underline">
 				{title}
 			</a>
 		</span>
 	);
 }
 
-export function SessionTag() {
-	return <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">Session</span>;
-}
-
 /** One message row: avatar, name, and time, or for a grouped one only the time on hover in the avatar's place. */
 function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted = false, toolbar, children }: { by: BoardAuthor; at: number; sessions: KnownSessions; state: BoardState; workspace: string; grouped: boolean; highlighted?: boolean; toolbar?: ReactNode; children: ReactNode }) {
 	return (
-		<div className={cn("group/message relative flex gap-2 px-5 hover:bg-accent/40", grouped ? "py-0.5" : "pt-2 pb-1", highlighted && "bg-amber-100/60 hover:bg-amber-100/80 dark:bg-amber-500/10 dark:hover:bg-amber-500/15")}>
+		<div className={cn("group/message relative flex gap-2 px-6 hover:bg-accent/40", grouped ? "py-0.5" : "pt-2 pb-1", highlighted && "bg-accent hover:bg-accent")}>
 			<div className="flex w-9 shrink-0 justify-end">
 				{grouped ? (
-					<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="invisible pt-0.5 text-[11px] text-muted-foreground tabular-nums group-hover/message:visible">
+					<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="pt-0.5 text-xs text-muted-foreground tabular-nums opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100">
 						{shortClock(at)}
 					</time>
 				) : (
@@ -285,7 +300,7 @@ function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted =
 				)}
 				{children}
 			</div>
-			{toolbar && <div className="invisible absolute -top-4 right-5 z-10 flex items-center gap-0.5 rounded-[7px] border border-border bg-background p-0.5 shadow-sm group-focus-within/message:visible group-hover/message:visible">{toolbar}</div>}
+			{toolbar && <div className="invisible absolute -top-4 right-6 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 shadow-sm group-focus-within/message:visible group-hover/message:visible">{toolbar}</div>}
 		</div>
 	);
 }
@@ -315,7 +330,7 @@ function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 					? ["Asks you", work.stop.request.title]
 					: [work.stop.kind === "input" ? "Waiting for your input" : "Waiting for your reply", detail];
 	return (
-		<span className="flex min-w-0 items-baseline gap-1.5 text-[13px]">
+		<span className="flex min-w-0 items-baseline gap-1.5 text-xs">
 			<span className={cn("shrink-0", work.kind === "waiting" ? "font-semibold text-amber-600 dark:text-amber-400" : "shimmer-text")}>{label}</span>
 			{rest && <span className="truncate text-muted-foreground">{rest}</span>}
 		</span>
@@ -326,7 +341,7 @@ function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 function WorkingLine({ work, sessions, href }: { work: Work; sessions: KnownSessions; href: string }) {
 	const sessionId = work.kind === "starting" ? null : work.sessionId;
 	return (
-		<a {...activityControl("board.task.open")} href={href} onClick={revealThreadTab} className="mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background">
+		<a {...activityControl("board.task.open")} href={href} onClick={revealThreadTab} className="mt-1 -ml-1 flex max-w-md items-center gap-2 rounded-lg p-1 ring-1 ring-transparent ring-inset hover:bg-background hover:ring-border">
 			{sessionId ? (
 				<Avatar by={{ kind: "session", sessionId }} sessions={sessions} size="summary" />
 			) : (
@@ -446,7 +461,7 @@ function MessageEditor({ text, onSave, onClose }: { text: string; onSave: (text:
 				</p>
 			)}
 			<div className="flex items-center gap-1.5">
-				<span className="mr-auto text-xs text-muted-foreground">Saving stops its session's turn and resends it</span>
+				<span className="mr-auto text-xs text-muted-foreground">Saving stops the session's turn and sends your edit</span>
 				<Button variant="outline" size="compact" disabled={pending} onClick={onClose}>
 					Cancel
 				</Button>
@@ -531,33 +546,33 @@ function ThreadSummary({ replies, unread, work, sessions, href }: { replies: Ext
 			{...activityControl("board.task.open")}
 			href={href}
 			onClick={revealThreadTab}
-			className="group/summary mt-1 -ml-[5px] flex max-w-md items-center gap-2 rounded-lg border border-transparent p-1 hover:border-border hover:bg-background"
+			className="group/summary mt-1 -ml-1 flex w-fit max-w-full items-center gap-2 rounded-lg p-1 pr-2 ring-1 ring-transparent ring-inset hover:bg-background hover:ring-border"
 		>
 			<span className="flex gap-0.5">
 				{authors.map(by => (
 					<Avatar key={authorKey(by)} by={by} sessions={sessions} size="summary" />
 				))}
 			</span>
-			<span className="text-[13px] font-bold text-blue-600 hover:underline dark:text-blue-400">
+			<span className="text-xs font-semibold whitespace-nowrap text-foreground">
 				{replies.length} {replies.length === 1 ? "reply" : "replies"}
 			</span>
 			{unread > 0 && (
-				<span aria-label={`${unread} unread`} className="rounded-full bg-blue-600 px-1.5 text-[11px] leading-4 font-bold text-white tabular-nums dark:bg-blue-500">
-					{unread}
+				<span aria-label={`${unread} unread`} className="flex">
+					<CountPill count={unread} />
 				</span>
 			)}
 			{work ? (
-				<span className="min-w-0 group-hover/summary:hidden">
+				<span className="min-w-0">
 					<WorkLabel work={work} detail={null} />
 				</span>
 			) : (
 				last && (
-					<span className="text-[13px] text-muted-foreground group-hover/summary:hidden">
+					<span className="min-w-0 truncate text-xs whitespace-nowrap text-muted-foreground">
 						Last reply <Age at={last.at} className="tabular-nums" /> ago
 					</span>
 				)
 			)}
-			<span className="hidden flex-1 text-[13px] text-muted-foreground group-hover/summary:inline">View thread</span>
+			<IconChevronRightSmall aria-hidden className="-ml-1 size-4 shrink-0 text-muted-foreground opacity-0 group-hover/summary:opacity-100" />
 		</a>
 	);
 }
@@ -587,7 +602,7 @@ function Composer({ workspace, core, disabled, onChange }: { workspace: Workspac
 	return (
 		<div {...activityControl("board.post")} className="shrink-0">
 			<NewSession
-				board={{ placeholder: `Message ${folder(workspace.cwdDisplay)}: a session starts on it`, sendLabel: "Post and start a session" }}
+				board={{ placeholder: `Message ${folder(workspace.cwdDisplay)} to start a session`, sendLabel: "Post and start a session" }}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
 				launch={null}
