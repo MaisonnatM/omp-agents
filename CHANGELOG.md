@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-25
 
+- A finished Board task's suggested next steps now sit under the thread's reply box, as they do under a session's composer, with the same keys: Enter sends one, Tab fills it in to edit first. They no longer show as buttons under the last message.
 - A Board thread summary now shows omp's mark once, however many sessions replied, instead of one identical mark per session.
 - A Board task whose session stopped for you now says so in the Board's message list, in amber, in place of "Working on it…": "Asks you" with its question, "Waiting for your input", or "Waiting for your reply". Clicking a question opens the session's conversation, where you answer it.
 - A Board session that changes something you can see now puts its screenshots in the message that closes the task, so the thread shows them.
