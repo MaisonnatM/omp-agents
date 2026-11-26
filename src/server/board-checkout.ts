@@ -4,9 +4,13 @@
  * and adds back after ending a session removed it. Both run the repository's own commands, so each waits for project
  * trust to admit the checkout first. See docs/architecture/board.md.
  */
-import { existsSync } from "node:fs";
-import { holderOf, mainCheckoutOf, restoreWorktree, worktreeAt } from "../git";
-import { runShell } from "../proc";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { mainCheckoutOf, restoreWorktree, worktreeAt, worktreeOnBranch } from "../git";
+import { runChecked, runShell } from "../proc";
+import { errorText } from "../json";
+import { UntrustedProjectError } from "./project-trust-file";
 import { configAt } from "../../templates/omp/agent/extensions/land/gate";
 import { CONFIG_FILE, describe, land } from "../../templates/omp/agent/extensions/land/lander";
 
@@ -44,7 +48,7 @@ const removeWorktree = (repository: string, dir: string): Promise<string> => run
 export async function boardCheckout(workspace: string, branch: string, admit: Admit): Promise<string | null> {
 	const repository = await repositoryOf(workspace);
 	if (!repository) return null;
-	const held = await holderOf(repository, branch);
+	const held = await worktreeOnBranch(repository, branch);
 	if (held) return held.path;
 	const dir = `${repository}-wt/${branch.replace(/[^\w.-]+/g, "-")}`;
 	if (existsSync(dir)) throw new Error(`${dir} already exists, and it is no worktree on ${branch}.`);
