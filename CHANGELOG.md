@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- A project's page is now built around its plan: a large progress bar, an Up next box with Mark done and Start session for the next step, and the plan grouped by step, each group folding open with its sub-steps and their count.
+- On a project's page, Hide done hides finished steps, Expand all opens every group, and the bar with Select stays at the top while you scroll the plan.
+- A project's page no longer shows the strip of four figures or the To do, Done, and All tabs; Sessions, Decisions, and Recent activity now sit under the plan, and New session in its header is now a plain outlined button.
 - On Pull requests, a pull request whose only failing checks wait on someone's approval, such as a workflow GitHub holds for approval or a `human-review` gate, now shows an **Approval** badge under Waiting on others instead of **Fix CI**.
 - The Todo page is gone, along with its list, the todo picker in new sessions, todo links in messages, and the todo tool sessions used to add items to it. Settings › Sync no longer carries a todo list.
 - A new branch or Board task in a repository whose origin was added by hand, not cloned, now starts from its main branch instead of failing with a git usage message.
