@@ -62,9 +62,9 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 	switch (op.kind) {
 		case "new":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, projectId: op.projectId, taskId: null, reviewDraft: false, bot: null, private: op.private, reachOwner: false };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, projectId: op.projectId, taskId: null, reviewDraft: false, private: op.private, reachOwner: false };
 		case "quick":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: op.branch, model: null, thinking: null, skill: op.skill, projectId: null, taskId: null, bot: null, private: false, ...startTarget(op.subject) };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: op.branch, model: null, thinking: null, skill: op.skill, projectId: null, taskId: null, private: false, ...startTarget(op.subject) };
 		case "pull-request-new":
 			return {
 				t: "start",
@@ -81,7 +81,6 @@ export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 				projectId: null,
 				taskId: null,
 				reviewDraft: false,
-				bot: null,
 				private: false,
 				reachOwner: false,
 			};

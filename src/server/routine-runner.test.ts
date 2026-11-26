@@ -3,10 +3,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ShellResult } from "../proc";
-import { COMMAND_TIMEOUT_MS, type RoutineTask, type Schedule, type TriggerEvent } from "../routines";
-import type { BotId } from "../shared/bots";
-import { readRoutineMessage, type RoutineMessage, routineMessageText } from "../shared/routine-message";
-import { RoutineRunner, STOPPED_WHILE_SENDING } from "./routine-runner";
+import type { RunTurn } from "../routine-health";
+import { COMMAND_TIMEOUT_MS, type CommandRun, type RoutineTask, type Schedule, type TriggerEvent } from "../routines";
+import { applyChange, type BoardChange, type BoardState, emptyBoard } from "../../templates/omp/agent/extensions/board/log";
+import { commandReport, postText, RoutineRunner, STOPPED_WHILE_SENDING } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 
 const dirs: string[] = [];
@@ -16,12 +16,8 @@ afterEach(() => {
 
 const HOUR = 3_600_000;
 const T0 = Date.parse("2026-10-05T08:00:00Z");
-const SCOUT = "scout" as BotId;
-
-/** What routine `id` of Bot Scout, named `name`, sends for its run at `at`, as the fake Bot records it. */
-const sentBy = (id: string, name: string, at: number, triggeredBy: TriggerEvent[], sent: RoutineMessage["sent"]): string =>
-	`scout: ${routineMessageText({ botId: SCOUT, routine: { id, name }, at, triggeredBy, sent })}`;
-const summary = { kind: "prompt", prompt: "Summarize yesterday's commits." } as const;
+const WORKSPACE = "/work/webapp";
+const summary = "Summarize yesterday's commits.";
 
 function routinesPath(): string {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
@@ -29,15 +25,18 @@ function routinesPath(): string {
 	return join(dir, "omp-agents", "routines.json");
 }
 
+/** A RoutinesFile at `path` that reads no Bots. */
+const routinesAt = (path: string): RoutinesFile => new RoutinesFile(path, { file: join(path, "..", "bots.json"), dir: join(path, "..", "bots") });
+
 const everyHour = { kind: "every" as const, minutes: 60 };
 
-/** Adds hourly routine `id` of Bot Scout. */
+/** Adds hourly routine `id` of the webapp Workspace. */
 function save(file: RoutinesFile, id: string, task: RoutineTask, name = "Notes"): void {
-	file.apply({ op: "save", routine: { id, botId: SCOUT, name, schedules: [everyHour], triggers: [], task, enabled: true } }, T0);
+	file.apply({ op: "save", routine: { id, workspace: WORKSPACE, name, schedules: [everyHour], triggers: [], task, enabled: true } }, T0);
 }
 
-function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: "Summarize yesterday's commits." }): RoutinesFile {
-	const file = new RoutinesFile(path);
+function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: summary }): RoutinesFile {
+	const file = routinesAt(path);
 	save(file, "r1", task);
 	return file;
 }
@@ -51,24 +50,28 @@ interface FakeExec {
 	fail: (err: Error) => void;
 }
 
-/** A runner over `file` with a fake clock, commands, Bots, and wake; Scout works in `/work/webapp`, and its conversation is `s-scout`. */
+/** A runner over `file` with a fake clock and commands, on a Board folded as the server folds it. */
 function harness(file: RoutinesFile) {
 	const fake = {
 		now: T0 + HOUR,
 		/** Whether the Mac is fully awake rather than in a dark wake. */
 		awake: true,
 		execs: [] as FakeExec[],
-		/** Each message a Bot was sent, as `<bot>: <text>`. */
-		messages: [] as string[],
-		/** Whether each message, in the same order, asked for a fresh conversation. */
-		fresh: [] as boolean[],
-		/** Each Bot's workspace and conversation; a Bot not named here is gone. */
-		bots: new Map<string, { cwd: string; sessionId: string }>([[SCOUT, { cwd: "/work/webapp", sessionId: "s-scout" }]]),
+		board: emptyBoard() as BoardState,
+		/** Each change the runner applied to the Board. */
+		changes: [] as BoardChange[],
+		/** Why the Board refuses every change, while set. */
+		refuse: null as string | null,
+		turns: new Map<number, RunTurn>(),
+	};
+	const apply = (change: BoardChange): void => {
+		const result = applyChange(fake.board, change, fake.now);
+		if ("error" in result) throw new Error(result.error);
+		fake.board = result.ok;
 	};
 	const runner = new RoutineRunner({
 		file,
 		now: () => fake.now,
-		workspace: botId => fake.bots.get(botId)?.cwd ?? null,
 		exec(command, cwd, env) {
 			const { promise, resolve, reject } = Promise.withResolvers<ShellResult>();
 			fake.execs.push({ command, cwd, env, end: resolve, fail: reject });
@@ -76,16 +79,26 @@ function harness(file: RoutinesFile) {
 		},
 		fullyAwake: async () => fake.awake,
 		onChange: () => {},
-		async messageBot(botId: BotId, text: string, fresh = false): Promise<string> {
-			const bot = fake.bots.get(botId);
-			if (!bot) throw new Error("This Bot is gone.");
-			fake.messages.push(`${botId}: ${text}`);
-			fake.fresh.push(fresh);
-			return bot.sessionId;
+		board: () => fake.board,
+		postBoard(change) {
+			if (fake.refuse !== null) throw new Error(fake.refuse);
+			fake.changes.push(change);
+			apply(change);
+			return change.op === "reply" ? change.task : fake.board.tasks.at(-1)!.id;
 		},
+		turnOf: task => fake.turns.get(task) ?? null,
 	});
-	return { runner, fake };
+	/** Marks Board task `task` done, as its session would. */
+	const done = (task: number): void => {
+		apply({ op: "start", task, sessionId: `s-${task}` });
+		apply({ op: "done", task, sessionId: `s-${task}` });
+	};
+	/** The texts the runner posted or replied, in order. */
+	const posted = (): string[] => fake.changes.flatMap(change => (change.op === "post" || change.op === "reply" ? [change.text ?? ""] : []));
+	return { runner, fake, done, posted };
 }
+
+const report = (run: Exclude<CommandRun, { phase: "running" }>, triggeredBy: TriggerEvent[] = [], prompt?: string): string => postText(prompt, triggeredBy, commandReport("git worktree prune", run));
 
 /** Lets the runner see a command that the test just ended, and post its report. */
 function settled(): Promise<void> {
@@ -95,74 +108,112 @@ function settled(): Promise<void> {
 }
 
 describe("RoutineRunner", () => {
-	test("a prompt goes into its Bot's conversation, and the run records that conversation", async () => {
+	test("a due run posts a Board task in the routine's Workspace, as the routine, and records it", async () => {
+		const file = fileWith(routinesPath());
+		file.apply({ op: "save", routine: { ...file.value[0]!, launch: { model: { provider: "anthropic", id: "claude" }, thinking: "high", skill: null } } }, T0);
+		const { runner, fake } = harness(file);
+		await runner.tick();
+		expect(fake.changes).toEqual([
+			{ op: "post", by: { kind: "routine", routineId: "r1", name: "Notes" }, workspace: WORKSPACE, title: "Notes", text: summary, launch: { model: { provider: "anthropic", id: "claude" }, thinking: "high", skill: null } },
+		]);
+		expect(file.value[0]?.runs).toEqual([{ at: T0 + HOUR, outcome: { kind: "posted", task: 1 }, errors: [], triggeredBy: [] }]);
+	});
+
+	test("a run while the routine's Board task is open replies on it, and once it is done the next run posts a new one", async () => {
+		const file = fileWith(routinesPath());
+		const { runner, fake, done } = harness(file);
+		await runner.tick();
+		fake.now += HOUR;
+		await runner.tick();
+		expect(fake.changes.map(change => change.op)).toEqual(["post", "reply"]);
+		expect(fake.changes[1]).toEqual({ op: "reply", by: { kind: "routine", routineId: "r1", name: "Notes" }, task: 1, text: summary });
+		expect(file.value[0]?.runs.map(run => run.outcome)).toEqual([
+			{ kind: "posted", task: 1 },
+			{ kind: "posted", task: 1 },
+		]);
+
+		done(1);
+		fake.now += HOUR;
+		await runner.tick();
+		expect(fake.changes.map(change => change.op)).toEqual(["post", "reply", "post"]);
+		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "posted", task: 2 });
+	});
+
+	test("a routine moved to another Workspace posts a new Board task there, not a reply on the old one", async () => {
 		const file = fileWith(routinesPath());
 		const { runner, fake } = harness(file);
 		await runner.tick();
-		expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], summary)]);
-		expect(file.value[0]?.runs).toEqual([{ at: T0 + HOUR, outcome: { kind: "sent", sessionId: "s-scout" }, errors: [], triggeredBy: [] }]);
+		file.apply({ op: "save", routine: { ...file.value[0]!, workspace: "/work/other" } }, T0);
+		fake.now += HOUR;
+		await runner.tick();
+		expect(fake.changes.map(change => [change.op, change.op === "post" ? change.workspace : null])).toEqual([
+			["post", WORKSPACE],
+			["post", "/work/other"],
+		]);
+		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "posted", task: 2 });
 	});
 
-	test("a prompt routine with freshConversation asks the Bot for a new conversation, and one without it appends", async () => {
+	test("each routine posts its own Board task", async () => {
 		const file = fileWith(routinesPath());
-		file.apply({ op: "save", routine: { id: "r2", botId: SCOUT, name: "Fresh", schedules: [everyHour], triggers: [], task: summary, enabled: true, freshConversation: true } }, T0);
+		for (let index = 2; index <= 3; index++) save(file, `r${index}`, { kind: "prompt", prompt: `Prompt ${index}` }, `Routine ${index}`);
 		const { runner, fake } = harness(file);
 		await runner.tick();
-		expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], summary), sentBy("r2", "Fresh", T0 + HOUR, [], summary)]);
-		expect(fake.fresh).toEqual([false, true]);
+		expect(fake.board.tasks.map(({ id, title }) => [id, title])).toEqual([
+			[1, "Notes"],
+			[2, "Routine 2"],
+			[3, "Routine 3"],
+		]);
 	});
 
-	test("every due routine runs at once, whatever their number, since none starts a session of its own", async () => {
+	test("a tick records what the session spent on a run once its turn ended", async () => {
 		const file = fileWith(routinesPath());
-		for (let index = 2; index <= 5; index++) save(file, `r${index}`, { kind: "prompt", prompt: `Prompt ${index}` });
 		const { runner, fake } = harness(file);
 		await runner.tick();
-		expect(fake.messages).toHaveLength(5);
-		expect(file.value.map(routine => routine.runs[0]?.outcome.kind)).toEqual(["sent", "sent", "sent", "sent", "sent"]);
+		fake.turns.set(1, { replied: true, quiet: false, failed: false, ms: 60_000, usage: { tokens: 1200, cost: 0.03 } });
+		await runner.tick();
+		expect(file.value[0]?.runs[0]?.usage).toEqual({ tokens: 1200, cost: 0.03 });
 	});
 
-	test("a queued run survives a restart, and the next server sends it without claiming again", async () => {
+	test("a queued run survives a restart, and the next server posts it without claiming again", async () => {
 		const path = routinesPath();
-		const first = new RoutinesFile(path);
-		save(first, "r1", { kind: "prompt", prompt: "Summarize yesterday's commits." });
+		const first = routinesAt(path);
+		save(first, "r1", { kind: "prompt", prompt: summary });
 		first.claim("r1", T0 + HOUR, []);
 		first.flush();
 
-		const file = new RoutinesFile(path);
-		const { runner, fake } = harness(file);
+		const file = routinesAt(path);
+		const { runner, posted } = harness(file);
 		await runner.tick();
-		expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], summary)]);
-		expect(file.value[0]?.runs).toEqual([{ at: T0 + HOUR, outcome: { kind: "sent", sessionId: "s-scout" }, errors: [], triggeredBy: [] }]);
+		expect(posted()).toEqual([summary]);
+		expect(file.value[0]?.runs).toEqual([{ at: T0 + HOUR, outcome: { kind: "posted", task: 1 }, errors: [], triggeredBy: [] }]);
 	});
 
-	test("a run whose Bot cannot take the prompt records why, and the next run tries again", async () => {
+	test("a run the Board refuses records why, and the next run tries again", async () => {
 		const file = fileWith(routinesPath());
 		const { runner, fake } = harness(file);
-		const scout = fake.bots.get(SCOUT)!;
-		fake.bots.delete(SCOUT);
+		fake.refuse = "The Board is full.";
 		await runner.runNow("r1");
-		expect(file.value[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "failed" }, errors: ["Notes: This Bot is gone."], triggeredBy: [] });
+		expect(file.value[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "failed" }, errors: ["The run could not be posted to the Board: The Board is full."], triggeredBy: [] });
 
-		fake.bots.set(SCOUT, scout);
+		fake.refuse = null;
 		fake.now += HOUR;
 		await runner.tick();
-		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "sent", sessionId: "s-scout" });
+		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "posted", task: 1 });
 	});
 
-	test("a run a stopped server left sending its prompt loads as failed, saying so, and is not sent again", async () => {
+	test("a run a stopped server left sending loads as failed, saying so, and is not posted again", async () => {
 		const path = routinesPath();
 		fileWith(path).flush();
-		// What a server leaves when it stops while the prompt goes: the run off the queue, with nothing sent and no error.
 		const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: Record<string, unknown>[] };
 		saved.routines[0] = { ...saved.routines[0], scheduledAt: T0 + HOUR, runs: [{ at: T0 + HOUR, outcome: { kind: "pending", queued: false }, errors: [], triggeredBy: [] }] };
 		writeFileSync(path, JSON.stringify(saved));
 
-		const file = new RoutinesFile(path);
-		const { runner, fake } = harness(file);
+		const file = routinesAt(path);
+		const { runner, posted } = harness(file);
 		runner.recover();
 		expect(file.value[0]?.runs).toEqual([{ at: T0 + HOUR, outcome: { kind: "failed" }, errors: [STOPPED_WHILE_SENDING], triggeredBy: [] }]);
 		await runner.tick();
-		expect(fake.messages).toEqual([]);
+		expect(posted()).toEqual([]);
 	});
 
 	describe("a trigger", () => {
@@ -170,23 +221,23 @@ describe("RoutineRunner", () => {
 		const dm: TriggerEvent = { kind: "slack", title: "Bo wrote to you", detail: "Lunch?", url: null };
 		const merged: TriggerEvent = { kind: "pull-request", title: "acme/app#4 was merged", detail: "Fix login, by ada", url: "https://github.com/acme/app/pull/4" };
 
-		/** Saves routine `id` of Bot Scout with `triggers` and `schedules`. */
+		/** Saves routine `id` of the webapp Workspace with `triggers` and `schedules`. */
 		function saveTriggered(file: RoutinesFile, id: string, triggers: TriggerEvent["kind"][], schedules: Schedule[] = [everyHour], enabled = true): void {
 			const task = { kind: "prompt", prompt: `Prompt ${id}` } as const;
-			file.apply({ op: "save", routine: { id, botId: SCOUT, name: id, schedules, triggers: triggers.map(kind => ({ kind })), task, enabled } }, T0);
+			file.apply({ op: "save", routine: { id, workspace: WORKSPACE, name: id, schedules, triggers: triggers.map(kind => ({ kind })), task, enabled } }, T0);
 		}
 
-		test("starts one run of each enabled routine that watches the news's kinds, holding what it saw, and leaves the schedule's clock", async () => {
-			const file = new RoutinesFile(routinesPath());
+		test("starts one run of each enabled routine that watches the news's kinds, posting what it saw, and leaves the schedule's clock", async () => {
+			const file = routinesAt(routinesPath());
 			saveTriggered(file, "slack", ["slack"]);
 			saveTriggered(file, "prs", ["pull-request"], []);
 			saveTriggered(file, "scheduled", []);
 			saveTriggered(file, "paused", ["slack"], [everyHour], false);
-			const { runner, fake } = harness(file);
+			const { runner, fake, posted } = harness(file);
 			fake.now = T0 + HOUR / 2;
 			await runner.fire([mention, merged, dm]);
-			const at = T0 + HOUR / 2;
-			expect(fake.messages).toEqual([sentBy("slack", "slack", at, [mention, dm], { kind: "prompt", prompt: "Prompt slack" }), sentBy("prs", "prs", at, [merged], { kind: "prompt", prompt: "Prompt prs" })]);
+			expect(posted()).toEqual([postText("Prompt slack", [mention, dm]), postText("Prompt prs", [merged])]);
+			expect(posted()[0]).toContain("- slack: Ana mentioned you in #eng (https://acme.slack.com/archives/C1/p1)");
 			expect(file.value.map(({ runs }) => runs.map(({ triggeredBy }) => triggeredBy))).toEqual([[[mention, dm]], [[merged]], [], []]);
 
 			// The hourly schedule still counts from when the routine was made, so its slot comes on time.
@@ -199,7 +250,7 @@ describe("RoutineRunner", () => {
 		});
 
 		test("a second batch in the same millisecond starts a run of its own", async () => {
-			const file = new RoutinesFile(routinesPath());
+			const file = routinesAt(routinesPath());
 			saveTriggered(file, "slack", ["slack"], []);
 			const { runner } = harness(file);
 			await runner.fire([mention]);
@@ -210,19 +261,19 @@ describe("RoutineRunner", () => {
 			]);
 		});
 
-		test("a command gets what it saw as JSON in ROUTINE_TRIGGERS, and its report says why it ran", async () => {
-			const file = new RoutinesFile(routinesPath());
-			file.apply({ op: "save", routine: { id: "r1", botId: SCOUT, name: "Notes", schedules: [], triggers: [{ kind: "slack" }], task: { kind: "command", command: "./triage.sh" }, enabled: true } }, T0);
-			const { runner, fake } = harness(file);
+		test("a command gets what it saw as JSON in ROUTINE_TRIGGERS, and its post says why it ran", async () => {
+			const file = routinesAt(routinesPath());
+			file.apply({ op: "save", routine: { id: "r1", workspace: WORKSPACE, name: "Notes", schedules: [], triggers: [{ kind: "slack" }], task: { kind: "command", command: "./triage.sh" }, enabled: true } }, T0);
+			const { runner, fake, posted } = harness(file);
 			await runner.fire([dm]);
 			expect(fake.execs.map(({ env }) => env)).toEqual([{ ROUTINE_TRIGGERS: JSON.stringify([dm]) }]);
 			fake.execs[0]!.end({ exitCode: 0, output: "ok\n" });
 			await settled();
-			expect(readRoutineMessage(fake.messages[0]!.slice("scout: ".length))?.triggeredBy).toEqual([dm]);
+			expect(posted()[0]).toContain("- slack: Bo wrote to you");
 		});
 
 		test("a routine scheduled on weekdays only ignores its triggers on a weekend day, and hears them again on Monday", async () => {
-			const file = new RoutinesFile(routinesPath());
+			const file = routinesAt(routinesPath());
 			saveTriggered(file, "prs", ["pull-request"], [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 10, minute: 0 } }]);
 			const { runner, fake } = harness(file);
 			const saturday = T0 + 5 * 24 * HOUR;
@@ -237,9 +288,9 @@ describe("RoutineRunner", () => {
 	describe("a command routine", () => {
 		const command = { kind: "command", command: "git worktree prune" } as const;
 
-		test("runs its command once in its Bot's workspace, returns from the tick while it runs, saves how it ended, and posts that into the Bot's conversation", async () => {
-			const file = fileWith(routinesPath(), command);
-			const { runner, fake } = harness(file);
+		test("runs its command once in its Workspace, returns from the tick while it runs, saves how it ended, and posts its prompt and report as a Board task", async () => {
+			const file = fileWith(routinesPath(), { ...command, prompt: "Say which worktrees went." });
+			const { runner, fake, posted } = harness(file);
 			await runner.tick();
 			expect(fake.execs.map(({ command, cwd }) => ({ command, cwd }))).toEqual([{ command: "git worktree prune", cwd: "/work/webapp" }]);
 			expect(file.value[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "command", run: { phase: "running", startedAt: T0 + HOUR } }, errors: [], triggeredBy: [] });
@@ -249,30 +300,31 @@ describe("RoutineRunner", () => {
 			fake.execs[0]!.end({ exitCode: 0, output: "Removing worktrees/old\n" });
 			await settled();
 			const run = { phase: "exited", code: 0, output: "Removing worktrees/old\n", startedAt: T0 + HOUR, endedAt: T0 + HOUR + 4000 } as const;
-			expect(file.value[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "command", run }, errors: [], triggeredBy: [] });
-			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], { kind: "command", command: "git worktree prune", run })]);
+			expect(file.value[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "command", run, task: 1 }, errors: [], triggeredBy: [] });
+			expect(posted()).toEqual([report(run, [], "Say which worktrees went.")]);
+			expect(posted()[0]).toStartWith("Say which worktrees went.\n\nThe routine ran this command in its Workspace:");
 		});
 
 		test("posting only failures, a command that exits 0 keeps its output on the run and posts nothing, and one that fails posts", async () => {
 			const file = fileWith(routinesPath(), { ...command, post: "failures" });
-			const { runner, fake } = harness(file);
+			const { runner, fake, posted } = harness(file);
 			await runner.tick();
 			fake.execs[0]!.end({ exitCode: 0, output: "clean\n" });
 			await settled();
 			expect(file.value[0]?.runs[0]).toMatchObject({ errors: [], outcome: { kind: "command", run: { phase: "exited", code: 0, output: "clean\n" } } });
-			expect(fake.messages).toEqual([]);
+			expect(posted()).toEqual([]);
 
 			fake.now += HOUR;
 			await runner.tick();
 			fake.execs[1]!.end({ exitCode: 2, output: "boom\n" });
 			await settled();
 			const run = { phase: "exited", code: 2, output: "boom\n", startedAt: T0 + 2 * HOUR, endedAt: T0 + 2 * HOUR } as const;
-			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + 2 * HOUR, [], { kind: "command", command: "git worktree prune", run })]);
+			expect(posted()).toEqual([report(run)]);
 		});
 
 		test("posting changes, a command that exits 0 posts only when its output differs from the last run's, and a failure always posts", async () => {
 			const file = fileWith(routinesPath(), { ...command, post: "changes" });
-			const { runner, fake } = harness(file);
+			const { runner, fake, posted } = harness(file);
 			const runOnce = async (exitCode: number, output: string): Promise<void> => {
 				await runner.tick();
 				fake.execs.at(-1)!.end({ exitCode, output });
@@ -283,25 +335,8 @@ describe("RoutineRunner", () => {
 			await runOnce(0, "3 open\n");
 			await runOnce(0, "4 open\n");
 			await runOnce(1, "4 open\n");
-			expect(fake.messages).toHaveLength(3);
+			expect(posted()).toHaveLength(3);
 			expect(file.value[0]?.runs).toHaveLength(4);
-		});
-
-		test("with freshConversation, a posted report asks for a new conversation, a run that posts nothing asks for none, and without it a report appends", async () => {
-			const file = fileWith(routinesPath(), command);
-			file.apply({ op: "save", routine: { id: "r2", botId: SCOUT, name: "Fresh", schedules: [everyHour], triggers: [], task: { ...command, post: "failures" }, enabled: true, freshConversation: true } }, T0);
-			const { runner, fake } = harness(file);
-			await runner.tick();
-			fake.execs[0]!.end({ exitCode: 0, output: "plain\n" });
-			fake.execs[1]!.end({ exitCode: 0, output: "clean\n" });
-			await settled();
-			expect(fake.fresh).toEqual([false]);
-
-			fake.now += HOUR;
-			await runner.tick();
-			fake.execs[3]!.end({ exitCode: 2, output: "boom\n" });
-			await settled();
-			expect(fake.fresh).toEqual([false, true]);
 		});
 
 		test("runs no second command while its last one runs, and a failure or a stop goes to the run's errors", async () => {
@@ -324,34 +359,35 @@ describe("RoutineRunner", () => {
 			expect(file.value[0]?.runs[0]).toMatchObject({ errors: ["Stopped after 10 minutes."], outcome: { kind: "command", run: { phase: "stopped", reason: "time-limit" } } });
 		});
 
-		test("a command stopped at the time limit after the Mac slept saves how long it slept, and tells the Bot", async () => {
+		test("a command stopped at the time limit after the Mac slept saves how long it slept, and its report says so", async () => {
 			const file = fileWith(routinesPath(), command);
-			const { runner, fake } = harness(file);
+			const { runner, fake, posted } = harness(file);
 			await runner.tick();
 			const slept = 9 * 60_000;
 			fake.now += COMMAND_TIMEOUT_MS + slept;
 			fake.execs[0]!.end({ exitCode: null, output: "", slept });
 			await settled();
 			const run = { phase: "stopped", reason: "time-limit", output: "", startedAt: T0 + HOUR, endedAt: T0 + HOUR + COMMAND_TIMEOUT_MS + slept, slept } as const;
-			expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "command", run });
-			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], { kind: "command", command: "git worktree prune", run })]);
+			expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "command", run, task: 1 });
+			expect(posted()).toEqual([report(run)]);
+			expect(posted()[0]).toContain("The Mac slept for 9 minutes while it ran, which the time limit does not count.");
 		});
 
 		test("a command that ends in a dark wake posts its report at the first tick at a full wake", async () => {
 			const file = fileWith(routinesPath(), command);
-			const { runner, fake } = harness(file);
+			const { runner, fake, posted } = harness(file);
 			await runner.tick();
 			fake.awake = false;
 			fake.execs[0]!.end({ exitCode: 0, output: "ok\n" });
 			await settled();
 			const run = { phase: "exited", code: 0, output: "ok\n", startedAt: T0 + HOUR, endedAt: T0 + HOUR } as const;
-			expect([file.value[0]?.runs[0]?.outcome, fake.messages]).toEqual([{ kind: "command", run }, []]);
+			expect([file.value[0]?.runs[0]?.outcome, posted()]).toEqual([{ kind: "command", run }, []]);
 
 			await runner.tick();
 			fake.awake = true;
 			await runner.tick();
 			await settled();
-			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], { kind: "command", command: "git worktree prune", run })]);
+			expect(posted()).toEqual([report(run)]);
 		});
 
 		test("a command that cannot start saves why as its failure and its error", async () => {
@@ -366,22 +402,14 @@ describe("RoutineRunner", () => {
 			});
 		});
 
-		test("a run whose Bot cannot take the output keeps it, and records why", async () => {
+		test("a report the Board refuses keeps the output on the run, and records why", async () => {
 			const file = fileWith(routinesPath(), command);
 			const { runner, fake } = harness(file);
 			await runner.tick();
-			fake.bots.delete(SCOUT);
+			fake.refuse = "The Board is full.";
 			fake.execs[0]!.end({ exitCode: 0, output: "ok\n" });
 			await settled();
-			expect(file.value[0]?.runs[0]).toMatchObject({ errors: ["The output could not be posted to the Bot: This Bot is gone."], outcome: { kind: "command", run: { phase: "exited", output: "ok\n" } } });
-		});
-
-		test("a command whose Bot is gone does not run, and the run says why", async () => {
-			const file = fileWith(routinesPath(), command);
-			const { runner, fake } = harness(file);
-			fake.bots.delete(SCOUT);
-			await runner.tick();
-			expect([fake.execs, file.value[0]?.runs[0]?.errors]).toEqual([[], ["This Bot is gone."]]);
+			expect(file.value[0]?.runs[0]).toMatchObject({ errors: ["The run could not be posted to the Board: The Board is full."], outcome: { kind: "command", run: { phase: "exited", output: "ok\n" } } });
 		});
 
 		test("the next server runs no command that a stopped one left running, and that run says why", async () => {
@@ -389,7 +417,7 @@ describe("RoutineRunner", () => {
 			const first = harness(fileWith(path, command));
 			await first.runner.tick();
 
-			const file = new RoutinesFile(path);
+			const file = routinesAt(path);
 			const second = harness(file);
 			second.runner.recover();
 			await second.runner.tick();
@@ -411,40 +439,41 @@ describe("RoutineRunner", () => {
 
 		test("a tick starts nothing, and the first tick at a full wake runs what came due once", async () => {
 			const file = fileWith(routinesPath());
-			const { runner, fake } = harness(file);
+			const { runner, fake, posted } = harness(file);
 			fake.awake = false;
 			await runner.tick();
 			fake.now += 2 * HOUR;
 			await runner.tick();
-			expect([fake.messages, file.value[0]?.runs]).toEqual([[], []]);
+			expect([posted(), file.value[0]?.runs]).toEqual([[], []]);
 
 			fake.awake = true;
 			await runner.tick();
-			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + 3 * HOUR, [], summary)]);
+			expect(posted()).toEqual([summary]);
+			expect(file.value[0]?.runs.map(run => run.at)).toEqual([T0 + 3 * HOUR]);
 		});
 
 		test("trigger news joins one waiting run, which starts at the first tick at a full wake", async () => {
-			const file = new RoutinesFile(routinesPath());
-			file.apply({ op: "save", routine: { id: "r1", botId: SCOUT, name: "Notes", schedules: [], triggers: [{ kind: "slack" }], task: summary, enabled: true } }, T0);
-			const { runner, fake } = harness(file);
+			const file = routinesAt(routinesPath());
+			file.apply({ op: "save", routine: { id: "r1", workspace: WORKSPACE, name: "Notes", schedules: [], triggers: [{ kind: "slack" }], task: { kind: "prompt", prompt: summary }, enabled: true } }, T0);
+			const { runner, fake, posted } = harness(file);
 			fake.awake = false;
 			await runner.fire([mention]);
 			fake.now += 16 * 60_000;
 			await runner.fire([reply]);
-			expect([fake.messages, file.value[0]?.runs.map(({ at, triggeredBy }) => [at, triggeredBy])]).toEqual([[], [[T0 + HOUR, [mention, reply]]]]);
+			expect([posted(), file.value[0]?.runs.map(({ at, triggeredBy }) => [at, triggeredBy])]).toEqual([[], [[T0 + HOUR, [mention, reply]]]]);
 
 			fake.awake = true;
 			fake.now += 60_000;
 			await runner.tick();
-			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [mention, reply], summary)]);
+			expect(posted()).toEqual([postText(summary, [mention, reply])]);
 		});
 
 		test("Run now starts at once, since the user asked", async () => {
 			const file = fileWith(routinesPath());
-			const { runner, fake } = harness(file);
+			const { runner, fake, posted } = harness(file);
 			fake.awake = false;
 			await runner.runNow("r1");
-			expect(fake.messages).toEqual([sentBy("r1", "Notes", T0 + HOUR, [], summary)]);
+			expect(posted()).toEqual([summary]);
 		});
 	});
 });

@@ -1,12 +1,12 @@
 /**
  * The dashboard behind the server: the registries and stores, the live sessions and the views on them, and the loops and
  * inboxes that keep them current. It builds its parts in dependency order, each handed the parts above it.
- * Two edges point down, closing the only cycles: a live session's update reaches the views, the broadcasts, the Bots,
- * and the loops through its live-update handler, and a notice change reaches the broadcasts that read the notices.
+ * Two edges point down, closing the only cycles: a live session's update reaches the views, the broadcasts, and the
+ * loops through its live-update handler, and a notice change reaches the broadcasts that read the notices.
  * No constructor calls either; nothing follows the registry, watches a directory, or publishes before {@link Dashboard.start}.
  */
-import { join } from "node:path";
 import type { Server } from "bun";
+import { doneQuietly } from "../../templates/omp/agent/extensions/board/log";
 import { ForeignUsage } from "../foreign/usage";
 import { flushJsonFiles } from "../fs";
 import { mergedPullRequests } from "../pull-requests";
@@ -20,7 +20,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, endedWorktreesFile, HOME, interruptedFile, machineFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, endedWorktreesFile, HOME, interruptedFile, machineFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, workspaceFor, workspacesFile } from "../paths";
 import { type ModuleChanges, type ModuleRun, isStoredModuleId, moduleJoins, openModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { worktreeAt } from "../git";
@@ -35,8 +35,6 @@ import { inAppData } from "../shared/workspaces";
 import { Terminals } from "../terminals";
 import { Worktrees } from "../worktrees";
 import { WorktreeOccupants } from "./worktree-occupants";
-import { Bots, startingRoutine } from "./bots";
-import { BotsFile } from "./bots-file";
 import { Broadcasts } from "./broadcasts";
 import { EndInbox } from "./end-inbox";
 import type { Guards } from "./http";
@@ -73,6 +71,7 @@ import type { SelfUpdate } from "./self-update";
 import { EndedWorktrees, endSession, restoreEndedWorktree } from "./session-end";
 import { ProjectTrustFile } from "./project-trust-file";
 import { SessionFollowUps } from "./session-follow-ups";
+import { SessionRoutines } from "./session-routines";
 import { PullRequestWatches, PullRequestWatchesFile } from "./pull-request-watches";
 import { SessionMoves } from "./session-moves";
 import { SessionWaits } from "./session-waits";
@@ -82,7 +81,6 @@ import { ACTIVITY_KEPT_DAYS, ActivityStore } from "./activity-store";
 import { DAY_MS } from "../shared/days";
 import { Dictation } from "./dictation";
 import { createClientHandler } from "./socket";
-import { botExtension, designerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import type { JsonInboxDir } from "./json-inbox";
 import { unattendedWork } from "./unattended-work";
@@ -117,27 +115,28 @@ export class Dashboard {
 		now: Date.now,
 		onChange: () => this.#broadcasts.pushList("review-drafts"),
 	});
-	readonly #botsFile = new BotsFile(botsFile);
-	readonly #bots: Bots;
 	readonly #projectTrust = new ProjectTrustFile(projectTrustFile);
 	readonly #admit = (dir: string): Promise<void> => this.#projectTrust.admit(dir);
 	readonly #onLiveUpdate: (instanceId: string, update: SessionUpdate) => void;
 	readonly #takeOver: () => void;
 	readonly #moves = new SessionMoves({
 		session: instanceId => this.#sessions.started(instanceId),
-		staysPut: request => this.#bots.botOf(request) !== null,
 		admit: this.#admit,
 	});
 	readonly #waits = new SessionWaits({
 		hosts: () => this.#sessions.rows(this.#files.factsOf),
 		reply: sessionId => this.#sessions.lastReply(sessionId, this.#files.pathOf),
-		isBot: request => this.#bots.botOf(request) !== null,
 	});
 	readonly #followUps = new SessionFollowUps({
 		hosts: () => this.#sessions.rows(this.#files.factsOf),
-		isBot: request => this.#bots.botOf(request) !== null,
 		schedule: change => this.#lists.apply("scheduled", change),
 		now: Date.now,
+	});
+	readonly #routineTools = new SessionRoutines({
+		hosts: () => this.#sessions.rows(this.#files.factsOf),
+		workspaceOf: cwd => this.#files.facts.placement.workspaceOf(cwd, worktreeAt),
+		routines: () => this.#routines.value,
+		apply: change => this.#lists.apply("routines", change),
 	});
 	/** The pull requests sessions watch, which the activity check's list wakes them about; the constructor builds it once it can reach a session. */
 	readonly #prWatches: PullRequestWatches;
@@ -199,7 +198,7 @@ export class Dashboard {
 
 	/**
 	 * `selfUpdate` is **Update dashboard**, which pulls the checkout the server runs from and restarts the server.
-	 * `unattended` is false for a server an omp session started, which then never runs routines, Bots, or the file inboxes.
+	 * `unattended` is false for a server an omp session started, which then never runs routines or the file inboxes.
 	 */
 	constructor(port: number, selfUpdate: SelfUpdate, unattended = true) {
 		this.#selfUpdate = selfUpdate;
@@ -209,13 +208,9 @@ export class Dashboard {
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
 		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
 		const stores = syncStores(
-			{ sourceControl: this.#sourceControl, preferences: this.#preferences, processes: this.#processSettings, workspaces, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile), projects: this.#modules.projects },
+			{ sourceControl: this.#sourceControl, preferences: this.#preferences, processes: this.#processSettings, workspaces, routines: this.#routines, machine: thisMachine(machineFile), projects: this.#modules.projects },
 			HOME,
-			list => {
-				// Every Bot memory is read again, since a sync may have rewritten them.
-				if (list === "bots") this.#bots.forgetRead();
-				this.#broadcasts.pushList(list);
-			},
+			list => this.#broadcasts.pushList(list),
 		);
 		this.#settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores });
 		const files = this.#files;
@@ -232,7 +227,13 @@ export class Dashboard {
 			const prs = prWatchesFile.value.filter(watch => watch.sessionId === sessionId).map(watch => ({ pr: watch.pr, checks: watch.seen?.checks ?? null }));
 			return prs.length > 0 ? { kind: "pull-request", prs } : null;
 		};
-		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update), undefined, undefined, scheduledCheck));
+		const sessions = (this.#sessions = new LiveSessions(
+			(instanceId, update) => this.#onLiveUpdate(instanceId, update),
+			undefined,
+			undefined,
+			scheduledCheck,
+			(sessionId, since) => doneQuietly(this.#modules.board.value, sessionId, since),
+		));
 		const { placement } = files.facts;
 		const { factsOf } = files;
 		const pathFor = (view: View): string | null =>
@@ -255,15 +256,12 @@ export class Dashboard {
 				files,
 				interrupted,
 				routines,
+				board: () => modules.board.value,
 			}),
 			() => this.#broadcasts.pushList("notices"),
 		));
 		const lists = (this.#lists = new ListRegistry({
-			// Every routine belongs to a Bot, so a save for a Bot that is gone saves nothing.
-			routines: {
-				msg: () => ({ t: "routines", routines: routines.value }),
-				apply: change => (change.op === "save" && !this.#botsFile.value.some(({ id }) => id === change.routine.botId) ? false : routines.apply(change, Date.now())),
-			},
+			routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, Date.now()) },
 			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, Date.now()) },
 			workspaces: {
 				msg: () => {
@@ -279,19 +277,6 @@ export class Dashboard {
 			merges: { msg: () => ({ t: "merges", list: [...this.#mergeQueue.list] }) },
 			jobs: { msg: () => ({ t: "jobs", jobs: this.#sessions.jobs() }) },
 			"review-drafts": { msg: () => ({ t: "review-drafts", list: this.#reviewDrafts.list }), apply: edit => this.#reviewDrafts.edit(edit) },
-			bots: {
-				msg: () => this.#bots.msg(),
-				apply: change => {
-					// Deleting a Bot deletes its routines, first, so a crash between the saves leaves none without its Bot.
-					if (change.op === "remove" && routines.removeBot(change.id)) this.#broadcasts.pushList("routines");
-					const created = change.op === "save" && !this.#botsFile.value.some(({ id }) => id === change.bot.id);
-					if (!this.#botsFile.apply(change, new Date().toISOString())) return false;
-					// A new PR shepherd starts with the routine that wakes it as what it watches changes, after the Bot it belongs to is saved.
-					const routine = created ? startingRoutine[change.bot.kind]?.(change.bot.id) : null;
-					if (routine && routines.apply({ op: "save", routine }, Date.now())) this.#broadcasts.pushList("routines");
-					return true;
-				},
-			},
 		}, modules, kind => {
 			this.#broadcasts.pushList(kind);
 			if (isStoredModuleId(kind)) this.#moduleRuns.get(kind)?.changed();
@@ -345,7 +330,6 @@ export class Dashboard {
 			sessions,
 			hosts: () => sessions.rows(factsOf),
 			pathOf: files.pathOf,
-			bots: () => this.#bots,
 			owner: () => ownerLock.held,
 			processSettings: this.#processSettings,
 		});
@@ -372,16 +356,6 @@ export class Dashboard {
 			if (!resumed) throw new Error("The session exited as it resumed.");
 			return resumed;
 		};
-		this.#bots = new Bots({
-			file: this.#botsFile,
-			start: startSession,
-			live: sessionId => sessions.bySessionId(sessionId),
-			session: instanceId => sessions.get(instanceId),
-			savedFile: files.pathOf,
-			paths: { extension: botExtension, botsFile, botInboxDir, botsDir, routinesFile, routineInboxDir, shepherdExtension, shepherdInboxDir, designerExtension, sessionArchiveDir: join(agentDir, "session-archive") },
-			now: () => new Date().toISOString(),
-			onChange: () => broadcasts.pushList("bots"),
-		});
 		this.#endInbox = new EndInbox(sessionEndInboxDir, {
 			end: async sessionId => {
 				const session = sessions.bySessionId(sessionId);
@@ -401,16 +375,13 @@ export class Dashboard {
 			routines,
 			scheduled,
 			triggerWatch: this.#triggerWatch,
-			botsFile: this.#botsFile,
-			bots: this.#bots,
+			pathOf: files.pathOf,
 			sourceControl: this.#sourceControl,
 			worktrees,
 			usage: this.#usage,
 			start: startSession,
 			reach,
 			endLive: session => this.#endLive(session),
-			workspaceOf,
-			knownWorkspaces: () => this.knownWorkspaces(),
 			owner: () => ownerLock.held,
 			admit: this.#admit,
 			stopping: this.#stopping.signal,
@@ -427,7 +398,6 @@ export class Dashboard {
 		this.#prWatches = new PullRequestWatches({
 			file: prWatchesFile,
 			hosts: () => sessions.rows(factsOf),
-			isBot: request => this.#bots.botOf(request) !== null,
 			wake: async (sessionId, text) => (await reach(sessionId)).prompt(null, text, [], "followUp"),
 			active: () => ownerLock.held,
 			now: Date.now,
@@ -459,7 +429,6 @@ export class Dashboard {
 				await scheduledRunner.tick();
 				await runner.tick();
 				await this.#mergeCleanup.tick();
-				await this.#bots.stopIdle(Date.now());
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
 			onActivityTick: async () => {
@@ -511,11 +480,6 @@ export class Dashboard {
 			cancelContinue: sessionId => autoContinue.cancel(sessionId),
 			sendScheduledNow: id => scheduledRunner.sendNow(id),
 			runRoutine: id => runner.runNow(id),
-			messageBot: async (id, text) => void (await this.#bots.message(id, text)),
-			restartBot: async id => {
-				await this.#bots.restart(id);
-				if (await files.refresh()) this.#onFilesChanged();
-			},
 			changeNotices: (ids, op) => notices.apply(ids, op),
 			dictation: this.#dictation,
 			owner: () => ownerLock.held,
@@ -530,13 +494,10 @@ export class Dashboard {
 			waits: this.#waits,
 			broadcasts,
 			reviewDrafts: this.#reviewDrafts,
-			bots: this.#bots,
 			privateSessions: this.#privateSessions,
 			interrupted,
 			loops: this.#loops,
 			autoContinue,
-			routines,
-			pathOf: files.pathOf,
 		});
 	}
 
@@ -597,7 +558,7 @@ export class Dashboard {
 		this.#loops.watch();
 		// Before the owner lock, whose taking drains the inboxes.
 		await this.#rescanFiles();
-		if (!this.#unattended) console.log("omp-agents: an omp session started this server, so it never runs routines, Bots, or the file inboxes.");
+		if (!this.#unattended) console.log("omp-agents: an omp session started this server, so it never runs routines or the file inboxes.");
 		else if (!this.#claimUnattendedWork()) {
 			const owner = this.#ownerLock.holder();
 			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the file inboxes; this one takes over when it exits.`);
@@ -683,15 +644,15 @@ export class Dashboard {
 		this.#activity.prune(Date.now() - ACTIVITY_KEPT_DAYS * DAY_MS);
 	}
 
-	/** How `request` joins the server as session `instanceId`: as a Review session, as a Bot's conversation, both, or plain; any loads what the modules the user left on join with, and any but a Bot's can wait on another session, move itself, and schedule follow-ups to itself. */
+	/** How `request` joins the server as session `instanceId`: as a Review session or plain; any loads what the modules the user left on join with, and can wait on another session, move itself, schedule follow-ups to itself, and keep its Workspace's routines. */
 	#joinFor(request: StartRequest, instanceId: string): SessionJoin {
 		const joins = [
 			this.#reviewDrafts.join(request),
-			this.#bots.join(request),
-			this.#moves.join(request, instanceId),
-			this.#waits.join(request, instanceId),
-			this.#followUps.join(request, instanceId),
-			this.#prWatches.join(request, instanceId),
+			this.#moves.join(instanceId),
+			this.#waits.join(instanceId),
+			this.#followUps.join(instanceId),
+			this.#routineTools.join(instanceId),
+			this.#prWatches.join(instanceId),
 			...moduleJoins(this.#preferences.value),
 		];
 		return {

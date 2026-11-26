@@ -3,7 +3,6 @@ import type { ClientFrame } from "../shared/protocol";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineSpec, Schedule } from "../routines";
-import type { BotId } from "../shared/bots";
 import { MAX_CAPTURE_ID } from "../shared/dictation";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_PULL_REQUEST_ATTACHMENTS, MAX_PULL_REQUEST_IMAGE_BYTES, type PullRequestChange } from "../shared/github";
@@ -109,7 +108,7 @@ describe("parseClientMsg", () => {
 		const weekdays: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } };
 		const routine: RoutineSpec = {
 			id: "r1",
-			botId: "scout" as BotId,
+			workspace: "/Users/me/code/app",
 			name: "Reviews",
 			schedules: [weekdays],
 			triggers: [],
@@ -143,12 +142,12 @@ describe("parseClientMsg", () => {
 			expect(save({ schedules: [] })).toBeNull();
 		});
 
-		test("save refuses a pull request or Bot task, a blank name or prompt, and a routine without a Bot", () => {
+		test("save refuses a pull request task, a blank name or prompt, and a routine without an absolute Workspace", () => {
 			expect(save({ task: { kind: "pull-requests", action: "review" } })).toBeNull();
-			expect(save({ task: { kind: "bot", botId: "scout", prompt: "Summarize" } })).toBeNull();
 			expect(save({ task: { kind: "prompt", prompt: " " } })).toBeNull();
 			expect(save({ name: "" })).toBeNull();
-			expect(save({ botId: null })).toBeNull();
+			expect(save({ workspace: null })).toBeNull();
+			expect(save({ workspace: "code/app" })).toBeNull();
 			expect(save({ enabled: "yes" })).toBeNull();
 			expect(change({ op: "enable", id: "r1" })).toBeNull();
 		});
@@ -273,8 +272,6 @@ describe("parseClientMsg", () => {
 			reviewDraft: true,
 		});
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi" })).toMatchObject({ reviewDraft: false });
-		// Only the server's Bots starts a Bot's session.
-		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", bot: "scout" })).toMatchObject({ bot: null });
 		expect(msg({ t: "start", reqId: 5, kind: "fork", view: { kind: "past", sessionId: "s1" }, entryId: "e1" })).toEqual({
 			t: "start",
 			reqId: 5,

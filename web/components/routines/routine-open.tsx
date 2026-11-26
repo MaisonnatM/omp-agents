@@ -1,4 +1,4 @@
-/** What an open row of a Bot's routines card shows: the picked run, the task whole, the schedule to change in place, and Edit and Delete. */
+/** What an open row of a Workspace's routines card shows: the picked run, the task whole, the schedule to change in place, and Edit and Delete. */
 import { Radio, RadioGroup } from "@ui-sdk/react/radio";
 import { IconPencil, IconTrashCan } from "central-icons";
 import { useId, useState } from "react";
@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { hashForBotRoutine, hashForBots } from "../../routing";
-import { usePageHash } from "../../page-hash";
+import { hashForRoutines } from "../../routing";
 import {
 	CADENCES,
 	type Cadence,
@@ -19,6 +18,7 @@ import {
 	durationWords,
 	pastRunWords,
 	runDuration,
+	runTask,
 	runWords,
 	scheduleOfCadence,
 	schedulesWords,
@@ -29,6 +29,7 @@ import {
 	usageWords,
 } from "../../routines-model";
 import { useDashboardActions } from "../dashboard-context";
+import { hashForBoard } from "../board/sidebar";
 import { FIELD } from "../form-field";
 import { RunIcon } from "./routine-marks";
 
@@ -81,8 +82,7 @@ export function TriggeredBy({ events }: { events: TriggerEvent[] }) {
 }
 
 /** The picked run: how it went, when, how long its command took, what started it, what it printed, and its errors. */
-function RunReport({ run, latest, routine, botName, now }: { run: RoutineRun | undefined; latest: boolean; routine: Routine; botName: string; now: number }) {
-	const to = usePageHash();
+function RunReport({ run, latest, routine, now }: { run: RoutineRun | undefined; latest: boolean; routine: Routine; now: number }) {
 	const headingId = useId();
 	const heading = (
 		<h4 id={headingId} className={HEADING}>
@@ -98,6 +98,7 @@ function RunReport({ run, latest, routine, botName, now }: { run: RoutineRun | u
 		);
 	}
 	const { outcome } = run;
+	const task = runTask(run);
 	const output = outcome.kind === "command" && "output" in outcome.run ? outcome.run.output : "";
 	const duration = runDuration(run);
 	return (
@@ -105,12 +106,12 @@ function RunReport({ run, latest, routine, botName, now }: { run: RoutineRun | u
 			{heading}
 			<p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
 				<RunIcon run={run} />
-				{outcome.kind === "sent" ? (
-					<a href={hashForBots(routine.botId, to)} className="font-medium underline-offset-2 hover:underline">
-						Sent to {botName}
-					</a>
-				) : (
+				{task === null ? (
 					<span className="font-medium">{runWords(run)}</span>
+				) : (
+					<a href={hashForBoard(routine.workspace, task)} className="font-medium underline-offset-2 hover:underline">
+						{runWords(run)}
+					</a>
 				)}
 				<span className="text-muted-foreground tabular-nums">{pastRunWords(run.at, now)}</span>
 				{duration !== null && <span className="text-muted-foreground tabular-nums">took {durationWords(duration)}</span>}
@@ -131,7 +132,7 @@ function RunReport({ run, latest, routine, botName, now }: { run: RoutineRun | u
 	);
 }
 
-/** The message or the command, whole. */
+/** The instructions or the command, whole, with the instructions a command's Board task carries above its report. */
 function Instructions({ task }: { task: RoutineTask }) {
 	const headingId = useId();
 	return (
@@ -139,11 +140,8 @@ function Instructions({ task }: { task: RoutineTask }) {
 			<h4 id={headingId} className={HEADING}>
 				Instructions
 			</h4>
-			{task.kind === "prompt" ? (
-				<p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{task.prompt}</p>
-			) : (
-				<code className="block rounded-md bg-muted px-2 py-1.5 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">{task.command}</code>
-			)}
+			{task.kind === "command" && <code className="block rounded-md bg-muted px-2 py-1.5 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">{task.command}</code>}
+			{(task.kind === "prompt" || task.prompt) && <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{task.prompt}</p>}
 		</section>
 	);
 }
@@ -233,10 +231,9 @@ function ScheduleEditor({ routine, disabled }: { routine: Routine; disabled: boo
 
 /** Edit, the full editor, and Delete, which asks first in its place, then leaves the card with no row open. */
 function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) {
-	const to = usePageHash();
 	const { send } = useDashboardActions();
 	const [confirming, setConfirming] = useState(false);
-	const { id, botId, name } = routine;
+	const { id, workspace, name } = routine;
 	if (confirming) {
 		return (
 			<div role="group" aria-label={`Delete ${name}?`} className="flex flex-wrap items-center justify-end gap-2 text-xs">
@@ -246,7 +243,7 @@ function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) 
 					disabled={disabled}
 					onClick={() => {
 						send({ t: "routine", change: { op: "remove", id } });
-						location.hash = hashForBotRoutine(botId, { kind: "list" }, to);
+						location.hash = hashForRoutines(workspace);
 					}}
 				>
 					Delete routine
@@ -259,8 +256,8 @@ function Footer({ routine, disabled }: { routine: Routine; disabled: boolean }) 
 	}
 	return (
 		<div className="flex items-center justify-end gap-1">
-			<Button variant="ghost" size="compact" leadingIcon={IconPencil} render={<a href={hashForBotRoutine(botId, { kind: "edit", id }, to)} />}>Edit</Button>
-			<Button {...activityControl("bots.routine.delete")} variant="ghost" size="compact" leadingIcon={IconTrashCan} disabled={disabled} onClick={() => setConfirming(true)}>
+			<Button variant="ghost" size="compact" leadingIcon={IconPencil} render={<a href={hashForRoutines(workspace, { kind: "edit", id })} />}>Edit</Button>
+			<Button {...activityControl("routines.delete")} variant="ghost" size="compact" leadingIcon={IconTrashCan} disabled={disabled} onClick={() => setConfirming(true)}>
 				Delete
 			</Button>
 		</div>
@@ -271,15 +268,14 @@ interface RoutineOpenProps {
 	routine: Routine;
 	/** The run the row shows, the latest unless a tick picked another; `undefined` before the first run. */
 	run: RoutineRun | undefined;
-	botName: string;
 	connected: boolean;
 	now: number;
 }
 
-export function RoutineOpen({ routine, run, botName, connected, now }: RoutineOpenProps) {
+export function RoutineOpen({ routine, run, connected, now }: RoutineOpenProps) {
 	return (
 		<div className="space-y-5 pt-3">
-			<RunReport run={run} latest={run === routine.runs[0]} routine={routine} botName={botName} now={now} />
+			<RunReport run={run} latest={run === routine.runs[0]} routine={routine} now={now} />
 			<Instructions task={routine.task} />
 			<ScheduleEditor routine={routine} disabled={!connected} />
 			<Footer routine={routine} disabled={!connected} />

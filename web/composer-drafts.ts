@@ -1,9 +1,8 @@
 /**
- * Unsent composer text, one draft per session, subagent, new-session draft, and Bot, kept in this browser across reloads, and
+ * Unsent composer text, one draft per session, subagent, new-session draft, and Board composer, kept in this browser across reloads, and
  * the channels that append text, replace part of it, and attach files to it from elsewhere on the page, such as the session's Browser and dictation.
  */
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
-import type { BotId } from "../src/shared/bots";
 import type { LiveView } from "../src/shared/sessions";
 import { expiringStrings } from "./expiring-strings";
 
@@ -15,9 +14,6 @@ export const liveDraftKey = (view: LiveView): string => (view.agentId === null ?
 
 /** The draft of the new-session page. */
 export const NEW_DRAFT_KEY = "new";
-
-/** The draft of a Bot's composer while no omp runs its conversation. */
-export const botDraftKey = (id: BotId): string => `bot/${id}`;
 
 /** The draft of the Board's composer in Workspace `cwd`. */
 export const boardDraftKey = (cwd: string): string => `board/${cwd}`;

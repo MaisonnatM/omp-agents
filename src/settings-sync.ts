@@ -10,14 +10,13 @@ import { hostname } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { atomicWriteText, atomicWriteTextSync, JsonFile, type ReducerFile } from "./fs";
 import { ensurePrivateRepo } from "./github";
-import { canonicalJson, errorText, isNonEmpty, isObject, isSafeInteger, isTexts, type Parsed, parseJson } from "./json";
+import { canonicalJson, errorText, isNonEmpty, isObject, isSafeInteger, type Parsed, parseJson } from "./json";
 import { isRoutineMachine, parseKeptRoutineSpec, type Routine, type RoutineMachine } from "./routines";
 import { SerialLane } from "./serial-lane";
 import type { ListKind } from "./server/list-registry";
 import type { ModuleFile } from "./modules";
 import { type CarriedProject, parseProjects, portableProjects, withProjects } from "./project-sync";
 import type { ProjectChange, ProjectList } from "./shared/projects";
-import type { Bot } from "./shared/bots";
 import type { PagePreferences } from "./shared/preferences";
 import type { ProcessSettings } from "./shared/processes";
 import { DEFAULT_SYNC_SETTINGS, isSyncItemId, isSyncOutcome, neverSynced, parseSyncSettings, SYNC_ITEMS, type SyncAnswer, type SyncConflict, type SyncItem, type SyncOutcome, type SyncSettings, type SyncSide, type SyncSkip, type SyncStoreId } from "./shared/settings-sync";
@@ -286,80 +285,45 @@ function homePaths(home: string): Carriage {
 	return { portable: json => each(json, portablePath), local: json => each(json, localPath) };
 }
 
-/** A Bot's memory, one line per fact; empty while it has none. */
-function memoryLines(path: string): string[] {
-	try {
-		return readFileSync(path, "utf8").split("\n").filter(line => line.trim() !== "");
-	} catch {
-		return [];
-	}
-}
-
 /** A routine as sync carries it: not its runs nor when its schedules last ran, which stay with the computer that ran them. */
 type CarriedRoutine = Omit<Routine, "runs" | "scheduledAt">;
 
 /**
- * The Bots with their memories and routines. Each memory is a list of facts so two machines' new facts merge. A Bot's
- * conversation stays on the machine that ran it, so a Bot arriving from another machine starts one here; its workspace
- * is named from `home`. Each routine says which computer runs it, `runsOn`, `null` while paused, so the travelling form
- * cannot hold a routine enabled on no computer, and two computers enabling it at once conflict.
+ * The routines, each with its Workspace named from `home`. Each says which computer runs it, `runsOn`, `null` while
+ * paused, so the travelling form cannot hold a routine enabled on no computer, and two computers enabling it at once
+ * conflict.
  */
-function botsStore(files: SyncedFiles, home: string, changed: (list: ListKind) => void): SyncStore {
-	const { bots: file, botsDir, routines: routinesFile, machine: here } = files;
-	const memoryPath = (id: string): string => join(botsDir, id, "memory.md");
-	const current = (): Bot[] => file.parse(file.json()) ?? [];
-	const localRoutines = (): CarriedRoutine[] => routinesFile.value.map(({ runs: _, scheduledAt: _at, ...routine }) => routine);
-	const portableRoutine = ({ botId: _, enabled, machine, ...routine }: CarriedRoutine): unknown => ({ ...routine, runsOn: enabled ? (machine ?? here) : null });
-	const portable = (bots: Bot[], memory: (id: string) => string[], routines: readonly CarriedRoutine[]): unknown =>
-		bots.map(({ sessionId: _, ...bot }) => ({
-			...bot,
-			cwd: portablePath(bot.cwd, home),
-			memory: memory(bot.id),
-			routines: routines.filter(routine => routine.botId === bot.id).map(portableRoutine),
-		}));
-	const parseRoutine = (value: unknown, botId: unknown): CarriedRoutine | { dropped: string } | null => {
+function routinesStore(files: SyncedFiles, home: string, changed: (list: ListKind) => void): SyncStore {
+	const { routines: file, machine: here } = files;
+	const localRoutines = (): CarriedRoutine[] => file.value.map(({ runs: _, scheduledAt: _at, ...routine }) => routine);
+	const portable = (routines: readonly CarriedRoutine[]): unknown =>
+		routines.map(({ enabled, machine, ...routine }) => ({ ...routine, workspace: portablePath(routine.workspace, home), runsOn: enabled ? (machine ?? here) : null }));
+	const parseRoutine = (value: unknown): CarriedRoutine | { dropped: string } | null => {
 		if (!isPlainObject(value)) return null;
-		const { runsOn = null, createdAt, ...fields } = value;
-		if (!(runsOn === null || isRoutineMachine(runsOn)) || !isSafeInteger(createdAt)) return null;
-		const spec = parseKeptRoutineSpec({ ...fields, botId, enabled: runsOn !== null });
+		const { runsOn = null, createdAt, workspace, ...fields } = value;
+		if (!(runsOn === null || isRoutineMachine(runsOn)) || !isSafeInteger(createdAt) || typeof workspace !== "string") return null;
+		const spec = parseKeptRoutineSpec({ ...fields, workspace: localPath(workspace, home), enabled: runsOn !== null });
 		if (!spec || "dropped" in spec) return spec;
 		return { ...spec.ok, machine: runsOn === null || runsOn.id === here.id ? null : runsOn, createdAt };
 	};
-	const parse = (value: unknown): { bots: Bot[]; memories: Map<string, string[]>; routines: CarriedRoutine[] } | null => {
+	const parse = (value: unknown): CarriedRoutine[] | null => {
 		if (!Array.isArray(value)) return null;
-		const sessions = new Map(current().map(bot => [bot.id, bot.sessionId]));
-		const kept = localRoutines();
-		const memories = new Map<string, string[]>();
 		const routines: CarriedRoutine[] = [];
-		const local: unknown[] = [];
-		for (const entry of value) {
-			if (!isPlainObject(entry) || typeof entry.id !== "string" || typeof entry.cwd !== "string" || !isTexts(entry.memory)) return null;
-			const { memory, routines: carried, ...bot } = entry;
-			if (carried === undefined) {
-				// A machine on the version before routines synced sends none and may drop them from the remote, so this machine keeps its own.
-				routines.push(...kept.filter(routine => routine.botId === entry.id));
-			} else {
-				if (!Array.isArray(carried)) return null;
-				for (const item of carried) {
-					const routine = parseRoutine(item, entry.id);
-					if (routine === null) return null;
-					if ("dropped" in routine) {
-						const name = isPlainObject(item) && typeof item.name === "string" && item.name ? item.name : "unnamed";
-						console.error(`omp-agents: dropped synced routine "${name}", which ${routine.dropped}`);
-						continue;
-					}
-					routines.push(routine);
-				}
+		for (const item of value) {
+			const routine = parseRoutine(item);
+			if (routine === null) return null;
+			if ("dropped" in routine) {
+				const name = isPlainObject(item) && typeof item.name === "string" && item.name ? item.name : "unnamed";
+				console.error(`omp-agents: dropped synced routine "${name}", which ${routine.dropped}`);
+				continue;
 			}
-			memories.set(entry.id, memory);
-			local.push({ ...bot, cwd: localPath(entry.cwd, home), sessionId: sessions.get(entry.id as Bot["id"]) ?? null });
+			routines.push(routine);
 		}
-		const bots = file.parse({ bots: local });
-		return bots && bots.length === value.length ? { bots, memories, routines } : null;
+		return routines;
 	};
 	/** The routines file after `incoming`, in its own order with new routines last; each keeps the runs and schedule this computer ran. */
 	const nextRoutines = (incoming: readonly CarriedRoutine[]): Routine[] => {
-		const stored = routinesFile.value;
+		const stored = file.value;
 		const byId = new Map(incoming.map(routine => [routine.id, routine]));
 		const storedIds = new Set(stored.map(routine => routine.id));
 		return [
@@ -371,30 +335,17 @@ function botsStore(files: SyncedFiles, home: string, changed: (list: ListKind) =
 		];
 	};
 	return {
-		read: () => portable(current(), id => memoryLines(memoryPath(id)), localRoutines()),
+		read: () => portable(localRoutines()),
 		parse: value => {
 			const parsed = parse(value);
-			return parsed && { ok: portable(parsed.bots, id => parsed.memories.get(id) ?? [], parsed.routines) };
+			return parsed && { ok: portable(parsed) };
 		},
 		write: value => {
 			const parsed = parse(value);
-			if (!parsed) throw new Error("Sync cannot write Bots their store does not keep");
-			let wrote = false;
-			for (const [id, lines] of parsed.memories) {
-				if (Bun.deepEquals(lines, memoryLines(memoryPath(id)))) continue;
-				mkdirSync(join(botsDir, id), { recursive: true });
-				atomicWriteTextSync(memoryPath(id), lines.length > 0 ? `${lines.join("\n")}\n` : "");
-				wrote = true;
-			}
-			if (!Bun.deepEquals(parsed.bots, current())) {
-				file.replace(parsed.bots);
-				wrote = true;
-			}
-			if (wrote) changed("bots");
-			// After the Bots, since a routine belongs to one.
-			const routines = nextRoutines(parsed.routines);
-			if (!Bun.deepEquals(routines, routinesFile.value)) {
-				routinesFile.replace(routines);
+			if (!parsed) throw new Error("Sync cannot write routines their store does not keep");
+			const routines = nextRoutines(parsed);
+			if (!Bun.deepEquals(routines, file.value)) {
+				file.replace(routines);
 				changed("routines");
 			}
 		},
@@ -427,10 +378,7 @@ export interface SyncedFiles {
 	preferences: SyncedFile<PagePreferences | null>;
 	processes: SyncedFile<ProcessSettings>;
 	workspaces: SyncedFile<WorkspaceList>;
-	bots: SyncedFile<Bot[]>;
-	/** Where each Bot's memory directory is. */
-	botsDir: string;
-	/** The routines, which travel inside their Bots; the runs stay here. */
+	/** The routines; the runs stay here. */
 	routines: Pick<ReducerFile<Routine[], never>, "value" | "replace">;
 	/** This computer, as the routines it runs name it to the others. */
 	machine: RoutineMachine;
@@ -455,7 +403,7 @@ export function syncStores(files: SyncedFiles, home: string, changed: (list: Lis
 		"source-control": sourceControlStore(files.sourceControl, home),
 		preferences: partsStore({ page: fileStore(files.preferences, () => changed("preferences"), PAGE_VALUES), processes: fileStore(files.processes) }),
 		workspaces: fileStore(files.workspaces, () => changed("workspaces"), homePaths(home)),
-		bots: botsStore(files, home, changed),
+		routines: routinesStore(files, home, changed),
 		projects: projectsStore(files.projects, () => changed("projects")),
 	};
 }
@@ -571,11 +519,14 @@ interface SyncState {
 /** Whether `next` points sync at another remote or branch than `before`, so an outcome about `before` says nothing about it. */
 const movedFrom = (before: SyncSettings, next: SyncSettings): boolean => next.remote !== before.remote || next.branch !== before.branch;
 
-/** The saved state; an excluded item an older version had, such as `notes`, drops out. */
+/**
+ * The saved state; an excluded item an older version had, such as `notes`, drops out, and an excluded `bots`, which
+ * carried the routines, excludes `routines`.
+ */
 function parseState(value: unknown): SyncState | null {
 	if (!isObject(value) || !isObject(value.settings)) return null;
 	const { excluded } = value.settings;
-	const settings = parseSyncSettings({ ...value.settings, excluded: Array.isArray(excluded) ? excluded.filter(isSyncItemId) : excluded });
+	const settings = parseSyncSettings({ ...value.settings, excluded: Array.isArray(excluded) ? excluded.map(id => (id === "bots" ? "routines" : id)).filter(isSyncItemId) : excluded });
 	if (!("ok" in settings)) return null;
 	return { settings: settings.ok, last: isSyncOutcome(value.last) ? value.last : null };
 }

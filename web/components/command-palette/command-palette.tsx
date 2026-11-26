@@ -66,7 +66,6 @@ const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	settings: PAGE_ICON.settings,
 	help: IconKeyboard,
 	"pull-requests": PAGE_ICON["pull-requests"],
-	bots: PAGE_ICON.bots,
 	sessions: PAGE_ICON.sessions,
 	...Object.fromEntries(MODULE_LIST.map(({ id, tab }) => [id, tab.icon])),
 };

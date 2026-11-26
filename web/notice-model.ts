@@ -7,7 +7,7 @@ import { hashForSession } from "../src/shared/sessions";
 import { folderName, providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
-import { hashForBotRoutine, hashForPullRequests, hashForSettings } from "./routing";
+import { hashForPullRequests, hashForRoutines, hashForSettings } from "./routing";
 import type { EarlyExit } from "../src/routine-health";
 
 /** The bell's filters, each a source of notices. */
@@ -170,7 +170,7 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				headline: count === 1 ? "1 routine run exited early" : `${count} routine runs exited early`,
 				preview: notice.runs.map(({ name, exit }) => `${name} ${EXIT_LABEL[exit]}`).join(" · "),
 				// The first routine it names, whose runs show what went wrong.
-				link: first ? { href: hashForBotRoutine(first.botId, { kind: "open", id: first.routineId }), external: false } : null,
+				link: first ? { href: hashForRoutines(first.workspace, { kind: "open", id: first.routineId }), external: false } : null,
 				face: { kind: "warning" },
 				// It comes once a day, which you may not watch.
 				toast: { kind: "news", duration: Infinity },

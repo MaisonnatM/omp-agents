@@ -47,7 +47,7 @@
   With one pane the hash is the single-view form above, so older links still open.
   **Settings** takes over the page and leaves the panes behind it.
   Select **Sessions** to return to them.
-- A part of the hash that does not decode, such as `#bots/%E0`, names nothing: the page opens without it, and a pane it names drops.
+- A part of the hash that does not decode, such as `#new/%E0`, names nothing: the page opens without it, and a pane it names drops.
 - When a pane's view fails to render, that pane shows **This view failed to render.** with the error under it, and the other panes and the sidebar keep working; the pane's header buttons still close or maximize it.
   A page that fails shows the same in its place, and opening another view clears it.
 - Session conversations, their composers, and the new-session composer are at most 48rem wide.

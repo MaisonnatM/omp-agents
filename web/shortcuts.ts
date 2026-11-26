@@ -55,7 +55,6 @@ export type ShortcutId =
 	| "browserPickErase"
 	| "focusComposer"
 	| "pull-requests"
-	| "bots"
 	| "sessions"
 	| "workspace"
 	| "nextPullRequest"
@@ -105,15 +104,15 @@ export const CLOSE_TAB: Chord = { key: "w", mod: true };
 const digitKeys = (modifiers: Omit<Chord, "key">, scope: Scope): Binding[] =>
 	["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key): Binding => ({ chord: { key, ...modifiers }, scope }));
 
-/** A category of Settings › Keyboard: the core's, a tab's but Bots', which has no shortcuts of its own, or Changes. */
-export type ShortcutCategory = "general" | "sessions" | Exclude<SidebarTab, "bots"> | "changes";
+/** A category of Settings › Keyboard: the core's, a tab's, or Changes. */
+export type ShortcutCategory = "general" | "sessions" | SidebarTab | "changes";
 
 /** The categories Settings › Keyboard lists the shortcuts under, in order: the core's, then each tab's in the sidebar's order but a module's with no rows, then Changes. */
 export const SHORTCUT_CATEGORIES: readonly { id: ShortcutCategory; label: string }[] = [
 	{ id: "general", label: "General" },
 	{ id: "sessions", label: "Sessions" },
 	...SIDEBAR_TABS.flatMap(({ value, label }): { id: ShortcutCategory; label: string }[] => {
-		if (!isWebModuleId(value)) return value === "bots" ? [] : [{ id: value, label }];
+		if (!isWebModuleId(value)) return [{ id: value, label }];
 		const { shortcuts } = moduleOf({ kind: value });
 		return shortcuts.rows.length > 0 ? [{ id: value, label: shortcuts.category }] : [];
 	}),
@@ -133,7 +132,6 @@ export interface Shortcut {
 /** The go-to shortcuts of the core's tabs, each under its tab's id. */
 const TAB_GO_TO = {
 	"pull-requests": { label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
-	bots: { label: "Go to your Bots", command: "Go to Bots", keys: [] },
 } satisfies { [T in Exclude<SidebarTab, WebModuleId>]: Pick<Shortcut, "label" | "command" | "keys"> };
 
 /**
@@ -272,7 +270,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{
 		id: "detailsSidebar",
 		category: "sessions",
-		label: "Show or hide the details sidebar, on the right: a session's, or a Bot's",
+		label: "Show or hide the session's details sidebar, on the right",
 		command: "Toggle details sidebar",
 		keys: [{ chord: { key: "b", mod: true, shift: true }, scope: "anywhere" }],
 	},

@@ -1,14 +1,14 @@
 # Routines
 
-Every routine belongs to a Bot, through its required `botId`, and acts in that Bot on its schedules, its triggers, or both, with at least one of either; see [Bots](bots.md).
+Every routine belongs to one Workspace, its `workspace`, and acts on its schedules, its triggers, or both, with at least one of either.
 A schedule is every so many minutes, counted from the last scheduled run, or a local time on chosen weekdays, so 9:00 stays 9:00 across DST.
 The routine is due at the earliest of them.
 Two intervals share that last scheduled run, so the shorter one decides.
 The routine keeps that run's time in `scheduledAt`, which a slot's or **Run now**'s claim sets and a trigger's leaves alone, so a busy Slack moves no schedule; a file from before triggers reads it as its newest run's time.
-Its task is a `prompt`, a message that goes into the Bot's conversation, or a `command`, a shell command that runs in the Bot's workspace.
-A routine has no workspace, skill, or pin of its own: the Bot's workspace, job, and conversation stand in for them.
+Its task is a `prompt`, which each run posts as a Board task in its Workspace, or a `command`, a shell command that runs in its Workspace, whose report a run posts the same way, under the command's own `prompt` when it has one.
+Its optional `launch`, the Board's `BoardLaunch`, picks the model and thinking of the session the Board starts on its Board task.
 A routine runs only where `runsHere` in `src/routines.ts` holds: it is `enabled` and its `machine` is `null`, as it is for every routine made, edited on, or turned on here.
-Settings sync carries routines inside their Bots and sets `machine` to the other machine that runs one, `{ id, name }`; see [Settings sync](settings-sync.md).
+Settings sync carries the routines and sets `machine` to the other machine that runs one, `{ id, name }`; see [Settings sync](settings-sync.md).
 `applyRoutine` keeps `machine` through an edit, clears it when a routine is paused, and clears it when **enable** turns on a routine another machine runs, setting `scheduledAt` to now so a slot that machine ran does not run again here at once.
 `isDue` and `isTriggeredBy` check `runsHere`, so the runner, the triggers, and `watchedKinds` skip a routine another machine runs, and the page shows **Runs on** and that machine's name with its switch off.
 
@@ -17,62 +17,59 @@ A file from before `schedules` reads its `schedule` as a one-element list, and d
 The rest of the file stays.
 A file that is not a list of routines still moves aside.
 `parseRoutineSpec` in `src/routines.ts` checks each routine's fields both for the file and for the socket's `routine` save, so the two hold the same limits.
-The `Dashboard` refuses a save whose `botId` names no Bot, and sends the routines back to the page that asked.
-A Bot can also create, change, and delete its own routines through its `save_routine` and `delete_routine` tools; see [Bots](bots.md).
-They leave one `BotRoutineRequest` each in `routine-inbox/` beside `routines.json`, and `RoutineInbox` in `src/server/routine-inbox.ts` applies them through the list registry, oldest name first, so every page hears the change and the same check refuses a save for a Bot that is gone.
-`parseBotRoutineRequest` reads each file with `parseRoutineSpec`, and the inbox checks ownership against the routines as each file applies: a save must name the requesting Bot and, for an id that exists, change a routine of that Bot, and a remove must name an existing routine of that Bot.
-Any other file moves aside as `<name>.invalid` with a logged reason, and so does a change the routines refuse, such as a save for a Bot deleted since, with `the routines refused it; its Bot may be gone`.
-A save the routines already hold, as when a Bot saved the same edit twice while the dashboard was stopped, is done and deleted.
-Only the server that owns routines drains the inbox, so a request waits there while the dashboard is stopped.
+The `Dashboard` sends the routines back to the page that asked.
+Every dashboard-started main session also gets the strict host tools `save_routine` and `delete_routine`, from `SessionRoutines` in `src/server/session-routines.ts`, the way `schedule_follow_up` reaches it.
+They reach only the routines of the session's Workspace, its directory or, in a linked worktree, that repository's main checkout: a new routine gets that Workspace, a save keeps it, and an id that names no routine of that Workspace is refused.
+Each result and each refusal lists the Workspace's routines by id and name, so `delete_routine` with an empty id lists them and changes nothing.
+They apply through the list registry, so every page hears the change.
 Each routine holds its last 10 runs, newest first.
-A run holds its slot time, its errors, `triggeredBy`, the events that started it, empty for a slot's or **Run now**'s run, and one `outcome`: `pending` from its claim, with whether it is still `queued`; `sent` with the session its message went to; or a `command` with the command's result once it ran.
-A run from before `outcome` migrates as the file loads, in `parseRun`, and nothing else sees the old fields: its `command` becomes a `command` outcome, a started session or a Bot's message `sent`, and otherwise `pending`, queued when its `queued` is set or its `queue` list holds an entry.
-A run stays queued from its claim until the drain sends its message or starts its command.
+A run holds its slot time, its errors, `triggeredBy`, the events that started it, empty for a slot's or **Run now**'s run, and one `outcome`: `queued` from its claim, `sending` while its post goes to the Board, `posted` with the Board task it posted or replied on, a `command` with the command's result once it ran and the Board task its report went to, if any, or `failed`.
+A run from before `outcome` migrates as the file loads, in `parseRun`, and nothing else sees the old fields: its `command` becomes a `command` outcome, and otherwise `queued`.
+A run that went to a session before routines posted to the Board, `sent`, `session`, or `started`, is dropped, since no Board task holds it.
 
-## Routines from before Bots
+## Routines from before the Board
 
-A routine from before Bots has no `botId`, and `RoutinesFile` gives it one as it reads the file.
-Only the server that owns routines saves that and creates the Bot it needs, through `RoutinesFile.migrate`: as it takes ownership at start, before the runner recovers, and again as it takes over routines and rereads the file.
-Another server reads the migrated routines in memory and leaves both files alone.
-Each routine goes to one Bot named **Routines**, `ROUTINES_BOT_ID`, whose workspace is the first routine's workspace, else the home directory, and whose job says it runs the routines moved there.
-A command whose workspace differs from that Bot's runs `cd` into its old workspace first, so it acts where it did.
-A prompt whose workspace differs starts with **Work in** and that workspace, and a prompt with a skill starts with `/skill:` and the skill's name.
-The pin goes, since a Bot's conversation is never ended.
-The Routines Bot is created only when it is missing, through the lists so pages hear of it, so a migration that runs again reuses it, and a file already migrated changes nothing.
+Only the server that owns routines rewrites the file, through `RoutinesFile.migrate`: as it takes ownership at start, before the runner recovers, and again as it takes over routines and rereads the file.
+Another server reads the migrated routines in memory and leaves the files alone.
+A routine with a `botId` belonged to an agent kept in `bots.json`; it takes that file's `cwd` as its Workspace, its model as its `launch`, and its prompt, or a command's new `prompt`, becomes the routine's prompt, then `## Job` and that agent's job, then `## Memory` and its `memory.md` under `$XDG_DATA_HOME/omp-agents/bots/<id>/` when that is not empty, cut to `MAX_PROMPT_LENGTH` with a log line.
+A routine whose `botId` names nothing in `bots.json` is dropped with a log line.
+A built-in routine's id takes the task `BUILT_IN_ROUTINES` ships instead, with no job or memory folded in, so no past built-in prompt survives the move.
+Before the migrating save, `migrate` copies `routines.json` to `routines.json.before-board`, once; then it renames `bots.json` to `bots.json.migrated`, or to `bots.json.migrated-<milliseconds>` when that name is taken.
+A routine that moved but does not parse is logged and keeps both files as they are, so nothing is lost: the server runs the routines it read, and the next start tries again.
+An older routine with its own `workspace` keeps it, and a skill it had becomes its `launch`'s.
+A file already migrated changes nothing.
 
 ## Routine heartbeat
 
-`earlyRuns` in `src/routine-health.ts` lists the runs that exited early, as `EarlyRun`s: the routine's Bot, id, and name, the run's key, and why, one of `EARLY_EXITS`.
+`earlyRuns` in `src/routine-health.ts` lists the runs that exited early, as `EarlyRun`s: the routine's Workspace, id, and name, the run's key, and why, one of `EARLY_EXITS`.
 It judges the runs claimed in the day before the last half hour (`HEALTH_WINDOW_MS`, `SETTLE_MS`), so a run still under way waits for the next look.
 
-- `errored`: the run has errors, its outcome is `failed`, its command did not exit 0, or its Bot's turn ended on a provider's error.
-  A command whose routine has `post: "failures"` hands its output to the Bot by exiting non-zero, so that exit, and the `exitedWith` error it records, is no error.
-- `no-reply`: its Bot's turn ended with no text reply and without `stay_quiet`.
-- `short`: it took less than `SHORT_SHARE`, a quarter, of the median of the routine's other runs, once at least `MIN_USUAL_RUNS` of them have a time; a command's time is its run's, and a message's is its Bot's turn.
+- `errored`: the run has errors, its outcome is `failed`, its command did not exit 0, or its Board task's session failed.
+  A command whose routine has `post: "failures"` hands its output to a session by exiting non-zero, so that exit, and the `exitedWith` error it records, is no error.
+- `no-reply`: its Board task's session ended without replying on the Board thread and without a quiet `done`.
+- `short`: it took less than `SHORT_SHARE`, a quarter, of the median of the routine's other runs, once at least `MIN_USUAL_RUNS` of them have a time; a command's time is its run's, and a posted run's is its session's turn.
 - `missed`: a slot's run was claimed `LATE_AFTER_MS`, an hour, or more after the slot the previous scheduled run gave, or stayed queued that long.
   A routine that `runsHere` and whose next slot is that overdue with no claim is listed at that slot too.
   Lateness counts only the time the Mac was awake: `macSleeps` in `src/sleep-log.ts` reads the spans from a Sleep to the next full Wake out of `pmset -g log`, so a catch-up run at wake is not missed.
 
-`routineTurn` in `src/live-session.ts` finds a message run's turn in its Bot's session file: the messages between the prompt whose routine stamp names the routine and the run's key, and the next prompt, read as `turnUpdate` reads an `agent_end`'s.
-A run whose session file or prompt is not found has no turn, so it is judged on its outcome alone.
-It also sums the turn's `usage`: every assistant message's input, output, and cache tokens, and its `usage.cost.total`.
-When a session's turn ends, the `Dashboard` records that sum as `usage` on each prompt run sent into that session that has none yet, in `routines.json`, so the page shows each run's tokens and cost and a routine's total over its kept runs.
+`boardRunTurn` in `src/server/routine-turns.ts` reads a posted run's turn, a `RunTurn`, from its Board task, from what the run posted, the Board task or the routine's reply, to the first done after it: the session that took it (`start`, or the `startedOn` of the reply the run posted), whether that session replied or marked the Board task done quietly, whether its start failed, how long it took, and its `usage`, every assistant message's input, output, and cache tokens, and its `usage.cost.total`, read from that session's file.
+A run whose Board task or session file is not found has no turn, so it is judged on its outcome alone.
+The runner records that `usage` on each posted run that has none yet once its session's turn ended, in `routines.json`, so the page shows each run's tokens and cost and a routine's total over its kept runs.
 The `Dashboard` checks `HEALTH_KINDS` on the owner at startup and on the daily tick, and the bell shows one `routine-health` notice for what it found; see [Notifications](notifications.md).
 
 ## Built-in routines
 
-`BUILT_IN_ROUTINES` in `src/server/built-in-routines.ts` holds the routines the dashboard adds by itself, each with the Bot that runs it.
-As the owner takes ownership, right after it migrates the routines from before Bots, `addBuiltInRoutines` saves each one that `built-in-routines.json` beside the access token does not list yet, and its Bot unless that Bot exists, through the lists so pages hear of them, then lists its id there.
-A routine you delete is not added again, and adding one listed changes nothing but a past prompt, as the end of this section says.
-The second built-in routine is **Friday routine receipt** of the **Routine receipt** Bot, a `routines` Bot in `sourceDir`, disabled, on Fridays at 17:00.
-Its prompt, `ROUTINE_RECEIPT_PROMPT`, reads the last 7 days of runs in `routines.json`, with each prompt run's `usage`, tells a quiet run by the `stay_quiet` call in its session file, and asks for one table of runs, useful runs, tokens, cost, and a keep, slow down, or retire verdict per routine; it changes nothing.
-The first is **Weekly harness review** of the **Harness review** Bot, a `routines` Bot that works in the omp-agents checkout (`sourceDir`), disabled, on Mondays at 9:00.
+`BUILT_IN_ROUTINES` in `src/server/built-in-routines.ts` holds the routines the dashboard adds by itself, each with the omp-agents checkout (`sourceDir`) as its Workspace.
+As the owner takes ownership, right after it migrates the routines, `addBuiltInRoutines` saves each one that `built-in-routines.json` beside the access token does not list yet, through the lists so pages hear of them, then lists its id there.
+A routine you delete is not added again, and one listed is left as it is.
+The second built-in routine is **Friday routine receipt**, disabled, on Fridays at 17:00.
+Its prompt, `ROUTINE_RECEIPT_PROMPT`, reads the last 7 days of runs in `routines.json`, with each run's `usage`, tells a quiet run by the quiet `done` of its Board task in `board.json`, and asks for one table of runs, useful runs, tokens, cost, and a keep, slow down, or retire verdict per routine; it changes nothing.
+The first is **Weekly harness review**, disabled, on Mondays at 9:00.
 Its prompt, `HARNESS_REVIEW_PROMPT`, first judges last week's change: it finds the newest `~/.cache/omp-harness-review/<date>-review.md` before today and, when its folder `<date>/` holds replay results, runs `model-replay.ts summary --by-task` there and says per replayed failure whether the replay kept its base's checks and now passes the ones that failed; with no results it says in one line that the replay was never run.
 It then reads the last week of `ship-trace.jsonl` for every repository, with the fixes refused at their round budget or stall limit, which need `moreRounds`, `LEARNINGS.md`, the failed merges in `merges.json`, and the failed runs in `routines.json`, and asks for the failures grouped by cause, exactly one harness change as a decision for the user, and five past failures to replay against it.
 It saves those five with `model-replay.ts candidates --sessions` as `<today>-tasks.json` and its reply as `<today>-review.md` in that folder, and ends with the `model-replay.ts run` command, on the `task` role's model and out to `<today>/`, to run once the change lands; see [Worker model replay](token-cost.md#worker-model-replay).
 It forbids editing, committing, or pushing in any repository and running `run` or `judge`, and writes only under `~/.cache/omp-harness-review/`.
 Since a replay loads no extension but `cache-tail.ts`, a proposed extension change names instead the [Evals](evals.md) run that would measure it with the full harness, such as its `--disable-extensions` arm, which the review does not run.
-Each entry of `BUILT_IN_ROUTINES` lists its `pastPrompts`, every prompt an earlier version saved; on each start `addBuiltInRoutines` gives a listed routine whose stored prompt is one of them the current prompt, keeping its runs and settings, and leaves a prompt the user edited alone.
 
 ## The runner
 
@@ -88,41 +85,33 @@ Each tick at a full wake does three things, in order:
 2. It claims each due slot: it saves a new queued run before it starts anything.
    Slots missed while the dashboard was closed or the Mac slept coalesce into one run at the next tick at a full wake.
 3. It starts the queued runs, oldest first.
-   A prompt is serialized with `routineMessageText` from `src/shared/routine-message.ts` and goes through `Bots.message` in `src/server/bots.ts`, the path the Bot page's composer takes.
-   It follows the Bot's live session, resumes its saved one, or starts its first session in its workspace.
-   The run records `sent` with the session it went to; a refusal, such as a Bot that is gone, goes to the run's errors, and the next run tries again.
-   A run starts no session of its own, so routines hold no slot cap; the Bot keeps its one conversation, which the runner neither tracks nor ends.
-   A command starts through the runner's `exec`, `runShell` in `src/proc.ts`, in the Bot's workspace, and the drain does not wait for it, so a tick never blocks for minutes.
+   A prompt run posts to the Board of its Workspace through the runner's `postBoard`, which writes it at once and returns the Board task it posted or replied on, the path the Board page and tool take, as the routine author `{ kind: "routine", routineId, name }`, which only the server may post as; see [Board](board.md).
+   The post's title is the routine's name, its `launch` the routine's, and its text, from `postText`, the prompt, then the trigger events fenced as data.
+   When the routine's newest Board task in its Workspace, the newest one posted there as that routine, is not done, the run replies on it instead, which wakes its session; otherwise it posts a new Board task.
+   The run records `posted` with that Board task's id; a refusal, or a Board that could not be written, goes to the run's errors, and the next run tries again.
+   The Board's runner starts the Board task's session as for any other, in its worktree `board/<id>`; the routine runner neither tracks nor ends it, so routines hold no slot cap of their own.
+   A command starts through the runner's `exec`, `runShell` in `src/proc.ts`, in the routine's Workspace, and the drain does not wait for it, so a tick never blocks for minutes.
    `runShell` runs `/bin/sh -c` with stderr merged into stdout, keeps the last 64 KB of output, and stops the command after 10 minutes of awake time.
    Timers and `Date.now()` count the time the Mac sleeps, so its timer re-arms for the awake time left by `performance.now()`, which stops while the Mac sleeps.
    It returns `slept`, the wall time less the awake time, to the second, when a second or more.
    It spawns the shell in its own process group and stops the whole group with SIGTERM, since a command's own children would otherwise keep running and hold the output pipe open.
    When the command ends, the runner writes its exit code, output, times, and `slept` to the run; a non-zero exit, a stop, or a failed spawn also goes to the run's errors.
-   It then posts the command's completed `RoutineMessage` through `routineMessageText` and `Bots.message`, with the routine's name, command, result, how long the Mac slept, and output fenced as data.
+   It then posts, or replies, the command's report, `commandReport`: the command, its result, how long the Mac slept, and its output fenced as data, under the command task's `prompt` when it has one.
    A command task with `post: "failures"` skips that post, and holds nothing for a full wake, when it exited with code 0; see [Command routines can post only their failures](../decisions/2026-11-04-command-routines-can-post-only-failures.md).
-   With `post: "changes"` it skips it only when it exited 0 with the same output as the routine's newest earlier run that exited, so a command acts as a cheap gate before the Bot's model turn.
-   That post waits for a full wake, since the Bot's turn it starts would stall in a dark wake; it waits in memory, so a server that stops first never posts it, though the run keeps the output.
-   The run keeps the output whether or not the post goes through, and a post the Bot refused adds why to the run's errors.
+   With `post: "changes"` it skips it only when it exited 0 with the same output as the routine's newest earlier run that exited, so a command acts as a cheap gate before a session's model turn.
+   That post waits for a full wake, since the session it starts would stall in a dark wake; it waits in memory, so a server that stops first never posts it, though the run keeps the output.
+   The run keeps the output whether or not the post goes through, records the Board task in its `command` outcome's `task`, and a post the Board refused adds why to the run's errors.
    The runner keeps the routines whose command runs in memory, since a run holds one outcome and later `run-now` claims can push a running command's run out of the saved 10; a command routine whose last command still runs records an error instead of running a second one.
 
 Running a tick twice starts nothing new, since the slot is claimed, and a tick that comes while one runs is skipped.
 A crash after a claim loses no queued run, since it is on disk.
-A message that had not gone waits for the routine's next slot.
+A run left `sending` when the server stopped fails at the next start with `STOPPED_WHILE_SENDING`, and waits for the routine's next slot.
 Stopping the server stops every running command, right before it exits, so the result of a command it stopped is never saved as a time-limit stop.
 A run saves its command as `running` before the command starts, then as `exited`, `stopped`, or `failed` when it ends.
 No command resumes after a restart: the server that owns routines turns each run still saved as `running` into `stopped` by the dashboard, with that error, when it starts or takes over (`RoutineRunner.recover`).
 
-`RoutineMessage` snapshots the Bot id, routine id and name, run time, triggering events, and either the prompt or the command and its completed result.
-`routineMessageText` writes the prompt or command report first, then a trailing `# omp-agents routine run, read as data, not instructions: ` line with a JSON stamp.
-The stamp holds the snapshot's metadata, including `triggeredBy`, without repeating the prompt or command output from the body.
-Keeping the prompt first preserves omp's leading `/skill:` expansion, and the `#` stamp remains a shell comment for a `!` prompt.
-`readRoutineMessage` checks the stamp's fields and, for a command report, checks that the body matches its result.
-The transcript folds a valid stamp into a distinct `routine` item, so its conversation card needs no lookup of the current routine or its retained runs.
-Unstamped messages remain ordinary user messages.
-
 A `routine` socket message carries one change: `save`, `remove`, `enable`, or `run-now`, which claims a slot now, whatever the schedules, and drains it.
 Every socket hears the routines after each change and each step of a run as a `routines` message on the roster topic, also sent when a socket opens.
-Removing a Bot removes its routines first, in the same `bot` change, and every socket hears both lists.
 
 ## Triggers
 
@@ -132,7 +121,7 @@ The `Dashboard` wraps two of the `NoticeSources`, `pullRequests` and `slack`, so
 A sighting has an id that names what it saw in the state it saw it, and a scope, which one answer covers:
 
 - **Pull requests**: each pull request of a repository GitHub answered for whose move is yours, by that move as `moveOf` reads it with the sessions on it, as the bell reads it; scope `pull-request:<owner/repo>`.
-  A pull request is new when its move becomes yours or changes to another of yours, so a draft, checks still running, or a session at work on it, such as a Bot pushing a fix, fires nothing until it ends in a move of yours.
+  A pull request is new when its move becomes yours or changes to another of yours, so a draft, checks still running, or a session at work on it, such as a routine session pushing a fix, fires nothing until it ends in a move of yours.
 - **Slack**: each conversation's newest message that waits on you, by Slack's id for it; scope `slack`.
   While Slack is signed out, the check forgets the scope, so the first answer after signing in sets a new baseline and fires nothing for messages already waiting.
 
@@ -144,7 +133,7 @@ Every server learns its sightings, but only the server that owns routines fires 
 Otherwise the runs stay queued for the next tick at a full wake, and news for a routine whose triggered run is still queued joins that run, up to 10 events, through `RoutinesFile.addTriggerEvents`, so a night of dark wakes starts one run.
 A run is keyed by its time, so a claim lands at least a millisecond after the routine's newest run.
 A routine whose schedules are all weekly hears its triggers only on the weekdays they name, by `triggersOn`, so a weekdays-only routine ignores weekend news; one with no schedule or an interval hears them every day.
-A prompt run carries the events in the trailing JSON stamp rather than fenced trigger prose.
+A prompt run lists the events under its instructions in the Board task it posts, as one JSON list fenced as data.
 A command gets the events as a JSON list in the `ROUTINE_TRIGGERS` environment variable, `[]` for a scheduled run or **Run now**, which `runShell` sets beside the server's environment.
 Each event carries its kind, a title, a detail of at most 2,000 characters, and a link when it has one.
 The pull request and Slack checks run on the 2-minute activity tick, which checks both while a page listens; while none does, the owner checks only the kinds an enabled routine has a trigger for, by `watchedKinds`, and another server checks nothing.
@@ -153,16 +142,16 @@ A page that opens after a tick checked only some kinds checks both again.
 ## One server runs the unattended work
 
 Servers on different ports share `~/.config/omp-agents`: your app and a smoke run, say.
-Routines, the sport, routine, bot, and shepherd inboxes, the daily sweep of omp's isolation sandboxes, and the idle stop of sessions' processes write that directory or omp's, or end processes, without anyone asking, so one server at a time runs them.
+Routines, the sport inbox, the daily sweep of omp's isolation sandboxes, and the idle stop of sessions' processes write that directory or omp's, or end processes, without anyone asking, so one server at a time runs them.
 `OwnerLock` in `templates/omp/agent/extensions/github/owner-lock.ts` decides which, with `server.lock`, a file that holds `{pid, port}` of the owner.
 A server creates it whole through a draft file and a hard link, so a reader never sees half of it.
 Taking over a dead or invalid owner holds a short ownership lock at `<path>.reap` and rereads the original file before removal, so competing reclaimers cannot remove a new owner's lock.
 The same mechanism recovers a crashed reclaimer's lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
-On a takeover the server logs it, reads `routines.json` and `bots.json` again, since the previous owner kept saving them, fails the runs left sending a prompt or running a command and the scheduled sends left sending, and drains the sport, routine, bot, and shepherd inboxes.
+On a takeover the server logs it, reads `routines.json` again, since the previous owner kept saving it, migrates it, fails the runs left sending a prompt or running a command and the scheduled sends left sending, and drains the sport inbox.
 A server that exits normally deletes its lock.
-The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the sport, routine, bot, and shepherd inboxes, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
+The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, **Run now**, or a process's **Stop**; only the minute tick's routines, scheduled sends, and isolation sweep, the runs the routines' triggers start, the sport inbox, the end inbox's requests for sessions started in a terminal, and the process sample's idle and gone-session stops are left to the owner.
 Each server keeps its own copy of `routines.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
 `scheduled.json` is the exception: `ScheduledFile` is a `shared` `ReducerFile`, so a send added on any server reaches the owner and only one process can claim it.
 Each mutation holds an `OwnerLock` at `<path>.lock` across reload, reduction, and the immediate JSON replacement, so independent server processes keep one another's changes.

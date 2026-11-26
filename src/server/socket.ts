@@ -3,7 +3,6 @@ import { complete } from "../commands";
 import { errorText } from "../json";
 import { PromptRefused, skipRefused } from "../live-session";
 import { directoryOf } from "../paths";
-import type { BotId } from "../shared/bots";
 import type { NoticeOp } from "../shared/notices";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
@@ -48,10 +47,6 @@ export interface SocketEnv {
 	cancelContinue(sessionId: string): void;
 	/** Run routine `id` now, whatever its schedule. */
 	runRoutine(id: string): Promise<void>;
-	/** Send `text` into Bot `id`'s conversation, resuming it when no omp runs it. */
-	messageBot(id: BotId, text: string): Promise<void>;
-	/** End Bot `id`'s conversation, archive its file, and unbind it, so its next message starts a new one. */
-	restartBot(id: BotId): Promise<void>;
 	/** Send scheduled send `id` now, whatever its time, or try a failed one again. */
 	sendScheduledNow(id: string): Promise<void>;
 	/** Act on notices `ids`; every socket then gets the notices as they are after. */
@@ -188,11 +183,6 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 		lists.applyModule(id, change, peer);
 	},
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
-	bot: ({ lists, messageBot, restartBot }, peer, { change }) => {
-		if (change.op === "message") return messageBot(change.id, change.text);
-		if (change.op === "restart") return restartBot(change.id);
-		lists.apply("bots", change, peer);
-	},
 	schedule: ({ lists, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : void lists.apply("scheduled", change, peer)),
 	pin: ({ lists }, peer, { change }) => void lists.apply("pins", change, peer),
 	preference: ({ lists }, peer, { change }) => void lists.apply("preferences", change, peer),

@@ -63,6 +63,10 @@ export class LiveSessions {
 	readonly #unreadFile: JsonFile<SavedUnread>;
 	/** The unread turn each session's running turn read as it started, by instance id, which a quiet end gives back. */
 	readonly #readByTurn = new Map<string, UnreadTurn>();
+	/** When each session's running or last turn started, by instance id, so {@link quietTurn} reads only that turn's done. */
+	readonly #turnStartedAt = new Map<string, number>();
+	/** Whether session `sessionId` marked a routine's Board task done quietly at or after `since`, which the Board alone records. */
+	readonly #doneQuietly: (sessionId: string, since: number) => boolean;
 	/** Whether each session's main agent waits on work it started, which its row's `turnWaits` shows. */
 	readonly #turnWaits = new TurnWaits();
 	/** Each session's background jobs, which the Overview tab's Jobs section and the sidebar's rows show. */
@@ -92,8 +96,15 @@ export class LiveSessions {
 	/** The scheduled check session `sessionId` waits on, which its row's `scheduledCheck` shows. */
 	readonly #scheduledCheck: (sessionId: string) => ScheduledCheck | null;
 
-	constructor(onUpdate: (instanceId: string, update: SessionUpdate) => void, taskClaims = new TaskClaims(), unreadPath = unreadFile, scheduledCheck: (sessionId: string) => ScheduledCheck | null = () => null) {
+	constructor(
+		onUpdate: (instanceId: string, update: SessionUpdate) => void,
+		taskClaims = new TaskClaims(),
+		unreadPath = unreadFile,
+		scheduledCheck: (sessionId: string) => ScheduledCheck | null = () => null,
+		doneQuietly: (sessionId: string, since: number) => boolean = () => false,
+	) {
 		this.#onUpdate = onUpdate;
+		this.#doneQuietly = doneQuietly;
 		this.#scheduledCheck = scheduledCheck;
 		this.#taskClaims = taskClaims;
 		this.#unreadFile = new JsonFile(unreadPath, { parse: decoder(isSavedUnread), holds: "a list of unread turns", onInvalid: "ignore" });
@@ -251,12 +262,22 @@ export class LiveSessions {
 
 	/** Session `instanceId` started a turn, which reads its unread turn unless the turn ends quietly; whether it had one. */
 	turnStarted(instanceId: string): boolean {
+		this.#turnStartedAt.set(instanceId, Date.now());
 		const turn = this.#unread.get(instanceId);
 		if (!turn) return false;
 		this.#unread.delete(instanceId);
 		this.#readByTurn.set(instanceId, turn);
 		this.#saveUnread();
 		return true;
+	}
+
+	/**
+	 * Whether session `instanceId`'s running or last turn marked a routine's Board task done quietly; a turn this server
+	 * did not see start counts any quiet done of its session, since that done ends the session.
+	 */
+	quietTurn(instanceId: string): boolean {
+		const sessionId = this.get(instanceId)?.sessionId;
+		return sessionId !== undefined && this.#doneQuietly(sessionId, this.#turnStartedAt.get(instanceId) ?? Number.NEGATIVE_INFINITY);
 	}
 
 	/**
@@ -304,7 +325,7 @@ export class LiveSessions {
 		for (const host of hosts) {
 			if (!(this.#sessions.get(host.instanceId) instanceof SessionGuest)) continue;
 			const file = savedFile(host.sessionId);
-			const missed = file === null || heardUntil === undefined ? null : endedTurn(file, heardUntil);
+			const missed = file === null || heardUntil === undefined || this.#doneQuietly(host.sessionId, heardUntil) ? null : endedTurn(file, heardUntil);
 			// A running turn read the one before, as its `turn-started` would have, and a missed turn counts once the host says it ended.
 			const turn = host.busy === true ? undefined : missed === null ? turns.get(host.instanceId) : host.busy === false ? unreadTurn(missed) : undefined;
 			if (turn) this.#unread.set(host.instanceId, turn);
@@ -327,6 +348,7 @@ export class LiveSessions {
 		this.#subjects.delete(instanceId);
 		this.#rows.delete(instanceId);
 		this.#readByTurn.delete(instanceId);
+		this.#turnStartedAt.delete(instanceId);
 		this.#turnWaits.forget(instanceId);
 		this.#jobs.forget(instanceId);
 		if (this.#unread.delete(instanceId)) this.#saveUnread();

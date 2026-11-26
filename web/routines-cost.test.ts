@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { RoutineRun } from "../src/routines";
 import { spentWords, usageWords } from "./routines-model";
 
-const run = (at: number, usage?: RoutineRun["usage"]): RoutineRun => ({ at, outcome: { kind: "sent", sessionId: "s" }, errors: [], triggeredBy: [], ...(usage ? { usage } : {}) });
+const run = (at: number, usage?: RoutineRun["usage"]): RoutineRun => ({ at, outcome: { kind: "posted", task: 1 }, errors: [], triggeredBy: [], ...(usage ? { usage } : {}) });
 
 test("a run's usage reads as compact tokens and dollars, a cost under a cent as <$0.01", () => {
 	expect(usageWords({ tokens: 12_345, cost: 0.0412 })).toBe("12.3k tokens · $0.04");

@@ -6,10 +6,15 @@
 /** The longest title, reply, body, and label a Board change takes. */
 export const MAX_TITLE = 200;
 export const MAX_TEXT = 8000;
+/** The longest body or reply a routine's run posts: its prompt, up to 20,000 characters, with its Trigger events or its command's report. */
+export const MAX_ROUTINE_TEXT = 128_000;
 export const MAX_LABELS = 12;
 
-/** Who wrote a Board task or a reply: the user on the Board page, or a top-level session through the `board` tool. */
-export type BoardAuthor = { kind: "user" } | { kind: "session"; sessionId: string };
+/**
+ * Who wrote a Board task or a reply: the user on the Board page, a top-level session through the `board` tool, or a
+ * routine's run, which only the server posts as.
+ */
+export type BoardAuthor = { kind: "user" } | { kind: "session"; sessionId: string } | { kind: "routine"; routineId: string; name: string };
 
 /** How the session started on a Board task runs, as the page's composer picked it: its model, thinking level, and skill; `null` for omp's default. */
 export interface BoardLaunch {
@@ -31,7 +36,7 @@ export type BoardChange = (
 	| { op: "edit"; by: BoardAuthor; task: number; reply?: number; text: string }
 	| { op: "close"; by: { kind: "user" }; task: number }
 	| { op: "claim"; sessionId: string; task: number }
-	| { op: "done"; sessionId: string; task: number; text?: string }
+	| { op: "done"; sessionId: string; task: number; text?: string; quiet?: boolean }
 	| { op: "start"; task: number; sessionId: string | null; error?: string; branch?: string }
 	| { op: "woke"; task: number; sessionId: string }
 	| { op: "expire"; task: number }
@@ -61,7 +66,7 @@ export type BoardNote =
 	| { kind: "expired"; sessionId: string }
 	| { kind: "unclaimed"; sessionId: string | null }
 	| { kind: "woke"; sessionId: string }
-	| { kind: "done"; sessionId: string }
+	| { kind: "done"; sessionId: string; quiet?: true }
 	| { kind: "closed" }
 	| { kind: "landed"; text: string }
 	| { kind: "land-failed"; text: string }
@@ -155,6 +160,13 @@ export function wakeTarget(task: BoardTask, by: BoardAuthor): string | null {
 	return target !== null && !(by.kind === "session" && by.sessionId === target) ? target : null;
 }
 
+/**
+ * Whether session `sessionId` marked a Board task done quietly at or after `since`, in ms since the epoch: the one
+ * record of a quiet run, which only a routine's Board task keeps, so it leaves the session as unread as before.
+ */
+export const doneQuietly = (state: BoardState, sessionId: string, since: number): boolean =>
+	state.tasks.some(task => task.replies.some(entry => "note" in entry && entry.note.kind === "done" && entry.note.sessionId === sessionId && entry.note.quiet === true && entry.at >= since));
+
 /** The sessions started on `task`, oldest first: one per round, since a reply on a done Board task starts a new one. */
 export const startedOn = (task: BoardTask): string[] => task.replies.flatMap(entry => ("note" in entry && entry.note.kind === "started" ? [entry.note.sessionId] : []));
 
@@ -247,8 +259,7 @@ function foldTasks(state: BoardState, event: BoardEvent): BoardState {
 				tasks: edit(event.task, task => {
 					const replied = { ...task, replies: [...task.replies, { at, by: event.by, text: event.text.trim(), ...(event.launch ? { launch: event.launch } : {}) }] };
 					if (landsOnReply(task, event.by, event.text)) return replied;
-					// The user's reply on a done Board task, or on one whose session failed to start, reopens it, so a new session starts on its thread with the launch the reply picked.
-					const reopens = event.by.kind === "user" && (task.doneAt !== null || task.start?.sessionId === null);
+					const reopens = (event.by.kind === "user" && task.doneAt !== null) || (event.by.kind !== "session" && task.start?.sessionId === null);
 					return reopens ? { ...replied, doneAt: null, start: null, launch: event.launch ?? task.launch } : replied;
 				}),
 			};
@@ -272,7 +283,7 @@ function foldTasks(state: BoardState, event: BoardEvent): BoardState {
 			return { ...state, tasks: edit(event.task, task => note({ ...task, claim: { sessionId: event.sessionId, at } }, { kind: "claimed", sessionId: event.sessionId })) };
 		case "done": {
 			const tasks = edit(event.task, task => {
-				const closed = note({ ...task, claim: null, doneAt: at }, { kind: "done", sessionId: event.sessionId });
+				const closed = note({ ...task, claim: null, doneAt: at }, { kind: "done", sessionId: event.sessionId, ...(event.quiet && task.by.kind === "routine" ? { quiet: true as const } : {}) });
 				return event.text?.trim() ? { ...closed, replies: [...closed.replies, { at, by: { kind: "session", sessionId: event.sessionId }, text: event.text.trim() }] } : closed;
 			});
 			return { ...state, tasks };
@@ -349,11 +360,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 const isText = (value: unknown, max: number): value is string => typeof value === "string" && value.length <= max;
 const isId = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) > 0;
 
-function parseAuthor(value: unknown): BoardAuthor | null {
+/** The author `value` holds; `server` admits a routine, as only the server posts a routine's runs. */
+function parseAuthor(value: unknown, server: boolean): BoardAuthor | null {
 	if (!isRecord(value)) return null;
 	if (value.kind === "user") return { kind: "user" };
+	if (value.kind === "routine") return server && isText(value.routineId, 200) && value.routineId && isText(value.name, MAX_TITLE) && value.name ? { kind: "routine", routineId: value.routineId, name: value.name } : null;
 	return value.kind === "session" && isText(value.sessionId, 200) && value.sessionId ? { kind: "session", sessionId: value.sessionId } : null;
 }
+
+/** The longest text `by` may post. */
+const maxTextOf = (by: BoardAuthor): number => (by.kind === "routine" ? MAX_ROUTINE_TEXT : MAX_TEXT);
 
 function parseLabels(value: unknown): Record<string, string> | null {
 	if (value === undefined) return {};
@@ -367,7 +383,7 @@ function parseLabels(value: unknown): Record<string, string> | null {
 const launchText = (value: unknown): string | null | false => (value === null || value === undefined ? null : isText(value, 200) && value ? value : false);
 
 /** The launch `value` holds: `undefined` for none, `null` for anything but a launch. */
-function parseLaunch(value: unknown): BoardLaunch | undefined | null {
+export function parseLaunch(value: unknown): BoardLaunch | undefined | null {
 	if (value === undefined) return undefined;
 	if (!isRecord(value)) return null;
 	const { model } = value;
@@ -384,31 +400,31 @@ export function parseChange(value: unknown, server = false): BoardChange | null 
 	if (!isRecord(value)) return null;
 	switch (value.op) {
 		case "post": {
-			const by = parseAuthor(value.by);
+			const by = parseAuthor(value.by, server);
 			const labels = parseLabels(value.labels);
 			const needs = value.needs === undefined ? [] : Array.isArray(value.needs) && value.needs.length <= 20 && value.needs.every(isId) ? (value.needs as number[]) : null;
 			const launch = parseLaunch(value.launch);
-			if (!by || !labels || !needs || launch === null || !isText(value.workspace, 4096) || !isText(value.title, MAX_TITLE) || (value.text !== undefined && !isText(value.text, MAX_TEXT))) return null;
+			if (!by || !labels || !needs || launch === null || !isText(value.workspace, 4096) || !isText(value.title, MAX_TITLE) || (value.text !== undefined && !isText(value.text, maxTextOf(by)))) return null;
 			return { op: "post", by, workspace: value.workspace, title: value.title, ...(typeof value.text === "string" && value.text.trim() ? { text: value.text } : {}), ...(Object.keys(labels).length ? { labels } : {}), ...(needs.length ? { needs } : {}), ...(launch ? { launch } : {}) };
 		}
 		case "reply": {
-			const by = parseAuthor(value.by);
+			const by = parseAuthor(value.by, server);
 			const launch = parseLaunch(value.launch);
-			return by && launch !== null && isId(value.task) && isText(value.text, MAX_TEXT) ? { op: "reply", by, task: value.task, text: value.text, ...(launch ? { launch } : {}) } : null;
+			return by && launch !== null && isId(value.task) && isText(value.text, maxTextOf(by)) ? { op: "reply", by, task: value.task, text: value.text, ...(launch ? { launch } : {}) } : null;
 		}
 		case "edit": {
-			const by = parseAuthor(value.by);
+			const by = parseAuthor(value.by, server);
 			const reply = value.reply === undefined ? undefined : Number.isSafeInteger(value.reply) && (value.reply as number) >= 0 ? (value.reply as number) : null;
 			return by && reply !== null && isId(value.task) && isText(value.text, MAX_TEXT) ? { op: "edit", by, task: value.task, ...(reply === undefined ? {} : { reply }), text: value.text } : null;
 		}
 		case "close":
-			return isId(value.task) && parseAuthor(value.by)?.kind === "user" ? { op: "close", by: { kind: "user" }, task: value.task } : null;
+			return isId(value.task) && parseAuthor(value.by, server)?.kind === "user" ? { op: "close", by: { kind: "user" }, task: value.task } : null;
 		// A `renew` line, from when a claim held a lease, reads as no event: the lease is gone, and the claim holds on its own.
 		case "claim":
 			return isId(value.task) && isText(value.sessionId, 200) && value.sessionId ? { op: "claim", task: value.task, sessionId: value.sessionId } : null;
 		case "done":
-			return isId(value.task) && isText(value.sessionId, 200) && value.sessionId && (value.text === undefined || isText(value.text, MAX_TEXT))
-				? { op: "done", task: value.task, sessionId: value.sessionId, ...(typeof value.text === "string" ? { text: value.text } : {}) }
+			return isId(value.task) && isText(value.sessionId, 200) && value.sessionId && (value.text === undefined || isText(value.text, MAX_TEXT)) && (value.quiet === undefined || typeof value.quiet === "boolean")
+				? { op: "done", task: value.task, sessionId: value.sessionId, ...(typeof value.text === "string" ? { text: value.text } : {}), ...(value.quiet ? { quiet: true } : {}) }
 				: null;
 		// A `worktree` an older start kept reads as nothing: the branch names where its sessions work.
 		case "start":

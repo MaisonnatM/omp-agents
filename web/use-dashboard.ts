@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
-import type { BotChange } from "../src/shared/bots";
 import type { PinChange } from "../src/shared/pins";
 import type { TrustChange } from "../src/shared/project-trust";
 import type { ModuleChanges, StoredModuleId } from "../src/modules";
@@ -7,7 +6,6 @@ import type { ClientMsg, ModuleChangeMsg, ServerMsg } from "../src/shared/protoc
 import type { View } from "../src/shared/sessions";
 import { errorText } from "../src/json";
 import { openSocket, putJson } from "./api";
-import { type OpenBot, openBot as findOpenBot } from "./bots-model";
 import { clearDraft, liveDraftKey, NEW_DRAFT_KEY, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDictationMessage, dictationDisconnected } from "./dictation";
@@ -61,8 +59,6 @@ export interface Dashboard {
 	state: DashboardState;
 	/** The page covering the panes; `null` while the panes show. */
 	page: Page | null;
-	/** The Bot whose page is open, which its page, its details, the streamed views, and the read turns all follow; `null` on any other page. */
-	openBot: OpenBot | null;
 	send: (msg: ClientMsg) => void;
 	/**
 	 * Send `msg` and settle once the server has handled it: rejects with the server's error, or at once while
@@ -94,21 +90,10 @@ export interface Dashboard {
 	changeModule: <I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => Promise<void>;
 	/** Pin or unpin sessions, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
 	changePins: (change: PinChange) => void;
-	/** Add, change, or delete a Bot, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
-	changeBot: (change: Exclude<BotChange, { op: "message" | "restart" }>) => void;
 	/** Trust the pieces `refused` asks about, then send its start again, which replaces it; rejects with why the trust could not be saved. */
 	trustAndStart: (refused: RefusedStart) => Promise<void>;
 	/** Close the trust dialog of start `reqId`, leaving its error showing. */
 	dismissTrust: (reqId: number) => void;
-}
-
-/** The Bot `page` opens, its conversation's view kept while it names the same conversation, since the roster changes far more often than which conversation shows. */
-function useOpenBot(page: Page | null, { bots, hosts, routines }: DashboardState): OpenBot | null {
-	const found = useMemo(() => findOpenBot(page, bots, hosts, routines), [page, bots, hosts, routines]);
-	const viewHash = found?.view ? hashForView(found.view) : null;
-	// Keyed on the hash alone: the view is the same while its hash is.
-	const view = useMemo(() => found?.view ?? null, [viewHash]);
-	return useMemo(() => found && { ...found, view }, [found, view]);
 }
 
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
@@ -121,9 +106,6 @@ export function useDashboard(): Dashboard {
 	const startsRef = useRef(state.starts);
 	startsRef.current = state.starts;
 	const page = state.cover?.kind === "page" ? state.cover.page : null;
-	const openBot = useOpenBot(page, state);
-	// The panes stream while they show, with the conversations a component shows beside them through `useShowConversation`,
-	// such as the right sidebar's Subagent tab; a page covering the panes streams only those, such as a Bot's open session.
 	const shownConversations = useShownConversations();
 	const watched = useMemo<View[]>(() => {
 		if (page) return shownConversations;
@@ -260,7 +242,6 @@ export function useDashboard(): Dashboard {
 					case "models":
 					case "module":
 					case "routines":
-					case "bots":
 					case "scheduled":
 					case "workspaces":
 					case "project-trust":
@@ -360,13 +341,6 @@ export function useDashboard(): Dashboard {
 		},
 		[write],
 	);
-	const changeBot = useCallback(
-		(change: Exclude<BotChange, { op: "message" | "restart" }>) => {
-			dispatch({ t: "bot", change, now: new Date().toISOString() });
-			void write({ t: "bot", change });
-		},
-		[write],
-	);
 	const dismissTrust = useCallback((reqId: number) => dispatch({ t: "trust-dismiss", reqId }), []);
 	const trustAndStart = useCallback(
 		async ({ op, trust }: RefusedStart) => {
@@ -376,5 +350,5 @@ export function useDashboard(): Dashboard {
 		[start],
 	);
 
-	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeModule, changePins, changeBot, trustAndStart, dismissTrust };
+	return { state, page, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeModule, changePins, trustAndStart, dismissTrust };
 }

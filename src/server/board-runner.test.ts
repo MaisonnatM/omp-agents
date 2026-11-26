@@ -138,6 +138,17 @@ describe("BoardRunner", () => {
 		expect(prompt).not.toMatch(/claim it|renew|lease|end_session/);
 	});
 
+	test("a routine's Board task tells its session to mark it done quietly when it found nothing to report, and a user's does not", async () => {
+		const board = harness();
+		board.runner.changed();
+		board.apply({ op: "post", by: { kind: "routine", routineId: "r1", name: "Digest" }, workspace: "/w", title: "Digest", text: "Summarize the inbox." });
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "Second" });
+		await settle();
+		const [routine, user] = board.starts.map(start => start.prompt);
+		expect(routine).toContain("quiet");
+		expect(user).not.toContain("quiet");
+	});
+
 	test("a Board task outside git starts its session in its Workspace, with no branch", async () => {
 		const board = harness();
 		board.runner.changed();

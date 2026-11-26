@@ -10,7 +10,6 @@ import { activityControl } from "../activity";
 import { plainMarkdown } from "../../src/shared/plain-markdown";
 import { skillLabel } from "../labels";
 import type { OutlineTurn } from "../transcript-view";
-import { TaskIcon } from "./routines/routine-marks";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
 import { Tooltip } from "./ui/tooltip";
 
@@ -98,7 +97,7 @@ function useReadingTurn(turns: readonly OutlineTurn[], rail: RefObject<HTMLEleme
 const excerpt = (text: string): string => plainMarkdown(text).slice(0, 240);
 
 const titleOf = (turn: OutlineTurn): string =>
-	[turn.routine?.name ?? turn.botMessage ?? (turn.skill && skillLabel(turn.skill)), excerpt(turn.prompt)].filter(Boolean).join(" · ") || "Prompt";
+	[turn.skill && skillLabel(turn.skill), excerpt(turn.prompt)].filter(Boolean).join(" · ") || "Prompt";
 
 const descriptionOf = (turn: OutlineTurn): string | null => (turn.reply ? excerpt(turn.reply.text) : turn.running ? "Working…" : null);
 
@@ -139,7 +138,6 @@ const Line = memo(function Line({ turn, index, active, onJump }: { turn: Outline
 			/>
 			<HoverCardContent side="right" align="center" sideOffset={8} className="w-64 p-3">
 				<p className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-					{turn.routine && <TaskIcon task={turn.routine.task} className="size-3.5 shrink-0 text-muted-foreground" />}
 					<span className="truncate">{title}</span>
 				</p>
 				{description && <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{description}</p>}

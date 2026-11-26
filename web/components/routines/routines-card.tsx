@@ -1,12 +1,10 @@
-/** A Bot's routines as one card in place of its conversation, as Arc's Agent routines: a header, then a row per routine, one open at a time. */
-import { IconArrowLeft, IconPlusSmall } from "central-icons";
+/** A Workspace's routines as one card in its Board's Routines tab, as Arc's Agent routines: a header, then a row per routine, one open at a time. */
+import { IconPlusSmall } from "central-icons";
 import type { KeyboardEvent } from "react";
 import { type Routine, runsHere } from "../../../src/routines";
-import type { Bot } from "../../../src/shared/bots";
 import { Button } from "@/components/ui/button";
 import { activityControl } from "../../activity";
-import { hashForBotRoutine, hashForBots } from "../../routing";
-import { usePageHash } from "../../page-hash";
+import { hashForRoutines } from "../../routing";
 import { useMinute } from "../../use-minute";
 import { PageFrame } from "../list-page";
 import { RoutineRow, stepIndex } from "./routine-row";
@@ -22,25 +20,21 @@ function moveBetweenNames(event: KeyboardEvent<HTMLUListElement>): void {
 }
 
 interface RoutinesCardProps {
-	bot: Bot;
+	/** The Workspace's directory, which its routines post in. */
+	workspace: string;
+	/** The Workspace's name, as its Board names it. */
+	name: string;
 	routines: Routine[];
 	/** The routine whose row is open, `null` for none. */
 	openId: string | null;
 	connected: boolean;
 }
 
-export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardProps) {
-	const to = usePageHash();
+export function RoutinesCard({ workspace, name, routines, openId, connected }: RoutinesCardProps) {
 	const now = useMinute();
 	const runningHere = routines.filter(runsHere).length;
 	return (
-		<PageFrame
-			title={bot.name}
-			meta="Routines"
-			actions={
-				<Button variant="ghost" size="compact" leadingIcon={IconArrowLeft} render={<a href={hashForBots(bot.id, to)} />}>Back to {bot.name}</Button>
-			}
-		>
+		<PageFrame title={name} meta="Routines">
 			<div className="px-4 py-6">
 				<section aria-labelledby="routines-card-title" className="@container/card mx-auto w-full max-w-[680px] rounded-xl border border-border bg-card">
 					<header className="flex items-center gap-3 border-b border-border px-4 py-3">
@@ -52,14 +46,14 @@ export function RoutinesCard({ bot, routines, openId, connected }: RoutinesCardP
 								{runningHere} of {routines.length} on schedule
 							</p>
 						</div>
-						<Button {...activityControl("bots.routine.new")} variant="outline" size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForBotRoutine(bot.id, { kind: "new" }, to)} />}>New routine</Button>
+						<Button {...activityControl("routines.new")} variant="outline" size="compact" leadingIcon={IconPlusSmall} render={<a href={hashForRoutines(workspace, { kind: "new" })} />}>New routine</Button>
 					</header>
 					{routines.length === 0 ? (
-						<p className="px-4 py-8 text-center text-sm text-muted-foreground">No routines yet. New routine makes one.</p>
+						<p className="px-4 py-8 text-center text-sm text-muted-foreground">No routines yet. A routine posts a Board task here on its schedules or its triggers. New routine makes one.</p>
 					) : (
 						<ul onKeyDown={moveBetweenNames} className="divide-y divide-border">
 							{routines.map(routine => (
-								<RoutineRow key={routine.id} routine={routine} botName={bot.name} open={routine.id === openId} connected={connected} now={now} />
+								<RoutineRow key={routine.id} routine={routine} open={routine.id === openId} connected={connected} now={now} />
 							))}
 						</ul>
 					)}

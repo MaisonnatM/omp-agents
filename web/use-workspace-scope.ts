@@ -26,7 +26,7 @@ function useSelectedWorkspace(workspaces: Workspace[]): [string | null, (cwd: st
 /** The directories the sidebar, the palette, and the pages list, and the workspace they are scoped to. */
 export interface WorkspaceScope extends WindowScope {
 	/**
-	 * The sessions in neither a temporary nor a hidden directory, and no Bot's conversation.
+	 * The sessions in neither a temporary nor a hidden directory.
 	 * The raw lists keep the others for what links to them.
 	 */
 	visible: { hosts: RosterHost[]; past: PastSession[] };
@@ -43,10 +43,8 @@ export interface WorkspaceScope extends WindowScope {
  * every one, which keeps the Pull requests tab's count current on every page, and follows a session this page starts into its workspace.
  */
 export function useWorkspaceScope(state: DashboardState): WorkspaceScope {
-	// Temporary and hidden workspaces, and Bots' conversations, remain in the raw sessions; only discoverable sessions enter the workspace list and sidebar view.
 	const hiddenCwds = useMemo(() => new Set(state.workspaceList.hidden.map(hidden => hidden.cwd)), [state.workspaceList.hidden]);
-	const botSessions = useMemo(() => new Set((state.bots ?? []).flatMap(bot => bot.sessionId ?? [])), [state.bots]);
-	const visible = useMemo(() => discoverableSessions(state.hosts, state.past, hiddenCwds, botSessions), [state.hosts, state.past, hiddenCwds, botSessions]);
+	const visible = useMemo(() => discoverableSessions(state.hosts, state.past, hiddenCwds), [state.hosts, state.past, hiddenCwds]);
 	const workspaces = useMemo(
 		() => listWorkspaces(visible.hosts, visible.past, state.workspaceList.added.filter(added => !hiddenCwds.has(added.cwd))),
 		[visible, state.workspaceList.added, hiddenCwds],

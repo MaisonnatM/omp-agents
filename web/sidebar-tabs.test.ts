@@ -13,7 +13,6 @@ import {
 
 const DEFAULT: TabLayout = [
 	{ tab: "pull-requests", hidden: false },
-	{ tab: "bots", hidden: false },
 	{ tab: "sport", hidden: false },
 	{ tab: "memory", hidden: false },
 	{ tab: "projects", hidden: false },
@@ -44,7 +43,6 @@ test("decoding keeps each known tab once, drops a stored tab of a page that left
 	]);
 	expect(decodeTabLayout(raw)).toEqual([
 		{ tab: "pull-requests", hidden: false },
-		{ tab: "bots", hidden: false },
 		{ tab: "sport", hidden: true },
 		{ tab: "memory", hidden: false },
 		{ tab: "projects", hidden: false },
@@ -52,7 +50,7 @@ test("decoding keeps each known tab once, drops a stored tab of a page that left
 	]);
 });
 
-test("a layout stored before the Bots tab gets it at its default place and loses the Routines and Sessions tabs", () => {
+test("a layout stored with the Routines and Sessions tabs loses them", () => {
 	const before = ["pull-requests", "sessions", "routines", "notes"].map(tab => ({ tab, hidden: false }));
 	expect(decodeTabLayout(JSON.stringify(before))).toEqual(DEFAULT);
 });
@@ -64,10 +62,10 @@ test("a layout stored before the Sport tab gets it at its default place, shown",
 });
 
 test("a layout stored with the Notes tab drops it and keeps every other tab where it was", () => {
-	const saved = ["pull-requests", "bots", "sessions", "notes", "sport"].map(tab => ({ tab, hidden: tab === "notes" }));
+	const saved = ["pull-requests", "sessions", "notes", "sport"].map(tab => ({ tab, hidden: tab === "notes" }));
 	expect(decodeTabLayout(JSON.stringify(saved))).toEqual(DEFAULT);
-	const sportFirst = ["sport", "pull-requests", "notes", "bots", "sessions"].map(tab => ({ tab, hidden: false }));
-	expect(decodeTabLayout(JSON.stringify(sportFirst)).map(({ tab }) => tab)).toEqual(["sport", "pull-requests", "bots", "memory", "projects", "board"]);
+	const sportFirst = ["sport", "pull-requests", "notes", "sessions"].map(tab => ({ tab, hidden: false }));
+	expect(decodeTabLayout(JSON.stringify(sportFirst)).map(({ tab }) => tab)).toEqual(["sport", "pull-requests", "memory", "projects", "board"]);
 });
 
 test("a stored layout decodes back to itself", () => {
@@ -78,19 +76,19 @@ test("a stored layout decodes back to itself", () => {
 test("moveTab swaps a tab with its neighbor and leaves a tab at either end where it is", () => {
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", -1)).toBe(DEFAULT_TAB_LAYOUT);
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "board", 1)).toBe(DEFAULT_TAB_LAYOUT);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "sport", -1).map(({ tab }) => tab)).toEqual(["pull-requests", "sport", "bots", "memory", "projects", "board"]);
-	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["bots", "pull-requests", "sport", "memory", "projects", "board"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "sport", -1).map(({ tab }) => tab)).toEqual(["sport", "pull-requests", "memory", "projects", "board"]);
+	expect(moveTab(DEFAULT_TAB_LAYOUT, "memory", 1).map(({ tab }) => tab)).toEqual(["pull-requests", "sport", "projects", "memory", "board"]);
 });
 
 test("hideTab hides and shows any tab", () => {
-	expect(hideTab(DEFAULT_TAB_LAYOUT, "sport", true)[2]).toEqual({ tab: "sport", hidden: true });
-	expect(hideTab(DEFAULT_TAB_LAYOUT, "memory", true)[3]).toEqual({ tab: "memory", hidden: true });
+	expect(hideTab(DEFAULT_TAB_LAYOUT, "sport", true)[1]).toEqual({ tab: "sport", hidden: true });
+	expect(hideTab(DEFAULT_TAB_LAYOUT, "memory", true)[2]).toEqual({ tab: "memory", hidden: true });
 	expect(hideTab(hideTab(DEFAULT_TAB_LAYOUT, "sport", true), "sport", false)).toEqual(DEFAULT);
 });
 
 test("shownTabs drops hidden and absent tabs and Projects, and keeps the order", () => {
 	const layout = moveTab(hideTab(DEFAULT_TAB_LAYOUT, "memory", true), "sport", -1);
-	expect(shownTabs(layout, new Set(["bots"]))).toEqual(["pull-requests", "sport", "board"]);
+	expect(shownTabs(layout, new Set(["board"]))).toEqual(["sport", "pull-requests"]);
 });
 
 const pageAt = (hash: string): Page => {

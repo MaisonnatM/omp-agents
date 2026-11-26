@@ -1,13 +1,11 @@
 /** `PageList`, the open page's own list, and `PageListColumn`, the column at the page's left that holds it. */
 import { type ReactNode, type RefObject, useLayoutEffect, useState } from "react";
-import type { BotRow } from "../bots-model";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { isModulePage } from "../modules";
 import { COLUMN_DEFAULT, COLUMN_MAX, COLUMN_MIN, type ListPage } from "../page-list";
 import { useStoredState } from "../stored-state";
 import type { SectionTarget } from "../section";
 import { TAB_ROWS } from "../sidebar-tabs";
-import { BotsNav } from "./bots/bots-nav";
 import { ModuleNavView } from "./module-views";
 import { SettingsNav } from "./settings/settings-nav";
 import { Separator, useDragSeparator } from "./drag-separator";
@@ -16,16 +14,13 @@ const COLUMN_STEP = 16;
 
 interface PageListProps {
 	page: ListPage;
-	botList: BotRow[] | null;
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
 }
 
-export function PageList({ page, botList, sectionTarget, onSectionTarget }: PageListProps) {
+export function PageList({ page, sectionTarget, onSectionTarget }: PageListProps) {
 	if (isModulePage(page)) return <ModuleNavView page={page} section={sectionTarget} onSection={onSectionTarget} />;
 	switch (page.kind) {
-		case "bots":
-			return <BotsNav rows={botList} openId={page.target === null ? (page.adding ? null : undefined) : page.target} />;
 		case "settings":
 			return <SettingsNav route={page} />;
 		default: {

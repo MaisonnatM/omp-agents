@@ -1,6 +1,5 @@
 /** Sessions as the roster, the panes, and the new-session draft see them: live hosts, past sessions, views, requests, and starts. */
 import { BASE64, isNonEmpty, isObject, type Parsed } from "../json";
-import type { BotId } from "./bot-id";
 import type { BranchChoice } from "./git";
 import { type CheckState, type LinkedPullRequest, parsePullRequest, type PullRequest, samePullRequest } from "./github";
 import type { ModelOption } from "./models";
@@ -172,9 +171,6 @@ export type ScheduledCheck = { kind: "send"; at: number } | { kind: "pull-reques
 
 /** Whether a watched pull request's checks are done and green, or it has none, so nothing about it is left to wait on. */
 const checksPassed = ({ checks }: WatchedChecks): boolean => checks === "passing" || checks === "none";
-
-/** The tool a session calls in a turn that found nothing for the user, such as a Bot's routine run; that turn ends without marking the session unread. */
-export const STAY_QUIET_TOOL = "stay_quiet";
 
 /** A turn that ended unseen: when, in ms since the epoch, and the first line of its reply, `null` when it ended on none. */
 export interface UnreadTurn {
@@ -396,8 +392,6 @@ export type StartRequest =
 			taskId: string | null;
 			/** The session reviews `subject`, a pull request, as a review draft it saves through the dashboard's `save_review_draft` tool rather than posting on GitHub. */
 			reviewDraft: boolean;
-			/** The Bot whose conversation the session starts, which launches it with the Bot extension; only the server's `Bots` sets it, since {@link parseNewSessionRequest} never reads one. */
-			bot: BotId | null;
 			/** The session is deleted, with everything it wrote, when it ends, and omp remembers nothing of it; it works on no project, task, or review draft. */
 			private: boolean;
 			/** When a session here already owns `subject`, the prompt goes to it instead of a new session: as a follow-up while it runs, else resumed. */
@@ -421,7 +415,6 @@ export const newSessionRequest = (cwd: string, prompt: string, options: Partial<
 	projectId: null,
 	taskId: null,
 	reviewDraft: false,
-	bot: null,
 	private: false,
 	reachOwner: false,
 	...options,

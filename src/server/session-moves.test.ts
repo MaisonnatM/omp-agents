@@ -2,9 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { BotId } from "../shared/bots";
 import type { TrustAsk } from "../shared/project-trust";
-import { newSessionRequest, type StartRequest } from "../shared/sessions";
 import { UntrustedProjectError, untrustedText } from "./project-trust-file";
 import { SessionMoves } from "./session-moves";
 
@@ -24,7 +22,6 @@ function setup(untrusted: (dir: string) => TrustAsk | null = () => null) {
 	const moved: string[] = [];
 	const moves = new SessionMoves({
 		session: instanceId => (instanceId === "i1" ? { moveAfterTurn: dir => void moved.push(dir) } : undefined),
-		staysPut: request => request.kind === "new" && request.bot !== null,
 		admit: async dir => {
 			const ask = untrusted(dir);
 			if (ask) throw new UntrustedProjectError(ask);
@@ -32,22 +29,13 @@ function setup(untrusted: (dir: string) => TrustAsk | null = () => null) {
 	});
 	/** Session `caller`'s turn calls the tool as call `toolCallId`. */
 	const call = (toolCallId: string, path: string, { caller = "i1", signal = new AbortController().signal }: { caller?: string; signal?: AbortSignal } = {}) =>
-		moves.join(newSessionRequest("/tmp", "Hi"), caller).rpc.tools[0]!.execute({ path }, { toolCallId, signal });
+		moves.join(caller).rpc.tools[0]!.execute({ path }, { toolCallId, signal });
 	/** omp's end of call `toolCallId`. */
 	const ended = (toolCallId: string, isError = false) => moves.heard({ type: "tool_execution_end", toolCallId, toolName: "move_session", isError });
 	return { moves, moved, call, ended };
 }
 
 describe("the move_session tool", () => {
-	test("every dashboard start gets it but a Bot's conversation", () => {
-		const { moves } = setup();
-		const toolsOf = (request: StartRequest) => moves.join(request, "i1").rpc.tools.map(tool => tool.name);
-		expect(toolsOf(newSessionRequest("/tmp", "Hi"))).toEqual(["move_session"]);
-		expect(toolsOf({ kind: "resume", sessionId: "s1" })).toEqual(["move_session"]);
-		expect(toolsOf({ kind: "fork", view: { kind: "past", sessionId: "s1" }, entryId: "e1" })).toEqual(["move_session"]);
-		expect(toolsOf(newSessionRequest("/tmp", "Hi", { bot: "scout" as BotId }))).toEqual([]);
-	});
-
 	test("a call's end hands the session that called it the move for its turn's end, once", async () => {
 		const { moved, call, ended } = setup();
 		const dir = tempDir();

@@ -1,9 +1,8 @@
-/** The dashboard's {@link SessionProcessWatch}, over the live sessions, the Bots, and the process settings. */
+/** The dashboard's {@link SessionProcessWatch}, over the live sessions and the process settings. */
 import { statSync } from "node:fs";
 import { ompDaemons } from "../omp/daemons";
 import { readProcessTable } from "../process-census";
 import { awaitsScheduled, awaitsSubagents, type RosterHost } from "../shared/sessions";
-import type { Bots } from "./bots";
 import type { LiveSessions } from "./live-sessions";
 import type { ProcessSettingsFile } from "./process-settings-file";
 import { readAppOf, readCwds, readListeningPorts, readSessionFiles, SessionProcessWatch, stopProcesses } from "./session-processes";
@@ -13,12 +12,11 @@ export interface SessionProcessWatchParts {
 	sessions: LiveSessions;
 	hosts(): RosterHost[];
 	pathOf(sessionId: string): string | null;
-	bots: () => Bots;
 	owner(): boolean;
 	processSettings: ProcessSettingsFile;
 }
 
-export function sessionProcessWatch({ sessions, hosts, pathOf, bots, owner, processSettings }: SessionProcessWatchParts): SessionProcessWatch {
+export function sessionProcessWatch({ sessions, hosts, pathOf, owner, processSettings }: SessionProcessWatchParts): SessionProcessWatch {
 	return new SessionProcessWatch({
 		...ompDaemons(),
 		readTable: readProcessTable,
@@ -27,9 +25,8 @@ export function sessionProcessWatch({ sessions, hosts, pathOf, bots, owner, proc
 		readSessionFiles,
 		appOf: readAppOf,
 		stopProcesses,
-		sessions: () => {
-			const botConversations = new Set(bots().list.flatMap(bot => bot.sessionId ?? []));
-			return hosts().map(row => ({
+		sessions: () =>
+			hosts().map(row => ({
 				instanceId: row.instanceId,
 				sessionId: row.sessionId,
 				file: sessions.transcriptPath(row.instanceId, null, pathOf),
@@ -37,10 +34,8 @@ export function sessionProcessWatch({ sessions, hosts, pathOf, bots, owner, proc
 				cwd: row.cwd,
 				status: row.status,
 				waitsOnWork: awaitsSubagents(row) || awaitsScheduled(row),
-				// A Bot ends its own idle conversation, and a private session's end deletes it.
-				stopsWhenIdle: row.source === "dashboard" && !row.private && !botConversations.has(row.sessionId),
-			}));
-		},
+				stopsWhenIdle: row.source === "dashboard" && !row.private,
+			})),
 		endSession: async instanceId => {
 			await sessions.started(instanceId)?.end();
 		},

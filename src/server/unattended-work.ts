@@ -1,6 +1,6 @@
 /**
  * The work that runs without a page: the routine and scheduled-send runners, the modules' runs, the continues, the merge
- * queue and the cleanup after a merge, and the file inboxes, each acting only on the server that holds the owner lock.
+ * queue and the cleanup after a merge, and the modules' file inboxes, each acting only on the server that holds the owner lock.
  */
 import { randomUUID } from "node:crypto";
 import { fullyAwake } from "../full-wake";
@@ -8,35 +8,29 @@ import type { LiveSession } from "../live-session";
 import { isStoredModuleId, type ModuleChanges, type ModuleFiles, type ModuleRun, moduleInboxes, moduleRuns, type StoredModuleId } from "../modules";
 import { directoryOf } from "../paths";
 import { runShell } from "../proc";
-import { unapprovedChange } from "../pull-request-approval";
 import { GITHUB_MERGES, readPullRequestStates } from "../pull-request-merge";
-import { loadPullRequests, repoOf } from "../pull-requests";
+import { repoOf } from "../pull-requests";
 import { worktreeAt } from "../git";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
-import { agentOn } from "../shared/moves";
 import { newSessionRequest, type RosterHost, type StartRequest, type StartResult } from "../shared/sessions";
 import type { SourceControl } from "../source-control";
 import type { Worktrees } from "../worktrees";
 import { configAt } from "../../templates/omp/agent/extensions/land/gate";
 import { AutoContinue, occupiedBy } from "./auto-continue";
 import { boardCheckout, landBoardBranch } from "./board-checkout";
-import { BotInbox } from "./bot-inbox";
-import type { Bots } from "./bots";
-import type { BotsFile } from "./bots-file";
 import type { Broadcasts } from "./broadcasts";
 import type { JsonInboxDir } from "./json-inbox";
 import type { ListRegistry } from "./list-registry";
 import type { LiveSessions } from "./live-sessions";
 import { MergeCleanup } from "./merge-cleanup";
 import { MergeQueue } from "./merge-queue";
-import { RoutineInbox } from "./routine-inbox";
 import { RoutineRunner } from "./routine-runner";
+import { boardRunTurn } from "./routine-turns";
 import type { RoutinesFile } from "./routines-file";
 import type { ScheduledFile } from "./scheduled-file";
 import { ScheduledRunner } from "./scheduled-runner";
-import { ShepherdInbox } from "./shepherd-inbox";
 import type { UsagePoll } from "./usage-poll";
-import { botInboxDir, builtInRoutinesFile, mergesFile, routineInboxDir, shepherdInboxDir } from "../paths";
+import { builtInRoutinesFile, mergesFile } from "../paths";
 import { addBuiltInRoutines } from "./built-in-routines";
 import type { TriggerWatch } from "./routine-triggers";
 
@@ -53,8 +47,8 @@ export interface UnattendedWorkDeps {
 	scheduled: ScheduledFile;
 	/** What the bell's checks saw last, which tells the routines' triggers what is new. */
 	triggerWatch: TriggerWatch;
-	botsFile: BotsFile;
-	bots: Bots;
+	/** The file of session `sessionId`, `null` when none is known. */
+	pathOf(sessionId: string): string | null;
 	sourceControl: SourceControl;
 	worktrees: Worktrees;
 	usage: UsagePoll;
@@ -63,8 +57,6 @@ export interface UnattendedWorkDeps {
 	reach(sessionId: string): Promise<LiveSession>;
 	/** Ends a live session as **End session** does. */
 	endLive(session: LiveSession): Promise<void>;
-	workspaceOf(cwd: string): Promise<string>;
-	knownWorkspaces(): string[];
 	/** Whether this server holds the owner lock. */
 	owner(): boolean;
 	/** Lets project code run in `dir`, or throws when the user has not trusted it as it is now. */
@@ -88,37 +80,15 @@ export interface UnattendedWork {
 }
 
 export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
-	const { sessions, modules, applyModuleNow, lists, broadcasts, routines, scheduled, triggerWatch, botsFile, bots, worktrees, start: startSession, reach, owner: ownerHeld, admit, stopping } = deps;
-	/**
-	 * Moves the routines of a file from before every routine had a Bot to their Bots, creating each Bot they need unless it
-	 * exists. Only the server that runs routines saves the move, so another, such as a smoke run, never rewrites the files
-	 * an older owner still reads; any server reads the routines moved, in memory.
-	 */
-	const migrateRoutines = (): void => {
-		routines.migrate(bot => {
-			if (!botsFile.value.some(({ id }) => id === bot.id)) lists.apply("bots", { op: "save", bot });
-		});
-	};
-	/** Adds the built-in routines not added before, disabled, each with its Bot unless that Bot exists; only the server that runs routines adds them. */
+	const { sessions, modules, applyModuleNow, lists, broadcasts, routines, scheduled, triggerWatch, worktrees, start: startSession, reach, owner: ownerHeld, admit, stopping } = deps;
+	/** Adds the built-in routines not added before, disabled; only the server that runs routines adds them. */
 	const addBuiltIns = (): void => {
-		addBuiltInRoutines(builtInRoutinesFile, {
-			hasBot: id => botsFile.value.some(bot => bot.id === id),
-			routine: id => routines.value.find(routine => routine.id === id),
-			saveBot: bot => lists.apply("bots", { op: "save", bot }),
-			saveRoutine: routine => lists.apply("routines", { op: "save", routine }),
-		});
+		addBuiltInRoutines(builtInRoutinesFile, routine => lists.apply("routines", { op: "save", routine }));
 	};
-	const modulesInboxes = moduleInboxes(modules, applyModuleNow, { active: ownerHeld });
-	const routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: ownerHeld });
-	const botInbox = new BotInbox(
-		botInboxDir,
-		{ bots: () => botsFile.value, save: change => lists.apply("bots", change), tell: (to, text) => bots.message(to, text), now: Date.now },
-		{ active: ownerHeld },
-	);
+	const inboxes = moduleInboxes(modules, applyModuleNow, { active: ownerHeld });
 	const runner = new RoutineRunner({
 		file: routines,
 		now: Date.now,
-		workspace: botId => botsFile.value.find(({ id }) => id === botId)?.cwd ?? null,
 		async exec(command, cwd, env) {
 			const dir = await directoryOf(cwd);
 			if (!dir) throw new Error(`${cwd.trim()} is not a directory.`);
@@ -126,7 +96,12 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		},
 		fullyAwake,
 		onChange: () => broadcasts.pushList("routines"),
-		messageBot: (botId, text, fresh) => bots.message(botId, text, fresh),
+		board: () => modules.board.value,
+		postBoard: change => {
+			if (!applyModuleNow("board", change)) throw new Error("The Board could not be saved.");
+			return change.op === "reply" ? change.task : modules.board.value.tasks.at(-1)!.id;
+		},
+		turnOf: (task, at) => boardRunTurn(modules.board.value, task, at, deps.pathOf),
 	});
 	const scheduledRunner = new ScheduledRunner({
 		file: scheduled,
@@ -214,21 +189,6 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		onChange: () => broadcasts.pushList("merges"),
 		onMerged: pr => void mergeCleanup.merged(pr),
 	});
-	const shepherdInbox = new ShepherdInbox(
-		shepherdInboxDir,
-		{
-			bots: () => botsFile.value,
-			pullRequests: () => loadPullRequests(deps.knownWorkspaces(), true),
-			agent: () => agentOn(deps.hosts()),
-			start: startSession,
-			queueMerge: change => mergeQueue.apply(change),
-			unapprovedChange,
-			landTarget: cwd => configAt(cwd)?.target ?? null,
-			tell: (botId, text) => bots.message(botId, text),
-		},
-		{ active: ownerHeld },
-	);
-	const inboxes = [routineInbox, botInbox, shepherdInbox, ...modulesInboxes];
 	const takeOver = (): void => {
 		// What the server that ran them saved since this one started, which the modules' runs and inboxes go on from.
 		for (const id of Object.keys(modules))
@@ -237,11 +197,9 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 				broadcasts.pushList(id);
 			}
 		routines.reload();
-		bots.reload();
-		migrateRoutines();
+		routines.migrate();
 		addBuiltIns();
 		broadcasts.pushList("routines");
-		broadcasts.pushList("bots");
 		runner.recover();
 		scheduledRunner.recover();
 		for (const inbox of inboxes) void inbox.drain();

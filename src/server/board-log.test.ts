@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyChange, type BoardChange, type BoardState, branchOf, emptyBoard, MAX_EXITS, parseChange, readLog, startedOn, statusOf, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
+import { applyChange, type BoardAuthor, type BoardChange, type BoardState, branchOf, doneQuietly, emptyBoard, MAX_EXITS, MAX_ROUTINE_TEXT, MAX_TEXT, parseChange, readLog, startedOn, statusOf, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
 import { BoardLog } from "./board-log";
 
 const WS = "/work/app";
@@ -237,6 +237,47 @@ describe("the Board's projection", () => {
 		expect(parseChange({ op: "land", task: 1, outcome: "landed", text: "Landed." }, true)).toEqual({ op: "land", task: 1, outcome: "landed", text: "Landed." });
 		expect(parseChange({ op: "renew", task: 1, sessionId: "a" }, false)).toBeNull();
 		expect(parseChange({ op: "claim", task: 1, sessionId: "a" }, false)).toEqual({ op: "claim", task: 1, sessionId: "a" });
+	});
+
+	test("only the server posts as a routine, and a routine's post may be as long as a whole run's", () => {
+		const routine = { kind: "routine", routineId: "r1", name: "Digest" } as const;
+		const post = { op: "post", by: routine, workspace: WS, title: "Digest", text: "x".repeat(MAX_ROUTINE_TEXT) } as const;
+		expect(parseChange(post, false)).toBeNull();
+		expect(parseChange({ op: "reply", by: routine, task: 1, text: "Again." }, false)).toBeNull();
+		expect(parseChange(post, true)).toEqual(post);
+		expect(parseChange({ ...post, text: "x".repeat(MAX_ROUTINE_TEXT + 1) }, true)).toBeNull();
+		expect(parseChange({ ...post, by: user, text: "x".repeat(MAX_TEXT + 1) }, true)).toBeNull();
+	});
+
+	test("only a routine's Board task keeps a quiet done, which doneQuietly reads for the session from the turn's start", () => {
+		expect(parseChange({ op: "done", sessionId: "a", task: 1, text: "Nothing new.", quiet: true }, false)).toEqual({ op: "done", sessionId: "a", task: 1, text: "Nothing new.", quiet: true });
+		const routine = { kind: "routine", routineId: "r1", name: "Digest" } as const;
+		const started = (id: number, by: BoardAuthor): [number, BoardChange][] => [
+			[0, { op: "post", by, workspace: WS, title: `Task ${id}` }],
+			[1, { op: "start", task: id, sessionId: `s${id}` }],
+		];
+		const state = play([...started(1, routine), [2, { op: "done", sessionId: "s1", task: 1, quiet: true }], ...started(2, user), [3, { op: "done", sessionId: "s2", task: 2, quiet: true }]]);
+		expect([task(state, 1).replies.at(-1), task(state, 2).replies.at(-1)]).toEqual([
+			{ at: 2, note: { kind: "done", sessionId: "s1", quiet: true } },
+			{ at: 3, note: { kind: "done", sessionId: "s2" } },
+		]);
+		expect([doneQuietly(state, "s1", 2), doneQuietly(state, "s1", 3), doneQuietly(state, "s2", 0)]).toEqual([true, false, false]);
+	});
+
+	test("a routine's reply on its Board task whose session failed to start starts it again, and one on a done Board task does not reopen it", () => {
+		const routine = { kind: "routine", routineId: "r1", name: "Digest" } as const;
+		const failed = play([
+			[0, { op: "post", by: routine, workspace: WS, title: "Digest" }],
+			[1, { op: "start", task: 1, sessionId: null, error: "No worktree" }],
+		]);
+		expect(unstartedReady(play([[2, { op: "reply", by: routine, task: 1, text: "Again." }]], failed)).map(each => each.id)).toEqual([1]);
+		const done = play([
+			[0, { op: "post", by: routine, workspace: WS, title: "Digest" }],
+			[1, { op: "start", task: 1, sessionId: "a" }],
+			[2, { op: "done", sessionId: "a", task: 1 }],
+			[3, { op: "reply", by: routine, task: 1, text: "Again." }],
+		]);
+		expect(statusOf(done, task(done, 1))).toEqual({ kind: "done" });
 	});
 });
 

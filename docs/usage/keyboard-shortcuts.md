@@ -37,7 +37,7 @@ Alt is Option on macOS.
 | Cmd+Shift+E | Anywhere | Show or hide tool calls |
 | Alt+T | Anywhere | Show or hide thinking |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
-| Cmd+Shift+B | Anywhere | Show or hide the details sidebar, on the right: a session's, or a Bot's |
+| Cmd+Shift+B | Anywhere | Show or hide the session's details sidebar, on the right |
 | Cmd+Shift+L | Anywhere a session's details can show | Open the Browser tab of the details sidebar, in the desktop app |
 | Cmd+Shift+G | While the details sidebar shows | Show its Overview tab; pressed again on Overview, review the session's changes from its first changed file |
 | Ctrl+Shift+F | Panes split in two or more | Maximize the focused pane, or restore the split |
@@ -114,7 +114,7 @@ Alt is Option on macOS.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in the app.
 - **Go to pull requests** in the command menu opens the Pull requests page.
-  **Go to sessions** goes back from the Pull requests page, a Bot, Settings, or the new-session draft to the panes.
+  **Go to sessions** goes back from the Pull requests page, Settings, or the new-session draft to the panes.
   The **Sport** button in the header opens that page.
   Cmd+, opens Settings, as the header's gear button does, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.

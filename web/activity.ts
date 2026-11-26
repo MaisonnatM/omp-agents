@@ -176,13 +176,6 @@ const TAB_VIEWS = {
 		{ key: "pull-requests/item", label: "A pull request" },
 		{ key: "pull-requests/files", label: "A pull request's files" },
 	],
-	bots: [
-		{ key: "bots", label: "Bots" },
-		{ key: "bots/new", label: "New Bot" },
-		{ key: "bots/item", label: "A Bot" },
-		{ key: "bots/routines", label: "A Bot's routines" },
-		{ key: "bots/routine", label: "A Bot's routine" },
-	],
 } as const satisfies { [T in Exclude<SidebarTab, WebModuleId>]: readonly { key: string; label: string }[] };
 
 type PageViewKey =
@@ -225,10 +218,6 @@ function pageView(page: Page): ViewKey {
 			return `settings/${page.section}`;
 		case "pull-requests":
 			return page.target === null ? "pull-requests" : page.files === null ? "pull-requests/item" : "pull-requests/files";
-		case "bots":
-			if (page.target === null) return page.adding ? "bots/new" : "bots";
-			if (page.routine === null) return "bots/item";
-			return page.routine.kind === "list" ? "bots/routines" : "bots/routine";
 		case "scheduled":
 			return page.id === null ? "scheduled" : "scheduled/item";
 		case "notifications":

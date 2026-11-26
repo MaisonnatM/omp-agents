@@ -11,7 +11,6 @@ import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
 import { InterruptedSessions } from "./interrupted";
 import type { EarlyRun } from "../routine-health";
-import type { BotId } from "../shared/bots";
 import { ACTIVITY_KINDS, DASHBOARD_KINDS, HEALTH_KINDS, Notices, type NoticeSources, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 
 const dirs: string[] = [];
@@ -458,8 +457,8 @@ describe("Notices", () => {
 	});
 
 	test("the heartbeat lists the routine runs that exited early in one notice, and a heartbeat that finds none takes it away", async () => {
-		const errored: EarlyRun = { botId: "b1" as BotId, routineId: "r1", name: "Digest", at: 1_000, exit: "errored" };
-		const missed: EarlyRun = { botId: "b1" as BotId, routineId: "r2", name: "Prune", at: 2_000, exit: "missed" };
+		const errored: EarlyRun = { workspace: "/work/webapp", routineId: "r1", name: "Digest", at: 1_000, exit: "errored" };
+		const missed: EarlyRun = { workspace: "/work/webapp", routineId: "r2", name: "Prune", at: 2_000, exit: "missed" };
 		const state: State = { latest: null, installed: "18.8.0", models: [], earlyRuns: [errored, missed], now: 5 * MINUTE };
 		const notices = new Notices(noticesPath(), sources(state), () => {});
 

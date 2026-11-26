@@ -100,10 +100,9 @@ export function attend(before: Attention, hosts: readonly RosterHost[]): { raise
 
 /**
  * The views on screen: only the focused pane while it is maximized, and none under a page or a `#session/<id>` link,
- * which opens its session over the panes it replaces, but a Bot's page shows its conversation.
+ * which opens its session over the panes it replaces.
  */
-export function shownViews({ cover, layout }: Pick<DashboardState, "cover" | "layout">, botConversation: View | null): View[] {
-	if (botConversation) return [botConversation];
+export function shownViews({ cover, layout }: Pick<DashboardState, "cover" | "layout">): View[] {
 	if (cover) return [];
 	return layout.maximized ? layout.panes.slice(layout.focus, layout.focus + 1) : layout.panes;
 }

@@ -1,5 +1,4 @@
 /** What the page holds of the dashboard, and how the server's messages and the page's own actions change it. */
-import { applyBot, type Bot, type BotChange, type BotId, type BotLast } from "../src/shared/bots";
 import type { PlanUsage } from "../src/shared/models";
 import type { BackgroundJob } from "../src/shared/jobs";
 import type { QueuedMerge } from "../src/shared/merge-queue";
@@ -42,18 +41,12 @@ export interface DashboardState extends PaneNavigation {
 	started: { instanceId: string; workspace: string } | null;
 	/** `null` until the server's first `omp usage` run finishes. */
 	usage: { plans: PlanUsage[]; error: string | null } | null;
-	/** Last model list the server sent for each live session whose menu asked, a pane's or a Bot page's, by instance id. */
+	/** Last model list the server sent for each live session whose menu asked, by instance id. */
 	models: Map<string, ModelList>;
 	/** Each stored module's state, `null` until the server first sends it; a change shows here before the server answers. */
 	modules: ModuleStates;
 	/** Every routine, empty until the server first sends them. */
 	routines: Routine[];
-	/** Every Bot, `null` until the server first sends them; a change shows here before the server answers. */
-	bots: Bot[] | null;
-	/** What each Bot remembers, as the server last read it. */
-	botMemories: Record<BotId, string>;
-	/** The last words of each Bot's conversation, as the server last read them. */
-	botLasts: Record<BotId, BotLast | null>;
 	/** The messages and session starts that wait for a time, soonest first, empty until the server first sends them. */
 	scheduled: ScheduledSend[];
 	/** The directories Settings → Workspaces added and hid, empty until the server first sends them. */
@@ -75,7 +68,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "module" | "routines" | "bots" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "jobs" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "module" | "routines" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "jobs" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -95,7 +88,6 @@ export type Action =
 	| { t: "new-session-completions"; completions: Completions }
 	| ModuleChangeMsg
 	| { t: "pin"; change: PinChange }
-	| { t: "bot"; change: Exclude<BotChange, { op: "message" | "restart" }>; now: string }
 	/** The trust dialog of start `reqId` closed, by trusting or by **Cancel**. */
 	| { t: "trust-dismiss"; reqId: number }
 	| ServerAction;
@@ -221,10 +213,6 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, modules: { ...state.modules, [action.id]: action.value } };
 		case "routines":
 			return { ...state, routines: action.routines };
-		case "bots":
-			return { ...state, bots: action.bots, botMemories: action.memories, botLasts: action.lasts };
-		case "bot":
-			return state.bots ? { ...state, bots: applyBot(state.bots, action.change, action.now) } : state;
 		case "scheduled":
 			return { ...state, scheduled: action.sends };
 		case "workspaces":
@@ -280,9 +268,6 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		models: new Map(),
 		modules: EMPTY_MODULE_STATES,
 		routines: [],
-		bots: null,
-		botMemories: {},
-		botLasts: {},
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
 		trustedProjects: [],

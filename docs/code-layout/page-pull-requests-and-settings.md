@@ -77,7 +77,7 @@
   It and the header's inline confirmation share `use-merge-controller.ts`: `useMergeController` owns the method, the queued merge lookup, the head-pinned request through `writeMergeQueue` in `web/reads.ts`, cancellation, and pending state, and remembers the method only when a merge is confirmed.
   Its `queuedMergeText` words the status and `QueuedMergeNote` offers Cancel or Dismiss through `useCancelMerge`.
   `web/use-drag-order.ts` drags the pull request list's repositories, sections, and pull requests, each within its own scope, with the drop line from `web/order.ts`.
-  The Pull requests page uses `web/components/list-page.tsx` for its frame, header, and load and refresh states through `ListPage`, and the New Bot form, a Bot's routines card, and the routine editor its `PageFrame`.
+  The Pull requests page uses `web/components/list-page.tsx` for its frame, header, and load and refresh states through `ListPage`, and the routines card, the routine editor, and the missing-routine notice its `PageFrame`.
   `PolledPageFrame` renders ordinary children while reads load; only `PolledContent` supplies a data render callback, after an answer exists.
   `web/components/list-split.tsx` holds `ListSplit`, a page's list on the left and its open item on the right, as in Memory, Sport's journal, and Settings › Extensions, split by a line you drag to size the list, at a width the page stores in localStorage under its own key; a page too narrow for both shows one or the other.
   It also owns `DetailBar` and `BarAction`, the narrow sticky bar such a page puts on top of its open item, with the previous, next, and close controls, and a slot for the page's own actions.

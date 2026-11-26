@@ -200,7 +200,7 @@ function IdleStops() {
 			</Section>
 			<Section
 				title="Stop idle sessions"
-				meta="Stops a session's omp once it has been idle that long with no subagent still running. It moves to Past with its worktree kept, and Resume picks it back up. Sessions started in a terminal, Bots' conversations, and private sessions keep running. Saved on the server."
+				meta="Stops a session's omp once it has been idle that long with no subagent still running. It moves to Past with its worktree kept, and Resume picks it back up. Sessions started in a terminal and private sessions keep running. Saved on the server."
 			>
 				{read.error && <p className="text-xs text-red-600 dark:text-red-400">{read.error}</p>}
 				{settings && (

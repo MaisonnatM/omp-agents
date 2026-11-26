@@ -5,12 +5,12 @@
 import { arrayOf, fields, type Guard, isNumber, isObject, isString, nullable, oneOf, type Parsed, tagged } from "../json";
 import { parseRemote } from "./github";
 
-export const SYNC_ITEM_IDS = ["omp-config", "omp-agents-md", "omp-append-system", "omp-skills", "omp-rules", "omp-agents", "omp-commands", "source-control", "preferences", "workspaces", "bots", "projects"] as const;
+export const SYNC_ITEM_IDS = ["omp-config", "omp-agents-md", "omp-append-system", "omp-skills", "omp-rules", "omp-agents", "omp-commands", "source-control", "preferences", "workspaces", "routines", "projects"] as const;
 export type SyncItemId = (typeof SYNC_ITEM_IDS)[number];
 export const isSyncItemId = oneOf(SYNC_ITEM_IDS);
 
 /** A store the server holds, which sync reads and writes through its `SyncStore` rather than as a file. */
-export type SyncStoreId = "source-control" | "preferences" | "workspaces" | "bots" | "projects";
+export type SyncStoreId = "source-control" | "preferences" | "workspaces" | "routines" | "projects";
 
 /** Where an item lives on this machine: a file or a directory under omp's agent directory, or a store the server holds. */
 export type SyncSource = { kind: "omp-file"; path: string } | { kind: "omp-tree"; path: string } | { kind: "store"; store: SyncStoreId };
@@ -52,7 +52,7 @@ export const SYNC_ITEMS: readonly SyncItem[] = [
 		json: true,
 	},
 	{ id: "workspaces", label: "Workspaces", detail: "The directories Settings › Workspaces added and hid", path: "dashboard/workspaces.json", source: { kind: "store", store: "workspaces" }, json: true },
-	{ id: "bots", label: "Bots", detail: "Each Bot's name, job, type, look, model, skill, workspace, pin, and section, without its conversation", path: "dashboard/bots.json", source: { kind: "store", store: "bots" }, json: true },
+	{ id: "routines", label: "Routines", detail: "Each routine's name, Workspace, schedules, triggers, task, model, and the computer that runs it, without its runs", path: "dashboard/routines.json", source: { kind: "store", store: "routines" }, json: true },
 	{
 		id: "projects",
 		label: "Projects",

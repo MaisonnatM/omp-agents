@@ -27,7 +27,7 @@ interface PastConversationProps {
 	titleAction?: ReactNode;
 	/** Show its turns in place of its transcript. */
 	trajectory: boolean;
-	/** Draw the session's header, with its title and Resume; a Bot's page draws its own and resumes from its composer. */
+	/** Draw the session's header, with its title and Resume; a Board thread's Session tab and the details sidebar draw none. */
 	header: boolean;
 }
 

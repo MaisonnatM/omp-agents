@@ -55,7 +55,13 @@ const converse = (id: number, landable: boolean): string =>
 		...(landable ? [`When the thread ends on a merge that failed, fix the cause on the branch, commit, and mark the task done with "1. ${MERGE_REPLY}" as the first suggestion.`] : []),
 	].join("\n");
 
-const authorName = (by: BoardAuthor): string => (by.kind === "user" ? "The user" : `Session ${by.sessionId}`);
+const authorName = (by: BoardAuthor): string => (by.kind === "user" ? "The user" : by.kind === "routine" ? `The routine "${by.name}"` : `Session ${by.sessionId}`);
+
+/** What a session on a routine's Board task does when the run finds nothing: a quiet done, which notifies nobody. */
+const quietRun = (task: BoardTask): string[] =>
+	task.by.kind === "routine"
+		? [`Routine "${task.by.name}" posted this Board task, and each of its runs replies on it while it is not done. When a run finds nothing worth reporting, change nothing and mark Board task #${task.id} done with quiet set to true and one line saying so, with no Suggestions block: a quiet done notifies nobody.`]
+		: [];
 
 /** The lines of `task`'s thread a session reads: what the user and the sessions said, and how each merge the Board ran went. */
 const threadLines = (task: BoardTask): string[] =>
@@ -101,6 +107,7 @@ export const startPrompt = (task: BoardTask, checkout: TaskCheckout, landable: b
 		`<board-task id="${task.id}">`,
 		`This session was started to do Board task #${task.id}, and holds it until it marks it done. ${workplace(task, checkout)}`,
 		...earlierRounds(task),
+		...quietRun(task),
 		converse(task.id, landable),
 		finish(task.id, landable),
 		"</board-task>",
@@ -108,7 +115,7 @@ export const startPrompt = (task: BoardTask, checkout: TaskCheckout, landable: b
 
 /** What the session a reply is for reads: it answers or does the follow-up, then finishes as a started session does. */
 export const wakePrompt = (task: BoardTask, by: BoardAuthor, text: string, landable: boolean): string =>
-	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nWhen it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}); when it asks for more work, do it.\n${converse(task.id, landable)}\n${finish(task.id, landable)}`;
+	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nWhen it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}); when it asks for more work, do it.\n${[...quietRun(task), converse(task.id, landable), finish(task.id, landable)].join("\n")}`;
 
 /** What the session reads after the user edited their messages, which stopped its turn: each message's new text replaces the old. */
 export const editPrompt = (task: BoardTask, texts: string[], landable: boolean): string => {

@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarContent, SidebarGroup, SidebarMenu } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
-import { type BotRow, botsNeedingYou } from "../bots-model";
-import { folderName, type KnownSessions, sessionsWaiting } from "../labels";
+import { folderName, type KnownSessions } from "../labels";
 import { withoutHidden, yourMoveCount } from "../pull-requests-model";
 import { useHiddenRepos } from "../pull-requests-state";
 import { pullRequestsStore } from "../reads";
@@ -41,7 +40,6 @@ interface AppSidebarProps {
 	board: BoardState | null;
 	/** Every live and past session, which the Board tab names. */
 	known: KnownSessions;
-	botList: BotRow[] | null;
 	/** The open page's own list, shown beneath its row while the sidebar floats, as on a phone; otherwise the page holds it. */
 	list: ReactNode;
 	settings: SettingsRoute;
@@ -64,7 +62,6 @@ export const AppSidebar = memo(function AppSidebar({
 	tabs,
 	board,
 	known,
-	botList,
 	list,
 	settings,
 	unreadNotices,
@@ -77,10 +74,9 @@ export const AppSidebar = memo(function AppSidebar({
 	const [hiddenRepos] = useHiddenRepos();
 	const counts = useMemo(
 		(): Partial<Record<SidebarTab, NavCount>> => ({
-			bots: { count: botList ? botsNeedingYou(botList) : 0, says: sessionsWaiting },
 			"pull-requests": { count: pullRequestRead ? yourMoveCount(withoutHidden(pullRequestRead.data, hiddenRepos), agentOn(visible.hosts)) : 0, says: count => `${count} your move` },
 		}),
-		[botList, pullRequestRead, hiddenRepos, visible.hosts],
+		[pullRequestRead, hiddenRepos, visible.hosts],
 	);
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
@@ -127,7 +123,7 @@ export const AppSidebar = memo(function AppSidebar({
 							</SidebarMenu>
 						</nav>
 					</SidebarGroup>
-					<BoardSidebar route={boardRoute} state={board} workspaces={workspaces} picked={workspace} sessions={known} bots={botList} />
+					<BoardSidebar route={boardRoute} state={board} workspaces={workspaces} picked={workspace} sessions={known} />
 				</>
 			) : (
 				<>

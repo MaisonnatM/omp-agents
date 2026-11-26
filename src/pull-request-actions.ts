@@ -1,6 +1,6 @@
 /**
  * The pull request actions: which listed pull request each applies to, and the prompt that starts its session.
- * The Pull requests page's quick actions and a PR shepherd's fixes both read them, so the server and the page share one prompt.
+ * The Pull requests page's quick actions read them, so the server and the page share one prompt.
  */
 import { type PullRequestSummary, pullRequestUrl } from "./shared/github";
 import { REVIEW_DRAFT_TOOL } from "./shared/review-drafts";
@@ -130,7 +130,3 @@ export const explainPrompt = (pr: PullRequestSummary): string =>
 /** The draft that **Ask a question** opens a new session with, ending where the question goes. */
 export const askPrompt = (pr: PullRequestSummary): string =>
 	`${pullRequestContext(pr)} Read it (\`pr://${pr.owner}/${pr.repo}/${pr.number}\`) and answer my question without changing any code or posting anything on GitHub.\n\n`;
-
-/** The prompt of the session that lands `pr` through the `land` tool, for a repository that commits `.omp/land.json` and whose PR shepherd asked to merge it. */
-export const landPrompt = (pr: PullRequestSummary): string =>
-	`${pullRequestContext(pr)} Its PR shepherd asked to merge it, and this repository lands on \`${pr.base}\` only through the \`land\` tool, which runs the repository's checks on the merged result before it pushes. ${ON_BRANCH} First make the branch match the pull request: run \`git fetch origin\`, then \`git merge --ff-only origin/${pr.head}\`; if the branch has commits the pull request lacks, stop and say so. Then call \`land\` with the divergence "None". If \`land\` reports a conflict or a failed check, do not change the code: report what it returned, so the user can start a fix on the pull request.`;

@@ -1,6 +1,5 @@
 /** What the bell's checks read, from omp, the dashboard's checkout, GitHub, Slack, and the dashboard's own parts. */
 import { integrationFetch, integrationSignedIn } from "../integrations";
-import { routineTurn } from "../live-session";
 import { modelUpdates, upgradeModel } from "../settings";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { readCreditRuns } from "../omp/stats";
@@ -15,6 +14,8 @@ import type { PullRequestList } from "../shared/github";
 import type { InterruptedSessions } from "./interrupted";
 import type { NoticeSources } from "./notices";
 import { pullRequestSightings, SLACK_SCOPE, slackSightings, type TriggerWatch } from "./routine-triggers";
+import type { BoardState } from "../../templates/omp/agent/extensions/board/log";
+import { boardRunTurn } from "./routine-turns";
 import type { RoutinesFile } from "./routines-file";
 import type { SelfUpdate } from "./self-update";
 import type { SessionFiles } from "./session-files";
@@ -33,6 +34,8 @@ export interface NoticeSourcesDeps {
 	files: SessionFiles;
 	interrupted: InterruptedSessions;
 	routines: RoutinesFile;
+	/** The Board as it stands, whose routine Board tasks tell how each run went. */
+	board(): BoardState;
 }
 
 export function noticeSources(deps: NoticeSourcesDeps): NoticeSources {
@@ -81,10 +84,7 @@ export function noticeSources(deps: NoticeSourcesDeps): NoticeSources {
 			return earlyRuns(
 				routines.value,
 				Date.now(),
-				(sessionId, routineId, at) => {
-					const path = files.pathOf(sessionId);
-					return path === null ? null : routineTurn(path, routineId, at);
-				},
+				(task, at) => boardRunTurn(deps.board(), task, at, files.pathOf),
 				(from, to) => sleptWithin(sleeps, from, to),
 			);
 		},

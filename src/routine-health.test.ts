@@ -1,22 +1,16 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { routineTurn } from "./live-session";
+import { describe, expect, test } from "bun:test";
 import { earlyRuns, type RunTurn, type TurnOf } from "./routine-health";
 import type { Routine, RoutineRun } from "./routines";
-import type { BotId } from "./shared/bots";
-import { routineMessageText } from "./shared/routine-message";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const NOW = 10 * 24 * HOUR;
-const BOT = "b1" as BotId;
+const WORKSPACE = "/work/webapp";
 
 /** An hourly command routine with nothing overdue, as of {@link NOW}. */
 const routine = (fields: Partial<Routine> = {}): Routine => ({
 	id: "r1",
-	botId: BOT,
+	workspace: WORKSPACE,
 	name: "Digest",
 	schedules: [{ kind: "every", minutes: 60 }],
 	triggers: [],
@@ -35,8 +29,8 @@ const command = (hoursAgo: number, ms = 10 * MINUTE, code = 0): RoutineRun => {
 	return { at, outcome: { kind: "command", run: { phase: "exited", code, output: "", startedAt: at, endedAt: at + ms } }, errors: [], triggeredBy: [] };
 };
 
-/** A prompt run claimed `hoursAgo` hours before {@link NOW}, sent to conversation `s1`. */
-const sent = (hoursAgo: number): RoutineRun => ({ at: NOW - hoursAgo * HOUR, outcome: { kind: "sent", sessionId: "s1" }, errors: [], triggeredBy: [] });
+/** A prompt run claimed `hoursAgo` hours before {@link NOW}, posted as Board task #1. */
+const posted = (hoursAgo: number): RoutineRun => ({ at: NOW - hoursAgo * HOUR, outcome: { kind: "posted", task: 1 }, errors: [], triggeredBy: [] });
 
 /** Hourly runs 2 to 6 hours ago, each taking ten minutes. */
 const usual = (): RoutineRun[] => [2, 3, 4, 5, 6].map(hoursAgo => command(hoursAgo));
@@ -52,7 +46,7 @@ describe("earlyRuns", () => {
 	test("a command that exited non-zero, a run with errors, and a run that failed to start each errored", () => {
 		const runs = usual();
 		runs[0] = command(2, 10 * MINUTE, 1);
-		runs[1] = { ...command(3), errors: ["The Bot's session did not start."] };
+		runs[1] = { ...command(3), errors: ["The run could not be posted to the Board: The Board is full."] };
 		runs[2] = { ...command(4), outcome: { kind: "failed" } };
 		expect(earlyRuns([routine({ runs })], NOW, noTurn).map(({ at, exit }) => ({ hoursAgo: (NOW - at) / HOUR, exit }))).toEqual([
 			{ hoursAgo: 4, exit: "errored" },
@@ -63,13 +57,13 @@ describe("earlyRuns", () => {
 
 	test("a run far shorter than the routine's usual one ended early, once enough other runs show what usual is", () => {
 		const short = command(2, MINUTE);
-		expect(earlyRuns([routine({ runs: [short, ...usual().slice(1)] })], NOW, noTurn)).toEqual([{ botId: BOT, routineId: "r1", name: "Digest", at: short.at, exit: "short" }]);
+		expect(earlyRuns([routine({ runs: [short, ...usual().slice(1)] })], NOW, noTurn)).toEqual([{ workspace: WORKSPACE, routineId: "r1", name: "Digest", at: short.at, exit: "short" }]);
 		expect(earlyRuns([routine({ runs: [short, command(3), command(4)] })], NOW, noTurn)).toEqual([]);
 	});
 
-	test("a prompt run whose Bot's turn ended with no reply is listed, one that stayed quiet is not, and one a provider's error ended errored", () => {
-		const prompt = routine({ task: { kind: "prompt", prompt: "Summarize the inbox." }, runs: [sent(2)] });
-		expect(earlyRuns([prompt], NOW, turn({ replied: false }))).toEqual([{ botId: BOT, routineId: "r1", name: "Digest", at: NOW - 2 * HOUR, exit: "no-reply" }]);
+	test("a prompt run whose session's turn ended with no reply is listed, one marked done quietly is not, and one a provider's error ended errored", () => {
+		const prompt = routine({ task: { kind: "prompt", prompt: "Summarize the inbox." }, runs: [posted(2)] });
+		expect(earlyRuns([prompt], NOW, turn({ replied: false }))).toEqual([{ workspace: WORKSPACE, routineId: "r1", name: "Digest", at: NOW - 2 * HOUR, exit: "no-reply" }]);
 		expect(earlyRuns([prompt], NOW, turn({ replied: false, quiet: true }))).toEqual([]);
 		expect(earlyRuns([prompt], NOW, turn({ replied: false, failed: true })).map(({ exit }) => exit)).toEqual(["errored"]);
 		expect(earlyRuns([prompt], NOW, turn())).toEqual([]);
@@ -81,7 +75,7 @@ describe("earlyRuns", () => {
 		expect(earlyRuns([routine({ runs: [late, command(5)] })], NOW, noTurn).map(({ at, exit }) => ({ at, exit }))).toEqual([{ at: late.at, exit: "missed" }]);
 		expect(earlyRuns([routine({ runs: [queued] })], NOW, noTurn).map(({ exit }) => exit)).toEqual(["missed"]);
 		const overdue = routine({ scheduledAt: NOW - 3 * HOUR });
-		expect(earlyRuns([overdue], NOW, noTurn)).toEqual([{ botId: BOT, routineId: "r1", name: "Digest", at: NOW - 2 * HOUR, exit: "missed" }]);
+		expect(earlyRuns([overdue], NOW, noTurn)).toEqual([{ workspace: WORKSPACE, routineId: "r1", name: "Digest", at: NOW - 2 * HOUR, exit: "missed" }]);
 		expect(earlyRuns([{ ...overdue, enabled: false }, { ...overdue, machine: { id: "m2", name: "Laptop" } }], NOW, noTurn)).toEqual([]);
 	});
 
@@ -105,7 +99,7 @@ describe("earlyRuns", () => {
 		const failures = routine({ task: { kind: "command", command: "check", post: "failures" }, runs: [handOff, ...usual().slice(1)] });
 		expect(earlyRuns([failures], NOW, noTurn)).toEqual([]);
 		expect(earlyRuns([{ ...failures, task: { kind: "command", command: "check" } }], NOW, noTurn).map(({ exit }) => exit)).toEqual(["errored"]);
-		const alsoFailed = { ...failures, runs: [{ ...handOff, errors: [...handOff.errors, "The Bot's session did not start."] }, ...usual().slice(1)] };
+		const alsoFailed = { ...failures, runs: [{ ...handOff, errors: [...handOff.errors, "The run could not be posted to the Board: The Board is full."] }, ...usual().slice(1)] };
 		expect(earlyRuns([alsoFailed], NOW, noTurn).map(({ exit }) => exit)).toEqual(["errored"]);
 	});
 
@@ -113,42 +107,7 @@ describe("earlyRuns", () => {
 		const late = command(2);
 		const sleptAll = () => 2 * HOUR;
 		expect(earlyRuns([routine({ runs: [late, command(5)] })], NOW, noTurn, sleptAll)).toEqual([]);
-		expect(earlyRuns([routine({ runs: [late, command(5)] })], NOW, noTurn, () => HOUR)).toEqual([{ botId: BOT, routineId: "r1", name: "Digest", at: late.at, exit: "missed" }]);
+		expect(earlyRuns([routine({ runs: [late, command(5)] })], NOW, noTurn, () => HOUR)).toEqual([{ workspace: WORKSPACE, routineId: "r1", name: "Digest", at: late.at, exit: "missed" }]);
 		expect(earlyRuns([routine({ scheduledAt: NOW - 3 * HOUR })], NOW, noTurn, sleptAll)).toEqual([]);
-	});
-});
-
-describe("routineTurn", () => {
-	const dirs: string[] = [];
-	afterEach(() => {
-		for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
-	});
-	const at = 50;
-	const prompt = (routineId: string) =>
-		routineMessageText({ botId: BOT, routine: { id: routineId, name: "Digest" }, at, triggeredBy: [], sent: { kind: "prompt", prompt: "Summarize the inbox." } });
-	const line = (role: string, content: unknown, timestamp: string) => JSON.stringify({ type: "message", timestamp, message: { role, content } });
-	const write = (lines: string[]): string => {
-		const dir = mkdtempSync(join(tmpdir(), "omp-agents-health-"));
-		dirs.push(dir);
-		const path = join(dir, "session.jsonl");
-		writeFileSync(path, `${lines.join("\n")}\n`);
-		return path;
-	};
-
-	test("reads the reply, quiet, and failure of the turn after the run's prompt, up to the next prompt", () => {
-		const path = write([
-			line("user", prompt("r1"), "2026-05-02T09:00:00.000Z"),
-			JSON.stringify({ type: "message", timestamp: "2026-05-02T09:04:00.000Z", message: { role: "assistant", content: [{ type: "text", text: "Three new emails." }], usage: { input: 1000, output: 200, cacheRead: 3000, cacheWrite: 0, cost: { total: 0.012 } } } }),
-			line("user", "Thanks, archive them.", "2026-05-02T09:10:00.000Z"),
-			line("assistant", [{ type: "toolCall", name: "bash", arguments: {} }], "2026-05-02T09:11:00.000Z"),
-		]);
-		expect(routineTurn(path, "r1", at)).toEqual({ replied: true, quiet: false, failed: false, ms: 4 * MINUTE, usage: { tokens: 4200, cost: 0.012 } });
-		expect(routineTurn(path, "r2", at)).toBeNull();
-	});
-
-	test("a turn that ended on tool calls alone has no reply", () => {
-		const path = write([line("user", prompt("r1"), "2026-05-02T09:00:00.000Z"), line("assistant", [{ type: "toolCall", name: "bash", arguments: {} }], "2026-05-02T09:00:30.000Z")]);
-		expect(routineTurn(path, "r1", at)).toEqual({ replied: false, quiet: false, failed: false, ms: 30_000, usage: { tokens: 0, cost: 0 } });
-		expect(routineTurn(join(tmpdir(), "omp-agents-health-missing.jsonl"), "r1", at)).toBeNull();
 	});
 });

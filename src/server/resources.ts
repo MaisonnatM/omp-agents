@@ -25,15 +25,6 @@ export const sessionVisualsExtension: string = packagedResources
 	? join(packagedResources, "session-visuals-extension.js")
 	: join(import.meta.dir, "..", "omp", "session-visuals-extension.ts");
 
-/** The omp extension a Bot's session loads (`src/omp/bot-extension.ts`): its bundle in a packaged app. */
-export const botExtension: string = packagedResources ? join(packagedResources, "bot-extension.js") : join(import.meta.dir, "..", "omp", "bot-extension.ts");
-
-/** The omp extension a PR shepherd Bot's session loads beside {@link botExtension} (`src/omp/shepherd-extension.ts`): its bundle in a packaged app. */
-export const shepherdExtension: string = packagedResources ? join(packagedResources, "shepherd-extension.js") : join(import.meta.dir, "..", "omp", "shepherd-extension.ts");
-
-/** The omp extension a Bot designer's session loads beside {@link botExtension} (`src/omp/designer-extension.ts`): its bundle in a packaged app. */
-export const designerExtension: string = packagedResources ? join(packagedResources, "designer-extension.js") : join(import.meta.dir, "..", "omp", "designer-extension.ts");
-
 /** A file a module ships, such as its omp extension: `source` in a checkout, its bundle `bundle` in a packaged app, which `scripts/build-desktop-artifact.ts` builds from it. */
 export function shippedFile({ source, bundle }: { source: string; bundle: string }): string {
 	return packagedResources ? join(packagedResources, bundle) : source;

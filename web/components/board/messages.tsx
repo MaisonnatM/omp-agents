@@ -16,9 +16,10 @@ import { errorText } from "../../../src/json";
 import { activityControl } from "../../activity";
 import { useStoredState } from "../../stored-state";
 import { AppMark } from "../app-mark";
-import { BOT_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
+import { BOARD_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type KnownSessions, sessionLabel } from "../../labels";
 import { hashForBoardSession, revealSessionTab, revealThreadTab } from "./sidebar";
+import { RoutineAuthorName, RoutineAvatar } from "./routine-author";
 import type { Work } from "./work";
 
 export const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
@@ -26,7 +27,7 @@ export const folder = (display: string): string => display.split("/").filter(Boo
 /** Slack starts a later message from the same author within five minutes of the last one without its avatar and name. */
 const GROUP_MS = 5 * 60_000;
 
-const authorKey = (by: BoardAuthor): string => (by.kind === "user" ? "user" : by.sessionId);
+const authorKey = (by: BoardAuthor): string => (by.kind === "user" ? "user" : by.kind === "routine" ? `routine:${by.routineId}` : by.sessionId);
 
 function continues(previous: { at: number; by: BoardAuthor }, next: { at: number; by: BoardAuthor }): boolean {
 	return authorKey(previous.by) === authorKey(next.by) && next.at - previous.at < GROUP_MS && sameDay(previous.at, next.at);
@@ -84,10 +85,11 @@ function YourAvatar({ size, box }: { size: "message" | "summary"; box: string })
 	);
 }
 
-/** The author's square picture: yours for you, omp's mark for a session. */
+/** The author's square picture: yours for you, a routine's loop for a routine, omp's mark for a session. */
 export function Avatar({ by, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
 	const box = size === "message" ? "size-9 rounded-lg text-sm" : "size-6 rounded-md text-[11px]";
 	if (by.kind === "user") return <YourAvatar size={size} box={box} />;
+	if (by.kind === "routine") return <RoutineAvatar size={size} box={box} />;
 	return (
 		<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-muted", box)}>
 			<AppMark className={size === "message" ? "size-5" : "size-3.5"} />
@@ -95,9 +97,10 @@ export function Avatar({ by, size = "message" }: { by: BoardAuthor; sessions: Kn
 	);
 }
 
-/** The author's name: yours, or for a session "omp agent" then the session's title, which opens its conversation in its Board thread. */
+/** The author's name: yours; a routine's name; or for a session "omp agent" then the session's title, which opens its conversation in its Board thread. */
 function AuthorName({ by, sessions, state, workspace }: { by: BoardAuthor; sessions: KnownSessions; state: BoardState; workspace: string }) {
 	if (by.kind === "user") return <span className="text-sm font-semibold">You</span>;
+	if (by.kind === "routine") return <RoutineAuthorName routineId={by.routineId} name={by.name} workspace={workspace} />;
 	const title = sessionLabel(by.sessionId, sessions).name;
 	return (
 		<span className="flex min-w-0 items-baseline gap-1.5">
@@ -166,7 +169,7 @@ function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 	);
 }
 
-/** A row under a Board task still in work, in the thread summary's style: who works on it and how it stands, as a Slack bot shows it is thinking; it opens the thread with its Thread tab in front. */
+/** A row under a Board task still in work, in the thread summary's style: who works on it and how it stands, as Slack shows someone typing; it opens the thread with its Thread tab in front. */
 function WorkingLine({ work, sessions, href }: { work: Work; sessions: KnownSessions; href: string }) {
 	const sessionId = work.kind === "working" || work.kind === "waiting" ? work.sessionId : null;
 	return (
@@ -183,11 +186,11 @@ function WorkingLine({ work, sessions, href }: { work: Work; sessions: KnownSess
 	);
 }
 
-/** A Board task's or reply's text as Markdown, with single line breaks kept, as a Bot's message shows; `(edited)` after it once its author edited it, as Slack marks one. */
+/** A Board task's or reply's text as Markdown, with single line breaks kept; `(edited)` after it once its author edited it, as Slack marks one. */
 function BoardText({ text, editedAt }: { text: string; editedAt?: number }) {
 	return (
 		<div className="max-w-conversation min-w-0 text-sm leading-relaxed">
-			<MessageMarkdown text={text} preset={BOT_MESSAGE_PRESET} />
+			<MessageMarkdown text={text} preset={BOARD_MESSAGE_PRESET} />
 			{editedAt !== undefined && (
 				<span title={`Edited ${new Date(editedAt).toLocaleString()}`} className="text-xs text-muted-foreground">
 					(edited)
@@ -336,7 +339,15 @@ const useSeen = (): Record<string, number> =>
 		},
 		() => seen,
 	);
-/** Replies past the ones seen that someone else wrote: the unread count, as Slack's thread pill. */
-const unreadOf = (task: BoardTask, seenCount: number | undefined): number => said(task).slice(seenCount ?? 0).filter(reply => reply.by.kind !== "user").length;
+/** Replies past the ones seen that someone else wrote: the unread count, as Slack's thread pill. The line a session leaves with a quiet done, having found nothing to report, counts for nothing. */
+const unreadOf = (task: BoardTask, seenCount: number | undefined): number => {
+	const quiet = new Set(
+		task.replies.filter((entry, index) => {
+			const before = task.replies[index - 1];
+			return "by" in entry && before !== undefined && "note" in before && before.note.kind === "done" && before.note.quiet === true;
+		}),
+	);
+	return said(task).slice(seenCount ?? 0).filter(reply => reply.by.kind !== "user" && !quiet.has(reply)).length;
+};
 
 export { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, MarkUnreadButton, markSeen, MessageEditor, MessageRow, said, sameDay, TaskBody, unreadOf, useSeen, WorkingLine, WorkLabel };

@@ -1,4 +1,4 @@
-/** One row of a Bot's routines card: its name, Run now, and switch; when it runs; what starts it and what it does, with its run strip; and, open, the rest in place. */
+/** One row of a Workspace's routines card: its name, Run now, and switch; when it runs; what starts it and what it does, with its run strip; and, open, the rest in place. */
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { IconArrowRight, IconChevronDownSmall, IconPlay } from "central-icons";
 import { type KeyboardEvent, type MouseEvent, useId, useState } from "react";
@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { hashForBotRoutine } from "../../routing";
-import { usePageHash } from "../../page-hash";
+import { hashForRoutines } from "../../routing";
 import {
 	durationWords,
 	nextRunWords,
@@ -104,7 +103,7 @@ function RunStrip({ runs, picked, now, onPick }: RunStripProps) {
 						>
 							<Tooltip content={<TickDetail run={slot} now={now} />}>
 								<button
-									{...activityControl("bots.routine.run")}
+									{...activityControl("routines.run")}
 									type="button"
 									data-run-at={slot.at}
 									tabIndex={slot === focused ? 0 : -1}
@@ -128,26 +127,24 @@ function RunStrip({ runs, picked, now, onPick }: RunStripProps) {
 /** A row's third line for the screen reader, in place of its marks: what else starts it, and what it does. */
 function marksSentence(routine: Routine): string {
 	const triggers = routine.triggers.map(({ kind }) => TRIGGER_MARKS[kind].name);
-	const does = routine.task.kind === "prompt" ? "Sends the message" : "Runs the command";
+	const does = routine.task.kind === "prompt" ? "Posts the instructions" : "Runs the command";
 	return triggers.length > 0 ? `Starts on ${triggers.join(", ")}. ${does}:` : `${does}:`;
 }
 
 interface RoutineRowProps {
 	routine: Routine;
-	botName: string;
 	open: boolean;
 	connected: boolean;
 	now: number;
 }
 
-export function RoutineRow({ routine, botName, open, connected, now }: RoutineRowProps) {
-	const to = usePageHash();
+export function RoutineRow({ routine, open, connected, now }: RoutineRowProps) {
 	const detailsId = useId();
 	const reduceMotion = useReducedMotion() ?? false;
 	const { request, send } = useDashboardActions();
 	const runNow = useAction(() => request({ t: "routine", change: { op: "run-now", id: routine.id } }), "Could not run the routine");
 	const [pickedAt, setPickedAt] = useState<number | null>(null);
-	const { id, botId, name, machine, runs, task, triggers } = routine;
+	const { id, workspace, name, machine, runs, task, triggers } = routine;
 	const here = runsHere(routine);
 	const latest = runs[0];
 	const picked = runs.find(({ at }) => at === pickedAt) ?? latest;
@@ -158,7 +155,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 	const toggle = (): void => {
 		// Opened afresh, the row shows the latest run until a tick picks another.
 		if (!open) setPickedAt(null);
-		location.hash = hashForBotRoutine(botId, open ? { kind: "list" } : { kind: "open", id }, to);
+		location.hash = hashForRoutines(workspace, open ? { kind: "list" } : { kind: "open", id });
 	};
 	const clickRow = (event: MouseEvent<HTMLDivElement>): void => {
 		if (!(event.target as Element).closest(ROW_CONTROLS)) toggle();
@@ -278,7 +275,7 @@ export function RoutineRow({ routine, botName, open, connected, now }: RoutineRo
 							transition={reduceMotion ? INSTANT : { duration: 0.2, delay: 0.08, ease: "easeOut" }}
 							className="px-4 pb-4"
 						>
-							<RoutineOpen routine={routine} run={picked} botName={botName} connected={connected} now={now} />
+							<RoutineOpen routine={routine} run={picked} connected={connected} now={now} />
 						</motion.div>
 					</motion.div>
 				)}

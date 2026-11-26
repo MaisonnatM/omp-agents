@@ -1,4 +1,4 @@
-/** What a Bot's details and its routines card mark a routine with: its task's icon, its triggers' logos, its runs' dots, icons, and ticks, and how an opened routine or run unfolds. */
+/** What the Routines tab marks a routine with: its task's icon, its triggers' logos, its runs' dots, icons, and ticks, and how an opened routine or run unfolds. */
 import { IconBubbleText, IconCircleCheck, IconCircleDashed, IconCircleX, IconConsole, IconLoadingCircle } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { ReactNode } from "react";

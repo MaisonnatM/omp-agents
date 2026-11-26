@@ -35,7 +35,7 @@
 - Each artifact the agent saves shows as a card between the tool groups, with its kind's icon, its title, and its kind, version number, and note; click it to show that version in the sidebar's **Artifacts** tab; see [Artifacts](artifacts.md).
   While the tab shows that version, the card reads **Showing**.
   A save whose bytes equal the version before it names that version's number.
-  Hiding tool calls keeps these cards; a Bot's page shows none.
+  Hiding tool calls keeps these cards.
 - A code block in a message names its language above the code, colors it, and has a copy button; a block with no language shows the button when you hover or focus it.
 - In a session's conversation, a `mermaid` or `chart` code block in a message draws as a diagram or a chart once the message settles; while a reply streams, it shows as code.
   A `mermaid` block draws a flowchart (`graph` or `flowchart` with a direction such as `TD` or `LR`), a `sequenceDiagram`, a `stateDiagram-v2`, a `classDiagram`, or an `erDiagram`, named on its first line, in up to 20,000 characters.

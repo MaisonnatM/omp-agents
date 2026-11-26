@@ -76,7 +76,7 @@ const MOVE_WORDS: Record<YourMove, string> = {
 /**
  * Each pull request of the repositories GitHub answered for whose next move is yours, by that move, read with the
  * sessions on it as the bell reads it: a pull request whose move becomes yours, or changes to another of yours, is a new
- * sighting. A draft, checks still running, or a session at work on it is none, so a Bot's own push fires nothing until
+ * sighting. A draft, checks still running, or a session at work on it is none, so a routine session's own push fires nothing until
  * it ends in a move of yours.
  */
 export function pullRequestSightings(list: PullRequestList, agent: AgentOn): Seen {

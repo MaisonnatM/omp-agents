@@ -7,7 +7,6 @@
 		"web/components/dithercn/dither-globe.tsx": 1,
 		"web/components/dithercn/galaxy.tsx": 1,
 		"web/components/settings/extensions-tab.tsx": 4,
-		"web/components/transcript.tsx": 1,
 		"web/lib/dither/shader.tsx": 1
 	},
 	"glossary-terms": {

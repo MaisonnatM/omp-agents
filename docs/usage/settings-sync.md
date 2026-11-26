@@ -21,12 +21,12 @@
   - the source control settings: automatic pulls, each repository's choice, and the cleanup after a merge;
   - your preferences: the theme, what transcripts hide, the sidebar tabs, the pinned skill, notifications, the merge method, the diff view, and the idle stop;
   - the workspaces Settings › Workspaces added and hid;
-  - your Bots, each with its name, job, type, look, model, skill, workspace, pin, section, memory, and routines;
+  - your routines, each with its name, Workspace, model, task, schedules, triggers, and the machine that runs it;
   - your projects, each with its name, goal, decisions, archive, and plan steps with their state, without its sessions or log.
-  A Bot's conversation stays on the machine that had it, so a Bot from another machine starts a new one here; facts each machine's Bot remembered arrive on both, and a Bot one machine deleted goes on the other with its routines.
+  A routine one machine deleted goes on the other.
   Each routine runs on one machine only: one made or turned on here runs here, and on the other machines its row reads **Runs on** and this machine's name, with its switch off.
   Turning that switch on moves the routine there, its schedule counting from then, and it stops here at this machine's next sync; until then, both may run it.
-  Two machines that both change where a routine runs before syncing get a conflict on the Bots, so it never ends up running on both.
+  Two machines that both change where a routine runs before syncing get a conflict on the routines, so it never ends up running on both.
   A routine's runs stay on the machine that ran them.
   A project's sessions, a step's claim, and the project's messages stay on the machine that had them; a step or decision each machine added arrives on both.
   A project whose name another channel already holds here takes the next free name, such as `launch-2`, on every machine.
@@ -34,6 +34,6 @@
 - **Never synced** lists what stays on each machine whatever the remote holds.
   That covers omp's `agent.db` and other databases, `mcp.json`, which can hold OAuth client secrets, `secrets.yml`, key files such as `.env` or `*.pem`, session files, lock files, and the dashboard's access token, interrupted sessions, and merges.
   Inside a synced directory, links, binary files, files over 1 MB, and files with text shaped like a token or a private key stay too, and so do the dashboard's lists while one of them holds such text; the sync names each one it left.
-  Scheduled sends, pinned sessions, notices, Bots' conversations, and routines' runs do not sync, since they belong to this machine's sessions and runs.
+  Scheduled sends, pinned sessions, notices, and routines' runs do not sync, since they belong to this machine's sessions and runs.
 - A path under your home directory is written as `~` on the remote: `/Users/ann/notes` in `AGENTS.md` arrives as `~/notes`, and a repository's pull choice or a workspace moves to the same path under the other machine's home.
 - A change you make here while a sync runs is kept, and the next sync sends it.

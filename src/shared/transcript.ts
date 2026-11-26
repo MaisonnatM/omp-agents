@@ -1,12 +1,9 @@
 /** What a transcript shows: its items, the files its agent changed, its images, and the files it opens. */
 
 import type { ArtifactSave } from "./artifacts";
-import { type BotMessage, readBotMessage } from "./bot-message";
-import type { BotId } from "./bots";
 import type { DiffRow } from "./changes";
 import type { Frontmatter } from "./models";
 import type { PromptFile } from "./prompt-files";
-import { readRoutineMessage, type RoutineMessage } from "./routine-message";
 
 /** The extensions of the files that agent text may open in the page's file dialog, `GET /api/file`. */
 export const TEXT_FILE_EXTENSIONS: readonly string[] = ["md", "markdown", "txt", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "xml", "diff", "patch"];
@@ -72,16 +69,10 @@ export const mediaUrl = (path: string): string => `/api/media?${new URLSearchPar
 /** How a prompt the dashboard sent in the user's place starts, such as a pull request watch's wake; the agent reads it, the transcript hides it. */
 export const DASHBOARD_PROMPT_PREFIX = "[omp-agents]";
 
-/** Who sent a prompt: the user, the dashboard in the user's place, or a routine or another Bot, whose message a stamp tells. */
-export type PromptAuthor = { kind: "user" } | { kind: "dashboard" } | { kind: "routine"; message: RoutineMessage } | { kind: "bot-message"; message: BotMessage };
+/** Who sent a prompt: the user, or the dashboard in the user's place. */
+export type PromptAuthor = { kind: "user" } | { kind: "dashboard" };
 
-export function promptAuthor(text: string): PromptAuthor {
-	if (text.startsWith(DASHBOARD_PROMPT_PREFIX)) return { kind: "dashboard" };
-	const routine = readRoutineMessage(text);
-	if (routine) return { kind: "routine", message: routine };
-	const message = readBotMessage(text);
-	return message ? { kind: "bot-message", message } : { kind: "user" };
-}
+export const promptAuthor = (text: string): PromptAuthor => (text.startsWith(DASHBOARD_PROMPT_PREFIX) ? { kind: "dashboard" } : { kind: "user" });
 
 /** A `/skill:` prompt as typed: the skill's token, then `text` after a space when there is any. */
 export const skillInvocation = (skill: string, text: string): string => (text ? `/skill:${skill} ${text}` : `/skill:${skill}`);
@@ -101,29 +92,21 @@ export type Item = { at?: number } & (
 	 * The page shows nothing for it, but it opens a turn as a prompt does. `entryId` as a prompt's.
 	 */
 	| { id: string; kind: "dashboard"; text: string; entryId: string | null }
-	/**
-	 * A message a routine run sent, which {@link promptAuthor} tells; it opens a turn as a prompt does. `entryId` and
-	 * `pending` as a prompt's. `shell`: what omp's run of a `!` prompt printed and how it ended; absent for any other.
-	 */
-	| { id: string; kind: "routine"; message: RoutineMessage; entryId: string | null; pending?: true; shell?: { output: string; code: number | null; cancelled: boolean } }
-	/** A message another Bot sent with `message_bot`, which {@link promptAuthor} tells; it opens a turn as a prompt does. `entryId` and `pending` as a prompt's. */
-	| { id: string; kind: "bot-message"; message: BotMessage; entryId: string | null; pending?: true }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean; suggestions: string[] }
 	/** The model's reasoning text. `streaming` while that reply is still arriving. A redacted block has no text and is left out. */
 	| { id: string; kind: "thinking"; text: string; streaming: boolean }
 	/**
 	 * `images`: the addresses of the images its result returned, such as a screenshot, as a prompt's; absent when none.
-	 * `to`: the Bot a `message_bot` call messaged; absent for every other call.
 	 * `artifact`: the checked record of a successful artifact save, absent on other tools or failed saves.
 	 */
-	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; images?: string[]; artifact?: ArtifactSave; to?: BotId }
+	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; images?: string[]; artifact?: ArtifactSave }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string }
 );
 
-/** A prompt the page shows: the user's, a routine's, or another Bot's message; the dashboard's opens a turn but shows nothing. */
-export type PromptItem = Extract<Item, { kind: "user" | "routine" | "bot-message" }>;
+/** A prompt the page shows: the user's; the dashboard's opens a turn but shows nothing. */
+export type PromptItem = Extract<Item, { kind: "user" }>;
 
-export const isPrompt = (item: Item): item is PromptItem => item.kind === "user" || item.kind === "routine" || item.kind === "bot-message";
+export const isPrompt = (item: Item): item is PromptItem => item.kind === "user";
 
 /** One successful `edit` or `write` result on a file; `at` is when omp recorded it, in ms since the epoch, or `null` when its entry carries no time. */
 export type FileChange =

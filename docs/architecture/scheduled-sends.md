@@ -33,7 +33,7 @@ Each server also reads the file and sends the list on its minute tick, so pages 
 A send is at most a minute late, and one whose time passed while no server ran goes at the first tick after one starts.
 A message whose session runs live on a server that does not own the unattended work goes to a resumed copy on the owner, since each server reaches only the dashboard sessions it started.
 
-`SessionFollowUps` in `src/server/session-follow-ups.ts` lets an agent schedule a message to itself: `join` gives every dashboard-started main session but a Bot's conversation the strict host tool `schedule_follow_up`, which takes a message and a delay of 1 to 10,080 minutes.
+`SessionFollowUps` in `src/server/session-follow-ups.ts` lets an agent schedule a message to itself: `join` gives every dashboard-started main session the strict host tool `schedule_follow_up`, which takes a message and a delay of 1 to 10,080 minutes.
 It closes over its caller's instance id from the join, as `SessionWaits` in [Dashboard sessions](dashboard-sessions.md) does, reads the caller's current session id from the roster rows, and adds a `message` send through the list registry's `scheduled` list, so every page hears it and the runner sends it like a page's.
 
 `PullRequestWatches` in `src/server/pull-request-watches.ts` wakes an agent that waits on a pull request instead of letting it poll: `join` gives the same sessions the host tool `watch_pull_request`, which takes the pull request's `url`, `ready: true` to also wake when it becomes ready to merge, and, to end a watch, `stop: true`.

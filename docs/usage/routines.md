@@ -1,15 +1,20 @@
 # Routines
 
-- A routine belongs to one [Bot](bots.md), and on its schedules, its triggers, or both, it messages that Bot or runs a shell command in the Bot's workspace.
-  Every routine has a Bot; deleting a Bot deletes its routines.
-- Click a Bot's name at the top of its page to see its **Routines** in its details: each with its last run's dot, its name, and its schedules and triggers, or **Paused**.
-  Click the **Routines** heading to open the Bot's routines card in place of the conversation, at `#bots/<Bot id>/routines`, or click one routine to open the card with its row open, at `#bots/<Bot id>/routines/<routine id>`.
+- A routine belongs to one Workspace, and on its schedules, its triggers, or both, it posts a Board task on that Workspace's [Board](board.md), or runs a shell command in the Workspace and posts its report.
+  The Board starts a session on that Board task as it does on any other, in its own worktree, with the routine's model if it has one; see [Board](board.md).
+  While the routine's last Board task is not done, a run replies on it instead, which wakes its session, so one open Board task gathers a routine's runs until a session marks it done.
+- Each Workspace's Board has a **Routines** tab, at `#board/routines?workspace=<cwd>`, which lists that Workspace's routines; click one to open its row in place, at `#board/routines/<routine id>?workspace=<cwd>`.
+  A Board task a routine posted shows the routine's name as its author, which opens the routine's row; once the routine is deleted, the name stays as plain text.
+  A routine's address under another Workspace's tab opens it in its own Workspace's tab; one no Workspace has reads **No such routine**.
 - Routines run only while the dashboard runs; a time missed while it was down, or while the Mac was off or asleep, starts one run once it is back.
   In the desktop app, **Open at Login** keeps it running from the moment you log in.
 - Routines also wait through the few seconds the Mac wakes on its own while asleep, for Power Nap or the network, since a run started then would stall when it sleeps again.
   What came due starts once the Mac fully wakes, and the news a trigger saw meanwhile starts one run.
-- **New routine**, in the **Routines** tab of the Bot's details or at the top of its routines card, opens the editor in place of the conversation: a name, its task, its schedules, and its triggers.
-  The task is **Send a message**, a message that goes into the Bot's conversation as a routine run card, or **Run a command**, a shell command.
+- **New routine**, at the top of the **Routines** tab, opens the editor: a name, its Workspace, its model, its task, its schedules, and its triggers.
+  The Workspace is the Board it posts on; the tab's Workspace starts picked.
+  The model, effort, and skill are those the session that takes each Board task starts with; the Board's defaults when none is picked.
+  A routine's saved effort stays while the model list loads or fails to load.
+  The task is **Post instructions**, the text the Board task carries, or **Run a command**, a shell command, with optional instructions the Board task carries above the command's report.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run a schedule or **Run now** started, or runs at a time of day on the days you pick.
   **Weekdays** and **Every day** pick those days at once.
   **Add schedule** adds another.
@@ -19,75 +24,59 @@
   - **When a Slack message waits on you**: a mention or direct message you have not answered, once Slack is signed in under **Settings › Integrations**.
     What already waits when you sign in starts nothing.
   - **When a pull request waits on you**: one of yours, or one waiting on your review, comes to wait on you, such as a review asked of you, its checks failing, a conflict, comments to address, or it becoming ready to merge.
-    A draft, checks still running, or a session at work on it, such as a Bot pushing a fix, starts nothing until it ends waiting on you.
+    A draft, checks still running, or a session at work on it, such as one pushing a fix, starts nothing until it ends waiting on you.
 
   They watch what the bell already reads: Slack and pull requests every 2 minutes.
-  Everything that happened between two checks starts one run, and the run gets what the trigger saw: a message gets it after the routine's text, as data rather than as instructions, and a command gets it as a JSON list in `$ROUTINE_TRIGGERS`, which is `[]` when a schedule or **Run now** started it.
+  Everything that happened between two checks starts one run, and the run gets what the trigger saw: a Board task gets it after the routine's instructions, as data rather than as instructions, and a command gets it as a JSON list in `$ROUTINE_TRIGGERS`, which is `[]` when a schedule or **Run now** started it.
   What happened while the dashboard was quit starts nothing when it comes back, nor does what was already there when it started.
   A triggered run leaves the schedules alone: an hourly routine still runs on the hour.
-- A message reaches the Bot the way your own does: it follows the Bot's running session, resumes its saved one, or starts its first.
-  A routine starts no session of its own, so the Bot keeps one conversation, and its answers show there.
-  With **New conversation each run** checked, each run that posts to the Bot first restarts its conversation, as **Restart conversation** does, so its message or command output opens a new conversation; a command run that posts nothing, such as one that exits 0 while posting only failures, restarts nothing; while the Bot is busy with a turn, the post joins the current conversation instead.
-  A new routine has it checked, whether you or the Bot create it, so a run does not re-read the whole earlier conversation; uncheck it for a routine that builds on the conversation you have with the Bot.
-- In the conversation, each routine message has a folded card with the routine's name, a message or command icon, the logos of what triggered it, its time, and a status icon and label.
-  A message reads **Sending…** until recorded, then **Sent**; a command report shows how the command ended and how long it took.
-  Click the card to show its **Prompt** or **Command**, any output, and **Started by** with links to the events when available.
-  A prompt that starts with `!` shows its shell output and result in the same card.
-  Output longer than 20 lines folds behind **Show output**.
-  **Open routine** opens the routine's row, and the copy button copies only its prompt or command.
-  The card keeps the name and instructions sent with that run, even after you edit the routine.
-  On a narrow conversation, the time and status label hide, but the status icon stays.
-- A command runs with `sh` in the Bot's workspace, without an omp session.
+- A session that takes a routine's Board task and finds nothing to report marks it done quietly, with one line, which raises no notification and leaves the Board task read.
+- A command runs with `sh` in the Workspace's main checkout, without an omp session.
   The command runs with your user's full permissions, and nothing asks before it acts: a file it deletes is gone.
   It stops after 10 minutes, not counting the time the Mac sleeps, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
-  When it ends, the dashboard posts into the Bot's conversation which routine ran what, how it ended, how long the Mac slept while it ran, if it did, and its output, which the Bot reads as data rather than as instructions.
+  When it ends, the dashboard posts a Board task, or a reply on the routine's open one, with which routine ran what, how it ended, how long the Mac slept while it ran, if it did, and its output, which the session reads as data rather than as instructions.
   A command that ends while the Mac sleeps posts once the Mac fully wakes.
-  **Post the output to the Bot** picks when a run posts: **Every run**; **Only when it fails**, where a command that exits 0 keeps its output on the run, in the routine's open row, and posts nothing, so it starts no turn; or **When it fails or its output changes**, which also posts a run that exits 0 with output other than the last run's, so a cheap check wakes the Bot only on news. A non-zero exit, a stop, or a failure to start always posts.
-  If the Bot cannot take that message, the run keeps the output anyway and lists why among its errors.
+  **Post the report** picks when a run posts: **Every run**; **Only when it fails**, where a command that exits 0 keeps its output on the run, in the routine's open row, and posts nothing; or **When it fails or its output changes**, which also posts a run that exits 0 with output other than the last run's, so a cheap check reaches the Board only on news. A non-zero exit, a stop, or a failure to start always posts.
   A command routine whose last command still runs records an error instead of running a second one.
   Its runs read **Running…**, **Succeeded**, **Failed (exit n)**, **Stopped at the time limit**, **Stopped with the dashboard**, or **Could not start**, and anything but a success also counts as an error.
-- The routines card lists every routine of the Bot under how many of them are on schedule, with **New routine** at the top.
+- The **Routines** tab lists every routine of the Workspace under how many of them are on schedule, with **New routine** at the top.
   Each row shows the routine's name, **Run now** while you point at the row or tab into it, and a switch that pauses or resumes the routine.
   Under the name are its schedules and its next run, counting down by the second in its last hour, or **Paused**, and its last run's mark and time.
   A routine another machine runs, as [Settings sync](settings-sync.md) carries it, reads **Runs on** and that machine's name, with its switch off; turning the switch on moves it to this machine, and its schedules count from then.
-  The last line shows the logos of its triggers, its message or command, and its last 10 runs as ticks, oldest on the left; pointing at a tick, or focusing it, shows how the run went, when, how long its command took, and what started it.
-  Beside the ticks, the row shows what the Bot's turns for its kept runs cost together, such as **$0.31 over 8 runs**, and an open run shows its own tokens and cost, such as **12.3k tokens · $0.04**; a message run counts once its Bot's turn ends, and a command run that posts nothing costs nothing.
-  The mark and the tick are green when the run went fine, red when it had an error, blue while its command runs, and amber while it waits to start.
+  The last line shows the logos of its triggers, its instructions or command, and its last 10 runs as ticks, oldest on the left; pointing at a tick, or focusing it, shows how the run went, when, how long its command took, and what started it.
+  Beside the ticks, the row shows what the sessions on its kept runs' Board tasks cost together, such as **$0.31 over 8 runs**, and an open run shows its own tokens and cost, such as **12.3k tokens · $0.04**; a command run that posts nothing costs nothing.
+  The mark and the tick are green when the run went fine, red when it had an error, blue while its command runs or it posts, and amber while it waits to start.
   While a run is under way, the row reads **Running…** over a moving line, which holds still when your system asks to reduce motion.
   On a narrow card, **Run now** shows only its icon and the last run's time leaves the row.
   Click a row to open it in place, which closes the one open before; click a tick to open the row on that run.
   The arrow keys move between the routines' names, and between the ticks of a strip.
 - An open row shows the run it picked, the latest one at first, with what triggered it, its command's output, and its errors.
-  A message's run reads **Sent to** and the Bot's name, a link to its conversation, once it went in.
+  A run that posted reads **Posted Board task #** and its number, a link to its Board thread.
   A triggered run lists each thing it saw, linked to the Slack message or pull request when it can.
   Output longer than 20 lines folds behind **Show output**.
-  Then it shows the routine's instructions, its message or command in full, and its schedule: **Hourly**, **Daily**, **Weekdays**, or **Weekly**, with its time and, for **Weekly**, its day, each saved as you change it.
+  Then it shows the routine's instructions or command in full, and its schedule: **Hourly**, **Daily**, **Weekdays**, or **Weekly**, with its time and, for **Weekly**, its day, each saved as you change it.
   A routine whose schedules fit none of these lists them with no choice picked, and picking one replaces them; its triggers stay.
   **Edit** opens the full editor, and **Delete** asks first, then closes the row.
-  **Run now** runs it at once whatever its schedules, and shows progress until the server sends the message or starts the command, not until it finishes.
-  **Back to** and the Bot's name returns to the conversation.
+  **Run now** runs it at once whatever its schedules, and shows progress until the server posts the Board task or starts the command, not until it finishes.
+- A session the dashboard started can also save or delete the routines of its own Workspace, the main checkout of its worktree, with its `save_routine` and `delete_routine` tools; a routine it makes posts on that Workspace's Board.
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
 - Once a day, and as it starts, the dashboard that runs the routines checks the runs of the last day and raises one notification, under **Routines** in [Notifications](notifications.md), for the runs that exited early.
-  A run exited early when it errored, its Bot's turn ended with no reply and without staying quiet, it took less than a quarter of the routine's usual time, or it started an hour or more after its schedule said.
+  A run exited early when it errored, its Board task's session ended with no reply and without marking it done quietly, it took less than a quarter of the routine's usual time, or it started an hour or more after its schedule said.
   A routine whose next run is an hour or more overdue counts as missing its schedule too.
-- The dashboard adds two routines of its own, each once, each paused until you turn it on, and each with a Bot that works in the omp-agents checkout.
-- **Friday routine receipt**, with a Bot named **Routine receipt**, runs on Fridays at 17:00 once on.
-  It reads the week's runs and their cost from `routines.json` and replies with one table: each routine's runs, useful runs (not quiet, skipped, or failed), tokens, cost, and a verdict to keep it, slow it down, or retire it. It changes no routine.
-- **Weekly harness review**, with a Bot named **Harness review**.
-  It is paused; turn it on to run it on Mondays at 9:00.
+- The dashboard adds two routines of its own, each once, each paused until you turn it on, and each in the omp-agents checkout's Workspace.
+- **Friday routine receipt** runs on Fridays at 17:00 once on.
+  It reads the week's runs and their cost from `routines.json` and replies with one table: each routine's runs, useful runs (not marked done quietly, skipped, or failed), tokens, cost, and a verdict to keep it, slow it down, or retire it. It changes no routine.
+- **Weekly harness review** is paused; turn it on to run it on Mondays at 9:00.
   Each run first says whether last week's proposed change fixed the failures it named, from the replay of them you ran once that change landed, or says in one line that the replay was never run.
   It then reads the last week of `ship-trace.jsonl` beside the access token, for every repository, `LEARNINGS.md`, the failed merges, and the failed routine runs.
   It groups by cause the failures and the pull requests whose fixes hit the round limit or stalled, proposes exactly one harness change as a decision for you, and lists five past failures to replay to test that change.
   It saves those five as replay tasks, and its reply, in `~/.cache/omp-harness-review/`, and ends with the command that replays them on the worker model once the change lands.
   It edits no repository and writes nothing outside that folder.
-  A copy whose prompt you never edited gets the newest prompt as the dashboard starts; one you edited keeps yours.
   If you delete it, it does not come back.
-- Routines made before every routine had a Bot move to Bots as the dashboard that runs the routines starts or takes over.
-  Each one goes to one Bot named **Routines**, made once, which works in the first routine's workspace, else your home directory.
-  A command that ran in another workspace now starts with `cd` into it, and a prompt that did starts by naming it; a prompt's skill moves into the message as `/skill:` and its name.
-  Pinning a finished session is gone, since a Bot keeps its one conversation.
+- Routines that belonged to a Bot move to that Bot's directory as their Workspace as the dashboard that runs the routines starts or takes over, with the Bot's model, and with the Bot's job and memory added to their instructions under **Job** and **Memory**; a routine whose Bot is gone is dropped.
+  The routines file from before is kept as `routines.json.before-board`, and the Bots file as `bots.json.migrated`; if a routine cannot move, both stay as they are and the log says which.
 - When more than one dashboard runs, such as a second one on another port, only one runs the routines; it is the first one started, and the server on another port says so in its log when it starts.
   If that one quits, another takes over within a minute.
 - The server keeps the routines in `routines.json` beside its access token, so every window of the app shows the same ones.

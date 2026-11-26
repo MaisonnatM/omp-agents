@@ -4,7 +4,7 @@
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
  * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
  */
-import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass, IconRobot } from "central-icons";
+import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { PastSession, PromptImage, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -37,15 +37,13 @@ import { sessionOverviewTab, sessionWorkTabs, useOpenTabOnNew, useSessionWork, w
 import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../../labels";
 import type { BoardRoute, BoardView } from "./module";
-import { PageHashContext } from "../../page-hash";
 import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
-import { boardPageHash, boardWorkspaces, hashForBoard, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
+import { boardWorkspaces, hashForBoard, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
-import { botRows, crossProject } from "../../bots-model";
-import { BotsGallery } from "../bots/bots-gallery";
 import { boardActions, SessionActions } from "./actions";
 import { BoardNoteLine, isThreadNote } from "./board-note";
+import { RoutineIds } from "./routine-author";
 import { threadSession, type Work, workOf } from "./work";
 import { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, folder, MarkUnreadButton, markSeen, MessageEditor, MessageRow, said, sameDay, TaskBody, unreadOf, useSeen, WorkingLine, WorkLabel, Avatar } from "./messages";
 
@@ -57,25 +55,19 @@ interface BoardPageProps {
 	onChange: (change: BoardChange) => Promise<void>;
 }
 
-export function BoardPage({ route, core, state, disabled, onChange }: BoardPageProps) {
+export function BoardPage(props: BoardPageProps) {
+	return (
+		<RoutineIds routines={props.core.routines}>
+			<BoardChannel {...props} />
+		</RoutineIds>
+	);
+}
+
+function BoardChannel({ route, core, state, disabled, onChange }: BoardPageProps) {
 	useMinute();
 	const [off] = useModulesOff();
 	const searchField = useRef<BoardSearchFieldHandle>(null);
 	if (state === null) return <BoardLoading />;
-	if (route.bots)
-		return (
-			<section aria-label="Bots" className="flex min-h-0 min-w-[360px] flex-1 flex-col">
-				<Header leading={<IconRobot aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title="Bots" />
-				<HeaderTitleShown.Provider value={false}>
-					<div className="flex min-h-0 flex-1">
-						{/* Each Bot opens in its own Workspace's Bots tab. */}
-						<PageHashContext.Provider value={page => boardPageHash(page.kind === "bots" && page.target !== null ? (core.bots?.find(bot => bot.id === page.target)?.cwd ?? null) : null)(page)}>
-							<BotsGallery rows={core.bots && botRows(core.bots.filter(bot => crossProject(bot, core.workspaces)), core.sessions.hosts, core.botLasts)} routines={core.routines} />
-						</PageHashContext.Provider>
-					</div>
-				</HeaderTitleShown.Provider>
-			</section>
-		);
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
 	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";

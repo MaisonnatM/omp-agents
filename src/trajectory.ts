@@ -6,8 +6,6 @@ import { isNonEmpty, isObject, num, str } from "./json";
 import { FoldedFile, ReadQueue } from "./line-reader";
 import { entryTime, textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { addUsage, type Clipped, NO_USAGE, type TokenUsage, type Turn, type TurnStep } from "./shared/trajectory";
-import { botMessageText } from "./shared/bot-message";
-import { routineMessageText } from "./shared/routine-message";
 import { isPrompt, promptAuthor } from "./shared/transcript";
 import { messageItemsOf } from "./transcript";
 
@@ -138,9 +136,7 @@ export class Trajectory {
 		};
 		this.#turns.push(turn);
 		this.#flush(turn);
-		const { body, skill } =
-			prompt.kind === "routine" ? { body: routineMessageText(prompt.message), skill: null } : prompt.kind === "bot-message" ? { body: botMessageText(prompt.message), skill: null } : { body: prompt.text, skill: prompt.skill };
-		this.#push(turn, { kind: "prompt", body: clip(body), skill });
+		this.#push(turn, { kind: "prompt", body: clip(prompt.text), skill: prompt.skill });
 		return turn;
 	}
 

@@ -1,14 +1,11 @@
 /** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
-import { isObject, num } from "./json";
-import type { RunUsage } from "./routines";
+import { isObject } from "./json";
 import type { HostSnapshot } from "./omp/collab";
 import { type TurnFailure, turnFailureOf } from "./omp/turn-failure";
-import type { RunTurn } from "./routine-health";
-import { entryTime, tailEntries, textOf } from "./session-entries";
-import { readRoutineMessage } from "./shared/routine-message";
-import { type Delivery, type MessageQueue, type PromptImage, type RosterHost, type SessionFacts, STAY_QUIET_TOOL, type UserAnswer, type WithdrawnMessage } from "./shared/sessions";
-import { skillInvocation, splitSuggestions } from "./shared/transcript";
-import { isUserPrompt, skillArgs } from "./transcript";
+import { entryTime, tailEntries } from "./session-entries";
+import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer, WithdrawnMessage } from "./shared/sessions";
+import { splitSuggestions } from "./shared/transcript";
+import { isUserPrompt } from "./transcript";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -27,10 +24,9 @@ export type LiveUpdate =
 
 /**
  * The main agent's turn started, or ran to its end; `reply` is its last text without suggested prompts, `null` when it ended on none,
- * `failure` how a provider's error ended it, `null` when it ended any other way, and `quiet` whether it called
- * {@link STAY_QUIET_TOOL}, so it leaves the session as unread as it was before the turn.
+ * and `failure` how a provider's error ended it, `null` when it ended any other way.
  */
-export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; failure: TurnFailure | null; quiet: boolean };
+export type TurnUpdate = { kind: "turn-started" } | { kind: "turn-ended"; reply: string | null; failure: TurnFailure | null };
 
 /** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
 function lastReply(messages: unknown): string | null {
@@ -45,24 +41,6 @@ function lastReply(messages: unknown): string | null {
 	return null;
 }
 
-/** Whether an assistant message among `messages` called {@link STAY_QUIET_TOOL}. */
-const stayedQuiet = (messages: unknown): boolean =>
-	Array.isArray(messages) &&
-	messages.some(message => isObject(message) && message.role === "assistant" && Array.isArray(message.content) && message.content.some(block => isObject(block) && block.type === "toolCall" && block.name === STAY_QUIET_TOOL));
-
-/** What the assistant messages among `messages` spent, from each one's `usage`. */
-function usageOf(messages: unknown[]): RunUsage {
-	let tokens = 0;
-	let cost = 0;
-	for (const message of messages) {
-		if (!isObject(message) || message.role !== "assistant" || !isObject(message.usage)) continue;
-		const { usage } = message;
-		for (const key of ["input", "output", "cacheRead", "cacheWrite"]) tokens += num(usage[key]) ?? 0;
-		cost += (isObject(usage.cost) ? num(usage.cost.total) : undefined) ?? 0;
-	}
-	return { tokens, cost };
-}
-
 /**
  * What a main-agent live event does to its turn, which both transports report: `agent_start` starts one, and an
  * `agent_end` that gives the turn back ends it, as a terminal one does and one that only waits on a background job's
@@ -73,7 +51,7 @@ export function turnUpdate(event: unknown): TurnUpdate | null {
 	if (event.type === "agent_start") return { kind: "turn-started" };
 	if (event.type !== "agent_end") return null;
 	const gaveTurnBack = event.isTerminal !== false || event.awaitingAsyncWork === true;
-	return gaveTurnBack ? { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages), quiet: stayedQuiet(event.messages) } : null;
+	return gaveTurnBack ? { kind: "turn-ended", reply: lastReply(event.messages), failure: turnFailureOf(event.messages) } : null;
 }
 
 /** A turn that ended: when, in ms since the epoch, and its last reply, `null` when it ended on none. */
@@ -87,8 +65,7 @@ export interface EndedTurn {
  * of its last message, and the reply among the messages after its prompt, chosen as {@link turnUpdate} chooses an
  * `agent_end`'s. For a turn that ended while no server listened. A turn stopped before any message followed its prompt
  * counts too, at its prompt's time with no reply, as the live path marks an `agent_end` that carries none. `null` when
- * the file is gone or unreadable, its end holds no prompt or message with a time, that time is not after `since`, or
- * the turn stayed quiet.
+ * the file is gone or unreadable, its end holds no prompt or message with a time, or that time is not after `since`.
  */
 export function endedTurn(sessionFile: string, since = Number.NEGATIVE_INFINITY): EndedTurn | null {
 	const newestFirst: unknown[] = [];
@@ -108,40 +85,7 @@ export function endedTurn(sessionFile: string, since = Number.NEGATIVE_INFINITY)
 		return null;
 	}
 	const at = lastAt ?? promptedAt;
-	return at === null || at <= since || stayedQuiet(newestFirst) ? null : { at, reply: lastReply(newestFirst.toReversed()) };
-}
-
-/**
- * The turn that answered routine `routineId`'s run at `at` in session file `sessionFile`: the messages between that run's
- * stamped prompt and the next prompt, read as {@link turnUpdate} reads an `agent_end`'s, and the time from the prompt to
- * the last of them. `null` when the file is gone or unreadable, or its tail holds no such prompt with a time.
- */
-export function routineTurn(sessionFile: string, routineId: string, at: number): RunTurn | null {
-	const newestFirst: unknown[] = [];
-	let lastAt: number | null = null;
-	try {
-		for (const entry of tailEntries(sessionFile)) {
-			const message = entry.type === "message" && isObject(entry.message) ? entry.message : entry.type === "custom_message" ? entry : null;
-			if (message === null) continue;
-			if (!isUserPrompt(message)) {
-				newestFirst.push(message);
-				lastAt ??= entryTime(entry);
-				continue;
-			}
-			const skill = entry.type === "custom_message" && isObject(entry.details) && typeof entry.details.name === "string" ? entry.details.name : null;
-			const sent = readRoutineMessage(skill === null ? textOf(message.content) : skillInvocation(skill, skillArgs(message)));
-			const promptedAt = entryTime(entry);
-			if (sent?.routine.id === routineId && sent.at === at && promptedAt !== null) {
-				const messages = newestFirst.toReversed();
-				return { replied: lastReply(messages) !== null, quiet: stayedQuiet(messages), failed: turnFailureOf(messages) !== null, ms: (lastAt ?? promptedAt) - promptedAt, usage: usageOf(messages) };
-			}
-			newestFirst.length = 0;
-			lastAt = null;
-		}
-	} catch {
-		return null;
-	}
-	return null;
+	return at === null || at <= since ? null : { at, reply: lastReply(newestFirst.toReversed()) };
 }
 
 /** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */

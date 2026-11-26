@@ -5,6 +5,12 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- Bots are gone. Each routine now belongs to one Workspace, and every run posts a Board task there, so a fresh session does the work on its own branch and you can merge it from the Board.
+- A routine whose last Board task is still open replies on it instead of posting a new one.
+- A run that finds nothing to report closes its Board task quietly, without a notification.
+- Each Workspace on the Board has a Routines tab, in place of the Bots tab, where you make and edit its routines and pick their model.
+- Your Bots' routines moved to their Workspaces, each carrying its Bot's job and memory in its prompt. The Bots gallery, Bot designer, PR shepherd, and Bot messages are removed.
+- Any session can now create and edit the routines of its own Workspace.
 - A Board task whose session could not start now says why, with "Reply to try again", instead of "Starting a session…" forever; a session that keeps crashing stops after three tries the same way.
 - **Close task** on a Board task stops it: its session ends and no new one starts until you reply.
 - The Board no longer loses a reply or an edit you send while its session is still starting, and a dashboard restart no longer leaves a finished Board session running, starts a second session on the same task, or forgets a **Merge on main** you sent.

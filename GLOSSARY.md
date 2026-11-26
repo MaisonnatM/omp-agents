@@ -52,8 +52,8 @@ _Avoid_: Competition, race, tournament
 
 **Agent definition**:
 The named prompt, declared tools, and model choices omp discovers for a kind of subagent, which Settings › Agents previews before a new session starts.
-It is not a running subagent or a Bot.
-_Avoid_: Worker, Bot type
+It is not a running subagent.
+_Avoid_: Worker
 
 **Isolation sandbox**:
 The directory under `~/.omp/wt` where omp runs a subagent's isolated task, with a marker naming the omp process that owns it.
@@ -73,12 +73,12 @@ _Avoid_: Epic, initiative, workspace
 
 **Project memory**:
 The decisions, facts, and lessons the sessions of one git repository share through the starter kit's `project_memory` tool, kept on `refs/omp/memory`, with the brief and catch-ups that tell each session what other sessions landed and remembered.
-It is separate from omp's own memory and from a Bot's memory.
+It is separate from omp's own memory.
 _Avoid_: Shared memory, team memory, knowledge base
 
 **omp memory**:
 What omp itself recalls across sessions of a workspace, through the store its `memory.backend` setting picks, which Settings › omp memory shows and edits.
-It is separate from project memory and from a Bot's memory.
+It is separate from project memory.
 _Avoid_: Memory (bare), Agent memory, Long-term memory
 
 ## Collab
@@ -127,12 +127,8 @@ A repository's main checkout, or a folder outside git, whose project code you tr
 _Avoid_: Allowed project, approved folder, trusted workspace
 
 **Pin**:
-A session id the server keeps at the top of the roster in every window, or a Bot it keeps under **Pinned** at the top of the Bots tab and the gallery.
+A session id the server keeps at the top of the roster in every window.
 _Avoid_: Favorite, bookmark
-
-**Section**:
-A named group of Bots in the Bots tab and the gallery, which exists while a Bot names it.
-_Avoid_: Folder, category
 
 **Notice**:
 An entry on the Notifications page: what a check found or how an update went.
@@ -162,40 +158,15 @@ _Avoid_: Device (see **Paired phone**), device preset, viewport, breakpoint
 ## Unattended work
 
 **Routine**:
-A task a Bot does on its schedules, its triggers, or both: a message into its conversation, or a shell command in its workspace.
-Every routine belongs to one Bot.
+A task a Workspace does on its schedules, its triggers, or both: each run posts a Board task there, or replies on the routine's Board task that is not done yet, and a session takes it like any Board task.
+Its task is a message, or a shell command whose report it posts.
+Every routine belongs to one Workspace.
 _Avoid_: Cron job, automation
 
 **Trigger**:
 What also starts a routine's run when something new happens: a Slack message waiting on you or a pull request changing status.
 The run gets what the trigger saw.
 _Avoid_: Hook, webhook, event listener
-
-**Bot**:
-A named teammate with one conversation you come back to, a job, and a memory that only its `remember` tool writes.
-_Avoid_: Agent, assistant, persona
-
-**Cross-project Bot**:
-A Bot whose directory holds other Workspaces, such as `~/code`, so it works across projects; the Board's **Bots** page lists only these.
-A Bot whose directory is one project's shows in that Workspace's **Bots** tab instead.
-_Avoid_: Global Bot, shared Bot
-
-**Bot type**:
-What a Bot is for, picked when it is made and kept after: **Bot designer**, **Routines**, or **PR shepherd**.
-The code calls it the Bot's `kind`.
-_Avoid_: Bot class, role
-
-**Bot designer**:
-A Bot type that asks a few questions about the Bot you want, then creates it; the New Bot form starts on one named Dr Eggbot.
-_Avoid_: Bot builder, Bot factory
-
-**Bot message**:
-A message one Bot sends another, which wakes it to handle the message and lets it answer back later with one of its own.
-_Avoid_: Handoff, DM
-
-**PR shepherd**:
-A Bot type that drives your approved pull requests to merged: it starts quick-action sessions to fix them, then queues their merge.
-_Avoid_: Babysitter, merge bot
 
 **Scheduled send**:
 One message to a session, or one new session's start, that waits for a time.
@@ -252,7 +223,7 @@ _Avoid_: Rest week, recovery week, off week
 
 **Routine (Sport)**:
 A named list of exercises the plan repeats outside the workouts, such as « Mobilité hanche » or the evening stretches, which a habit can name; an exercise whose `opensAs` lists a routine's exercises opens on the Sport page as their demos.
-It is not a Bot's routine (see **Routine**).
+It is not a Workspace's routine (see **Routine**).
 _Avoid_: Program, circuit
 
 **Routine check**:

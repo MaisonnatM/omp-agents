@@ -23,4 +23,3 @@ Each save keeps a version, so you can step back through what the agent changed.
 - In a narrow sidebar, the name takes a row of its own above **Preview**, **Source**, and the actions; below 30rem **Preview** and **Source** keep only their icons and the bar drops the kind, size, and save time.
 - A version whose saved copy was deleted, such as one a fork inherited from a session since deleted, reads **This version's saved copy is gone. Pick another version.**, and its **Copy**, **Download**, and **Open in browser** are off.
 - A past session shows its artifacts too, and a fork shows those of the session it came from.
-- A Bot's page shows no artifact lines and no tab.

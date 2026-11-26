@@ -3,9 +3,8 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fromPartial } from "@total-typescript/shoehorn";
-import type { BotId } from "../shared/bots";
 import type { PullRequestList, PullRequestSummary } from "../shared/github";
-import { newSessionRequest, type RosterHost, type StartRequest } from "../shared/sessions";
+import type { RosterHost } from "../shared/sessions";
 import { CHANGE_HOLD_MS, PullRequestWatches, PullRequestWatchesFile, UNLISTED_GRACE_MS } from "./pull-request-watches";
 
 const NOW = 1_700_000_000_000;
@@ -26,14 +25,13 @@ function setup({ active = true } = {}) {
 		new PullRequestWatches({
 			file: from,
 			hosts: () => hosts,
-			isBot: request => request.kind === "new" && request.bot !== null,
 			wake: async (sessionId, text) => void woken.push([sessionId, text]),
 			active: () => active,
 			now: () => now,
 		});
 	const watches = make(file);
 	const call = (args: Record<string, unknown>, caller = "i1") =>
-		watches.join(newSessionRequest("/tmp", "Hi"), caller).rpc.tools[0]!.execute(args, { toolCallId: "c1", signal: new AbortController().signal });
+		watches.join(caller).rpc.tools[0]!.execute(args, { toolCallId: "c1", signal: new AbortController().signal });
 	return { watches, file, path, woken, call, make, later: (ms: number) => void (now += ms) };
 }
 
@@ -206,13 +204,6 @@ describe("pull request watches", () => {
 });
 
 describe("the watch_pull_request tool", () => {
-	test("every dashboard start gets it but a Bot's conversation", () => {
-		const { watches } = setup();
-		const toolsOf = (request: StartRequest) => watches.join(request, "i1").rpc.tools.map(tool => tool.name);
-		expect(toolsOf(newSessionRequest("/tmp", "Hi"))).toEqual(["watch_pull_request"]);
-		expect(toolsOf(newSessionRequest("/tmp", "Hi", { bot: "scout" as BotId }))).toEqual([]);
-	});
-
 	test("watches once per session and pull request, reports the last state it read, and stops on request", async () => {
 		const { watches, file, call } = setup();
 		watches.learn(listOf(summary({ checks: "failing" })));

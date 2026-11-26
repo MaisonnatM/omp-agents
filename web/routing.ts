@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage, IconWidgets } from "central-icons";
+import { IconAgentNetwork, IconAiBotHead, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage, IconWidgets } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
@@ -7,6 +7,7 @@ import type { StartOp } from "./starts";
 import { decodeSegment } from "./hash-segment";
 import { PAGE_ICON } from "./page-icons";
 import { isModulePage, isWebModuleId, MODULE_LIST, type ModulePage, moduleOf, modulePage, type PageAddresses, type WebModuleId } from "./modules";
+import type { RoutineRoute } from "./components/board/module";
 
 /** A sidebar tab's row: its label, its icon, and its `place` among the tabs, lowest first. */
 export interface SidebarTabRow {
@@ -19,7 +20,6 @@ export interface SidebarTabRow {
 /** The core's tabs, which the modules' tabs join by `place`. */
 const CORE_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: 10 },
-	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: 30 },
 ] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number }[];
 
 /**
@@ -28,7 +28,7 @@ const CORE_TABS = [
  */
 export const SIDEBAR_TABS: readonly SidebarTabRow[] = [...CORE_TABS, ...MODULE_LIST.map(({ id, tab }) => ({ value: id, ...tab }))].sort((a, b) => a.place - b.place);
 
-/** A sidebar tab, a row of the sidebar's page list; the Bots and module tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A sidebar tab, a row of the sidebar's page list; the module tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof CORE_TABS)[number]["value"] | WebModuleId;
 
 const PAST_PREFIX = "past/";
@@ -76,7 +76,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "mcp-servers", label: "MCP servers", icon: IconBlocks, group: "connections", keywords: ["mcp", "tools"] },
 	{ value: "source-control", label: "Source control", icon: IconMerged, group: "connections", keywords: ["github", "gh", "pull", "merge"] },
 	{ value: "models", label: "Models", icon: IconDirection1, group: "workspace", keywords: ["roles", "fallback", "retry"], meta: AS_LOADED },
-	{ value: "agents", label: "Agents", icon: PAGE_ICON.bots, group: "workspace", keywords: ["subagents", "delegation", "concurrency", "isolation"], meta: { workspace: "Preview of a new session in this workspace", none: "Preview of a new session with user defaults only" } },
+	{ value: "agents", label: "Agents", icon: IconAiBotHead, group: "workspace", keywords: ["subagents", "delegation", "concurrency", "isolation"], meta: { workspace: "Preview of a new session in this workspace", none: "Preview of a new session with user defaults only" } },
 	{ value: "omp", label: "omp settings", icon: IconSettingsSliderHor, group: "workspace", keywords: ["config", "thinking", "compaction", "advisor", "bash", "lsp", "tools"], meta: AS_LOADED },
 	{ value: "omp-memory", label: "omp memory", icon: IconBrain, group: "workspace", keywords: ["memory", "remember", "recall", "auto-learn", "mnemopi", "hindsight", "sharpshooter"], meta: { ...AS_LOADED, none: "Your user settings only; memory is kept per workspace" } },
 	{ value: "files", label: "Files", icon: IconFileText, group: "workspace", keywords: ["AGENTS.md", "config", "skills", "rules"], meta: AS_LOADED },
@@ -111,36 +111,6 @@ export interface SettingsRoute {
 	section: SettingsSection;
 }
 
-/**
- * A Bot's page, its conversation beside the right sidebar's details: its look, name, job, memory, and routines; `null` for the gallery of
- * every Bot, or the New Bot form while `adding`. `routine` names what shows in place of the conversation, `null` for none.
- */
-export type BotsRoute = { target: null; adding: boolean } | { target: string; routine: BotRoutineRoute | null };
-
-/** The card of the Bot's routines, that card with one routine open, a new routine's editor, or a routine's editor. */
-export type BotRoutineRoute = { kind: "list" } | { kind: "new" } | { kind: "open"; id: string } | { kind: "edit"; id: string };
-
-/** What `#bots/<id>/routines/<routine>/<more>` names, the card alone without `<routine>`, `null` for an address that names nothing. */
-function botRoutineRoute(routine: string | null | undefined, more: (string | null)[]): BotRoutineRoute | null {
-	if (routine === undefined) return { kind: "list" };
-	if (!routine) return null;
-	if (more.length === 0) return routine === "new" ? { kind: "new" } : { kind: "open", id: routine };
-	return more.length === 1 && more[0] === "edit" && routine !== "new" ? { kind: "edit", id: routine } : null;
-}
-
-function restOfBotRoutine(routine: BotRoutineRoute): string {
-	switch (routine.kind) {
-		case "list":
-			return "routines";
-		case "new":
-			return "routines/new";
-		case "open":
-			return `routines/${encodeURIComponent(routine.id)}`;
-		case "edit":
-			return `routines/${encodeURIComponent(routine.id)}/edit`;
-	}
-}
-
 /** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. */
 export interface NewSessionRoute {
 	cwd: string | null;
@@ -158,7 +128,6 @@ export type CorePage =
 	| { kind: "get-started" }
 	| ({ kind: "settings" } & SettingsRoute)
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
-	| ({ kind: "bots" } & BotsRoute)
 	| { kind: "notifications" }
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "scheduled" } & ScheduledRoute);
@@ -187,10 +156,6 @@ const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : 
  *   and `#pull-requests/<owner>/<repo>/<number>` shows that pull request's details in the main content.
  *   `#pull-requests/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
  *   at that encoded path. Any other `#pull-requests/…` shows the tab alone.
- * - `#bots` opens the gallery of every Bot, `#bots/new` the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines` the card of that
- *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
- *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
- *   are UUIDs, so none reads as `new`.
  * - `#notifications` opens the Notifications page, every notice by source, unread first.
  * - A module's page, `#<id>`, reads the rest of its hash as its module's address does.
  */
@@ -204,12 +169,6 @@ const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchPa
 		if (!match) return { kind: "pull-requests", target: null };
 		const files = match[4] ? { path: match[5] ? decodeSegment(match[5]) : null } : null;
 		return { kind: "pull-requests", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
-	},
-	bots: rest => {
-		if (rest === "new") return { kind: "bots", target: null, adding: true };
-		const [target, routines, routine, ...more] = (rest ?? "").split("/").map(decodeSegment);
-		if (!target) return { kind: "bots", target: null, adding: false };
-		return { kind: "bots", target, routine: routines === "routines" ? botRoutineRoute(routine, more) : null };
 	},
 	notifications: () => ({ kind: "notifications" }),
 };
@@ -229,9 +188,6 @@ function restOfPage(page: CorePage): string | null {
 			if (page.files === null) return pr;
 			return page.files.path === null ? `${pr}/files` : `${pr}/files/${encodeURIComponent(page.files.path)}`;
 		}
-		case "bots":
-			if (page.target === null) return page.adding ? "new" : null;
-			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/${restOfBotRoutine(page.routine)}`;
 		case "scheduled":
 			return page.id === null ? null : encodeURIComponent(page.id);
 		case "notifications":
@@ -254,7 +210,6 @@ function queryOfPage(page: CorePage): string | null {
 		}
 		case "settings":
 		case "pull-requests":
-		case "bots":
 		case "notifications":
 		case "get-started":
 		case "scheduled":
@@ -286,9 +241,9 @@ export type PageHash = (page: Page) => string;
 
 export const hashForPullRequests = (target: PullRequest | null, to: PageHash = hashForPage): string => to(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null, to: PageHash = hashForPage): string => to({ kind: "pull-requests", target: pr, files: { path } });
-export const hashForBots = (target: string | null, to: PageHash = hashForPage): string => to(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
-export const hashForNewBot = (to: PageHash = hashForPage): string => to({ kind: "bots", target: null, adding: true });
-export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute, to: PageHash = hashForPage): string => to({ kind: "bots", target: botId, routine });
+/** Workspace `workspace`'s Routines tab, showing what `routine` names. */
+export const hashForRoutines = (workspace: string, routine: RoutineRoute = { kind: "list" }): string =>
+	hashForPage({ kind: "board", workspace, view: { tab: "routines", routine }, search: null, reply: null, session: null });
 export const hashForNotifications = (): string => hashForPage({ kind: "notifications" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = ({ cwd = null, projectId = null }: Partial<NewSessionRoute> = {}): string => hashForPage({ kind: "new", cwd, projectId });
@@ -354,7 +309,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `session`, or `new`. `null` for a pane whose ids do not decode. */
 function viewFromPane(pane: string): View | null {
 	if (pane.startsWith(PAST_PREFIX)) {
 		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));

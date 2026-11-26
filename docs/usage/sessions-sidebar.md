@@ -3,19 +3,17 @@
 - The sidebar's foot shows how much quota is left on each plan account, one full-width row with a bar per account.
 - The sidebar runs the window's height on the window's background, and the page and the session details sidebar sit beside it as rounded panels.
   Its top row, 48 px tall at the default font size as the header's tabs beside it are, holds the button that hides the sidebar; under it a row holds the omp mark and the command menu button.
-- Under it the page list shows **New session**, then **Notifications** with its unread count, then **Pull requests**, **Bots**, **Sessions**, and **Sport** in the order Settings › Preferences gives them, and **Settings**.
-  A row opens its page, and the open page's row stays highlighted while that page's own list, such as the Bots or the Settings sections, shows in a column at the page's left.
+- Under it the page list shows **New session**, then **Notifications** with its unread count, then **Pull requests**, **Sessions**, and **Sport** in the order Settings › Preferences gives them, and **Settings**.
+  A row opens its page, and the open page's row stays highlighted while that page's own list, such as the Sport days or the Settings sections, shows in a column at the page's left.
   Drag the column's right edge to widen or narrow it, or double-click the edge to reset it; every page's list keeps that width in this browser.
   On a phone, where the sidebar floats over the page, that list shows under the page's row instead, and a page whose row you hid in Preferences shows its list after the last row.
-  **Bots** lists your Bots and opens their conversations, which stay out of the roster.
-  See [Bots](bots.md).
   **Sessions** counts the sessions of the picked workspace that need you: each that asks you something, or finished a turn you have not looked at since.
   A finished turn you have read leaves the count, though its session stays idle.
   So does a finished turn of a session waiting on its subagents, until they stop.
 - The header's tabs run across the top right of the sidebar: Back and Forward, your tabs, and a + that opens a new tab.
   A tab works as in Capy: opening a page or a session, from the sidebar or anywhere else, shows it in the tab on screen, and a session another tab already shows switches to that tab; only the + or Cmd+T adds a tab, on New session.
   Back and Forward, Cmd+[ and Cmd+], and the mouse's back and forward buttons move through what the tab on screen showed, as Capy's do: each tab keeps its own history, so switching tabs leaves it as it was, and it stays across reloads.
-  A page that picks what it opens, such as Bots opening its latest Bot, or a click into another pane, changes the entry on screen rather than adding one.
+  A page that picks what it opens, such as a Board opening its last Workspace, or a click into another pane, changes the entry on screen rather than adding one.
   Cmd+1 through Cmd+9 go to the first through ninth tab, and Ctrl+Tab and Ctrl+Shift+Tab, or Cmd+Alt+→ and Cmd+Alt+←, to the next and previous one.
   The × on a tab, a middle-click, or Cmd+W closes it, closing the one on screen shows its neighbor, and closing the last one leaves a new tab on New session; Cmd+Alt+W closes every tab but the pinned ones and the one on screen.
   Cmd+Shift+T reopens the last closed tab where it was, on the page it showed and with its Back and Forward, and pressed again brings back the one closed before; when another tab shows that tab's session by then, it switches to that tab instead.
@@ -114,7 +112,7 @@
   The button at the right end of the sidebar's top row hides it: the sidebar slides shut and the button glides to the start of the header's tabs, where a click shows it again.
   Both sidebars slide open and shut in about a quarter second, or at once when the system asks for reduced motion.
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
-  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the details sidebar, which shows the session's details on the panes and a Bot's on its page.
+  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the details sidebar, which shows the session's details on the panes.
   Each sidebar's width, and whether it is hidden, is saved in the app.
 - The left sidebar's session rows leave out the full working directory, the model, the /ship step, and the pull requests; hover the workspace in the pane header to see the directory, the composer shows the model, and the session details sidebar shows the pull requests.
 - The sidebar's foot, under the roster and a dividing line, shows how much quota is left on each plan account that `omp usage` reports, one full-width row per account: the provider's logo, from [svgl](https://svgl.app), then the account's email when the provider has several, else the window, such as `7d`, then the percent left of its tightest open window, over a bar that empties as the plan is used.
@@ -142,6 +140,6 @@
   Only the server that runs unattended work, the first one started, stops processes.
 - The idle session stop stops a session's omp once the session has been idle, with no subagent still running, for the time **Stop idle sessions** in [Settings](settings.md) names, 12 hours by default.
   The session then shows under Past with its worktree kept, and **Resume** picks it back up; it is not **End session**.
-  It stops only sessions the dashboard started, and leaves terminal sessions, private sessions, and Bots' conversations running.
+  It stops only sessions the dashboard started, and leaves terminal sessions and private sessions running.
 - When a session ends or its omp exits, the server stops the services it owned and the jobs it left running.
   A session started from the dashboard also has the rest of its processes ended when it ends, as before.

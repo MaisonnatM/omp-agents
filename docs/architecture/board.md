@@ -19,10 +19,13 @@ It imports nothing, so the starter kit can ship it.
 - `edit` replaces the text of the user's own Board task, whose title becomes its first line, or of their reply at index `reply` in `replies`, and sets its `editedAt`; only the page sends it, as the user.
 - `close` marks a Board task that is not done done as the user, with a `closed` note; only the page sends it, and the runner ends the session that held it.
 - `claim` lets an interactive session hold a Board task until it is done; a session the runner started holds its Board task from its `start` and never claims it.
-- `done` marks a Board task done, from the session that holds it.
+- `done` marks a Board task done, from the session that holds it; a `quiet` done, a routine's run that found nothing to report, keeps `quiet` on its note only when a routine posted the Board task.
+  That note is the one record of a quiet turn: `doneQuietly` reads it, and `LiveSessions.quietTurn` leaves a session that marked a Board task done quietly since its turn started as unread as it was before, with no notice; a refused done silences nothing.
 - `start`, `woke`, `expire`, and `land` come from the server alone: a session started on a Board task, with its `branch`, or failed to, with the `error` its `start-failed` note keeps; a reply woke a stopped session; the session that held a Board task exited without marking it done; the server merged its branch on main, with an `outcome` of `landed`, `failed`, or `refused`.
   A `start` is refused unless the Board task is still ready with no start, so one that comes up after the Board task was claimed, closed, or done records nothing.
   `parseChange` refuses them from the page and the tool, and drops a `renew` line an older Board wrote while a claim lasted 15 minutes.
+  It also refuses there the routine author, `{ kind: "routine", routineId, name }`, which only the server's routine runner posts and replies as; see [Routines](routines.md#the-runner).
+  A post's or reply's text holds at most `MAX_TEXT` characters, and a routine's `MAX_ROUTINE_TEXT`, 128,000, so a whole run's prompt, trigger events, and command report fit.
 - A change from the `board` tool carries `request`, the name of the inbox file it came in; the Board keeps the last `REQUESTS_KEPT` of them in `requests`, so a file a crash left behind after it was applied changes nothing the second time.
 
 `statusOf` says whether a Board task is done, claimed, failed, waiting on another, or ready: `failed` when its last `start` failed, carrying that start's error, which the page shows with "Reply to try again".
@@ -31,7 +34,8 @@ After `MAX_EXITS`, 3, sessions in a row exit without marking it done, the fold r
 `unstartedReady` lists the ready Board tasks no session was started on since they last became ready, and `wakeTarget` who a reply wakes: the claimer, else the session started on it, else a session that posted it, never the replier, and nobody on a done Board task.
 A reply from the page carries the `launch` picked in its composer, which the reply keeps.
 The user's reply on a done Board task reopens it in the fold: `doneAt` and `start` clear and the task takes the reply's `launch`, so `unstartedReady` lists it again; `startedOn` names the sessions started on it in earlier rounds.
-So does the user's reply on a Board task whose session failed to start, and on one the user closed.
+So does the user's or a routine's reply on a Board task whose session failed to start, and the user's on one the user closed; a routine's reply never reopens a done one, since a routine's next run posts a new Board task instead.
+A routine's Board task's start prompt tells its session to mark it done quietly, with one line, when it found nothing to report.
 `landsOnReply` picks out the exception: the user's bare `MERGE_REPLY`, "Merge on main", on a done Board task that has a branch, which keeps it done.
 A `failed` land reopens the Board task as a reply would; a `landed` one, which counts a branch with nothing left to merge, and a `refused` one, where the repository has no `.omp/land.json` or the user has not trusted the project, keep it done.
 Each stays in its replies as a `landed`, `land-failed`, or `land-refused` note, which the Board thread shows.
@@ -75,9 +79,9 @@ A post goes to the Workspace of the session's directory, the main checkout of a 
 `workOf` in `web/components/board/work.ts` says what a Board task in work shows: a session starting, working, or waiting on the user, or the error of a start that failed. `BoardNoteLine` in `web/components/board/board-note.tsx` draws the notes a thread shows, the ones `isThreadNote` picks: merges, a failed start, and a close.
 Its address is `#board?workspace=<dir>`, and `#board/<n>?workspace=<dir>` opens Board task `n`'s Board thread; `session=<id>` picks which session's tab the thread shows, which `threadSession` honors when the Board task names that session and else replaces with the one a reply wakes.
 A session the page names, in the sidebar, as an author, or on a Board task in work, opens on the Board too: `hashForBoardSession` in `web/components/board/sidebar.tsx` picks the Board thread whose tabs show it, else the latest that names it, adds `session=<id>`, and `revealSessionTab` shows that session's tab.
-The sidebar's **Bots** group, in `web/components/board/sidebar.tsx`, lists every Bot under the Bots tab's groups (Pinned, each section, Other Bots); a group's row opens `#board?space=bots`: the Bots gallery of every Bot, whatever its Workspace, where a Workspace's **Bots** tab shows only the Bots whose directory is that Workspace.
-A Workspace's **Bots**, **Projects**, and **Pull requests** tabs hold the page they show in `BoardView`'s `page`, written as that page's own address after `#board/`, which `web/routing.ts` reads and writes for the module through `PageAddresses`, since a module definition imports no hub.
-`WorkspaceTab` in `web/components/board/tabs.tsx` provides `boardPageHash(workspace)` through `PageHashContext` (`web/page-hash.ts`), and every Bot, project, and pull request link builder in `web/routing.ts` takes it, so the page's links stay in the tab; `openBot` in `web/bots-model.ts` reads a Board Bots tab's Bot too, which keeps its details sidebar and conversation live.
+A Workspace's **Routines** tab, `RoutinesTab` in `web/components/routines/routines-tab.tsx`, lists the routines whose `workspace` is that Workspace, and a run row links to the Board thread its run posted or replied on.
+A Workspace's **Routines**, **Projects**, and **Pull requests** tabs hold the page they show in `BoardView`'s `page`, written as that page's own address after `#board/`, which `web/routing.ts` reads and writes for the module through `PageAddresses`, since a module definition imports no hub.
+`WorkspaceTab` in `web/components/board/tabs.tsx` provides `boardPageHash(workspace)` through `PageHashContext` (`web/page-hash.ts`), and every routine, project, and pull request link builder in `web/routing.ts` takes it, so the page's links stay in the tab.
 `q=<words>` shows the search results, with `in=thread` or `in=all` widening or narrowing them from the open Workspace, and `reply=<index>` highlights that reply of the open Board thread.
 `searchBoard` in `web/components/board/search.ts` runs the search on the page's copy of the Board, so the server answers no search request.
 The page sends `post`, `reply`, `edit`, and `close` as the user; the server parses them with `BOARD_MODULE.store.parse`, which accepts nothing else from the page.

@@ -13,7 +13,7 @@ import { PROJECTS_PAGE } from "./components/projects/module";
 import type { Page } from "./routing";
 import type { Binding } from "./shortcuts";
 
-/** Another page's address, which a module's address may hold, such as a Bot's page in a Board tab; `web/routing.ts` passes it, since a definition imports no hub. */
+/** Another page's address, which a module's address may hold, such as a project's page in a Board tab; `web/routing.ts` passes it, since a definition imports no hub. */
 export interface PageAddresses {
 	/** The page `hash` names, `null` for an address that names no page. */
 	page(hash: string): Page | null;

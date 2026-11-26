@@ -1,9 +1,8 @@
 /**
- * The routines' daily heartbeat: which recent runs exited early. A run errored, its Bot's turn ended with no reply, it
- * ended far shorter than the routine's usual run, or it missed its schedule.
+ * The routines' daily heartbeat: which recent runs exited early. A run errored, the session on its Board task ended
+ * without marking it done, it ended far shorter than the routine's usual run, or it missed its schedule.
  */
 import { exitedWith, nextDueAt, type Routine, type RoutineRun, type RunUsage, runsHere } from "./routines";
-import type { BotId } from "./shared/bots";
 import { DAY_MS } from "./shared/days";
 
 /** How far back each heartbeat looks: one day, as it runs once a day. */
@@ -23,7 +22,8 @@ export type EarlyExit = (typeof EARLY_EXITS)[number];
 
 /** A run that exited early, named as the notice lists it; `at` is the run's key, or the slot a routine has not run yet. */
 export interface EarlyRun {
-	botId: BotId;
+	/** The routine's Workspace, whose Routines tab lists it. */
+	workspace: string;
 	routineId: string;
 	name: string;
 	at: number;
@@ -31,8 +31,8 @@ export interface EarlyRun {
 }
 
 /**
- * The Bot's turn that answered a prompt run, as its session file holds it: whether it ended on a reply, called
- * `stay_quiet`, or ended on a provider's error, and how long it took.
+ * The turn the session on a run's Board task took on it, as the Board and its session file hold it: whether the session
+ * marked the Board task done, quietly or not, or ended on a provider's error, and how long it took.
  */
 export interface RunTurn {
 	replied: boolean;
@@ -43,15 +43,15 @@ export interface RunTurn {
 	usage: RunUsage;
 }
 
-/** The turn of routine `routineId`'s run at `at` in conversation `sessionId`, or `null` when it is not found. */
-export type TurnOf = (sessionId: string, routineId: string, at: number) => RunTurn | null;
+/** The turn the session on Board task `task` took on the run at `at`, or `null` while it has not ended or is not found. */
+export type TurnOf = (task: number, at: number) => RunTurn | null;
 
 /** How long the Mac slept between `from` and `to`. */
 export type SleptWithin = (from: number, to: number) => number;
 
 const neverSlept: SleptWithin = () => 0;
 
-/** How long `run` took: its command's run, or its Bot's turn; `null` while it has not ended or is not found. */
+/** How long `run` took: its command's run, or its session's turn; `null` while it has not ended or is not found. */
 function durationOf(run: RoutineRun, turn: RunTurn | null): number | null {
 	const { outcome } = run;
 	if (outcome.kind === "command") return outcome.run.phase === "running" ? null : outcome.run.endedAt - outcome.run.startedAt;
@@ -59,8 +59,8 @@ function durationOf(run: RoutineRun, turn: RunTurn | null): number | null {
 }
 
 /**
- * Whether `run` failed in itself: an error, a command that did not exit 0, or a Bot turn a provider's error ended. A
- * command whose routine posts only its failures hands its output to the Bot by exiting non-zero, so that exit is no error.
+ * Whether `run` failed in itself: an error, a command that did not exit 0, or a session's turn a provider's error ended.
+ * A command whose routine posts only its failures posts its output by exiting non-zero, so that exit is no error.
  */
 function errored(routine: Routine, run: RoutineRun, turn: RunTurn | null): boolean {
 	const { outcome } = run;
@@ -96,7 +96,7 @@ function exitOf(routine: Routine, run: RoutineRun, turn: RunTurn | null, older: 
 /**
  * Every run of `routines` that exited early among those claimed from {@link HEALTH_WINDOW_MS} before the last
  * {@link SETTLE_MS} up to it, oldest first, so two heartbeats a day apart judge each run once; and each routine that
- * runs here and has a slot overdue by {@link LATE_AFTER_MS} or more of awake time, at that slot. `turnOf` finds a prompt
+ * runs here and has a slot overdue by {@link LATE_AFTER_MS} or more of awake time, at that slot. `turnOf` finds a posted
  * run's turn, and `slept` how long the Mac slept, which no run is late for.
  */
 export function earlyRuns(routines: readonly Routine[], now: number, turnOf: TurnOf, slept: SleptWithin = neverSlept): EarlyRun[] {
@@ -104,19 +104,19 @@ export function earlyRuns(routines: readonly Routine[], now: number, turnOf: Tur
 	const from = to - HEALTH_WINDOW_MS;
 	const early: EarlyRun[] = [];
 	for (const routine of routines) {
-		const { botId, id: routineId, name } = routine;
-		const turns = new Map(routine.runs.map(run => [run.at, run.outcome.kind === "sent" ? turnOf(run.outcome.sessionId, routineId, run.at) : null]));
+		const { workspace, id: routineId, name } = routine;
+		const turns = new Map(routine.runs.map(run => [run.at, run.outcome.kind === "posted" ? turnOf(run.outcome.task, run.at) : null]));
 		const durations = new Map(routine.runs.map(run => [run.at, durationOf(run, turns.get(run.at) ?? null)]));
 		routine.runs.forEach((run, index) => {
 			if (run.at < from || run.at >= to) return;
 			const older = routine.runs.slice(index + 1).find(({ triggeredBy }) => triggeredBy.length === 0);
 			const usual = routine.runs.flatMap(other => (other === run ? [] : (durations.get(other.at) ?? [])));
 			const exit = exitOf(routine, run, turns.get(run.at) ?? null, older, usual, now, slept);
-			if (exit !== null) early.push({ botId, routineId, name, at: run.at, exit });
+			if (exit !== null) early.push({ workspace, routineId, name, at: run.at, exit });
 		});
 		if (!runsHere(routine) || routine.schedules.length === 0) continue;
 		const due = nextDueAt(routine.schedules, routine.scheduledAt ?? routine.createdAt);
-		if (now - due - slept(due, now) >= LATE_AFTER_MS) early.push({ botId, routineId, name, at: due, exit: "missed" });
+		if (now - due - slept(due, now) >= LATE_AFTER_MS) early.push({ workspace, routineId, name, at: due, exit: "missed" });
 	}
 	return early.toSorted((a, b) => a.at - b.at);
 }

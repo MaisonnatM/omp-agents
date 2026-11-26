@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { loadGrammars } from "../code-highlight";
 import { DashboardActionsContext, type DashboardActions } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
-import { AGENT_PRESET, BOT_MESSAGE_PRESET, GITHUB_PRESET, loadRawHtml, markdownBlocks, type MarkdownPreset, MessageMarkdown, PROMPT_PRESET, SESSION_AGENT_PRESET } from "./message-markdown";
+import { AGENT_PRESET, BOARD_MESSAGE_PRESET, GITHUB_PRESET, loadRawHtml, markdownBlocks, type MarkdownPreset, MessageMarkdown, PROMPT_PRESET, SESSION_AGENT_PRESET } from "./message-markdown";
 
 // A static render reads the grammars and the raw HTML plugins as they stand, so they load first, as in a page that showed code and GitHub text before.
 await Promise.all([loadGrammars(), loadRawHtml()]);
@@ -210,6 +210,6 @@ test("a message renders block by block exactly as it renders whole", () => {
 		);
 	for (const text of texts) {
 		expect(markdownBlocks(text).length).toBeGreaterThan(1);
-		for (const preset of [AGENT_PRESET, SESSION_AGENT_PRESET, BOT_MESSAGE_PRESET]) expect(ids(render(text, preset))).toBe(ids(render(text, whole(preset))));
+		for (const preset of [AGENT_PRESET, SESSION_AGENT_PRESET, BOARD_MESSAGE_PRESET]) expect(ids(render(text, preset))).toBe(ids(render(text, whole(preset))));
 	}
 });
