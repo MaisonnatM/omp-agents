@@ -175,6 +175,11 @@ _Avoid_: Hook, webhook, event listener
 A named teammate with one conversation you come back to, a job, and a memory that only its `remember` tool writes.
 _Avoid_: Agent, assistant, persona
 
+**Cross-project Bot**:
+A Bot whose directory holds other Workspaces, such as `~/code`, so it works across projects; the Board's **Bots** page lists only these.
+A Bot whose directory is one project's shows in that Workspace's **Bots** tab instead.
+_Avoid_: Global Bot, shared Bot
+
 **Bot type**:
 What a Bot is for, picked when it is made and kept after: **Bot designer**, **Routines**, or **PR shepherd**.
 The code calls it the Bot's `kind`.

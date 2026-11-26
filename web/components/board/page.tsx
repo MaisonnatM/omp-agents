@@ -45,7 +45,7 @@ import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
 import { boardPageHash, boardWorkspaces, hashForBoard, hashForBoardSession, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
-import { botRows } from "../../bots-model";
+import { botRows, crossProject } from "../../bots-model";
 import { BotsGallery } from "../bots/bots-gallery";
 import { boardActions, SessionActions } from "./actions";
 
@@ -70,7 +70,7 @@ export function BoardPage({ route, core, state, disabled, onChange }: BoardPageP
 					<div className="flex min-h-0 flex-1">
 						{/* Each Bot opens in its own Workspace's Bots tab. */}
 						<PageHashContext.Provider value={page => boardPageHash(page.kind === "bots" && page.target !== null ? (core.bots?.find(bot => bot.id === page.target)?.cwd ?? null) : null)(page)}>
-							<BotsGallery rows={core.bots && botRows(core.bots, core.sessions.hosts, core.botLasts)} routines={core.routines} />
+							<BotsGallery rows={core.bots && botRows(core.bots.filter(bot => crossProject(bot, core.workspaces)), core.sessions.hosts, core.botLasts)} routines={core.routines} />
 						</PageHashContext.Provider>
 					</div>
 				</HeaderTitleShown.Provider>
