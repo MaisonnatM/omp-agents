@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- A routine's run now reports in a few short lines; when it has more to say, the details go in a reply on its Board thread first.
 - Terminal sessions you can only watch no longer show in the sidebar or anywhere else; one appears once it grants you control.
 - A routine can now be added to every Workspace: turn on **Add to every new Workspace** in its editor, and it is copied into each repository you work in that lacks it, now and as you start working in new ones. Each copy is its own routine, and one you delete does not come back.
 - The Board's tests now catch it if two quick replies to a stopped session ever start waking it at the same time again.

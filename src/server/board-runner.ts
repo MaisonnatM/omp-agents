@@ -57,10 +57,13 @@ const converse = (id: number, landable: boolean): string =>
 
 const authorName = (by: BoardAuthor): string => (by.kind === "user" ? "The user" : by.kind === "routine" ? `The routine "${by.name}"` : `Session ${by.sessionId}`);
 
-/** What a session on a routine's Board task does when the run finds nothing: a quiet done, which notifies nobody. */
-const quietRun = (task: BoardTask): string[] =>
+/** What a session on a routine's Board task does with a run's findings: a short done, the details in the thread, or a quiet done, which notifies nobody. */
+const routineRun = (task: BoardTask): string[] =>
 	task.by.kind === "routine"
-		? [`Routine "${task.by.name}" posted this Board task, and each of its runs replies on it while it is not done. When a run finds nothing worth reporting, change nothing and mark Board task #${task.id} done with quiet set to true and one line saying so, with no Suggestions block: a quiet done notifies nobody.`]
+		? [
+				`Routine "${task.by.name}" posted this Board task, and each of its runs replies on it while it is not done. When a run finds nothing worth reporting, change nothing and mark Board task #${task.id} done with quiet set to true and one line saying so, with no Suggestions block: a quiet done notifies nobody.`,
+				`Keep what a run reports small: the done text is a summary of at most about five short lines. When the findings need more, such as lists, logs, or per-item detail, first post them on the thread with the board tool (action reply, task ${task.id}), then mark the task done with only the summary.`,
+			]
 		: [];
 
 /** The lines of `task`'s thread a session reads: what the user and the sessions said, and how each merge the Board ran went. */
@@ -107,7 +110,7 @@ export const startPrompt = (task: BoardTask, checkout: TaskCheckout, landable: b
 		`<board-task id="${task.id}">`,
 		`This session was started to do Board task #${task.id}, and holds it until it marks it done. ${workplace(task, checkout)}`,
 		...earlierRounds(task),
-		...quietRun(task),
+		...routineRun(task),
 		converse(task.id, landable),
 		finish(task.id, landable),
 		"</board-task>",
@@ -115,7 +118,7 @@ export const startPrompt = (task: BoardTask, checkout: TaskCheckout, landable: b
 
 /** What the session a reply is for reads: it answers or does the follow-up, then finishes as a started session does. */
 export const wakePrompt = (task: BoardTask, by: BoardAuthor, text: string, landable: boolean): string =>
-	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nWhen it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}); when it asks for more work, do it.\n${[...quietRun(task), converse(task.id, landable), finish(task.id, landable)].join("\n")}`;
+	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nWhen it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}); when it asks for more work, do it.\n${[...routineRun(task), converse(task.id, landable), finish(task.id, landable)].join("\n")}`;
 
 /** What the session reads after the user edited their messages, which stopped its turn: each message's new text replaces the old. */
 export const editPrompt = (task: BoardTask, texts: string[], landable: boolean): string => {
