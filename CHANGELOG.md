@@ -7,6 +7,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 - The Board's tabs are back under the Workspace's name: Messages, Bots, Pull requests, Memory, Projects, and Settings.
 - Board threads no longer suggest ending the session, which a Board session does by itself.
+- A Board thread now ends with an **Actions** card listing what its sessions did, the Linear issues they saved, the branches they worked on, and the pull requests they opened, so you see it before you merge.
 - Behind the scenes: an eval run now stops when a task's hidden tests could not run, such as with Docker down, instead of scoring every run after it as the model's failure.
 - The comment count on each Pull requests row now counts only unresolved review threads, and hides when none are left open.
 - Opening a Board thread from the message list now always shows its Thread tab first, not the session's conversation.
