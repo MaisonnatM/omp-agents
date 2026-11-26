@@ -9,7 +9,6 @@ import { useStoredState } from "./stored-state";
 const TAB_PAGE: Record<Exclude<SidebarTab, WebModuleId>, CorePage> = {
 	"pull-requests": { kind: "pull-requests", target: null },
 	bots: { kind: "bots", target: null, adding: false },
-	todo: { kind: "todo", list: "all", open: null },
 };
 
 /** The settings section the header's Settings button, ⌘,, and the sidebar keep: the open page's, else the last one open, which this browser remembers, else Analytics. */

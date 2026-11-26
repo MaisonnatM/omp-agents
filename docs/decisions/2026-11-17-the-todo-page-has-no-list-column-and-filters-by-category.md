@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-17
 decision-makers: Maxence
+superseded-by: 2026-11-26-remove-the-todo-page-the-user-todo-tool-and-the-todo-store
 ---
 
 # The Todo page has no list column and filters by category
@@ -33,7 +34,7 @@ The column's color checkboxes kept a category's todos out of the lists that span
 
 ## Confirmation
 
-`web/page-list.test.ts` checks that the Todo page has no list of its own, `web/routing.test.ts` that an old category link reads as **All**, and `web/todo-filter.test.ts` that the Category filter keeps, stores, and prunes as above.
+`web/page-list.test.ts` checked that the Todo page had no list of its own, `web/routing.test.ts` that an old category link read as **All**, and a Todo filter test that the Category filter kept, stored, and pruned as above; those tests went with the Todo page.
 
 ## Revisit when
 

@@ -1,8 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { UserTodo, UserTodoList } from "../../src/user-todos-shared";
 import { loadGrammars } from "../code-highlight";
-import { DashboardActionsContext, type DashboardActions, UserTodosContext } from "./dashboard-context";
+import { DashboardActionsContext, type DashboardActions } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 import { AGENT_PRESET, BOT_MESSAGE_PRESET, GITHUB_PRESET, loadRawHtml, markdownBlocks, type MarkdownPreset, MessageMarkdown, PROMPT_PRESET, SESSION_AGENT_PRESET } from "./message-markdown";
 
@@ -160,24 +159,15 @@ test("a file link whose escapes do not decode drops its address instead of throw
 });
 
 test("a sent prompt draws its references as chips that open here, and code stays code", () => {
-	const todo: UserTodo = { id: "t1", text: "Tidy", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: "work", workspace: null, children: [], links: [], addedBy: null };
-	const prompt = (todos: UserTodoList | null) =>
-		renderToStaticMarkup(
-			<UserTodosContext.Provider value={todos}>
-				<MessageMarkdown
-					preset={PROMPT_PRESET}
-					text={
-						"/skill:ship check @web/app.tsx for [acme/web#7 Go](https://github.com/acme/web/pull/7), not `@web/x.ts`, then **todo \"Tidy\" (id t1)** after omp session \"Old\" (id s1)"
-					}
-				/>
-			</UserTodosContext.Provider>,
-		);
-	const html = prompt({ categories: [], todos: [todo], archive: [] });
-	expect(html.match(/data-chip="([\w-]+)"/g)).toEqual(['data-chip="skill"', 'data-chip="file"', 'data-chip="pull-request"', 'data-chip="todo"', 'data-chip="session"']);
-	expect(html.match(/href="[^"]*"/g)).toEqual(['href="#pull-requests/acme/web/7"', 'href="#todo?open=t1"', 'href="#session/s1"']);
+	const html = renderToStaticMarkup(
+		<MessageMarkdown
+			preset={PROMPT_PRESET}
+			text={"/skill:ship check @web/app.tsx for [acme/web#7 Go](https://github.com/acme/web/pull/7), not `@web/x.ts`, after omp session \"Old\" (id s1)"}
+		/>,
+	);
+	expect(html.match(/data-chip="([\w-]+)"/g)).toEqual(['data-chip="skill"', 'data-chip="file"', 'data-chip="pull-request"', 'data-chip="session"']);
+	expect(html.match(/href="[^"]*"/g)).toEqual(['href="#pull-requests/acme/web/7"', 'href="#session/s1"']);
 	expect(html).not.toContain("_blank");
-	expect(prompt({ categories: [], todos: [], archive: [todo] })).toContain('href="#todo/archive?open=t1"');
-	for (const unknown of [null, { categories: [], todos: [], archive: [] }]) expect(prompt(unknown)).not.toContain("#todo");
 	expect(html).toContain("<code>@web/x.ts</code>");
 	expect(html).not.toContain("/skill:ship check");
 });

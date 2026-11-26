@@ -1,5 +1,5 @@
 import type { Element, ElementContent } from "hast";
-import { type ComponentProps, Fragment, memo, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform, type ExtraProps, type Options, type UrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
@@ -9,14 +9,12 @@ import { highlightLines, useGrammars } from "../code-highlight";
 import { loadedOnce, useLoaded } from "../loaded-once";
 import { githubMediaPath, pullRequestOfUrl, type PullRequestDetail } from "../../src/shared/github";
 import { hashForSession } from "../../src/shared/sessions";
-import type { UserTodoList } from "../../src/user-todos-shared";
 import { linkedFile, remarkFilePaths } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
 import { useRead } from "../reads";
 import { parseBeforeAfter } from "../before-after";
 import { parseReviewPages } from "../review-pages";
-import { hashForPullRequests, hashForTodoId } from "../routing";
-import { UserTodosContext } from "./dashboard-context";
+import { hashForPullRequests } from "../routing";
 import { FileLink } from "./file-link";
 import { LocalMedia, MediaStrip } from "./local-media";
 import { Openable, OpenMarkdownImage, useMarkdownImages } from "./markdown-images";
@@ -175,11 +173,9 @@ const agentLink: Components["a"] = ({ href, children, node: _node, ...props }) =
 	);
 };
 
-/** Where a chip opens in the dashboard; `null` for a skill, command, file, folder, person, or Browser annotation, which have no page of their own, and for a todo not found. */
-function chipHref({ kind, target }: ChipProps, todos: UserTodoList | null): string | null {
+/** Where a chip opens in the dashboard; `null` for a skill, command, file, folder, person, or Browser annotation, which have no page of their own. */
+function chipHref({ kind, target }: ChipProps): string | null {
 	switch (kind) {
-		case "todo":
-			return todos && hashForTodoId(todos, target);
 		case "session":
 			return hashForSession(target);
 		case "pull-request": {
@@ -201,15 +197,14 @@ function chipHref({ kind, target }: ChipProps, todos: UserTodoList | null): stri
 }
 
 /**
- * A reference in a sent prompt, which `remarkPromptChips` marks; a todo, session, or pull request opens in the
+ * A reference in a sent prompt, which `remarkPromptChips` marks; a session or pull request opens in the
  * dashboard. Any other `span` stays one.
  */
 function PromptChipSpan({ node, ...props }: ComponentProps<"span"> & ExtraProps) {
-	const todos = useContext(UserTodosContext);
 	const { dataChip: kind, dataLabel: label, dataTarget: target } = node?.properties ?? {};
 	if (!isChipKind(kind) || typeof label !== "string" || typeof target !== "string") return <span {...props} />;
 	const chip = { kind, label, target };
-	const href = chipHref(chip, todos);
+	const href = chipHref(chip);
 	return href === null ? (
 		<PromptChip {...chip} />
 	) : (
@@ -332,7 +327,7 @@ export const loadRawHtml = (): Promise<unknown> => rawHtmlPlugins.load();
  */
 export const AGENT_PRESET: MarkdownPreset = { remark: [remarkGfm, remarkFilePaths], rawHtml: false, rehype: [], components: AGENT_COMPONENTS, urlTransform: agentUrlTransform, openImages: true, linkPages: false, blocks: true };
 
-/** A user's prompt, read as agent text with its skill, command, file, pull request, todo, and session references as chips; a reference at the very start reads apart from one later, so it renders whole. */
+/** A user's prompt, read as agent text with its skill, command, file, pull request, and session references as chips; a reference at the very start reads apart from one later, so it renders whole. */
 export const PROMPT_PRESET: MarkdownPreset = { ...AGENT_PRESET, remark: [remarkGfm, remarkPromptChips, remarkFilePaths], components: PROMPT_COMPONENTS, blocks: false };
 
 /** A settled message in a session's conversation: agent text whose `mermaid` and `chart` fences draw as visuals. */

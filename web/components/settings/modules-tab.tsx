@@ -3,7 +3,7 @@ import { useId, useState } from "react";
 import type { ServedBuild } from "../../../src/served-build";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
-import { appendToComposer, newDraftKey } from "../../composer-drafts";
+import { appendToComposer, NEW_DRAFT_KEY } from "../../composer-drafts";
 import { deleteModulePrompt, editModulePrompt, newModulePrompt } from "../../module-prompts";
 import { MODULE_LIST, type WebModuleId } from "../../modules";
 import { useModulesOff } from "../../modules-off";
@@ -82,7 +82,7 @@ export function ModulesTab() {
 	const [asking, setAsking] = useState<Asking | null>(null);
 	const draft = (cwd: string, prompt: string): void => {
 		setAsking(null);
-		appendToComposer(newDraftKey(null), prompt);
+		appendToComposer(NEW_DRAFT_KEY, prompt);
 		openNewSession(cwd);
 	};
 	return (

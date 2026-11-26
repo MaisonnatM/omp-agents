@@ -3,8 +3,6 @@ import { IconAgentNetwork, IconArrowRotateCounterClockwise, IconBlocks, IconBrai
 import type { IconComponent } from "@/lib/icon-context";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
-import { oneOf } from "../src/json";
-import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import type { StartOp } from "./starts";
 import { decodeSegment } from "./hash-segment";
 import { PAGE_ICON } from "./page-icons";
@@ -22,7 +20,6 @@ export interface SidebarTabRow {
 const CORE_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"], place: 10 },
 	{ value: "bots", label: "Bots", icon: PAGE_ICON.bots, place: 30 },
-	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo, place: 50 },
 ] as const satisfies readonly { value: string; label: string; icon: IconComponent; place: number }[];
 
 /**
@@ -31,7 +28,7 @@ const CORE_TABS = [
  */
 export const SIDEBAR_TABS: readonly SidebarTabRow[] = [...CORE_TABS, ...MODULE_LIST.map(({ id, tab }) => ({ value: id, ...tab }))].sort((a, b) => a.place - b.place);
 
-/** A sidebar tab, a row of the sidebar's page list; the Bots, todo, and module tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** A sidebar tab, a row of the sidebar's page list; the Bots and module tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof CORE_TABS)[number]["value"] | WebModuleId;
 
 const PAST_PREFIX = "past/";
@@ -114,19 +111,6 @@ export interface SettingsRoute {
 	section: SettingsSection;
 }
 
-/** Which todos the Todo page lists, in the order its tabs show them: every one, due ones, those waiting on you, those agents added, or the archive. */
-export const TODO_VIEWS = ["all", "today", "needs", "agents", "archive"] as const;
-
-export type TodoListView = (typeof TODO_VIEWS)[number];
-
-const isTodoView = oneOf(TODO_VIEWS);
-
-/** The Todo page, listing `list`, with todo `open` beside it when it is non-null and in the list. */
-export interface TodoRoute {
-	list: TodoListView;
-	open: string | null;
-}
-
 /**
  * A Bot's page, its conversation beside the right sidebar's details: its look, name, job, memory, and routines; `null` for the gallery of
  * every Bot, or the New Bot form while `adding`. `routine` names what shows in place of the conversation, `null` for none.
@@ -157,10 +141,9 @@ function restOfBotRoutine(routine: BotRoutineRoute): string {
 	}
 }
 
-/** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. `todoId` names the todo it works on. */
+/** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. */
 export interface NewSessionRoute {
 	cwd: string | null;
-	todoId: string | null;
 	/** The project the session joins as it starts; `null` for none. */
 	projectId: string | null;
 }
@@ -175,7 +158,6 @@ export type CorePage =
 	| { kind: "get-started" }
 	| ({ kind: "settings" } & SettingsRoute)
 	| ({ kind: "pull-requests" } & PullRequestsRoute)
-	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "bots" } & BotsRoute)
 	| { kind: "notifications" }
 	| ({ kind: "new" } & NewSessionRoute)
@@ -198,16 +180,13 @@ const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : 
  * what follows a `?` after it.
  * - `#settings/<section>` opens that section of the settings page, whose workspace sections follow the sidebar's workspace.
  *   `#settings` and an unknown section open Analytics; a segment after the section is ignored.
- * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, `?todo=<id>` with that todo's
- *   title and notes as its first message, and `?project=<id>` joining the session to that project as it starts. No omp runs until its first message.
+ * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?project=<id>` joining the session to
+ *   that project as it starts. No omp runs until its first message.
  * - `#scheduled/<id>` opens scheduled send `id`, a new session's start, as an editable draft.
  * - `#pull-requests` shows the sidebar's Pull requests tab, which lists the pull requests of the sidebar's workspace, beside the panes,
  *   and `#pull-requests/<owner>/<repo>/<number>` shows that pull request's details in the main content.
  *   `#pull-requests/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
  *   at that encoded path. Any other `#pull-requests/…` shows the tab alone.
- * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
- *   today, waiting on you, added by agents, or in the archive, and `?open=<id>` opens that todo; any other segment, such as an old
- *   `#todo/<category id>`, lists every todo.
  * - `#bots` opens the gallery of every Bot, `#bots/new` the New Bot form, `#bots/<id>` that Bot's page, `#bots/<id>/routines` the card of that
  *   Bot's routines in place of its conversation, `#bots/<id>/routines/<routine id>` that card with that routine open,
  *   `#bots/<id>/routines/<routine id>/edit` that routine's editor, and `#bots/<id>/routines/new` a new routine's editor; Bot and routine ids
@@ -218,7 +197,7 @@ const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : 
 const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	"get-started": () => ({ kind: "get-started" }),
 	settings: rest => ({ kind: "settings", section: settingsSection(rest?.split("/")[0] ?? null) }),
-	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null, projectId: query.get("project") || null }),
+	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), projectId: query.get("project") || null }),
 	scheduled: rest => ({ kind: "scheduled", id: rest ? decodeSegment(rest) : null }),
 	"pull-requests": rest => {
 		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)(\/files(?:\/(.+))?)?$/.exec(rest);
@@ -226,7 +205,6 @@ const PAGES: { [K in CorePage["kind"]]: (rest: string | null, query: URLSearchPa
 		const files = match[4] ? { path: match[5] ? decodeSegment(match[5]) : null } : null;
 		return { kind: "pull-requests", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
 	},
-	todo: (rest, query) => ({ kind: "todo", list: isTodoView(rest) ? rest : "all", open: query.get("open") || null }),
 	bots: rest => {
 		if (rest === "new") return { kind: "bots", target: null, adding: true };
 		const [target, routines, routine, ...more] = (rest ?? "").split("/").map(decodeSegment);
@@ -251,8 +229,6 @@ function restOfPage(page: CorePage): string | null {
 			if (page.files === null) return pr;
 			return page.files.path === null ? `${pr}/files` : `${pr}/files/${encodeURIComponent(page.files.path)}`;
 		}
-		case "todo":
-			return page.list === "all" ? null : page.list;
 		case "bots":
 			if (page.target === null) return page.adding ? "new" : null;
 			return page.routine === null ? encodeURIComponent(page.target) : `${encodeURIComponent(page.target)}/${restOfBotRoutine(page.routine)}`;
@@ -268,17 +244,14 @@ function restOfPage(page: CorePage): string | null {
 	}
 }
 
-/** The `?name=value` that follows `page`'s path: the todo and the project a new session starts with, or the todo its page opens; `null` for none. */
+/** The `?name=value` that follows `page`'s path: the project a new session starts with; `null` for none. */
 function queryOfPage(page: CorePage): string | null {
 	switch (page.kind) {
 		case "new": {
 			const query = new URLSearchParams();
-			if (page.todoId !== null) query.set("todo", page.todoId);
 			if (page.projectId !== null) query.set("project", page.projectId);
 			return query.size === 0 ? null : query.toString();
 		}
-		case "todo":
-			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
 		case "settings":
 		case "pull-requests":
 		case "bots":
@@ -313,19 +286,12 @@ export type PageHash = (page: Page) => string;
 
 export const hashForPullRequests = (target: PullRequest | null, to: PageHash = hashForPage): string => to(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null, to: PageHash = hashForPage): string => to({ kind: "pull-requests", target: pr, files: { path } });
-export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
-/** Todo `id` opened in every todo's list, or in **Archive** once put away; `null` for a todo deleted for good. */
-export function hashForTodoId({ todos, archive }: UserTodoList, id: string): string | null {
-	const holds = (todo: UserTodo): boolean => todo.id === id || todo.children.some(child => child.id === id);
-	if (todos.some(holds)) return hashForTodo("all", id);
-	return archive.some(holds) ? hashForTodo("archive", id) : null;
-}
 export const hashForBots = (target: string | null, to: PageHash = hashForPage): string => to(target === null ? { kind: "bots", target, adding: false } : { kind: "bots", target, routine: null });
 export const hashForNewBot = (to: PageHash = hashForPage): string => to({ kind: "bots", target: null, adding: true });
 export const hashForBotRoutine = (botId: string, routine: BotRoutineRoute, to: PageHash = hashForPage): string => to({ kind: "bots", target: botId, routine });
 export const hashForNotifications = (): string => hashForPage({ kind: "notifications" });
 export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
-export const hashForNewSession = ({ cwd = null, todoId = null, projectId = null }: Partial<NewSessionRoute> = {}): string => hashForPage({ kind: "new", cwd, todoId, projectId });
+export const hashForNewSession = ({ cwd = null, projectId = null }: Partial<NewSessionRoute> = {}): string => hashForPage({ kind: "new", cwd, projectId });
 export const hashForScheduled = (id: string): string => hashForPage({ kind: "scheduled", id });
 export const hashForProject = (open: string | null, to: PageHash = hashForPage): string => to({ kind: "projects", open });
 
@@ -388,7 +354,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `todo`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `bots`, `session`, or `new`. `null` for a pane whose ids do not decode. */
 function viewFromPane(pane: string): View | null {
 	if (pane.startsWith(PAST_PREFIX)) {
 		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));

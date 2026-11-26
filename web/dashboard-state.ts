@@ -12,8 +12,6 @@ import type { ScheduledSend } from "../src/shared/scheduled";
 import { newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Workspace, WorkspaceList } from "../src/shared/workspaces";
 import type { Routine } from "../src/routines";
-import { applyUserTodo } from "../src/user-todos";
-import type { UserTodoChange, UserTodoList } from "../src/user-todos-shared";
 import { applyDelta } from "./keyed-list";
 import { changeModuleState, EMPTY_MODULE_STATES, type ModuleStates } from "./modules";
 import type { Completions } from "./pane-store";
@@ -46,8 +44,6 @@ export interface DashboardState extends PaneNavigation {
 	usage: { plans: PlanUsage[]; error: string | null } | null;
 	/** Last model list the server sent for each live session whose menu asked, a pane's or a Bot page's, by instance id. */
 	models: Map<string, ModelList>;
-	/** The Todo page's list, `null` until the server first sends it; a change shows here before the server answers. */
-	userTodos: UserTodoList | null;
 	/** Each stored module's state, `null` until the server first sends it; a change shows here before the server answers. */
 	modules: ModuleStates;
 	/** Every routine, empty until the server first sends them. */
@@ -79,7 +75,7 @@ export interface DashboardState extends PaneNavigation {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "module" | "routines" | "bots" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "jobs" | "review-drafts" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "module" | "routines" | "bots" | "scheduled" | "workspaces" | "project-trust" | "pins" | "notices" | "merges" | "jobs" | "review-drafts" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -97,7 +93,6 @@ export type Action =
 	/** The server answered the page's end of `instanceId`, whether it ended or failed to. */
 	| { t: "ended"; instanceId: string }
 	| { t: "new-session-completions"; completions: Completions }
-	| { t: "user-todo"; change: UserTodoChange }
 	| ModuleChangeMsg
 	| { t: "pin"; change: PinChange }
 	| { t: "bot"; change: Exclude<BotChange, { op: "message" | "restart" }>; now: string }
@@ -222,8 +217,6 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		case "models":
 			if (!state.hosts.some(host => host.instanceId === action.instanceId)) return state;
 			return { ...state, models: new Map(state.models).set(action.instanceId, { data: { models: action.models }, error: action.error }) };
-		case "user-todos":
-			return { ...state, userTodos: action.list };
 		case "module":
 			return { ...state, modules: { ...state.modules, [action.id]: action.value } };
 		case "routines":
@@ -252,8 +245,6 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, jobs: action.jobs };
 		case "review-drafts":
 			return { ...state, reviewDrafts: action.list };
-		case "user-todo":
-			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
 		case "module-change": {
 			const modules = changeModuleState(state.modules, action.id, action.change);
 			return modules === state.modules ? state : { ...state, modules };
@@ -287,7 +278,6 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		started: null,
 		usage: null,
 		models: new Map(),
-		userTodos: null,
 		modules: EMPTY_MODULE_STATES,
 		routines: [],
 		bots: null,

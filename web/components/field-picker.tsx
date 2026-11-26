@@ -1,13 +1,11 @@
-/** Field pickers: a button that opens a searchable list of a field's choices, and the due date's. The Todo page and a pull request's details share them. */
-import { IconCalendar1, IconCheckmark1 } from "central-icons";
-import { type KeyboardEvent, type ReactNode, useState } from "react";
+/** The field picker: a button that opens a searchable list of a field's choices, as a pull request's details use. */
+import { IconCheckmark1 } from "central-icons";
+import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { dateLabel } from "../labels";
-import { Kbd } from "./kbd";
 
 /** A field's button in a side column: the row's width, its value in the text's color, and room for wrapped labels. */
 const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
@@ -29,24 +27,7 @@ export interface Choice {
 	icon?: ReactNode;
 }
 
-/** Whether a picker is open: its own state, or its owner's when `open` is given, so a key can open it. */
-interface OpenState {
-	open?: boolean;
-	onOpenChange?: (open: boolean) => void;
-}
-
-function useOpenState({ open, onOpenChange }: OpenState): [boolean, (open: boolean) => void] {
-	const [own, setOwn] = useState(false);
-	return [
-		open ?? own,
-		next => {
-			setOwn(next);
-			onOpenChange?.(next);
-		},
-	];
-}
-
-interface FieldPickerProps extends OpenState {
+interface FieldPickerProps {
 	/** What the field is, for the search box and screen readers: `Status`. */
 	field: string;
 	/** What the field holds now, in words, for screen readers. */
@@ -63,26 +44,17 @@ interface FieldPickerProps extends OpenState {
 	multi?: boolean;
 	/** The field cannot change yet, as before the item's details arrive. */
 	disabled?: boolean;
-	/** The digit that picks the first choice while the list is open, the next digit the next one, as the status (1) and priority (0) menus do. */
-	firstKey?: number;
 	/** A click opened the list: the fields ask for the choices then. */
 	onOpen?: () => void;
 	onPick: (value: string) => void;
 }
 
 /** A field as a button that opens a searchable list of its choices. */
-export function FieldPicker({ field, current, trigger, look = "field", className, choices, error = null, selected, multi = false, disabled = false, firstKey, onOpen, onPick, ...openState }: FieldPickerProps) {
-	const [open, setOpen] = useOpenState(openState);
+export function FieldPicker({ field, current, trigger, look = "field", className, choices, error = null, selected, multi = false, disabled = false, onOpen, onPick }: FieldPickerProps) {
+	const [open, setOpen] = useState(false);
 	const pick = (value: string): void => {
 		if (!multi) setOpen(false);
 		onPick(value);
-	};
-	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-		if (firstKey === undefined || choices === null || !/^\d$/.test(event.key) || event.metaKey || event.ctrlKey || event.altKey) return;
-		const choice = choices[Number(event.key) - firstKey];
-		if (!choice) return;
-		event.preventDefault();
-		pick(choice.value);
 	};
 	return (
 		<Popover
@@ -101,7 +73,7 @@ export function FieldPicker({ field, current, trigger, look = "field", className
 					}
 				/>
 			</Tooltip>
-			<PopoverContent align="start" className="w-64 p-0" onKeyDown={onKeyDown}>
+			<PopoverContent align="start" className="w-64 p-0">
 				<Command>
 					<CommandInput aria-label={`Search ${field.toLowerCase()}`} placeholder={`${field}…`} />
 					{choices !== null && <CommandEmpty>No match.</CommandEmpty>}
@@ -112,88 +84,19 @@ export function FieldPicker({ field, current, trigger, look = "field", className
 							</p>
 						) : (
 							<CommandGroup>
-								{choices.map((choice, index) => (
+								{choices.map(choice => (
 									// A choice without a value of its own, as for none, keys on its label.
 									<CommandItem key={choice.value} value={choice.value || choice.label} label={choice.label} keywords={[choice.value]} onSelect={() => pick(choice.value)}>
 										{choice.icon}
 										<span className="truncate">{choice.label}</span>
 										{choice.detail && <span className="flex-1 truncate text-muted-foreground">{choice.detail}</span>}
 										<IconCheckmark1 className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
-										{firstKey !== undefined && <Kbd size="sm">{firstKey + index}</Kbd>}
 									</CommandItem>
 								))}
 							</CommandGroup>
 						)}
 					</CommandList>
 				</Command>
-			</PopoverContent>
-		</Popover>
-	);
-}
-
-interface DuePickerProps extends OpenState {
-	/** `YYYY-MM-DD`, `null` for none. */
-	dueDate: string | null;
-	disabled: boolean;
-	/** What the button shows; a calendar and the date by default. */
-	trigger?: ReactNode;
-	look?: PickerLook;
-	/** The trigger button's classes, in place of the look's. */
-	className?: string;
-	onChange: (dueDate: string | null) => void;
-}
-
-/** The due date: a date field to set it, and a button to clear it. */
-export function DuePicker({ dueDate, disabled, trigger, look = "field", className, onChange, ...openState }: DuePickerProps) {
-	const [open, setOpen] = useOpenState(openState);
-	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<Tooltip content={dueDate ? `Change the due date: ${dateLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
-				<PopoverTrigger
-					render={
-						<Button size="compact" {...pickerButton(look, className)} aria-label={`Due date: ${dueDate ?? "none"}`} active={open} disabled={disabled}>
-							<span className="flex min-w-0 items-center gap-2">
-								{trigger ?? (
-									<>
-										{look !== "row" && <IconCalendar1 className="size-4 text-muted-foreground" />}
-										{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
-									</>
-								)}
-							</span>
-						</Button>
-					}
-				/>
-			</Tooltip>
-			<PopoverContent align="start" className="w-auto p-2">
-				<form
-					onSubmit={event => {
-						event.preventDefault();
-						// React bubbles events through the popover's portal, so a form around the picker would submit too.
-						event.stopPropagation();
-						const value = new FormData(event.currentTarget).get("due");
-						setOpen(false);
-						if (typeof value === "string" && value !== "" && value !== dueDate) onChange(value);
-					}}
-					className="flex items-center gap-1.5"
-				>
-					<input type="date" name="due" aria-label="Due date" defaultValue={dueDate ?? ""} required className="h-7 rounded-md border border-border bg-background px-2 text-xs" />
-					<Button type="submit" variant="secondary" size="compact">
-						Set
-					</Button>
-					{dueDate && (
-						<Button
-							type="button"
-							variant="ghost"
-							size="compact"
-							onClick={() => {
-								setOpen(false);
-								onChange(null);
-							}}
-						>
-							Clear
-						</Button>
-					)}
-				</form>
 			</PopoverContent>
 		</Popover>
 	);

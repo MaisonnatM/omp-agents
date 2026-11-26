@@ -3,7 +3,6 @@ import { createContext, useContext } from "react";
 import type { QueuedMerge } from "../../src/shared/merge-queue";
 import type { Project } from "../../src/shared/projects";
 import type { ReviewDraft } from "../../src/shared/review-drafts";
-import type { UserTodoList } from "../../src/user-todos-shared";
 import type { FileTarget } from "../file-paths";
 import type { MentionLists } from "../mentions";
 import type { WindowScope } from "../sessions";
@@ -22,7 +21,6 @@ export interface DashboardActions {
 	start: Dashboard["start"];
 	dismissStart: Dashboard["dismissStart"];
 	openNewSession: Dashboard["openNewSession"];
-	changeTodo: Dashboard["changeTodo"];
 	changeModule: Dashboard["changeModule"];
 	changeBot: Dashboard["changeBot"];
 	/**
@@ -82,7 +80,7 @@ export function useDashboardStatus(): DashboardStatus {
 
 /**
  * The page's lists that the composer's `@` menu offers, provided once by `App` apart from {@link DashboardActions}, so a
- * roster or todo change renders only the composers again and not every reader of the dashboard's actions.
+ * roster change renders only the composers again and not every reader of the dashboard's actions.
  */
 export const MentionListsContext = createContext<MentionLists | null>(null);
 
@@ -91,9 +89,6 @@ export function useMentionLists(): MentionLists {
 	if (!value) throw new Error("useMentionLists must be used within the App's MentionListsContext.Provider");
 	return value;
 }
-
-/** The Todo page's list as the server last sent it, `null` until it arrives, for a prompt's todo chips to find where each todo is now. */
-export const UserTodosContext = createContext<UserTodoList | null>(null);
 
 /** The open projects, oldest first, which a session row's menu offers to move the session to; none while Projects is off or the list has not arrived. */
 export const OpenProjectsContext = createContext<readonly Project[]>([]);

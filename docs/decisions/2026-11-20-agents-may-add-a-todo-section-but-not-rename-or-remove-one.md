@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-20
 decision-makers: user, agent
+superseded-by: 2026-11-26-remove-the-todo-page-the-user-todo-tool-and-the-todo-store
 ---
 
 # Agents may add a Todo section but not rename or remove one

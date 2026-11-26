@@ -5,11 +5,10 @@ import type { TrustChange } from "../src/shared/project-trust";
 import type { ModuleChanges, StoredModuleId } from "../src/modules";
 import type { ClientMsg, ModuleChangeMsg, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
-import type { UserTodoChange } from "../src/user-todos-shared";
 import { errorText } from "../src/json";
 import { openSocket, putJson } from "./api";
 import { type OpenBot, openBot as findOpenBot } from "./bots-model";
-import { clearDraft, liveDraftKey, newDraftKey, putDraft } from "./composer-drafts";
+import { clearDraft, liveDraftKey, NEW_DRAFT_KEY, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDictationMessage, dictationDisconnected } from "./dictation";
 import { Outbox } from "./outbox";
@@ -91,12 +90,7 @@ export interface Dashboard {
 	 * each session it resumes live in the pane that shows it.
 	 */
 	start: (op: StartOp) => void;
-	/**
-	 * Change the Todo page's list, which shows at once and reaches the server and every other window, on the next socket
-	 * while none is open; settles once the server has handled it, and rejects with the server's error.
-	 */
-	changeTodo: (change: UserTodoChange) => Promise<void>;
-	/** Change stored module `id`'s state, all of `change` or none of it, as {@link Dashboard.changeTodo} does the Todo page's list. */
+	/** Change stored module `id`'s state, all of `change` or none of it, which shows at once and reaches the server and every other window; settles once the server has handled it, and rejects with the server's error. */
 	changeModule: <I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => Promise<void>;
 	/** Pin or unpin sessions, which shows at once and reaches the server, on the next socket while none is open, and every other window. */
 	changePins: (change: PinChange) => void;
@@ -252,7 +246,7 @@ export function useDashboard(): Dashboard {
 							// A fork's composer opens on the prompt it branched at, to edit, and a sent first message leaves the new-session draft.
 							// Both are written before `answer` shows the layout, which mounts the fork's composer.
 							if (op.kind === "fork" && op.point.prefill && msg.result.prompt) putDraft(liveDraftKey({ kind: "live", instanceId: msg.result.instanceId, agentId: null }), msg.result.prompt);
-							if (op.kind === "new") clearDraft(newDraftKey(op.todoId));
+							if (op.kind === "new") clearDraft(NEW_DRAFT_KEY);
 						}
 						answer(msg, start && msg.result.ok ? layoutAfterStart(layoutRef.current, start.op, msg.result.instanceId) : null);
 						return;
@@ -264,7 +258,6 @@ export function useDashboard(): Dashboard {
 					case "past":
 					case "usage":
 					case "models":
-					case "user-todos":
 					case "module":
 					case "routines":
 					case "bots":
@@ -339,7 +332,7 @@ export function useDashboard(): Dashboard {
 
 	const openNewSession = useCallback((cwd?: string) => {
 		dispatch({ t: "dismiss-start", kind: "new" });
-		navigate({ kind: "new", cwd: cwd ?? null, todoId: null, projectId: null });
+		navigate({ kind: "new", cwd: cwd ?? null, projectId: null });
 	}, [navigate]);
 
 	const nextReqId = useRef(0);
@@ -350,13 +343,6 @@ export function useDashboard(): Dashboard {
 			request(messageOf(op, reqId)).catch((error: unknown) => dispatch({ t: "start-failed", reqId, error: errorText(error) }));
 		},
 		[request],
-	);
-	const changeTodo = useCallback(
-		(change: UserTodoChange) => {
-			dispatch({ t: "user-todo", change });
-			return write({ t: "user-todo", change });
-		},
-		[write],
 	);
 	const changeModule = useCallback(
 		<I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => {
@@ -390,5 +376,5 @@ export function useDashboard(): Dashboard {
 		[start],
 	);
 
-	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeTodo, changeModule, changePins, changeBot, trustAndStart, dismissTrust };
+	return { state, page, openBot, send, request, end, open, focus, show, close, resize, navigate, openNewSession, dismissStart, start, changeModule, changePins, changeBot, trustAndStart, dismissTrust };
 }

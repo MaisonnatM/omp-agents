@@ -8,7 +8,7 @@ const past = (title: string | null) => ({ title, cwdDisplay: "~/code/webapp" }) 
 describe("documentTitle", () => {
 	test("a page names itself ahead of the app", () => {
 		expect(documentTitle({ kind: "settings", section: "analytics" }, null, null, null)).toBe("Settings · omp agents");
-		expect(documentTitle({ kind: "new", cwd: "~/code", todoId: null, projectId: null }, null, null, null)).toBe("New session · omp agents");
+		expect(documentTitle({ kind: "new", cwd: "~/code", projectId: null }, null, null, null)).toBe("New session · omp agents");
 	});
 
 	test("the Bots gallery names the Bots, and the New Bot form the new one", () => {

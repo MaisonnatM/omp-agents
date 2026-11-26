@@ -3,7 +3,7 @@
 A module is a feature the core runs without naming it, such as Sport.
 Its whole wiring sits behind two definitions, one for the server and one for the page.
 The core lists the modules in two registries and iterates them, so no hub file names a module.
-The core keeps the sessions, pull requests, todos, Bots and their routines, Settings, and the Slack sign-in.
+The core keeps the sessions, pull requests, Bots and their routines, Settings, and the Slack sign-in.
 
 ## The module list
 
@@ -62,7 +62,7 @@ The page half is split in three files so that the pure registry never imports Re
 `web/modules.ts` holds the contract and the list, the module's `module.ts` holds its definition, and `web/components/module-views.tsx` maps each id to its `Page` and `Nav` components.
 
 Every module's `Page` takes its `route` and `core`, a `CoreData` that `PageSwitch` builds from the core's own state.
-`CoreData` holds the routines, the Bots, the todo list, whether the sessions are listed, where a new session starts, the workspace the sidebar picked, the sidebar workspace's running sessions, and the page section a sidebar link last chose.
+`CoreData` holds the routines, the Bots, whether the sessions are listed, where a new session starts, the workspace the sidebar picked, the sidebar workspace's running sessions, and the page section a sidebar link last chose.
 A module reads core data through it without importing the core's stores.
 A stored module's `Page` also takes its `state`, `disabled`, and `onChange`.
 A module's `Nav`, which every module has but one whose page `listsItself`, takes its `route`, the chosen `section`, and `onSection`, which `PageList` passes so a list can scroll its page to a section.

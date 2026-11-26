@@ -57,13 +57,13 @@ Cache writes by cause, from consecutive requests of one session:
 
 ## Changes made
 
-- **Subagents no longer carry the user's session tools.** `end_session`, `land`, `ship_stage`, and `user_todo` drop out of a subagent at its start; in 30 days no subagent called any of them.
+- **Subagents no longer carry the user's session tools.** `end_session`, `land`, `ship_stage`, and the other tools that act for the user's session drop out of a subagent at its start; in 30 days no subagent called any of them.
   A scout's request went from 11 tools and 14.6k chars of schemas to 5 tools and 5.2k chars, about 2,600 fewer tokens per subagent request, worth about $20 per 14 days in cache reads and first-request writes.
   `pr_description` and `project_memory` stay, since subagents call them.
 - **`skill://Poteto Mode` no longer fails 37 times per 14 days.** pstack renamed its skill `poteto-mode`, and the kit's alias still told agents the old name; it now says that `skill://poteto-mode` opens pstack's file.
 - **The baseline is one command.** `scripts/token-audit/report.ts` prints every table above, and `scripts/token-audit/dump-request.ts` writes each request omp sends so the report can size it.
 - **A Bot's system prompt no longer changes from turn to turn.** The Bot extension used to put the Bot's name, job, memory, routines, and the other Bots in the system prompt, read again each turn, so every `remember` or saved routine rewrote the cached head of the next request.
-  The system prompt now holds only rules that are the same for every Bot, and the changing part comes as a hidden message sent only when it changed and again after compaction, as `todos.ts` sends a session's todos; see [Bots](bots.md).
+  The system prompt now holds only rules that are the same for every Bot, and the changing part comes as a hidden message sent only when it changed and again after compaction; see [Bots](bots.md).
 
 ## Proposals
 
@@ -76,7 +76,7 @@ The worker-model proposal is applied in part: the kit's `poteto-worker` agent ru
 | Fewer, smaller worker turns: workers average 120 requests at 108k tokens | unknown until measured | lost context | pstack prompts, `task.agentCompactionThresholdOverrides` |
 | Resolve an edit's relative path to the checkout its hash came from, and stop stale-anchor edits | about $35 from 885 failed edits at 12 to 16% | none for users | omp's edit tool |
 | Give an agent file a skill allow-list, so a scout skips the 9.5k-char skill list | about $19 | an agent misses a skill it needed | omp's task executor |
-| Mount `user_todo` and `ship_stage` as `xd://` devices in the main session | about $5 | models think the tool is missing, as `2026-11-07-tell-cursor-models-where-dashboard-tools-are` found | kit extensions |
+| Mount `ship_stage` as an `xd://` device in the main session | about $3 | models think the tool is missing, as `2026-11-07-tell-cursor-models-where-dashboard-tools-are` found | kit extensions |
 | Move PR-review and design-handoff rules from the kit's `APPEND_SYSTEM.md` into skills | about $4 | an agent skips the review gate | kit `APPEND_SYSTEM.md` |
 
 ### Audit of the kit's `APPEND_SYSTEM.md`

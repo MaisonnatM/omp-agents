@@ -46,7 +46,7 @@ interface JsonFileOptions<T> {
 	parse: (json: unknown) => T | null;
 	/** What the file holds for `value`, when that is not `value` itself: `{ sessions }` around a list of session ids. */
 	toJson?: (value: T) => unknown;
-	/** What the file holds, as the report of a file that holds something else names it: `a todo list`. */
+	/** What the file holds, as the report of a file that holds something else names it: `a workspace list`. */
 	holds: string;
 	/** A file that holds something else stays where it is (`ignore`), or moves to `<path>.invalid` (`aside`) because it holds what someone typed. */
 	onInvalid: "ignore" | "aside";

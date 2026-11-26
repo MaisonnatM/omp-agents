@@ -8,7 +8,7 @@ import type { ForkPoint } from "./transcript-view";
 
 /**
  * What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A
- * quick action keeps its subject, the pull request or todo with the action, which its page shows progress
+ * quick action keeps its subject, the pull request with the action, which its page shows progress
  * and failure for; the server links its session to that subject. A new pull request from the Pull requests page keeps
  * the change it describes, which its popover shows the failure for. A **Resume all** resumes each of the sidebar's
  * interrupted sessions.
@@ -24,8 +24,6 @@ export type StartOp =
 			thinking: string | null;
 			/** The pinned skill, `null` when there is none or the draft skips it. */
 			skill: string | null;
-			/** The todo the session works on, `null` for none. */
-			todoId: string | null;
 			/** The project the session joins as it starts, `null` for none. */
 			projectId: string | null;
 			/** The session is deleted with everything it wrote when it ends. */
@@ -64,7 +62,7 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 	switch (op.kind) {
 		case "new":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId, projectId: op.projectId, taskId: null, reviewDraft: false, bot: null, private: op.private, reachOwner: false };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, projectId: op.projectId, taskId: null, reviewDraft: false, bot: null, private: op.private, reachOwner: false };
 		case "quick":
 			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: op.branch, model: null, thinking: null, skill: op.skill, projectId: null, taskId: null, bot: null, private: false, ...startTarget(op.subject) };
 		case "pull-request-new":
@@ -80,7 +78,6 @@ export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 				thinking: null,
 				skill: op.skill,
 				subject: null,
-				todoId: null,
 				projectId: null,
 				taskId: null,
 				reviewDraft: false,

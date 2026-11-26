@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-09
 decision-makers: agent
+superseded-by: 2026-11-26-remove-the-todo-page-the-user-todo-tool-and-the-todo-store
 ---
 
 # Todo sits between Calendar and Sport

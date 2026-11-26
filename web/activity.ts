@@ -183,10 +183,6 @@ const TAB_VIEWS = {
 		{ key: "bots/routines", label: "A Bot's routines" },
 		{ key: "bots/routine", label: "A Bot's routine" },
 	],
-	todo: [
-		{ key: "todo", label: "Todo" },
-		{ key: "todo/item", label: "A todo" },
-	],
 } as const satisfies { [T in Exclude<SidebarTab, WebModuleId>]: readonly { key: string; label: string }[] };
 
 type PageViewKey =
@@ -233,8 +229,6 @@ function pageView(page: Page): ViewKey {
 			if (page.target === null) return page.adding ? "bots/new" : "bots";
 			if (page.routine === null) return "bots/item";
 			return page.routine.kind === "list" ? "bots/routines" : "bots/routine";
-		case "todo":
-			return page.open === null ? "todo" : "todo/item";
 		case "scheduled":
 			return page.id === null ? "scheduled" : "scheduled/item";
 		case "notifications":

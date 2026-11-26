@@ -171,7 +171,6 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	"set-advisor": ({ sessions }, _peer, { instanceId, enabled }) => sessions.started(instanceId)?.setAdvisor(enabled),
 	goal: ({ sessions }, _peer, { instanceId, change }) => sessions.started(instanceId)?.changeGoal(change),
 	answer: ({ sessions }, _peer, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
-	"user-todo": ({ lists }, peer, { change }) => void lists.apply("user-todos", change, peer),
 	"module-change": ({ lists }, peer, { id, change }) => void lists.applyModule(id, change, peer),
 	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
 	bot: ({ lists, messageBot, restartBot }, peer, { change }) => {

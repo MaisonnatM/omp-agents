@@ -226,7 +226,7 @@ describe("explicit history and startup", () => {
 	test("a new session opens alone and retires the split it left", () => {
 		let state = select(select(setup(), live("c")), live("b"));
 		expect(hashForLayout(state.layout)).toBe("#a,b@1");
-		const next = layoutAfterStart(state.layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, todoId: null, projectId: null, private: false }, "fresh");
+		const next = layoutAfterStart(state.layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, projectId: null, private: false }, "fresh");
 		if (!next) throw new Error("A new session must open a pane");
 		state = command(state, { kind: "edit", layout: next });
 		expect(hashForLayout(state.layout)).toBe("#fresh");

@@ -1,5 +1,5 @@
-/** Quick actions on a pull request or a todo: the row menu, the details' buttons, and the note when a start fails. */
-import { IconBubbleText, IconChecklist, IconCircleX, IconEyeOpen, IconHammer, IconMerged, IconNuclearPowerPlant, IconToolbox, IconZap } from "central-icons";
+/** Quick actions on a pull request: the row menu, the details' buttons, and the note when a start fails. */
+import { IconBubbleText, IconCircleX, IconEyeOpen, IconMerged, IconNuclearPowerPlant, IconToolbox, IconZap } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -20,8 +20,6 @@ export const QUICK_ACTION_ICON: Record<QuickActionId, IconComponent> = {
 	"address-comments": IconBubbleText,
 	review: IconEyeOpen,
 	"thermonuclear-review": IconNuclearPowerPlant,
-	work: IconHammer,
-	plan: IconChecklist,
 };
 
 export interface QuickActionsProps {
@@ -88,19 +86,8 @@ interface NoticeProps {
 	onDismiss: () => void;
 }
 
-/** The name a failure notice gives what a quick start works on. */
-function subjectName(subject: QuickSubject): string {
-	switch (subject.kind) {
-		case "pull-request":
-			return `${subject.pr.owner}/${subject.pr.repo}#${subject.pr.number}`;
-		case "todo":
-			return `"${subject.text}"`;
-		default: {
-			const unhandled: never = subject;
-			return unhandled;
-		}
-	}
-}
+/** The name a failure notice gives the pull request a quick start works on. */
+const subjectName = ({ pr }: QuickSubject): string => `${pr.owner}/${pr.repo}#${pr.number}`;
 
 /**
  * Why the last quick action's session did not start, with a button that forgets it; nothing while it starts. When

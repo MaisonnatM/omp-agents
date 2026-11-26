@@ -95,9 +95,8 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Pages, each routed by `web/routing.ts`:
   - Get started: `web/components/get-started.tsx`, the step-by-step setup dialog and its bottom-right bubble under the toasts, mounted in `web/app.tsx` and open at `#get-started` and on a vacant home's first run, with each step's body in `web/components/get-started-steps.tsx`, the Tools and workflows step in `web/components/get-started-tools.tsx`, and its facts and surface choice in `web/get-started-model.ts`.
   - The empty home, with **New session** and **Get started**: `EmptyHome` in `web/components/empty-home.tsx`, which `PageSwitch` draws.
-  - New session: `web/components/new-session.tsx`, also used for todo drafts and scheduled starts, which docks the composer at the page's bottom with a new session's directory and branch pickers above it, draws `RetroGrid` from `web/components/dithercn/retro-grid.tsx` behind a new session, and shows a private draft's `PrivateFacts` from `web/components/new-session-modes.tsx` under the composer.
+  - New session: `web/components/new-session.tsx`, also used for scheduled starts, which docks the composer at the page's bottom with a new session's directory and branch pickers above it, draws `RetroGrid` from `web/components/dithercn/retro-grid.tsx` behind a new session, and shows a private draft's `PrivateFacts` from `web/components/new-session-modes.tsx` under the composer.
   - Pull requests: `web/components/pull-requests/pull-requests-page.tsx`, with the **Rebase N behind** button and the **Repositories** popover at its top, and one pull request in `pr-page.tsx` beside it.
-  - Todo: `web/components/todo/page.tsx`.
   - Sport: `web/components/sport/page.tsx`, with its sidebar tab in `web/components/sport/nav.tsx`, the week in `week.tsx` and `day-detail.tsx`, the demos in `demo-dialog.tsx`, the Fait dialog in `log-form.tsx`, the journal in `journal.tsx`, and the progress in `progress.tsx`, all in `web/components/sport/`.
   - Memory: `web/components/memory/page.tsx`, with the project memory in `project-memory.tsx` and the bookmarks in `bookmarks.tsx`, both in `web/components/memory/`.
   - Projects: `web/components/projects/page.tsx`, the table of every project or the open project across the page, with the open project in `detail.tsx` and `createProject` in `new-project.ts`, all in `web/components/projects/`.
@@ -136,7 +135,7 @@ The server lives in `src/`; its files, listed by area:
 - [Shared types, omp facades, analytics, and subprocesses](code-layout/server-shared-and-omp.md)
 - [Sessions and transcripts](code-layout/server-sessions.md)
 - [Git, worktrees, pull requests, merges, and sync](code-layout/server-git-and-pull-requests.md)
-- [Integrations, todos, shared lists, and inboxes](code-layout/server-integrations-and-inboxes.md)
+- [Integrations, shared lists, and inboxes](code-layout/server-integrations-and-inboxes.md)
 - [Routines, scheduled sends, usage, settings, and tests](code-layout/server-routines-and-settings.md)
 
 ## Page
@@ -148,6 +147,6 @@ Its files, listed by area:
 - [Shell, state, and models](code-layout/page-core.md)
 - [List models, sidebar tabs, model menu, and mentions](code-layout/page-models.md)
 - [Sidebar status, terminal, HTTP reads, shortcuts, and theme](code-layout/page-reads-and-chrome.md)
-- [Sidebar, Todo, Bots, Routines, Sport, Memory, Projects, and Board](code-layout/page-pages.md)
+- [Sidebar, Bots, Routines, Sport, Memory, Projects, and Board](code-layout/page-pages.md)
 - [Panes, session details, and changes](code-layout/page-panes.md)
 - [Pull requests, settings, integrations, and primitives](code-layout/page-pull-requests-and-settings.md)

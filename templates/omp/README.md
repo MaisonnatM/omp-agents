@@ -115,7 +115,7 @@ Files, in `agent/`:
   Call it with `path`, `title`, and an optional one-line `note` of at most 120 characters saying what this version changed.
   A file must be non-empty UTF-8 text of at most 2 MiB and stay within the local root after symlink resolution.
   Equal bytes share one copy under the session's `artifact-versions/` directory.
-- In a task subagent, `end-session.ts`, `arena.ts`, `artifact.ts`, `land.ts`, `ship.ts`, `todos.ts`, and `project.ts` remove their tools when its session starts, since those tools act for the session you talk to; each subagent request then carries fewer tokens of tool schemas.
+- In a task subagent, `end-session.ts`, `arena.ts`, `artifact.ts`, `land.ts`, `ship.ts`, and `project.ts` remove their tools when its session starts, since those tools act for the session you talk to; each subagent request then carries fewer tokens of tool schemas.
 - `extensions/pstack-skills.ts`: omp skips every pstack skill in the plugin, because pstack's `plugin.json` opts into a strict schema that refuses the `disable-model-invocation` key its skills carry.
   At each session start this links each skill of the installed pstack into `~/.omp/plugins/pstack-skills`, which `skills.customDirectories` lists and omp reads leniently, keeping them hidden from the model's skill list as pstack intends, and repoints the links after a marketplace update.
   Those links take the bare name from a skill of the same name in your own skill folders, which stays reachable under a prefixed name such as `agent/<name>`; pstack's `poteto-mode` is left out, so the kit's alias keeps that name.
@@ -155,8 +155,6 @@ Files, in `agent/`:
   Reads, files outside git, and the clones omp makes for `isolated: true` subagents pass, and a change in a directory that a variable names is blocked until the command writes the directory out.
   If a session's process dies and you know its work is done, delete the claim file it names; the guard also replaces a claim whose process has ended.
   It reads HEAD and `origin/HEAD` from their files in the git dir and keeps each directory's checkout for a minute, so an edit or write in a checkout another session does not hold starts no `git`.
-- `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add, check, edit, delete, and add-section changes; `add` and `edit` take the name of an existing section, including one added but not yet applied, and an `add` naming one that does not exist files the todo in none.
-  On `add`, an omitted or empty `due` value means no due date, and on `edit` an empty one clears it; a nonempty value must use `YYYY-MM-DD`.
 - `extensions/project.ts`: before a prompt, a session in an omp-agents dashboard project gets the project's brief, its goal, its plan with what is done, its decisions, and its 10 newest log lines, once at the start and again only after the project changed.
   `project_list` lists every project with its id, status, progress, and goal; `project_update` makes any change the Projects page makes, on the session's project or the one `projectId` names: create, rename, set the goal, archive, restore, add, edit, tick, untick, or remove a step, add or remove a decision, log a line signed with the session's id, and join or leave.
   `create` and `add_step` also take `steps`, a whole plan with sub-steps one level deep, added in order in one call.
@@ -164,7 +162,7 @@ Files, in `agent/`:
 - `extensions/board.ts`: the `board` tool for the omp-agents dashboard's Board, where you and your sessions hand each other Board tasks in a Workspace: `post`, `reply`, `claim`, `renew`, `done`, `list`, and `read`.
   A claim holds a 15-minute lease the session renews while it works; `done` makes the Board tasks that needed it ready, and the dashboard starts a session on each.
   Its changes go to the dashboard's `board-changes/`, which the dashboard appends to `board-events.jsonl`; a subagent acts for its top-level session.
-- `extensions/inbox/client.ts`: what `todos.ts`, `project.ts`, and `board.ts` use to read their inbox and leave a change there, one file each, for the dashboard to apply; the dashboard's own extensions import it too.
+- `extensions/inbox/client.ts`: what `project.ts` and `board.ts` use to read their inbox and leave a change there, one file each, for the dashboard to apply; the dashboard's own extensions import it too.
 - `skills/design-workflow/SKILL.md`: the steps `AGENTS.md` sends every UI change through: references before the first edit, five structurally different variants for a structural ask, a screenshot check every round, and the `design-critic` agent once the user approves the direction.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; `app-consistency-review`, which the interface reviewer autoloads to check a PR against the app's shared components, tokens, and sibling screens; `decision-records`, which keeps each choice made in a project as one dated file in its `docs/decisions/`, with a `check.ts` that checks them; `ship`, the `/ship` workflow above; and `poteto-mode`, which says where pstack's skill of the same name keeps its file.
   The alias maps Cursor-only cleanup and runtime-control instructions to omp's available tools without editing the plugin cache.

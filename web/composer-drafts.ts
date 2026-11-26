@@ -13,8 +13,8 @@ const drafts = expiringStrings("omp-agents.composer-drafts", 30 * 24 * 60 * 60 *
 /** The draft of a live session's or subagent's composer. */
 export const liveDraftKey = (view: LiveView): string => (view.agentId === null ? `live/${view.instanceId}` : `live/${view.instanceId}/${view.agentId}`);
 
-/** The draft of the new-session page: one for the plain draft, one for each todo it starts from. */
-export const newDraftKey = (todoId: string | null): string => (todoId === null ? "new" : `new/todo/${todoId}`);
+/** The draft of the new-session page. */
+export const NEW_DRAFT_KEY = "new";
 
 /** The draft of a Bot's composer while no omp runs its conversation. */
 export const botDraftKey = (id: BotId): string => `bot/${id}`;
@@ -108,7 +108,7 @@ export const useComposerReplacements = replacements.useReceiver;
 export function useComposerDraft(key: string | null, seed: string): [string, Dispatch<SetStateAction<string>>] {
 	const [slot] = useState(key);
 	const [text, setText] = useState(() => (slot === null ? seed : (drafts.get(slot) ?? seed)));
-	// The seed it opened with: a later one, such as a todo edited in another window, is not where this draft started.
+	// The seed it opened with: a later one is not where this draft started.
 	const [start] = useState(seed);
 	useEffect(() => {
 		if (slot !== null) drafts.set(slot, text === "" || text === start ? null : text);

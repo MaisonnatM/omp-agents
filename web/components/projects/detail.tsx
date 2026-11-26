@@ -10,7 +10,7 @@ import { listTime } from "../../labels";
 import { hashForNewSession, hashForProject } from "../../routing";
 import { usePageHash } from "../../page-hash";
 import { PageFrame } from "../list-page";
-import type { KnownSessions } from "../todo/links";
+import type { KnownSessions } from "../../labels";
 import { takeJustCreated } from "./new-project";
 import { Decisions, RecentActivity } from "./notes";
 import type { OnProjectChange } from "./parts";
@@ -107,7 +107,7 @@ export function ProjectDetail({ project, sessions, disabled, onChange }: Project
 					<div className="grid items-start gap-4 @4xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
 						<div className="flex min-w-0 flex-col gap-4">
 							<Plan project={project} readOnly={readOnly} onChange={onChange} />
-							<SessionsTable project={project} rows={work.sessions} sessions={sessions} archived={archived} />
+							<SessionsTable project={project} rows={work.sessions} archived={archived} />
 						</div>
 						<div className="flex min-w-0 flex-col gap-4">
 							<Decisions project={project} readOnly={readOnly} onChange={onChange} />

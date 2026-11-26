@@ -2,7 +2,7 @@
 
 `SettingsSync` in `src/settings-sync.ts` keeps the portable settings the same on several machines through one branch of a Git remote.
 What is portable is data, `SYNC_ITEMS` in `src/shared/settings-sync.ts`: omp's `config.yml`, `AGENTS.md`, and `APPEND_SYSTEM.md`, the `skills`, `rules`, `agents`, and `commands` trees of omp's agent directory, and the dashboard's stores, each under its path in the repository (`omp/…` and `dashboard/…`).
-The stores are the source control settings, the todos with their categories and archive, the preferences, the workspace list, the Bots, and the projects, each a `SyncStore` that `syncStores` builds over the server's own file.
+The stores are the source control settings, the preferences, the workspace list, the Bots, and the projects, each a `SyncStore` that `syncStores` builds over the server's own file.
 The Bots store carries each Bot of `bots.json` without its `sessionId`, with its `cwd` as a `~` path, its `memory.md` as `memory`, one entry per line, so facts two machines remembered merge entry by entry, and its routines as `routines`; a Bot arriving keeps this machine's session id for it, else none.
 Each carried routine is the routine of `routines.json` without its `botId`, `runs`, and `scheduledAt`, which stay on the machine that ran them, and with `enabled` and `machine` folded into `runsOn`: the machine that runs it, `{ id, name }`, or `null` while it is paused, so the carried form cannot hold a routine enabled on no machine, and two machines changing it conflict.
 `thisMachine` names this machine: an id that `machine.json` beside the access token keeps, made on first use since a Mac's name can change, and its host name.
@@ -16,7 +16,6 @@ The preferences store holds two parts: `page`, the page's portable `localStorage
 `NEVER_SYNCED` lists, as patterns on those paths, what never syncs even inside a synced tree: databases such as `agent.db`, `mcp.json`, `secrets.yml`, key and credential files, session files, lock files, the dashboard's token, `interrupted.json`, and `merges.json`, and `.git` and `node_modules` directories.
 `readLocal` also leaves a link inside a tree, a file over 1 MB, a file that is not UTF-8 text, and a file or store whose text matches a credential's shape (`CREDENTIAL_SHAPES`: private keys and GitHub, GitLab, Anthropic, OpenAI, Slack, AWS, Google, Linear, and npm tokens) on the machine, and reports each as skipped.
 Scheduled sends, pins, and notices stay out of the registry, since they name this machine's sessions or runs.
-A todo's session links travel with it, but the session they open exists only on the machine that ran it.
 
 The machine keeps a bare repository, `settings-sync.git` in the data directory, and runs every git command with `GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`, and, unless you set your own, `GIT_SSH_COMMAND="ssh -o BatchMode=yes"`, so git uses the machine's keys and credential helper and fails rather than prompt.
 `SyncRepo` in `src/sync-repo.ts` wraps those commands: it points `origin` at the remote, fetches the branch with `fetch.fsckObjects` on, so git refuses a tree that names `..` or `.git`, reads a commit's text files, builds a commit from a parent and a set of changes with `git fast-import`, and pushes without force.
@@ -34,7 +33,7 @@ A sync runs one at a time, in these steps.
    The order follows the side that reordered the entries all three versions hold, with each entry the other side added placed after the entry before it there; two different reorders conflict.
    A chosen side settles every conflict inside the file in its favor.
 4. Any conflict ends the sync with a `conflict` outcome, before anything is written on either side.
-5. Each store's planned value goes through its store's `parse`, which fails the sync on one it does not take, again before anything is written, and otherwise gives the form the store keeps, such as todos to do before done; that form goes to whichever side lacks it, so one sync leaves both sides equal.
+5. Each store's planned value goes through its store's `parse`, which fails the sync on one it does not take, again before anything is written, and otherwise gives the form the store keeps; that form goes to whichever side lacks it, so one sync leaves both sides equal.
 6. When this machine has changes, commit them on top of the remote's head and push as a fast-forward; a push that loses a race fails the sync, and the next one merges again.
 7. Write the remote's changes here: files through `atomicWriteText`, executable or not as the remote has them, with deleted files' emptied directories removed up to the tree, and stores through their `write`, which tells the pages that show a list it changed.
    A store edited here after step 2 merges with the incoming value against what step 2 read, keeping this machine's side of any conflict, so the edit survives the sync and goes out with the next one.

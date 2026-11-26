@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-26
 
+- The Todo page is gone, along with its list, the todo picker in new sessions, todo links in messages, and the todo tool sessions used to add items to it. Settings › Sync no longer carries a todo list.
 - A Board Workspace's **Projects** tab now lists its projects in a resizable column with search, **All projects**, and **New project**, as the **Bots** tab does; a project you pick opens on the right, beside the list.
 - Each reply in a Board thread has a **Mark unread** button, as in Slack: it closes the thread and its blue unread count comes back, counting from that reply, until you open the thread again.
 - The Board looks calmer: reply counts and unread counts use the app's own colors instead of bright blue, names drop the **SESSION** tag and use one size, the open Board task is marked in gray instead of yellow, the last reply's time no longer turns into "View thread" on hover, and messages line up with the Board's title.

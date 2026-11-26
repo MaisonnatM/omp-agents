@@ -184,7 +184,7 @@
   **Stop idle processes** picks when the server stops the dev servers, watchers, and services that sessions start besides omp: **Off**, or after 15 or 30 minutes, 1 hour, or 2 hours, 30 minutes by default.
   A process stops once every session it serves has been idle that long, and **Stop idle sessions** stops the omp of a session left idle with no subagent running: **Off**, or after 4, 12, or 24 hours, or 3 days, 12 hours by default; see [Sessions sidebar](sessions-sidebar.md).
   **New sessions** pins a skill.
-  Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request or a todo, then sends its first message through that skill.
+  Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, then sends its first message through that skill.
   The picker lists the skills of the sidebar's workspace, and says which, or your own skills with **All workspaces**.
   Choose **None** to unpin.
 - **Keyboard** lists every keyboard shortcut by category, and `?` outside a text field opens it; see [Keyboard shortcuts](keyboard-shortcuts.md).

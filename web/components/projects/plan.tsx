@@ -9,12 +9,12 @@ import { type Project, type ProjectStep, stepNumbers } from "../../../src/shared
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { appendToComposer, newDraftKey } from "../../composer-drafts";
+import { appendToComposer, NEW_DRAFT_KEY } from "../../composer-drafts";
 import { hashForNewSession } from "../../routing";
 import { SegmentedTab, SegmentedTabPanel, SegmentedTabs, SegmentedTabsList } from "../segmented-tabs";
 import { offerUndo } from "../toaster";
-import { TodoInput } from "../todo/input";
 import { AddLine, Card, EmptyNote, type OnProjectChange, PROJECT_UNDO, RemoveButton, RowAction } from "./parts";
+import { StepInput } from "./step-input";
 import { stepsPrompt } from "./steps-prompt";
 
 type PlanTab = "todo" | "done" | "all";
@@ -62,7 +62,7 @@ export function Plan({ project, readOnly, onChange }: { project: Project; readOn
 	const startSession = (stepIds: ReadonlySet<string>): void => {
 		const prompt = stepsPrompt(project, stepIds);
 		if (prompt === null) return;
-		appendToComposer(newDraftKey(null), prompt);
+		appendToComposer(NEW_DRAFT_KEY, prompt);
 		setSelection(null);
 		location.hash = hashForNewSession({ projectId });
 	};
@@ -206,7 +206,7 @@ function PlanRow({ projectId, step, number, readOnly, picked, onPick, onChange, 
 				</button>
 			)}
 			{editing && !selecting ? (
-				<TodoInput
+				<StepInput
 					initial={step.text}
 					label="Step"
 					onKey={(key, text) => {
@@ -252,7 +252,7 @@ function AddSubStep({ onAdd, onClose }: { onAdd: (text: string) => void; onClose
 	return (
 		<li className="flex min-h-10 items-center gap-3 border-b border-border/60 py-2 pr-4 pl-12 text-sm leading-snug last:border-b-0">
 			<span className="size-5 shrink-0 rounded-md border border-dashed border-border" aria-hidden />
-			<TodoInput
+			<StepInput
 				key={added}
 				initial=""
 				label="New sub-step"

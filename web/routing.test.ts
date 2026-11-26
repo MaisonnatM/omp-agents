@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { hashForSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { StartOp } from "./starts";
-import type { UserTodo } from "../src/user-todos-shared";
 import {
 	type BotRoutineRoute,
 	adjacentSession,
@@ -15,8 +14,6 @@ import {
 	hashForPullRequestFiles,
 	hashForBotRoutine,
 	hashForSettings,
-	hashForTodo,
-	hashForTodoId,
 	hashForView,
 	type Layout,
 	layoutAfterResumeAll,
@@ -30,9 +27,6 @@ import {
 	swapView,
 	viewForSession,
 } from "./routing";
-
-const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: null, categoryId: null, workspace: null, children: [], links: [], addedBy: null, ...fields });
-
 describe("layout hash", () => {
 	const live = (instanceId: string, agentId: string | null = null) => ({ kind: "live", instanceId, agentId }) as const;
 	const past = (sessionId: string) => ({ kind: "past", sessionId }) as const;
@@ -97,17 +91,10 @@ describe("layout hash", () => {
 	test("the new-session draft is not read as a layout, and its directory keeps its slashes and tilde", () => {
 		const hash = hashForNewSession({ cwd: "~/code/my app" });
 		expect(hash).toBe("#new/~%2Fcode%2Fmy%20app");
-		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "new", cwd: "~/code/my app", todoId: null, projectId: null } });
-		expect(routeFromHash("#new")).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: null, projectId: null } });
+		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "new", cwd: "~/code/my app", projectId: null } });
+		expect(routeFromHash("#new")).toEqual({ kind: "page", page: { kind: "new", cwd: null, projectId: null } });
 		expect(routeFromHash("#newer").kind).toBe("panes");
 		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
-	});
-
-	test("a draft for a todo names it after the directory, or alone", () => {
-		expect(hashForNewSession({ cwd: "~/code", todoId: "t 1" })).toBe("#new/~%2Fcode?todo=t+1");
-		expect(routeFromHash("#new/~%2Fcode?todo=t%201")).toEqual({ kind: "page", page: { kind: "new", cwd: "~/code", todoId: "t 1", projectId: null } });
-		expect(hashForNewSession({ todoId: "t1" })).toBe("#new?todo=t1");
-		expect(routeFromHash("#new?todo=t1")).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: "t1", projectId: null } });
 	});
 
 	test("the pull requests hash opens the page alone or at one pull request's row, and no pull requests hash is read as a layout", () => {
@@ -130,27 +117,6 @@ describe("layout hash", () => {
 			expect(routeFromHash(hashForPullRequestFiles(target, path))).toEqual({ kind: "page", page: { kind: "pull-requests", target, files: { path } } });
 		}
 		expect(routeFromHash("#pull-requests/acme/web.app/6596/filesx")).toEqual({ kind: "page", page: { kind: "pull-requests", target: null } });
-	});
-
-	test("the todo hash opens every todo or one of the other lists, with a todo open or none, an old category link lists every todo, and no todo hash is read as a layout", () => {
-		expect(hashForTodo("all")).toBe("#todo");
-		expect(routeFromHash("#todo")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: null } });
-		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: null } });
-		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: null } });
-		for (const list of ["today", "needs", "agents", "archive"] as const) {
-			expect(hashForTodo(list)).toBe(`#todo/${list}`);
-			expect(routeFromHash(`#todo/${list}`)).toEqual({ kind: "page", page: { kind: "todo", list, open: null } });
-		}
-		expect(hashForTodo("all", "t 1")).toBe("#todo?open=t%201");
-		const list = { categories: [], todos: [todo({ id: "t1" }), todo({ id: "t2", categoryId: "work", children: [todo({ id: "t3" })] })], archive: [todo({ id: "a1", children: [todo({ id: "a2" })] })] };
-		expect(hashForTodoId(list, "t3")).toBe("#todo?open=t3");
-		expect(hashForTodoId(list, "t1")).toBe("#todo?open=t1");
-		expect(hashForTodoId(list, "a2")).toBe("#todo/archive?open=a2");
-		expect(hashForTodoId(list, "gone")).toBeNull();
-		expect(routeFromHash("#todo?open=t%201")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: "t 1" } });
-		expect(routeFromHash("#todo/work?open=t1")).toEqual({ kind: "page", page: { kind: "todo", list: "all", open: "t1" } });
-		expect(routeFromHash("#todo/today?open=t1")).toEqual({ kind: "page", page: { kind: "todo", list: "today", open: "t1" } });
-		for (const hash of ["#todo", "#todo/0b9e", "#todo?open=t1"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
 	test("the bots hash opens the New Bot form, one Bot, its routines card with or without one open, a routine's editor, or a new routine's, and no bots or old routines hash is read as a page", () => {
@@ -180,7 +146,7 @@ describe("layout hash", () => {
 	test("every page hash names its page and route, and a session or layout hash names none", () => {
 		expect(routeFromHash(hashForSettings("files"))).toEqual({ kind: "page", page: { kind: "settings", section: "files" } });
 		expect(routeFromHash(hashForPullRequests(null))).toEqual({ kind: "page", page: { kind: "pull-requests", target: null } });
-		expect(routeFromHash(hashForNewSession())).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: null, projectId: null } });
+		expect(routeFromHash(hashForNewSession())).toEqual({ kind: "page", page: { kind: "new", cwd: null, projectId: null } });
 		expect(routeFromHash("#session/01a0f6a5-181e")).toEqual({ kind: "session", sessionId: "01a0f6a5-181e" });
 		expect(routeFromHash("#7c51f77b2a1bf7ba,past/9d2e0000").kind).toBe("panes");
 	});
@@ -195,10 +161,9 @@ describe("layout hash", () => {
 
 	test("a malformed percent-escape names nothing instead of throwing: the page opens without its target, and its pane drops", () => {
 		const page = (page: Page): Route => ({ kind: "page", page });
-		expect(routeFromHash("#todo/%E0")).toEqual(page({ kind: "todo", list: "all", open: null }));
 		expect(routeFromHash("#bots/%zz")).toEqual(page({ kind: "bots", target: null, adding: false }));
 		expect(routeFromHash("#bots/b1/routines/%zz")).toEqual(page({ kind: "bots", target: "b1", routine: null }));
-		expect(routeFromHash("#new/%E0?todo=t1")).toEqual(page({ kind: "new", cwd: null, todoId: "t1", projectId: null }));
+		expect(routeFromHash("#new/%E0?project=p1")).toEqual(page({ kind: "new", cwd: null, projectId: "p1" }));
 		expect(routeFromHash("#pull-requests/acme/web/1/files/%E0")).toEqual(page({ kind: "pull-requests", target: { owner: "acme", repo: "web", number: 1 }, files: { path: null } }));
 		expect(routeFromHash("#session/%E0")).toEqual({ kind: "panes", layout: { panes: [], focus: 0, maximized: false } });
 		expect(routeFromHash("#a,past/%zz,b/%E0,c@1")).toEqual({ kind: "panes", layout: { panes: [live("a"), live("c")], focus: 1, maximized: false } });
@@ -267,9 +232,9 @@ describe("opening and closing panes", () => {
 	test("a started session opens where its start asked: a resume in its transcript's pane, a new pull request in the focused pane, a quick action nowhere", () => {
 		const past: View = { kind: "past", sessionId: "s" };
 		const layout = split([a, past, b], 2);
-		const quick: StartOp = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "todo", id: "t1", text: "fix", action: "work" }, skill: null };
+		const quick: StartOp = { kind: "quick", cwd: "/tmp", branch: null, prompt: "fix", subject: { kind: "pull-request", pr: { owner: "o", repo: "r", number: 1 }, action: "review" }, skill: null };
 		expect(layoutAfterStart(layout, { kind: "resume", sessionId: "s" }, "c")).toEqual(split([a, c, b], 1));
-		expect(layoutAfterStart(layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, todoId: null, projectId: null, private: false }, "c")).toEqual(split([c], 0));
+		expect(layoutAfterStart(layout, { kind: "new", cwd: "/work", prompt: "hi", images: [], model: null, thinking: null, skill: null, branch: null, projectId: null, private: false }, "c")).toEqual(split([c], 0));
 		expect(layoutAfterStart(layout, { kind: "fork", view: a, itemId: "u1", point: { entryId: "e1", prefill: true } }, "c")).toEqual(split([a, past, c], 2));
 		expect(layoutAfterStart(layout, { kind: "pull-request-new", cwd: "/work", repo: "webapp", change: "fix", skill: null }, "c")).toEqual(split([a, past, c], 2));
 		expect(layoutAfterStart(layout, quick, "c")).toBeNull();

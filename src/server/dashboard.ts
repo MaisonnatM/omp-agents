@@ -20,7 +20,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, stopStats } from "../omp/stats";
-import { activityDb, botInboxDir, botsDir, botsFile, endedWorktreesFile, HOME, interruptedFile, machineFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, userTodosFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, botInboxDir, botsDir, botsFile, endedWorktreesFile, HOME, interruptedFile, machineFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routineInboxDir, routinesFile, scheduledFile, shepherdInboxDir, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, workspaceFor, workspacesFile } from "../paths";
 import { type ModuleChanges, type ModuleRun, isStoredModuleId, moduleJoins, openModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { worktreeAt } from "../git";
@@ -33,7 +33,6 @@ import type { ScheduledCheck, StartRequest, StartResult, View } from "../shared/
 import { nextSendTo } from "../shared/scheduled";
 import { inAppData } from "../shared/workspaces";
 import { Terminals } from "../terminals";
-import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
 import { Worktrees } from "../worktrees";
 import { WorktreeOccupants } from "./worktree-occupants";
 import { Bots, startingRoutine } from "./bots";
@@ -86,7 +85,6 @@ import { createClientHandler } from "./socket";
 import { botExtension, designerExtension, shepherdExtension } from "./resources";
 import { createStarter, reattachAll, type SessionJoin } from "./start";
 import type { JsonInboxDir } from "./json-inbox";
-import { UserTodosFile } from "./user-todos-file";
 import { unattendedWork } from "./unattended-work";
 import { UsagePoll } from "./usage-poll";
 import { type Socket, Views } from "./views";
@@ -105,7 +103,6 @@ export class Dashboard {
 	readonly #foreignUsage = new ForeignUsage(SESSION_FORMATS, listPrice);
 	readonly #interrupted = new InterruptedSessions(interruptedFile, () => void this.#notices.check(STOPPED_KINDS));
 	readonly #endedWorktrees = new EndedWorktrees(endedWorktreesFile);
-	readonly #todos = new UserTodosFile(userTodosFile);
 	readonly #modules = openModules();
 	readonly #routines = new RoutinesFile(routinesFile);
 	readonly #scheduled = new ScheduledFile(scheduledFile);
@@ -212,7 +209,7 @@ export class Dashboard {
 		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
 		// A sync, which runs only once the server listens, tells the pages that show a list it rewrote.
 		const stores = syncStores(
-			{ sourceControl: this.#sourceControl, todos: this.#todos, preferences: this.#preferences, processes: this.#processSettings, workspaces, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile), projects: this.#modules.projects },
+			{ sourceControl: this.#sourceControl, preferences: this.#preferences, processes: this.#processSettings, workspaces, bots: this.#botsFile, botsDir, routines: this.#routines, machine: thisMachine(machineFile), projects: this.#modules.projects },
 			HOME,
 			list => {
 				// Every Bot memory is read again, since a sync may have rewritten them.
@@ -222,7 +219,6 @@ export class Dashboard {
 		);
 		this.#settingsSync = new SettingsSync(settingsSyncFile, settingsSyncRepo, { omp: agentDir, home: HOME, stores });
 		const files = this.#files;
-		const todos = this.#todos;
 		const modules = this.#modules;
 		const routines = this.#routines;
 		const scheduled = this.#scheduled;
@@ -263,7 +259,6 @@ export class Dashboard {
 			() => this.#broadcasts.pushList("notices"),
 		));
 		const lists = (this.#lists = new ListRegistry({
-			"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
 			// Every routine belongs to a Bot, so a save for a Bot that is gone saves nothing.
 			routines: {
 				msg: () => ({ t: "routines", routines: routines.value }),
@@ -330,9 +325,6 @@ export class Dashboard {
 			factsFor: factsOf,
 			onStarted: () => broadcasts.syncRoster(),
 			workspaceOf,
-			linkTodo: (todoId, sessionId) => {
-				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
-			},
 			joinProject: (projectId, sessionId) => applyModuleNow("projects", { op: "join", projectId, sessionId }),
 			joinFor: (request, instanceId) => this.#joinFor(request, instanceId),
 			admit: this.#admit,
@@ -408,7 +400,6 @@ export class Dashboard {
 			broadcasts,
 			routines,
 			scheduled,
-			todos,
 			triggerWatch: this.#triggerWatch,
 			botsFile: this.#botsFile,
 			bots: this.#bots,
@@ -462,7 +453,6 @@ export class Dashboard {
 				await notices.check(STOPPED_KINDS);
 				this.#fireTriggers();
 				if (!this.#claimUnattendedWork()) return;
-				this.#clearOldDone();
 				// It reads every sandbox's checkout, which takes minutes, so the routines and sends after it do not wait for it.
 				void this.#isolationSweep.tick();
 				await scheduledRunner.tick();
@@ -617,7 +607,6 @@ export class Dashboard {
 		await this.#notices.check(STOPPED_KINDS);
 		await this.#listRegistry();
 		if (this.#ownerLock.held) {
-			this.#clearOldDone();
 			this.#pruneActivity();
 			// A restart starts the daily loop over, so the heartbeat runs now too; the runs it finds name its one notice, which a second look at them keeps.
 			void this.#notices.check(HEALTH_KINDS);
@@ -685,11 +674,6 @@ export class Dashboard {
 	#workspaceCwds(): string[] {
 		const { added, hidden } = this.#workspaces.value;
 		return [...new Set([...this.knownWorkspaces(), ...added])].filter(cwd => !hidden.includes(cwd));
-	}
-
-	/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
-	#clearOldDone(): void {
-		this.#lists.apply("user-todos", { op: "clear-done", categoryId: null, before: new Date(Date.now() - DONE_KEPT_HOURS * 3_600_000).toISOString() });
 	}
 
 	/** Deletes the activity rows older than {@link ACTIVITY_KEPT_DAYS}. */

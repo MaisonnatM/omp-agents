@@ -9,7 +9,6 @@ import type { Bot, BotId, BotLast } from "../../src/shared/bots";
 import type { ProjectList } from "../../src/shared/projects";
 import type { RosterHost } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
-import type { UserTodoList } from "../../src/user-todos-shared";
 import type { OpenBot } from "../bots-model";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { Completions } from "../pane-store";
@@ -21,7 +20,7 @@ import { MemoryPage } from "./memory/page";
 import { ProjectsPage } from "./projects/page";
 import { SportNav } from "./sport/nav";
 import { SportPage } from "./sport/page";
-import type { KnownSessions } from "./todo/links";
+import type { KnownSessions } from "../labels";
 
 /** The core's data a module's page reads but does not own. */
 export interface CoreData {
@@ -33,8 +32,6 @@ export interface CoreData {
 	botLasts: Readonly<Record<BotId, BotLast | null>>;
 	/** The projects, `null` until the server first sends them, which a Board's Projects tab lists. */
 	projects: ProjectList | null;
-	/** The todo list, `null` until the server sends it. */
-	todos: UserTodoList | null;
 	/** The sessions are listed, so `workspaces` holds every workspace the sidebar offers. */
 	listed: boolean;
 	/** The workspace the sidebar picked, as Settings' workspace sections read it; `null` for all workspaces. */

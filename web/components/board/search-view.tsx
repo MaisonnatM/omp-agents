@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuRadioGroup,
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../../activity";
 import type { CoreData } from "../module-views";
-import { type KnownSessions, sessionLabel } from "../todo/links";
+import { type KnownSessions, sessionLabel } from "../../labels";
 import type { BoardRoute } from "./module";
 import { Avatar, clock, dayLabel, folder } from "./page";
 import { type BoardHit, type BoardScope, type BoardSearch, matchRanges, scopeOf, searchBoard, snippet } from "./search";

@@ -52,11 +52,9 @@ interface NewSessionProps {
 	 * Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at
 	 * `thinking` when it names a level; through `skill` when it names one.
 	 */
-	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId" | "projectId">) => void | Promise<void>;
+	onStart: (op: Omit<NewOp, "kind" | "cwd" | "projectId">) => void | Promise<void>;
 	/** Start the same session at `when` instead, with no page open; resolves once the server saved it. */
 	onSchedule?: (op: ScheduledOp, when: ScheduleWhen) => Promise<void>;
-	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
-	todo: { text: string; prompt: string } | null;
 	/** The project the session joins once it starts; `null` for none. */
 	projectId: string | null;
 	/** Start the session in no project instead. */
@@ -72,7 +70,7 @@ interface NewSessionProps {
 const NO_PROMPTS: string[] = [];
 
 /** What a scheduled start keeps of the draft: text only, in the draft's directory. */
-export type ScheduledOp = Omit<NewOp, "kind" | "cwd" | "todoId" | "projectId" | "images">;
+export type ScheduledOp = Omit<NewOp, "kind" | "cwd" | "projectId" | "images">;
 
 export interface ScheduledDraft {
 	request: NewSessionRequest;
@@ -94,11 +92,11 @@ export interface ScheduledDraft {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo, projectId, onDropProject, scheduled, draftKey, board }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, projectId, onDropProject, scheduled, draftKey, board }: NewSessionProps) {
 	const initial = scheduled?.request ?? null;
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const pickFiles = useRef<(accept?: string) => void>(null);
-	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? todo?.prompt ?? "");
+	const [draft, setDraft] = useComposerDraft(draftKey, initial?.prompt ?? "");
 	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null } | null>(initial && { cwd: initial.cwd, choice: initial.branch });
 	const models = useDraftModelSelection(cwd, initial ?? undefined);
@@ -107,8 +105,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const draftSkill = initial?.skill ?? pinnedSkill;
 	const [skipSkill, setSkipSkill] = useState(initial !== null && initial.skill === null);
 	const [privateOn, setPrivate] = useState(initial?.private ?? false);
-	// A draft that starts from a todo or for a project is never private, since nothing may link to a private session.
-	const linked = todo !== null || projectId !== null;
+	// A draft for a project is never private, since nothing may link to a private session.
+	const linked = projectId !== null;
 	const isPrivate = !linked && privateOn;
 	// Until the open projects arrive, or for one no longer open, the draft still names its project, so it can be dropped.
 	const openProjects = useContext(OpenProjectsContext);
@@ -273,7 +271,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				</div>
 				{directCommand && !completion.popup && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}
-				{!scheduled && todo && <p className="mt-2 px-1 text-xs text-muted-foreground">Your todo “{todo.text}” links to the session once it starts.</p>}
 				{panel}
 			</div>
 		</ComposerEditor>
@@ -307,7 +304,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			{scheduled ? (
 				<EmptyConversation title={`Scheduled in ${name}`}>
 					It starts at its time as Start session would start it. Edit the message, model, skill, directory, or branch, then save; the clock moves its time.
-					{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 				</EmptyConversation>
 			) : (
 				<>

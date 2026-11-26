@@ -18,14 +18,13 @@ const claimsPath = (): string => {
 	return join(dir, "claims.json");
 };
 
-test("explicit subjects, task identities, todos and command arguments identify work, not incidental prose", () => {
+test("explicit subjects, task identities, and command arguments identify work, not incidental prose", () => {
 	const request = (prompt: string) => newSessionRequest("/repo", prompt);
 	expect(taskIdentity(request("/ship https://github.com/ACME/App/pull/7"))).toBe("pr:acme/app#7");
 	expect(taskIdentity(request("/review https://github.com/ACME/App/pull/7"))).toBe("pr:acme/app#7");
 	expect(taskIdentity(request("https://github.com/ACME/App/pull/7 needs a rebase"))).toBe("pr:acme/app#7");
 	for (const prose of ["/ship ENG-2650", "Explain why PR 7 used this design", "S3 bucket policy is wrong"]) expect(taskIdentity(request(prose))).toBeNull();
 	expect(taskIdentity(newSessionRequest("/repo", "work", { subject: { kind: "pull-request", pr: { owner: "ACME", repo: "App", number: 7 } } }))).toBe("pr:acme/app#7");
-	expect(taskIdentity(newSessionRequest("/repo", "work", { todoId: "t1" }))).toBe("todo:t1");
 	expect(taskIdentity(newSessionRequest("/repo", "/ship ENG-2650", { taskId: "ENG-2650:read-only-review" }))).toBe("task:ENG-2650:read-only-review");
 	expect(parseNewSessionRequest({ ...request("work"), taskId: "" })).toBeNull();
 	expect(parseNewSessionRequest({ ...request("work"), taskId: "slice:tests" })?.ok.taskId).toBe("slice:tests");

@@ -34,14 +34,6 @@ export const keepersDir = join(configDir, "sessions", String(portFromEnv()));
 /** The turns this port's server's sessions ended that no page read yet: one file per port, as {@link keepersDir}, since instance ids are each server's own. */
 export const unreadFile = join(configDir, "unread", `${portFromEnv()}.json`);
 
-/** The Todo page's list, beside {@link tokenFile}. */
-export const userTodosFile = join(configDir, "todos.json");
-
-/**
- * Where omp's `user_todo` tool leaves its changes to the Todo page's list, one JSON file each, beside {@link tokenFile}.
- * The server applies and deletes them, so it stays the only writer of {@link userTodosFile}.
- */
-export const userTodoInboxDir = join(configDir, "todo-inbox");
 /** Where omp's `end_session` tool asks the server to end a session, one `<session id>.json` each, beside {@link tokenFile}. */
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
@@ -99,7 +91,7 @@ export const settingsSyncFile = join(configDir, "settings-sync.json");
 export const settingsSyncRepo = join(dataDir, "settings-sync.git");
 /** The page's activity events, which Settings › Activity reports, in the dashboard's data directory; a machine file settings sync never carries. */
 export const activityDb = join(dataDir, "activity.db");
-/** Names the server that runs routines and applies the todo inbox, which servers side by side share, beside {@link tokenFile}. */
+/** Names the server that runs routines and applies the file inboxes, which servers side by side share, beside {@link tokenFile}. */
 export const serverLockFile = join(configDir, "server.lock");
 
 /** `path` with a leading `~` or `~/` read as the home directory; any other path unchanged. */

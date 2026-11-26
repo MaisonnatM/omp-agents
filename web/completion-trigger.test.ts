@@ -26,8 +26,8 @@ test("mentions work after prose but not inside ordinary words", () => {
 });
 
 test("a word and a colon after the @ is the mention's prefix", () => {
-	expect(completionTrigger("Fix @todo:foo", 13)).toEqual({ kind: "mention", token: { start: 4, end: 13, prefix: "todo", body: "foo" } });
-	expect(completionTrigger('Fix @todo:"login page', 21)).toEqual({ kind: "mention", token: { start: 4, end: 21, prefix: "todo", body: '"login page' } });
-	expect(completionTrigger("Fix @todo:", 10)).toEqual({ kind: "mention", token: { start: 4, end: 10, prefix: "todo", body: "" } });
+	expect(completionTrigger("Fix @pr:foo", 11)).toEqual({ kind: "mention", token: { start: 4, end: 11, prefix: "pr", body: "foo" } });
+	expect(completionTrigger('Fix @pr:"login page', 19)).toEqual({ kind: "mention", token: { start: 4, end: 19, prefix: "pr", body: '"login page' } });
+	expect(completionTrigger("Fix @pr:", 8)).toEqual({ kind: "mention", token: { start: 4, end: 8, prefix: "pr", body: "" } });
 	expect(completionTrigger("Read @src/a:b", 13)).toEqual({ kind: "mention", token: { start: 5, end: 13, prefix: null, body: "src/a:b" } });
 });

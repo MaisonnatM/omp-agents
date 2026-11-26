@@ -34,12 +34,10 @@ import type { RoutinesFile } from "./routines-file";
 import type { ScheduledFile } from "./scheduled-file";
 import { ScheduledRunner } from "./scheduled-runner";
 import { ShepherdInbox } from "./shepherd-inbox";
-import { TodoInbox } from "./todo-inbox";
 import type { UsagePoll } from "./usage-poll";
-import { botInboxDir, builtInRoutinesFile, mergesFile, routineInboxDir, shepherdInboxDir, userTodoInboxDir } from "../paths";
+import { botInboxDir, builtInRoutinesFile, mergesFile, routineInboxDir, shepherdInboxDir } from "../paths";
 import { addBuiltInRoutines } from "./built-in-routines";
 import type { TriggerWatch } from "./routine-triggers";
-import type { UserTodosFile } from "./user-todos-file";
 
 /** The dashboard's parts the unattended work reads and acts through. */
 export interface UnattendedWorkDeps {
@@ -52,7 +50,6 @@ export interface UnattendedWorkDeps {
 	broadcasts: Broadcasts;
 	routines: RoutinesFile;
 	scheduled: ScheduledFile;
-	todos: UserTodosFile;
 	/** What the bell's checks saw last, which tells the routines' triggers what is new. */
 	triggerWatch: TriggerWatch;
 	botsFile: BotsFile;
@@ -88,7 +85,7 @@ export interface UnattendedWork {
 }
 
 export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
-	const { sessions, modules, applyModuleNow, lists, broadcasts, routines, scheduled, todos, triggerWatch, botsFile, bots, worktrees, start: startSession, reach, owner: ownerHeld, stopping } = deps;
+	const { sessions, modules, applyModuleNow, lists, broadcasts, routines, scheduled, triggerWatch, botsFile, bots, worktrees, start: startSession, reach, owner: ownerHeld, stopping } = deps;
 	/**
 	 * Moves the routines of a file from before every routine had a Bot to their Bots, creating each Bot they need unless it
 	 * exists. Only the server that runs routines saves the move, so another, such as a smoke run, never rewrites the files
@@ -108,7 +105,6 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 			saveRoutine: routine => lists.apply("routines", { op: "save", routine }),
 		});
 	};
-	const todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), deps.workspaceOf, { active: ownerHeld });
 	const modulesInboxes = moduleInboxes(modules, applyModuleNow, { active: ownerHeld });
 	const routineInbox = new RoutineInbox(routineInboxDir, () => routines.value, change => lists.apply("routines", change), { active: ownerHeld });
 	const botInbox = new BotInbox(
@@ -216,17 +212,15 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		},
 		{ active: ownerHeld },
 	);
-	const inboxes = [todoInbox, routineInbox, botInbox, shepherdInbox, ...modulesInboxes];
+	const inboxes = [routineInbox, botInbox, shepherdInbox, ...modulesInboxes];
 	const takeOver = (): void => {
 		// What the server that ran them saved since this one started.
 		routines.reload();
 		bots.reload();
 		migrateRoutines();
 		addBuiltIns();
-		todos.reload();
 		broadcasts.pushList("routines");
 		broadcasts.pushList("bots");
-		broadcasts.pushList("user-todos");
 		runner.recover();
 		scheduledRunner.recover();
 		for (const inbox of inboxes) void inbox.drain();

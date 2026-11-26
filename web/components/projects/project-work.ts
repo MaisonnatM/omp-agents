@@ -2,8 +2,7 @@
 import { type PullRequest, uniquePullRequests } from "../../../src/shared/github";
 import type { Project } from "../../../src/shared/projects";
 import type { RosterHost } from "../../../src/shared/sessions";
-import { hostLabel, pastLabel } from "../../labels";
-import type { KnownSessions } from "../todo/links";
+import { hostLabel, type KnownSessions, pastLabel } from "../../labels";
 
 /** A session of a project, read once from the roster: its live host while it runs, else its saved copy, or neither once the dashboard forgets it. */
 export interface ProjectSession {

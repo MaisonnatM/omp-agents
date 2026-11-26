@@ -15,7 +15,7 @@ let now = 0;
 Date.now = () => now;
 // React DOM reads these globals as it loads, so it is imported after they are set.
 const { createRoot } = await import("react-dom/client");
-const { appendToComposer, clearDraft, liveDraftKey, newDraftKey, putDraft, replaceInComposer, useComposerDraft, useComposerReplacements } = await import("./composer-drafts.ts");
+const { appendToComposer, clearDraft, liveDraftKey, NEW_DRAFT_KEY, putDraft, replaceInComposer, useComposerDraft, useComposerReplacements } = await import("./composer-drafts.ts");
 
 const DAY = 24 * 60 * 60 * 1000;
 const STORAGE_KEY = "omp-agents.composer-drafts";
@@ -44,14 +44,14 @@ await type("for b");
 results.separate = { a: await open(live("a")), subagent: await open(live("a", "agent-1")), b: await open(live("b")), stored: stored() };
 
 memory.clear();
-results.seeded = [await open(newDraftKey("t1"), "Fix the build")];
+results.seeded = [await open(live("seeded"), "Fix the build")];
 await type("Fix the build first");
 results.seeded.push(stored());
 await type("Fix the build");
 results.seeded.push(stored());
 await type("Something else");
 await type("");
-results.seeded.push(stored(), await open(newDraftKey("t1"), "Fix the build"));
+results.seeded.push(stored(), await open(live("seeded"), "Fix the build"));
 
 memory.clear();
 putDraft(live("fork"), "the prompt it branched at");
@@ -76,7 +76,7 @@ putDraft(live("old"), "old");
 now = 2 * DAY;
 putDraft(live("recent"), "recent");
 now = 31 * DAY;
-putDraft(newDraftKey(null), "new");
+putDraft(NEW_DRAFT_KEY, "new");
 results.expiry = stored();
 
 memory.set(STORAGE_KEY, "{not json");
@@ -116,7 +116,7 @@ test("each composer keeps its own draft, forgets one equal to its seed or empty,
 			b: "for b",
 			stored: { "live/a": { text: "for a", at: 0 }, "live/a/agent-1": { text: "for its subagent", at: 0 }, "live/b": { text: "for b", at: 0 } },
 		},
-		seeded: ["Fix the build", { "new/todo/t1": { text: "Fix the build first", at: 0 } }, {}, {}, "Fix the build"],
+		seeded: ["Fix the build", { "live/seeded": { text: "Fix the build first", at: 0 } }, {}, {}, "Fix the build"],
 		put: "the prompt it branched at",
 		cleared: "",
 		appended: {

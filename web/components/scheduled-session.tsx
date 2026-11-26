@@ -17,11 +17,9 @@ interface ScheduledSessionProps {
 	workspaces: Workspace[];
 	connected: boolean;
 	completions: Completions | null;
-	/** The todo `todoId` names, as the new-session draft words it. */
-	todoOf: (todoId: string | null) => { text: string; prompt: string } | null;
 }
 
-export function ScheduledSession({ id, workspaces, connected, completions, todoOf }: ScheduledSessionProps) {
+export function ScheduledSession({ id, workspaces, connected, completions }: ScheduledSessionProps) {
 	const send = useContext(ScheduledSends).find(candidate => candidate.id === id);
 	if (!send) return <p className="m-auto text-sm text-muted-foreground">It is no longer scheduled: it started, or was canceled.</p>;
 	if (send.target.kind !== "start") {
@@ -32,7 +30,7 @@ export function ScheduledSession({ id, workspaces, connected, completions, todoO
 		);
 	}
 	// Keyed by the send, so another one opens as its own draft.
-	return <ScheduledDraftPage key={send.id} send={send} request={send.target.request} workspaces={workspaces} connected={connected} completions={completions} todoOf={todoOf} />;
+	return <ScheduledDraftPage key={send.id} send={send} request={send.target.request} workspaces={workspaces} connected={connected} completions={completions} />;
 }
 
 interface DraftPageProps extends Omit<ScheduledSessionProps, "id"> {
@@ -40,7 +38,7 @@ interface DraftPageProps extends Omit<ScheduledSessionProps, "id"> {
 	request: NewSessionRequest;
 }
 
-function ScheduledDraftPage({ send, request, workspaces, connected, completions, todoOf }: DraftPageProps) {
+function ScheduledDraftPage({ send, request, workspaces, connected, completions }: DraftPageProps) {
 	const { request: ask, send: post } = useDashboardActions();
 	const [cwd, setCwd] = useState(request.cwd);
 	const [projectId, setProjectId] = useState(request.projectId);
@@ -49,7 +47,7 @@ function ScheduledDraftPage({ send, request, workspaces, connected, completions,
 	/** The send with the draft's start, at `when`, else at its own time. */
 	const updated = (op: ScheduledOp, when: ScheduleWhen | null): ScheduledChange => ({
 		op: "update",
-		send: { id: send.id, at: when?.at ?? send.at, reset: when ? when.reset : send.reset, target: { kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: request.todoId, projectId, subject: request.subject }) } },
+		send: { id: send.id, at: when?.at ?? send.at, reset: when ? when.reset : send.reset, target: { kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, projectId, subject: request.subject }) } },
 	});
 	return (
 		<NewSession
@@ -62,7 +60,6 @@ function ScheduledDraftPage({ send, request, workspaces, connected, completions,
 			onPickCwd={setCwd}
 			onStart={op => change.run(updated(op, null), { op: "send-now", id: send.id })}
 			onSchedule={(op, when) => ask({ t: "schedule", change: updated(op, when) })}
-			todo={todoOf(request.todoId)}
 			projectId={projectId}
 			onDropProject={() => setProjectId(null)}
 			draftKey={null}

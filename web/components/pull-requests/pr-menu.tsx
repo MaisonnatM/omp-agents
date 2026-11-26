@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { appendToComposer, newDraftKey } from "../../composer-drafts";
+import { appendToComposer, NEW_DRAFT_KEY } from "../../composer-drafts";
 import { rebaseApplies } from "../../pull-requests-model";
 import { useRebaseState } from "../../pull-request-rebases";
 import { QUICK_ACTIONS } from "../../quick-actions";
@@ -113,7 +113,7 @@ function ReviewersSubmenu({ pr, options, onChange }: MenuReviewers) {
 export function PullRequestMenuItems({ pr, state, quick, onState, onApprove, merge, rebase, reviewers, ask, pending = false }: PullRequestMenuItemsProps) {
 	const { openNewSession } = useDashboardActions();
 	const draft = (on: MenuAsk, prompt: string): void => {
-		appendToComposer(newDraftKey(null), prompt);
+		appendToComposer(NEW_DRAFT_KEY, prompt);
 		openNewSession(on.cwd ?? undefined);
 	};
 	const confirm = useInlineConfirm(prKey(pr));

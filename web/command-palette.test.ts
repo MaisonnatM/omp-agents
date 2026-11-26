@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { IconFolder1 } from "central-icons";
 import {
 	chordAction,
-	highlightOnFound,
 	type Frecency,
 	type HomeSection,
 	type PaletteAction,
@@ -66,12 +65,6 @@ describe("paletteReducer", () => {
 		expect(views(apply(typed, { type: "query", query: "" }, { type: "backspaceOnEmpty" }))).toEqual(["root"]);
 	});
 
-	test("quick capture lands on Create todo, above the root it goes back to", () => {
-		const state = apply(null, { type: "open", view: "createTodo" });
-		expect(views(state)).toEqual(["root", "createTodo"]);
-		expect(views(apply(state, { type: "escape" }))).toEqual(["root"]);
-	});
-
 	test("the action panel opens only on a highlighted item", () => {
 		expect(apply(null, { type: "open" }, { type: "togglePanel" })?.panel).toBeNull();
 	});
@@ -86,20 +79,12 @@ describe("paletteSections", () => {
 		expect(listed(paletteSections(items, "deploy", frecency, NOW))).toEqual([["running", ["session:b", "session:a"]]]);
 	});
 
-	test("sections rank by their best match, and what the search becomes lists last under its own heading", () => {
-		const items = [
-			item("fallback:create-todo", "fallback", "Create todo “deploy”"),
-			item("session:p", "past", "Deploy fix"),
-			item("session:r", "running", "Notes"),
-			item("command:deploy", "commands", "Deploy"),
-		];
-		const sections = paletteSections(items, "deploy", {}, NOW);
-		expect(listed(sections)).toEqual([
+	test("sections rank by their best match", () => {
+		const items = [item("session:p", "past", "Deploy fix"), item("session:r", "running", "Notes"), item("command:deploy", "commands", "Deploy")];
+		expect(listed(paletteSections(items, "deploy", {}, NOW))).toEqual([
 			["commands", ["command:deploy"]],
 			["past", ["session:p"]],
-			["fallback", ["fallback:create-todo"]],
 		]);
-		expect(sections.at(-1)?.heading).toBe("Use “deploy”");
 	});
 
 	test("an empty search leads with the five most used items, which leave their own sections", () => {
@@ -128,29 +113,26 @@ describe("paletteSections", () => {
 		]);
 	});
 
-	test("todos and pull requests list for a search or under Suggestions, each under its own heading, and only when they hold every word", () => {
+	test("pull requests list for a search or under Suggestions, under their own heading, and only when they hold every word", () => {
 		const items = [
 			item("session:r", "running", "Large old gardens in north"),
-			item("todo:t", "todos", "Fix login"),
-			item("todo:loose", "todos", "Large old gardens in north"),
 			item("pr:o/r#4", "pullRequests", "Ship login"),
+			item("pr:o/r#5", "pullRequests", "Large old gardens in north"),
 		];
 		expect(listed(paletteSections(items, "", {}, NOW))).toEqual([["running", ["session:r"]]]);
-		expect(listed(paletteSections(items, "", { "todo:t": { count: 3, last: NOW } }, NOW, 5))).toEqual([
-			["suggestions", ["todo:t"]],
+		expect(listed(paletteSections(items, "", { "pr:o/r#4": { count: 3, last: NOW } }, NOW, 5))).toEqual([
+			["suggestions", ["pr:o/r#4"]],
 			["running", ["session:r"]],
 		]);
 		const found = paletteSections(items, "login", {}, NOW);
 		expect(found.map(section => [section.heading, section.items.map(entry => entry.id)]).toSorted()).toEqual([
 			["Pull requests", ["pr:o/r#4"]],
 			["Running", ["session:r"]],
-			["Todos", ["todo:t"]],
 		]);
 	});
 
-	test("conversation matches list for a search only, in the server's order whatever the fuzzy match scores, after the ranked sections and before what the search becomes", () => {
+	test("conversation matches list for a search only, in the server's order whatever the fuzzy match scores, after the ranked sections", () => {
 		const items = [
-			item("fallback:create-todo", "fallback", "Create todo"),
 			item("conversation:b", "conversations", "unrelated words"),
 			item("conversation:a", "conversations", "deploy deploy deploy"),
 			item("session:r", "running", "Deploy web"),
@@ -159,24 +141,15 @@ describe("paletteSections", () => {
 		expect(listed(paletteSections(items, "deploy", {}, NOW))).toEqual([
 			["running", ["session:r"]],
 			["conversations", ["conversation:b", "conversation:a"]],
-			["fallback", ["fallback:create-todo"]],
 		]);
-	});
-
-	test("arriving matches take the highlight from what the search becomes, and leave a highlight on a match where it is", () => {
-		const items = [item("fallback:create-todo", "fallback", "Create todo"), item("conversation:a", "conversations", "deploy"), item("session:r", "running", "Deploy web")];
-		const sections = paletteSections(items, "deploy", {}, NOW);
-		expect(highlightOnFound(sections, "fallback:create-todo")).toBe("session:r");
-		expect(highlightOnFound(sections, "conversation:a")).toBeNull();
-		expect(highlightOnFound(paletteSections([items[0]!], "deploy", {}, NOW), "fallback:create-todo")).toBeNull();
 	});
 });
 
 describe("paletteCommands", () => {
 	test("lists the shortcuts with a command title and a handler, less those unavailable now", () => {
-		const handlers: ShortcutHandlers = { todo: noop, "pull-requests": noop, restore: noop, closeTab: noop, help: noop };
-		expect(paletteCommands(handlers, new Set()).map(({ id }) => id)).toEqual(["help", "pull-requests", "todo"]);
-		expect(paletteCommands(handlers, new Set(["todo"])).map(({ id }) => id)).toEqual(["help", "pull-requests"]);
+		const handlers: ShortcutHandlers = { bots: noop, "pull-requests": noop, restore: noop, closeTab: noop, help: noop };
+		expect(paletteCommands(handlers, new Set()).map(({ id }) => id)).toEqual(["help", "pull-requests", "bots"]);
+		expect(paletteCommands(handlers, new Set(["bots"])).map(({ id }) => id)).toEqual(["help", "pull-requests"]);
 	});
 
 	test("the focused-session goal command uses the normal availability filter", () => {
@@ -220,20 +193,20 @@ describe("paletteSections matching", () => {
 		]);
 	});
 
-	test("an item the search does not match is absent, leaving only what the search becomes", () => {
-		const items = [item("session:r", "running", "Deploy web"), item("command:c", "commands", "Open settings"), item("fallback:create-todo", "fallback", "Create todo")];
-		expect(listed(paletteSections(items, "zzqx", {}, NOW))).toEqual([["fallback", ["fallback:create-todo"]]]);
+	test("an item the search does not match is absent", () => {
+		const items = [item("session:r", "running", "Deploy web"), item("command:c", "commands", "Open settings")];
+		expect(listed(paletteSections(items, "zzqx", {}, NOW))).toEqual([]);
 	});
 
 	test("a searched item lists only when it holds every typed word, which may sit across its title, subtitle and keywords", () => {
 		const items = [
-			item("todo:one-word", "todos", "Fix login"),
-			described(item("todo:split", "todos", "Fix login"), { subtitle: "deploy pipeline" }),
+			item("pr:one-word", "pullRequests", "Fix login"),
+			described(item("pr:split", "pullRequests", "Fix login"), { subtitle: "deploy pipeline" }),
 			described(item("settings:split", "settings", "Login"), { keywords: ["deploy"] }),
 		];
 		expect(listed(paletteSections(items, "login deploy", {}, NOW)).toSorted()).toEqual([
+			["pullRequests", ["pr:split"]],
 			["settings", ["settings:split"]],
-			["todos", ["todo:split"]],
 		]);
 	});
 

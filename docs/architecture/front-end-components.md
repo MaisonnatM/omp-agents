@@ -2,7 +2,7 @@
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components, installed with the shadcn CLI into `web/components/ui`, on [UI SDK](https://ui-sdk.dev/)'s primitives (`@ui-sdk/react`), whose docs ship in `node_modules/@ui-sdk/react/docs/`.
 `web/globals.css` declares the `ui-sdk` cascade layer first, so the page's own styles win over the CSS UI SDK adds.
-The roster uses `sidebar`, and the page switch, **Pull requests**, **Bots**, and **Sessions** in the sidebar and **Todo** and **Sport** in the header, uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+The roster uses `sidebar`, and the page switch, **Pull requests**, **Bots**, and **Sessions** in the sidebar and **Sport** in the header, uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
 User and assistant turns use `chat-message`, and the composer uses `input-message`.
 Tool calls and the model's thinking use shadcn's Base UI `trace`, vendored as `web/components/ui/trace.tsx` on `web/components/ui/collapsible.tsx`, UI SDK's collapsible, and code blocks in messages its `code-block`, vendored as `web/components/ui/code-block.tsx`.
 The utilities both use from shadcn's `tailwind.css`, such as `shimmer` and `scroll-fade-x`, are copied into `web/shadcn.css`, since that file's `scroll-fade` would clash with the page's own.

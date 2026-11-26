@@ -157,8 +157,8 @@ interface CompletionOptions extends Pick<MenuSource<unknown>, "editorRef" | "dra
 
 /**
  * omp's commands behind `/`, its skills behind `$`, and the `@` menu, for a composer. Live sessions, the new-session
- * draft, and a Bot's composer share it, so all offer the same commands and skills. The `@` menu adds todos, pull
- * requests, people, and sessions to omp's files; it asks the server only for files.
+ * draft, and a Bot's composer share it, so all offer the same commands and skills. The `@` menu adds pull requests,
+ * people, and sessions to omp's files; it asks the server only for files.
  */
 export function useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer }: CompletionOptions): Completion {
 	const nextId = useRef(0);
