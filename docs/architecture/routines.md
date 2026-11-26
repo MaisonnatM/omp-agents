@@ -71,6 +71,22 @@ It saves those five with `model-replay.ts candidates --sessions` as `<today>-tas
 It forbids editing, committing, or pushing in any repository and running `run` or `judge`, and writes only under `~/.cache/omp-harness-review/`.
 Since a replay loads no extension but `cache-tail.ts`, a proposed extension change names instead the [Evals](evals.md) run that would measure it with the full harness, such as its `--disable-extensions` arm, which the review does not run.
 
+## Routines in every Workspace
+
+A routine with `everyWorkspace: true` is a template, and a routine with `copyOf` is a copy of the template with that id; both fields are part of `RoutineSpec`, so a save, the file, and Settings sync carry them.
+A Workspace has a template when it is the template's own Workspace or one of its routines has that template as `copyOf`.
+`copiesFor` in `src/server/routine-copies.ts` names the copies due among the eligible Workspaces, given what was seen: a template not seen yet goes to every eligible Workspace that does not have it, and a Workspace not seen yet gets every template it does not have.
+A copy is a new routine with a fresh id, the template's name, schedules, triggers, task, launch, and `enabled`, the Workspace as its own, `copyOf` set, and no `everyWorkspace`; no later edit of the template reaches it.
+What was seen is `routine-copies.json` beside the access token, `{ workspaces, templates }`, which only this computer keeps and Settings sync never carries.
+With no such file yet, `RoutineCopies.check` copies nothing and records the eligible Workspaces and current templates, so the first run adds no copy.
+The seen Workspaces only grow, so a copy you delete stays deleted, and a Workspace hidden then shown again is not new.
+The seen templates are the ones still marked, so a template turned off and on again copies again where it is missing, and turning it off removes no copy.
+The eligible Workspaces are those the dashboard shows, the known and added ones without the hidden ones, that pass `takesCopies`: outside the temp roots, and with a `.git` directory, so a linked worktree, a folder outside git, and a gone directory take none.
+Only the server that owns routines checks: as it takes over, right after the built-in routines, on its minute tick after the runner, and right after any routine save that changed something, so turning a template on copies it at once.
+It saves the copies through the lists, so pages hear of them, and then what it saw, so a crash between the two repeats no copy, since the Workspace then has it.
+A check with nothing new changes nothing.
+The `save_routine` tool takes `everyWorkspace` and keeps the routine's own when it is left out, and always keeps a copy's `copyOf`.
+
 ## The runner
 
 `src/server/routine-runner.ts` runs on a 60 s tick in `src/server/loops.ts`, whether or not a page is connected, and only on the server that owns routines; see [One server runs the unattended work](#one-server-runs-the-unattended-work).

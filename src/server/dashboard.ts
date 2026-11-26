@@ -57,6 +57,7 @@ import type { SessionProcessWatch } from "./session-processes";
 import { sessionProcessWatch } from "./session-process-watch";
 import { ReviewDrafts } from "./review-drafts";
 import { ReviewDraftsFile } from "./review-drafts-file";
+import type { RoutineCopies } from "./routine-copies";
 import type { RoutineRunner } from "./routine-runner";
 import { TriggerWatch } from "./routine-triggers";
 import { RoutinesFile } from "./routines-file";
@@ -175,6 +176,7 @@ export class Dashboard {
 	readonly #autoContinue: AutoContinue;
 	readonly #mergeQueue: MergeQueue;
 	readonly #mergeCleanup: MergeCleanup;
+	readonly #routineCopies: RoutineCopies;
 	/** Stops the merge queue's loop, which {@link start} starts. */
 	#stopMergeQueue = (): void => {};
 	readonly #loops: Loops;
@@ -261,7 +263,15 @@ export class Dashboard {
 			() => this.#broadcasts.pushList("notices"),
 		));
 		const lists = (this.#lists = new ListRegistry({
-			routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, Date.now()) },
+			routines: {
+				msg: () => ({ t: "routines", routines: routines.value }),
+				apply: change => {
+					const changed = routines.apply(change, Date.now());
+					// A routine just marked for every Workspace is copied at once, after this save, on the server that runs routines.
+					if (changed && change.op === "save" && ownerLock.held) queueMicrotask(() => this.#routineCopies.check());
+					return changed;
+				},
+			},
 			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, Date.now()) },
 			workspaces: {
 				msg: () => {
@@ -385,6 +395,7 @@ export class Dashboard {
 			owner: () => ownerLock.held,
 			admit: this.#admit,
 			stopping: this.#stopping.signal,
+			workspaces: () => this.#workspaceCwds(),
 		});
 		const { runner, scheduledRunner, autoContinue } = work;
 		this.#runner = runner;
@@ -393,6 +404,7 @@ export class Dashboard {
 		this.#takeOver = work.takeOver;
 		this.#autoContinue = autoContinue;
 		this.#mergeCleanup = work.mergeCleanup;
+		this.#routineCopies = work.routineCopies;
 		this.#mergeQueue = work.mergeQueue;
 		this.#inboxes = work.inboxes;
 		this.#prWatches = new PullRequestWatches({
@@ -428,6 +440,7 @@ export class Dashboard {
 				void this.#isolationSweep.tick();
 				await scheduledRunner.tick();
 				await runner.tick();
+				this.#routineCopies.check();
 				await this.#mergeCleanup.tick();
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),

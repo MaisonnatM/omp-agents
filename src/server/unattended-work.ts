@@ -30,8 +30,9 @@ import type { RoutinesFile } from "./routines-file";
 import type { ScheduledFile } from "./scheduled-file";
 import { ScheduledRunner } from "./scheduled-runner";
 import type { UsagePoll } from "./usage-poll";
-import { builtInRoutinesFile, mergesFile } from "../paths";
+import { builtInRoutinesFile, mergesFile, routineCopiesFile } from "../paths";
 import { addBuiltInRoutines } from "./built-in-routines";
+import { RoutineCopies, takesCopies } from "./routine-copies";
 import type { TriggerWatch } from "./routine-triggers";
 
 /** The dashboard's parts the unattended work reads and acts through. */
@@ -63,6 +64,8 @@ export interface UnattendedWorkDeps {
 	admit(dir: string): Promise<void>;
 	/** Aborts as the dashboard stops, which stops every routine command still running. */
 	stopping: AbortSignal;
+	/** The Workspaces the dashboard shows, which take copies of the routines marked for every Workspace. */
+	workspaces(): string[];
 }
 
 /** The unattended work's parts, which the dashboard starts, ticks, and stops. */
@@ -77,6 +80,8 @@ export interface UnattendedWork {
 	inboxes: JsonInboxDir<unknown>[];
 	/** The steps of taking over routines and the file inboxes from the server that ran them. */
 	takeOver(): void;
+	/** Copies the routines marked for every Workspace where they are due; only the owner calls it. */
+	routineCopies: RoutineCopies;
 }
 
 export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
@@ -189,6 +194,12 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		onChange: () => broadcasts.pushList("merges"),
 		onMerged: pr => void mergeCleanup.merged(pr),
 	});
+	const routineCopies = new RoutineCopies({
+		path: routineCopiesFile,
+		routines: () => routines.value,
+		eligible: () => deps.workspaces().filter(takesCopies),
+		save: routine => lists.apply("routines", { op: "save", routine }),
+	});
 	const takeOver = (): void => {
 		// What the server that ran them saved since this one started, which the modules' runs and inboxes go on from.
 		for (const id of Object.keys(modules))
@@ -199,6 +210,7 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		routines.reload();
 		routines.migrate();
 		addBuiltIns();
+		routineCopies.check();
 		broadcasts.pushList("routines");
 		runner.recover();
 		scheduledRunner.recover();
@@ -207,5 +219,5 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		// It learned what the triggers see while another server ran routines, which that server fired.
 		triggerWatch.forget();
 	};
-	return { runner, scheduledRunner, moduleRuns: runs, autoContinue, mergeCleanup, mergeQueue, inboxes, takeOver };
+	return { runner, scheduledRunner, moduleRuns: runs, autoContinue, mergeCleanup, mergeQueue, inboxes, takeOver, routineCopies };
 }

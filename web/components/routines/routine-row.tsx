@@ -26,7 +26,7 @@ import { useAction } from "../../use-action";
 import { useCountdownNow } from "../../use-minute";
 import { useDashboardActions } from "../dashboard-context";
 import { ToggleSwitch } from "../toggle-switch";
-import { HEALTH_TICK, INSTANT, OPEN_SPRING, RunIcon, TaskIcon, TRIGGER_MARKS } from "./routine-marks";
+import { HEALTH_TICK, INSTANT, OPEN_SPRING, RunIcon, TaskIcon, TemplateMark, TRIGGER_MARKS } from "./routine-marks";
 import { RoutineOpen } from "./routine-open";
 
 /** A click on one of these inside a row works the control, and leaves the row as it is. */
@@ -133,12 +133,14 @@ function marksSentence(routine: Routine): string {
 
 interface RoutineRowProps {
 	routine: Routine;
+	/** The routine this one was copied from, while it still exists; `null` for none. */
+	template: Routine | null;
 	open: boolean;
 	connected: boolean;
 	now: number;
 }
 
-export function RoutineRow({ routine, open, connected, now }: RoutineRowProps) {
+export function RoutineRow({ routine, template, open, connected, now }: RoutineRowProps) {
 	const detailsId = useId();
 	const reduceMotion = useReducedMotion() ?? false;
 	const { request, send } = useDashboardActions();
@@ -176,6 +178,7 @@ export function RoutineRow({ routine, open, connected, now }: RoutineRowProps) {
 						<span className="truncate">{name}</span>
 						<IconChevronDownSmall className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", !open && "-rotate-90")} />
 					</button>
+					{routine.everyWorkspace && <TemplateMark />}
 					<div className="ml-auto flex shrink-0 items-center gap-3">
 						<Button
 							variant="ghost"
@@ -275,7 +278,7 @@ export function RoutineRow({ routine, open, connected, now }: RoutineRowProps) {
 							transition={reduceMotion ? INSTANT : { duration: 0.2, delay: 0.08, ease: "easeOut" }}
 							className="px-4 pb-4"
 						>
-							<RoutineOpen routine={routine} run={picked} connected={connected} now={now} />
+							<RoutineOpen routine={routine} template={template} run={picked} connected={connected} now={now} />
 						</motion.div>
 					</motion.div>
 				)}

@@ -4,6 +4,7 @@ import type { KeyboardEvent } from "react";
 import { type Routine, runsHere } from "../../../src/routines";
 import { Button } from "@/components/ui/button";
 import { activityControl } from "../../activity";
+import { templateOf } from "../../routines-model";
 import { hashForRoutines } from "../../routing";
 import { useMinute } from "../../use-minute";
 import { PageFrame } from "../list-page";
@@ -25,12 +26,14 @@ interface RoutinesCardProps {
 	/** The Workspace's name, as its Board names it. */
 	name: string;
 	routines: Routine[];
+	/** Every Workspace's routines, where a copy's template is found. */
+	allRoutines: readonly Routine[];
 	/** The routine whose row is open, `null` for none. */
 	openId: string | null;
 	connected: boolean;
 }
 
-export function RoutinesCard({ workspace, name, routines, openId, connected }: RoutinesCardProps) {
+export function RoutinesCard({ workspace, name, routines, allRoutines, openId, connected }: RoutinesCardProps) {
 	const now = useMinute();
 	const runningHere = routines.filter(runsHere).length;
 	return (
@@ -53,7 +56,7 @@ export function RoutinesCard({ workspace, name, routines, openId, connected }: R
 					) : (
 						<ul onKeyDown={moveBetweenNames} className="divide-y divide-border">
 							{routines.map(routine => (
-								<RoutineRow key={routine.id} routine={routine} open={routine.id === openId} connected={connected} now={now} />
+								<RoutineRow key={routine.id} routine={routine} template={templateOf(routine, allRoutines)} open={routine.id === openId} connected={connected} now={now} />
 							))}
 						</ul>
 					)}

@@ -4,7 +4,7 @@ import type { Routine, RoutineSpec } from "../../../src/routines";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { folderName } from "../../labels";
-import { draftOf, newDraft, type RoutineDraft } from "../../routines-model";
+import { draftOf, newDraft, type RoutineDraft, templateOf } from "../../routines-model";
 import { hashForRoutines } from "../../routing";
 import { useAction } from "../../use-action";
 import type { RoutineRoute } from "../board/module";
@@ -14,7 +14,21 @@ import { RoutineEditor } from "./routine-editor";
 import { RoutinesCard } from "./routines-card";
 
 /** The editor of a routine, new or saved; the routine opens in its Workspace's tab once the server has saved it, and a refused save says why. */
-function RoutineEditorPage({ workspace, initial, isNew, workspaces, connected }: { workspace: string; initial: RoutineDraft; isNew: boolean; workspaces: Workspace[]; connected: boolean }) {
+function RoutineEditorPage({
+	workspace,
+	initial,
+	isNew,
+	workspaces,
+	template,
+	connected,
+}: {
+	workspace: string;
+	initial: RoutineDraft;
+	isNew: boolean;
+	workspaces: Workspace[];
+	template: Routine | null;
+	connected: boolean;
+}) {
 	const { request } = useDashboardActions();
 	const save = useAction(async (spec: RoutineSpec) => {
 		await request({ t: "routine", change: { op: "save", routine: spec } });
@@ -25,6 +39,7 @@ function RoutineEditorPage({ workspace, initial, isNew, workspaces, connected }:
 			initial={initial}
 			isNew={isNew}
 			workspaces={workspaces}
+			template={template}
 			connected={connected}
 			saving={save.pending}
 			onCancel={() => (location.hash = hashForRoutines(workspace, isNew ? { kind: "list" } : { kind: "open", id: initial.id }))}
@@ -36,7 +51,7 @@ function RoutineEditorPage({ workspace, initial, isNew, workspaces, connected }:
 /** A new routine's editor for Workspace `workspace`, its id minted as it opens. */
 function NewRoutine({ workspace, workspaces, connected }: { workspace: string; workspaces: Workspace[]; connected: boolean }) {
 	const [initial] = useState(() => newDraft(crypto.randomUUID(), workspace));
-	return <RoutineEditorPage workspace={workspace} initial={initial} isNew workspaces={workspaces} connected={connected} />;
+	return <RoutineEditorPage workspace={workspace} initial={initial} isNew workspaces={workspaces} template={null} connected={connected} />;
 }
 
 /** In place of a routine the Workspace does not have, deleted or never made, with the way back to its routines. */
@@ -72,16 +87,26 @@ export function RoutinesTab({ workspace, route, routines, workspaces, connected 
 	if (target) return null;
 	switch (route.kind) {
 		case "list":
-			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} openId={null} connected={connected} />;
+			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} allRoutines={routines} openId={null} connected={connected} />;
 		case "open":
 			if (!here.some(({ id }) => id === route.id)) return <MissingRoutine workspace={workspace} />;
-			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} openId={route.id} connected={connected} />;
+			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} allRoutines={routines} openId={route.id} connected={connected} />;
 		case "new":
 			return <NewRoutine workspace={workspace} workspaces={workspaces} connected={connected} />;
 		case "edit": {
 			const routine = here.find(({ id }) => id === route.id);
 			if (!routine) return <MissingRoutine workspace={workspace} />;
-			return <RoutineEditorPage key={routine.id} workspace={workspace} initial={draftOf(routine)} isNew={false} workspaces={workspaces} connected={connected} />;
+			return (
+				<RoutineEditorPage
+					key={routine.id}
+					workspace={workspace}
+					initial={draftOf(routine)}
+					isNew={false}
+					workspaces={workspaces}
+					template={templateOf(routine, routines)}
+					connected={connected}
+				/>
+			);
 		}
 	}
 }

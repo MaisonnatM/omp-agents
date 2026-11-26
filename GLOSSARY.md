@@ -161,6 +161,7 @@ _Avoid_: Device (see **Paired phone**), device preset, viewport, breakpoint
 A task a Workspace does on its schedules, its triggers, or both: each run posts a Board task there, or replies on the routine's Board task that is not done yet, and a session takes it like any Board task.
 Its task is a message, or a shell command whose report it posts.
 Every routine belongs to one Workspace.
+A routine marked "Add to every new Workspace" is copied into each Workspace you start working in, and each copy is its own routine.
 _Avoid_: Cron job, automation
 
 **Trigger**:

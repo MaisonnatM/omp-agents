@@ -116,6 +116,10 @@ export interface Routine {
 	scheduledAt: number | null;
 	/** Newest first, the last 10. */
 	runs: RoutineRun[];
+	/** Set on a template: the owner server copies it into each Workspace you start working in, as {@link copyOf}. */
+	everyWorkspace?: true;
+	/** On a copy: the id of the template it was copied from. Each copy is its own routine, which no edit of the template changes. */
+	copyOf?: string;
 }
 
 /** A computer a routine runs on: Settings sync's stable id for it and its name as its owner sees it. */
@@ -204,6 +208,8 @@ export function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 		routine.workspace === spec.workspace &&
 		routine.name === spec.name &&
 		routine.enabled === spec.enabled &&
+		routine.everyWorkspace === spec.everyWorkspace &&
+		routine.copyOf === spec.copyOf &&
 		JSON.stringify([routine.launch ?? null, routine.schedules, routine.triggers, routine.task]) === JSON.stringify([spec.launch ?? null, spec.schedules, spec.triggers, spec.task])
 	);
 }
@@ -340,15 +346,19 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
  */
 export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	if (!isObject(value)) return null;
-	const { id, name, enabled, workspace } = value;
+	const { id, name, enabled, workspace, everyWorkspace, copyOf } = value;
 	const launch = parseLaunch(value.launch);
 	const schedules = parseSchedules(value.schedules);
 	const triggers = parseTriggers(value.triggers);
 	const task = parseRoutineTask(value.task);
 	if (!isNonEmpty(id) || !isNonEmpty(workspace) || !workspace.startsWith("/") || !isNonEmpty(name) || typeof enabled !== "boolean" || launch === null || !schedules || !triggers || !task) return null;
 	if (schedules.ok.length === 0 && triggers.ok.length === 0) return null;
+	if (!(everyWorkspace === undefined || typeof everyWorkspace === "boolean") || !(copyOf === undefined || isNonEmpty(copyOf))) return null;
 	const spec: RoutineSpec = { id, workspace, name, schedules: schedules.ok, triggers: triggers.ok, task: task.ok, enabled };
-	return { ok: launch ? { ...spec, launch } : spec };
+	if (launch) spec.launch = launch;
+	if (everyWorkspace) spec.everyWorkspace = true;
+	if (copyOf !== undefined) spec.copyOf = copyOf;
+	return { ok: spec };
 }
 
 /**

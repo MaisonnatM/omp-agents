@@ -23,7 +23,7 @@ function runNowButton(outcome: RoutineOutcome): string {
 	};
 	const html = renderToStaticMarkup(
 		<DashboardActionsContext.Provider value={{ request: async () => {}, send: () => {} } as unknown as DashboardActions}>
-			<RoutineRow routine={routine} open={false} connected now={NOW} />
+			<RoutineRow routine={routine} template={null} open={false} connected now={NOW} />
 		</DashboardActionsContext.Provider>,
 	);
 	const button = html.match(/<button[^>]*aria-label="Run Notes now"[^>]*>/)?.[0];

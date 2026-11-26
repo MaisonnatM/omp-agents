@@ -59,6 +59,9 @@
   **Edit** opens the full editor, and **Delete** asks first, then closes the row.
   **Run now** runs it at once whatever its schedules, and shows progress until the server posts the Board task or starts the command, not until it finishes.
 - A session the dashboard started can also save or delete the routines of its own Workspace, the main checkout of its worktree, with its `save_routine` and `delete_routine` tools; a routine it makes posts on that Workspace's Board.
+- **Add to every new Workspace**, in a routine's editor, copies the routine into each Workspace you work in that lacks it: every visible one that is a repository's main checkout when you turn it on, and each new one as you start working there.
+  Each copy is its own routine, enabled or paused as the original was when copied, which later edits of the original do not change; its editor says which routine it was copied from.
+  A copy you delete stays deleted, and turning the switch off stops new copies without removing any.
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.

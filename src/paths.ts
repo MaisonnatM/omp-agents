@@ -77,6 +77,8 @@ export const sourceControlFile = join(configDir, "source-control.json");
 export const mergesFile = join(configDir, "merges.json");
 /** The ids of the built-in routines the dashboard added once, so one you delete stays deleted, beside {@link tokenFile}. */
 export const builtInRoutinesFile = join(configDir, "built-in-routines.json");
+/** The Workspaces and templates the owner server already copied routines for, kept on this computer only, beside {@link tokenFile}. */
+export const routineCopiesFile = join(configDir, "routine-copies.json");
 /** The review drafts that Review sessions wrote for the user to post, and which session reviews which pull request, beside {@link tokenFile}. */
 export const reviewDraftsFile = join(configDir, "review-drafts.json");
 /** Settings sync's remote, branch, left-out items, and last outcome, beside {@link tokenFile}. */
