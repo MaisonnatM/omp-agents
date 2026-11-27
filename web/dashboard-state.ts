@@ -10,6 +10,7 @@ import { applyPins, type PinChange } from "../src/shared/pins";
 import type { ScheduledSend } from "../src/shared/scheduled";
 import { newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Workspace, WorkspaceList } from "../src/shared/workspaces";
+import type { StoredModuleId } from "../src/modules";
 import type { Routine } from "../src/routines";
 import { applyDelta } from "./keyed-list";
 import { changeModuleState, EMPTY_MODULE_STATES, type ModuleStates } from "./modules";
@@ -18,6 +19,13 @@ import { changePanes, DEFAULT_SPLIT_RATIOS, type PaneCommand, type PaneNavigatio
 import type { ModelList } from "./reads";
 import { EMPTY_LAYOUT, endSession, hashForLayout, hashForRoute, type Layout, type Page, type Route, sameView } from "./routing";
 import { beginStart, dismissSettled, dismissTrust, dropHidden, failStart, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
+
+/**
+ * Why unattended work waits to start, such as memory pressure: each stored module's own work by its id, such as the
+ * Board's ready tasks, and the routines' queued runs; missing or `null` where nothing waits. The server sends it with
+ * the module's state or the routines and never saves it.
+ */
+export type Held = Partial<Record<StoredModuleId | "routines", string | null>>;
 
 export interface DashboardState extends PaneNavigation {
 	connected: boolean;
@@ -47,6 +55,8 @@ export interface DashboardState extends PaneNavigation {
 	modules: ModuleStates;
 	/** Every routine, empty until the server first sends them. */
 	routines: Routine[];
+	/** Why unattended work waits to start, as the server last sent it with each list; see {@link Held}. */
+	held: Held;
 	/** The messages and session starts that wait for a time, soonest first, empty until the server first sends them. */
 	scheduled: ScheduledSend[];
 	/** The directories Settings → Workspaces added and hid, empty until the server first sends them. */
@@ -210,9 +220,9 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			if (!state.hosts.some(host => host.instanceId === action.instanceId)) return state;
 			return { ...state, models: new Map(state.models).set(action.instanceId, { data: { models: action.models }, error: action.error }) };
 		case "module":
-			return { ...state, modules: { ...state.modules, [action.id]: action.value } };
+			return { ...state, modules: { ...state.modules, [action.id]: action.value }, held: { ...state.held, [action.id]: action.held } };
 		case "routines":
-			return { ...state, routines: action.routines };
+			return { ...state, routines: action.routines, held: { ...state.held, routines: action.held } };
 		case "scheduled":
 			return { ...state, scheduled: action.sends };
 		case "workspaces":
@@ -268,6 +278,7 @@ export function initialState(route: Route, ratios: SplitRatios = DEFAULT_SPLIT_R
 		models: new Map(),
 		modules: EMPTY_MODULE_STATES,
 		routines: [],
+		held: {},
 		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
 		trustedProjects: [],

@@ -29,6 +29,8 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 	const holds: { checkouts: Promise<void> | null; merges: Promise<void> | null; waking: Promise<void> | null } = { checkouts: null, merges: null, waking: null };
 	/** Why unattended work waits, while set. */
 	const holding = { reason: null as string | null };
+	/** How many times the runner said its held reason changed, which pushes the Board to every page. */
+	const heldChanges = { count: 0 };
 	let runner: BoardRunner;
 	const apply = (change: BoardChange): boolean => {
 		const applied = applyChange(state, change, now);
@@ -73,6 +75,9 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 		landable: () => landable,
 		owner: () => owns,
 		holdsUnattended: () => holding.reason,
+		heldChanged: () => {
+			heldChanges.count++;
+		},
 		now: () => now,
 	};
 	runner = new BoardRunner(() => state, apply, core);
@@ -91,6 +96,7 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 		working,
 		holds,
 		holding,
+		heldChanges,
 		state: () => state,
 		tick: (ms: number) => {
 			now += ms;
@@ -131,6 +137,39 @@ describe("BoardRunner", () => {
 		await board.runner.sweep();
 		await settle();
 		expect(board.starts.map(start => start.cwd)).toEqual(["/w-wt/board-1"]);
+	});
+
+	test("a held ready Board task's reason is what the pages hear, until its session starts", async () => {
+		const board = harness();
+		const reason = "Memory pressure is critical, so unattended work waits until it eases.";
+		board.holding.reason = reason;
+		board.runner.changed();
+		// With no ready Board task, nothing waits.
+		expect(board.runner.held()).toBeNull();
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "First" });
+		expect(board.runner.held()).toBe(reason);
+		expect(board.heldChanges.count).toBe(1);
+		// The same reason again tells the pages nothing new.
+		board.runner.changed();
+		await board.runner.sweep();
+		expect(board.heldChanges.count).toBe(1);
+		board.holding.reason = null;
+		await board.runner.sweep();
+		await settle();
+		expect(board.starts.map(start => start.cwd)).toEqual(["/w-wt/board-1"]);
+		expect(board.runner.held()).toBeNull();
+		expect(board.heldChanges.count).toBe(2);
+	});
+
+	test("a server that does not run the unattended work holds nothing", () => {
+		const board = harness();
+		board.holding.reason = "Memory pressure is critical, so unattended work waits until it eases.";
+		board.runner.changed();
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "First" });
+		expect(board.runner.held()).not.toBeNull();
+		board.own(false);
+		board.runner.changed();
+		expect(board.runner.held()).toBeNull();
 	});
 
 	test("starts one session on each ready Board task in its own worktree, and one on a dependent once its need is done", async () => {

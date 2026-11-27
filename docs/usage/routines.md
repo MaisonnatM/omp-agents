@@ -47,6 +47,7 @@
   Beside the ticks, the row shows what the sessions on its kept runs' Board tasks cost together, such as **$0.31 over 8 runs**, and an open run shows its own tokens and cost, such as **12.3k tokens · $0.04**; a command run that posts nothing costs nothing.
   The mark and the tick are green when the run went fine, red when it had an error, blue while its command runs or it posts, and amber while it waits to start.
   While a run is under way, the row reads **Running…** over a moving line, which holds still when your system asks to reduce motion.
+  While memory pressure holds a queued run from starting, the row reads **Waiting for memory:** with the reason instead, without the moving line.
   On a narrow card, **Run now** shows only its icon and the last run's time leaves the row.
   Click a row to open it in place, which closes the one open before; click a tick to open the row on that run.
   The arrow keys move between the routines' names, and between the ticks of a strip.

@@ -135,12 +135,14 @@ interface RoutineRowProps {
 	routine: Routine;
 	/** The routine this one was copied from, while it still exists; `null` for none. */
 	template: Routine | null;
+	/** Why the server holds the queued runs from starting, such as memory pressure; `null` when it does not. */
+	held: string | null;
 	open: boolean;
 	connected: boolean;
 	now: number;
 }
 
-export function RoutineRow({ routine, template, open, connected, now }: RoutineRowProps) {
+export function RoutineRow({ routine, template, held, open, connected, now }: RoutineRowProps) {
 	const detailsId = useId();
 	const reduceMotion = useReducedMotion() ?? false;
 	const { request, send } = useDashboardActions();
@@ -154,6 +156,8 @@ export function RoutineRow({ routine, template, open, connected, now }: RoutineR
 	const health = latest && runHealth(latest);
 	// A run the server holds queued, sending, or running takes no second Run now: it would claim another run beside it.
 	const running = runNow.pending || health === "running" || health === "waiting";
+	// The server holds this routine's queued run from starting while unattended work waits, which the row says instead of Running….
+	const waitsFor = held !== null && runs.some(run => run.outcome.kind === "queued") ? held : null;
 	const toggle = (): void => {
 		// Opened afresh, the row shows the latest run until a tick picks another.
 		if (!open) setPickedAt(null);
@@ -206,7 +210,12 @@ export function RoutineRow({ routine, template, open, connected, now }: RoutineR
 				<div className={cn("flex min-w-0 items-center gap-3 text-xs text-muted-foreground", !here && "opacity-60")}>
 					<p className="min-w-0 flex-1 truncate">
 						{schedulesWords(routine)}
-						{running ? (
+						{waitsFor !== null ? (
+							<>
+								{" · "}
+								<span title={waitsFor}>Waiting for memory: {waitsFor}</span>
+							</>
+						) : running ? (
 							<>
 								{" · "}
 								<span className={cn(!reduceMotion && "shimmer-text")}>Running…</span>
@@ -255,7 +264,7 @@ export function RoutineRow({ routine, template, open, connected, now }: RoutineR
 					/>
 				</div>
 			</div>
-			{running && (
+			{running && waitsFor === null && (
 				<div aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden">
 					<div className={cn("h-full bg-primary/60", reduceMotion ? "w-full opacity-50" : "w-1/3 animate-[routine-progress_1.2s_ease-in-out_infinite]")} />
 				</div>

@@ -141,7 +141,7 @@ interface Seen {
 	jobs: Processes;
 }
 
-const memoryOf = (rows: ProcessRow[]): number => rows.reduce((sum, row) => sum + row.rssKb * 1024, 0);
+const memoryOf = (rows: ProcessRow[]): number => rows.reduce((sum, row) => sum + (row.footprintKb ?? row.rssKb) * 1024, 0);
 const cpuOf = (rows: ProcessRow[]): number => rows.reduce((sum, row) => sum + row.cpuPercent, 0);
 
 export class SessionProcessWatch {

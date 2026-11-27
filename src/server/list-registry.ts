@@ -33,11 +33,14 @@ export class ListRegistry {
 	readonly #entries: ListEntries;
 	readonly #modules: ModuleFiles;
 	readonly #push: (kind: ListKind) => void;
+	readonly #held: (id: StoredModuleId) => string | null;
 
-	constructor(entries: ListEntries, modules: ModuleFiles, push: (kind: ListKind) => void) {
+	/** `held` says why stored module `id`'s own work waits to start, which its message carries beside its state. */
+	constructor(entries: ListEntries, modules: ModuleFiles, push: (kind: ListKind) => void, held: (id: StoredModuleId) => string | null) {
 		this.#entries = entries;
 		this.#modules = modules;
 		this.#push = push;
+		this.#held = held;
 	}
 
 	message(kind: ListKind): ListMessage {
@@ -79,6 +82,6 @@ export class ListRegistry {
 	}
 
 	#moduleMessage<I extends StoredModuleId>(id: I): ModuleMsg<I> {
-		return { t: "module", id, value: this.#modules[id].value };
+		return { t: "module", id, value: this.#modules[id].value, held: this.#held(id) };
 	}
 }

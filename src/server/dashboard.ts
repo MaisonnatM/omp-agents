@@ -282,7 +282,8 @@ export class Dashboard {
 		));
 		const lists = (this.#lists = new ListRegistry({
 			routines: {
-				msg: () => ({ t: "routines", routines: routines.value }),
+				// Only the server that runs routines holds their queued runs, so only its pages hear why.
+				msg: () => ({ t: "routines", routines: routines.value, held: ownerLock.held ? this.#runner.held() : null }),
 				apply: change => {
 					const changed = routines.apply(change, Date.now());
 					// A routine just marked for every Workspace is copied at once, after this save, on the server that runs routines.
@@ -308,7 +309,7 @@ export class Dashboard {
 		}, modules, kind => {
 			this.#broadcasts.pushList(kind);
 			if (isStoredModuleId(kind)) this.#moduleRuns.get(kind)?.changed();
-		}));
+		}, id => (ownerLock.held ? (this.#moduleRuns.get(id)?.held() ?? null) : null)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),

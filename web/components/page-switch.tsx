@@ -26,7 +26,7 @@ import { useScheduleSend } from "./scheduled";
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "modules" | "routines" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
+	"hosts" | "past" | "lastHosts" | "layout" | "splits" | "models" | "modules" | "routines" | "held" | "workspaceList" | "trustedProjects" | "newSessionCompletions" | "connected" | "listed" | "rosterError" | "notices"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -60,6 +60,7 @@ export const PageSwitch = memo(function PageSwitch({
 	models,
 	modules,
 	routines,
+	held,
 	workspaceList,
 	trustedProjects,
 	newSessionCompletions,
@@ -87,6 +88,7 @@ export const PageSwitch = memo(function PageSwitch({
 		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
 		const core = {
 			routines,
+			held,
 			projects: modules.projects,
 			listed,
 			workspace,

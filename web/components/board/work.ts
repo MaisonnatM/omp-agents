@@ -2,16 +2,19 @@
 import { type RosterHost, type Stop, stopOf } from "../../../src/shared/sessions";
 import { type BoardState, type BoardTask, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 
-/** Where a Board task in work stands: its session starting, its last start failed with `error`, its session working, or its session stopped for you, as `stopOf` says. */
-export type Work = { kind: "starting" } | { kind: "failed"; error: string } | { kind: "working"; sessionId: string } | { kind: "waiting"; sessionId: string; stop: Stop };
+/**
+ * Where a Board task in work stands: its session starting, held from starting for `reason`, such as memory pressure, its
+ * last start failed with `error`, its session working, or its session stopped for you, as `stopOf` says.
+ */
+export type Work = { kind: "starting" } | { kind: "held"; reason: string } | { kind: "failed"; error: string } | { kind: "working"; sessionId: string } | { kind: "waiting"; sessionId: string; stop: Stop };
 
-/** Board task `task`'s {@link Work}, `null` once it is done or waits on another Board task. */
-export function workOf(state: BoardState, task: BoardTask, hosts: readonly RosterHost[]): Work | null {
+/** Board task `task`'s {@link Work}, `null` once it is done or waits on another Board task; `held` is why the server holds ready Board tasks from starting, `null` when it does not. */
+export function workOf(state: BoardState, task: BoardTask, hosts: readonly RosterHost[], held: string | null = null): Work | null {
 	const status = statusOf(state, task);
 	if (status.kind === "failed") return { kind: "failed", error: status.error };
 	if (status.kind !== "ready" && status.kind !== "claimed") return null;
 	const sessionId = task.claim?.sessionId ?? task.start?.sessionId ?? null;
-	if (sessionId === null) return { kind: "starting" };
+	if (sessionId === null) return held === null ? { kind: "starting" } : { kind: "held", reason: held };
 	const host = hosts.find(each => each.sessionId === sessionId);
 	const stop = host ? stopOf(host) : null;
 	return stop ? { kind: "waiting", sessionId, stop } : { kind: "working", sessionId };

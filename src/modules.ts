@@ -74,6 +74,8 @@ export interface ModuleRunCore {
 	owner(): boolean;
 	/** Why unattended work waits now, such as memory pressure; `null` when a Board task may start. */
 	holdsUnattended(): string | null;
+	/** The module's {@link ModuleRun.held} changed, so every page hears it with the module's state. */
+	heldChanged(): void;
 	now(): number;
 }
 
@@ -83,6 +85,8 @@ export interface ModuleRun {
 	stop(): void;
 	/** Called after each change to the module's state, and when this server starts to run the unattended work. */
 	changed(): void;
+	/** Why the module's own work waits to start, such as memory pressure; `null` when none waits. Kept only in memory, never in the module's file. */
+	held(): string | null;
 }
 
 /** A file a module ships beside the server's code: `source` in a checkout, and in a packaged app the bundle `bundle`. */
@@ -154,8 +158,8 @@ export function moduleInboxes(files: ModuleFiles, apply: <I extends StoredModule
 }
 
 /** The own work of the modules that do some, by id; `apply` applies a change to module `id`'s state and says whether it reached the disk. */
-export function moduleRuns(files: ModuleFiles, apply: <I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => boolean, core: ModuleRunCore): Map<StoredModuleId, ModuleRun> {
-	const runOf = <I extends StoredModuleId>(id: I): ModuleRun | undefined => STORED_MODULES[id].store.run?.(() => files[id].value, change => apply(id, change), core);
+export function moduleRuns(files: ModuleFiles, apply: <I extends StoredModuleId>(id: I, change: ModuleChanges[I]) => boolean, core: Omit<ModuleRunCore, "heldChanged">, heldChanged: (id: StoredModuleId) => void): Map<StoredModuleId, ModuleRun> {
+	const runOf = <I extends StoredModuleId>(id: I): ModuleRun | undefined => STORED_MODULES[id].store.run?.(() => files[id].value, change => apply(id, change), { ...core, heldChanged: () => heldChanged(id) });
 	return new Map(
 		STORED_IDS.flatMap(id => {
 			const run = runOf(id);

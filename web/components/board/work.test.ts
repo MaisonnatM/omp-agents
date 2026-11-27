@@ -36,6 +36,23 @@ describe("a Board task whose start failed", () => {
 	});
 });
 
+describe("a ready Board task the server holds from starting", () => {
+	const reason = "Memory pressure is critical, so unattended work waits until it eases.";
+
+	test("shows why it waits instead of a session starting, until its session starts", () => {
+		const ready = board(post("one"));
+		expect(workOf(ready, task(ready, 1), [], reason)).toEqual({ kind: "held", reason });
+		expect(workOf(ready, task(ready, 1), [], null)).toEqual({ kind: "starting" });
+		const started = board(post("one"), { op: "start", task: 1, sessionId: "s-1" });
+		expect(workOf(started, task(started, 1), [], reason)?.kind).not.toBe("held");
+	});
+
+	test("shows a failed start rather than the hold", () => {
+		const failed = board(post("one"), { op: "start", task: 1, sessionId: null, error: "setup exited 1" });
+		expect(workOf(failed, task(failed, 1), [], reason)).toEqual({ kind: "failed", error: "setup exited 1" });
+	});
+});
+
 describe("closing a Board task from the page", () => {
 	test("marks it done with a closed note its thread shows, and a reply reopens it", () => {
 		const closed = board(post("one"), { op: "start", task: 1, sessionId: "s1" }, { op: "close", by: user, task: 1 });
