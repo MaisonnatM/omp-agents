@@ -15,9 +15,10 @@ export const BOARD_INBOX = join(configDir, "board-changes");
 /** The images the page's composers attach, which a Board task or reply names by path; under the data directory, so the page shows them. */
 const BOARD_IMAGES = join(dataDir, "board-images");
 
-/** What the page may change, as the user: post a Board task, reply on one, edit one of their messages, or close a Board task. */
+/** What the page may change, as the user: post a Board task, reply on one, edit one of their messages, close a Board task, or add, change, or remove a quick link. */
 const pageChange = (value: unknown): BoardChange | null => {
 	const change = parseChange(value);
+	if (change?.op === "link" || change?.op === "unlink") return change;
 	return change && (change.op === "post" || change.op === "reply" || change.op === "edit" || change.op === "close") && change.by.kind === "user" ? change : null;
 };
 

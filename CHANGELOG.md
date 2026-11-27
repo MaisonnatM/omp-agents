@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- Each Workspace's Board has quick links, as a Slack channel's bookmarks: a row under the tabs where **Add a quick link** saves a web address with a name, a click opens it in your browser, and a right-click edits, copies, or removes it.
 - The "New session in …" row at the top of the left sidebar and the + New session button on each Workspace are gone; the New session keyboard shortcut still opens a new session.
 - Fixed: when a Board task's session asks you something, such as whether to put a pull request live, the Board thread now shows the question with its answer buttons above the reply box, so you can answer it there instead of opening the session's tab.
 - In the `general` Workspace's Sessions tab, each session shows the folder it ran in, such as `~/code`, `~/tmp`, or `~`, beside its name.

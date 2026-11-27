@@ -48,6 +48,7 @@ import { threadSession, type Work, workOf } from "./work";
 import { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, MarkUnreadButton, MessageEditor, MessageRow, sameDay, TaskBody, WorkingLine, WorkLabel, Avatar } from "./messages";
 import { markSeen, said, unreadOf, useSeen } from "./seen";
 import { ChannelUnreadPills, taskItemId, ThreadNewReplies } from "./unread-jump";
+import { QuickLinks } from "./quick-links";
 import { UserRequestCard } from "../user-request";
 
 interface BoardPageProps {
@@ -95,6 +96,7 @@ function BoardChannel({ route, core, state, disabled, onChange }: BoardPageProps
 					)}
 				</Header>
 				<ChannelTabs tab={view.tab} tabs={tabs} workspace={open} />
+				{openWorkspace && view.tab === "messages" && !route.search && <QuickLinks workspace={openWorkspace.cwd} state={state} disabled={disabled} onChange={onChange} />}
 				{view.tab === "messages" && route.search ? (
 					<SearchResults state={state} route={route} workspace={openWorkspace} core={core} />
 				) : view.tab === "messages" ? (

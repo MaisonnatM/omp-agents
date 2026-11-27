@@ -281,6 +281,36 @@ describe("the Board's projection", () => {
 	});
 });
 
+describe("quick links", () => {
+	const link = (url: string, title: string, replaces?: string): BoardChange => ({ op: "link", by: user, workspace: WS, url, title, ...(replaces ? { replaces } : {}) });
+
+	test("a Workspace keeps its links in the order added, an edit keeps its place, and a removal drops only that Workspace's link", () => {
+		const state = play([
+			[0, link("https://linear.app/team", "Linear")],
+			[1, link("https://github.com/org/app", "Repo")],
+			[2, { op: "link", by: user, workspace: "/work/other", url: "https://linear.app/team", title: "Other Linear" }],
+			[3, link("https://linear.app/team/cycle", "  Cycle  ", "https://linear.app/team")],
+			[4, { op: "unlink", by: user, workspace: WS, url: "https://github.com/org/app" }],
+		]);
+		expect(state.links).toEqual([
+			{ workspace: WS, url: "https://linear.app/team/cycle", title: "Cycle" },
+			{ workspace: "/work/other", url: "https://linear.app/team", title: "Other Linear" },
+		]);
+	});
+
+	test("refuses an address that is not http or https, a second link to the same address, and a removal of a missing link", () => {
+		const state = play([[0, link("https://linear.app/team", "Linear")]]);
+		expect(applyChange(state, link("javascript:alert(1)", "Bad"), 1)).toEqual({ error: "A quick link needs an http or https address." });
+		expect(applyChange(state, link("https://linear.app/team", "Again"), 1)).toEqual({ error: "This Workspace already has a quick link to https://linear.app/team." });
+		expect(applyChange(state, { op: "unlink", by: user, workspace: WS, url: "https://nope.dev" }, 1)).toEqual({ error: "There is no quick link to https://nope.dev." });
+	});
+
+	test("only the user's link changes parse, so a session's board tool cannot add one", () => {
+		expect(parseChange({ op: "link", by: session("s1"), workspace: WS, url: "https://a.dev", title: "A" })).toBeNull();
+		expect(parseChange({ op: "link", by: user, workspace: WS, url: "https://a.dev", title: "A" })).toEqual({ op: "link", by: user, workspace: WS, url: "https://a.dev", title: "A" });
+	});
+});
+
 describe("BoardLog", () => {
 	const dir = mkdtempSync(join(tmpdir(), "board-log-"));
 	afterAll(() => rmSync(dir, { recursive: true, force: true }));
