@@ -1,5 +1,5 @@
 /** A Workspace's quick links, the row under its tabs as a Slack channel's bookmarks bar: each opens its address, a right-click edits, copies, or removes it, and the last button adds one. */
-import { IconPlusSmall } from "central-icons";
+import { IconGlobe, IconPlusSmall } from "central-icons";
 import { type FormEvent, useId, useState } from "react";
 import { type BoardChange, type BoardState, MAX_TITLE, MAX_URL, type QuickLink, refusal } from "../../../templates/omp/agent/extensions/board/log";
 import { Button } from "@/components/ui/button";
@@ -73,9 +73,9 @@ function LinkDialog({ workspace, editing, state, onChange, onClose }: { workspac
 	const [url, setUrl] = useState(editing?.url ?? "");
 	const [title, setTitle] = useState(editing?.title ?? "");
 	const [error, setError] = useState<string | null>(null);
+	const address = addressOf(url.trim());
 	const save = (event: FormEvent) => {
 		event.preventDefault();
-		const address = addressOf(url.trim());
 		const name = title.trim() || (hostOf(address)?.replace(/^www\./, "") ?? "");
 		const change: BoardChange = { op: "link", by: USER, workspace, url: address, title: name, ...(editing ? { replaces: editing.url } : {}) };
 		const refused = refusal(state, change);
@@ -85,27 +85,34 @@ function LinkDialog({ workspace, editing, state, onChange, onClose }: { workspac
 	};
 	return (
 		<FormDialog busy={false} onClose={onClose} className="top-24 w-[min(28rem,calc(100vw-2rem))]">
-			<FormDialogHeader title={editing ? "Edit quick link" : "Add a quick link"} busy={false} />
+			<FormDialogHeader title={editing ? "Edit quick link" : "Add a quick link to this Workspace"} busy={false} />
 			<form onSubmit={save} className="flex flex-col gap-3 px-4 pt-3 pb-4">
 				<Field label="Link" htmlFor={ids.url}>
-					<input id={ids.url} autoFocus value={url} maxLength={MAX_URL} placeholder="https://linear.app/…" onChange={event => (setUrl(event.target.value), setError(null))} className={cn(FIELD, "w-full")} />
+					<input id={ids.url} autoFocus value={url} maxLength={MAX_URL} placeholder="https://docs.acme.com" onChange={event => (setUrl(event.target.value), setError(null))} className={cn(FIELD, "w-full")} />
 				</Field>
-				<Field label="Name" htmlFor={ids.title}>
-					<input id={ids.title} value={title} maxLength={MAX_TITLE} placeholder={hostOf(addressOf(url.trim()))?.replace(/^www\./, "") || "The site's name"} onChange={event => setTitle(event.target.value)} className={cn(FIELD, "w-full")} />
-				</Field>
-				{error && (
-					<p role="alert" className={ERROR_TEXT}>
-						{error}
-					</p>
+				{url.trim() && (
+					<>
+						<Field label="Name" htmlFor={ids.title}>
+							<div className="relative">
+								<SiteIcon hostname={hostOf(address)} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2" fallback={<IconGlobe aria-hidden className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />} />
+								<input id={ids.title} value={title} maxLength={MAX_TITLE} placeholder="Ex. Project tracker" onChange={event => setTitle(event.target.value)} className={cn(FIELD, "w-full pl-7")} />
+							</div>
+						</Field>
+						{error && (
+							<p role="alert" className={ERROR_TEXT}>
+								{error}
+							</p>
+						)}
+						<div className="flex justify-end gap-2">
+							<Button type="button" variant="outline" size="compact" onClick={onClose}>
+								Cancel
+							</Button>
+							<Button type="submit" size="compact">
+								{editing ? "Save" : "Add"}
+							</Button>
+						</div>
+					</>
 				)}
-				<div className="flex justify-end gap-2">
-					<Button type="button" variant="ghost" size="compact" onClick={onClose}>
-						Cancel
-					</Button>
-					<Button type="submit" size="compact" disabled={!url.trim()}>
-						{editing ? "Save" : "Add"}
-					</Button>
-				</div>
 			</form>
 		</FormDialog>
 	);
