@@ -2,11 +2,11 @@ import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Routine, RoutineOutcome } from "../../../src/routines";
 import { type DashboardActions, DashboardActionsContext } from "../dashboard-context";
-import { RoutineRow } from "./routine-row";
+import { RoutineDetail } from "./routine-row";
 
 const NOW = Date.parse("2026-10-05T09:00:00Z");
 
-/** A row whose latest run stands at `outcome`, with the server holding queued runs for `held`; the routine runs on Run now alone, so the row shows no countdown. */
+/** The open routine whose latest run stands at `outcome`, with the server holding queued runs for `held`; the routine runs on Run now alone, so it shows no countdown. */
 function rowHtml(outcome: RoutineOutcome, held: string | null = null): string {
 	const routine: Routine = {
 		id: "r1",
@@ -23,16 +23,16 @@ function rowHtml(outcome: RoutineOutcome, held: string | null = null): string {
 	};
 	return renderToStaticMarkup(
 		<DashboardActionsContext.Provider value={{ request: async () => {}, send: () => {} } as unknown as DashboardActions}>
-			<RoutineRow routine={routine} template={null} held={held} open={false} connected now={NOW} />
+			<RoutineDetail routine={routine} template={null} held={held} connected now={NOW} />
 		</DashboardActionsContext.Provider>,
 	);
 }
 
-/** The Run now button of a row whose latest run stands at `outcome`. */
+/** The Run now button of the open routine whose latest run stands at `outcome`. */
 function runNowButton(outcome: RoutineOutcome): string {
 	const html = rowHtml(outcome);
 	const button = html.match(/<button[^>]*aria-label="Run Notes now"[^>]*>/)?.[0];
-	if (!button) throw new Error("The row has no Run now button.");
+	if (!button) throw new Error("The routine has no Run now button.");
 	return button;
 }
 
