@@ -2,7 +2,7 @@
 import { IconBubble3, IconChevronDownSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass } from "central-icons";
 import { type KeyboardEvent, type ReactNode, type Ref, useImperativeHandle, useRef, useState } from "react";
 import { searchWords } from "../../../src/shared/every-word";
-import type { Workspace } from "../../../src/shared/workspaces";
+import { type Workspace, workspaceName } from "../../../src/shared/workspaces";
 import type { BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -12,7 +12,7 @@ import { activityControl } from "../../activity";
 import type { CoreData } from "../module-views";
 import { type KnownSessions, sessionLabel } from "../../labels";
 import type { BoardRoute } from "./module";
-import { Avatar, clock, dayLabel, folder } from "./messages";
+import { Avatar, clock, dayLabel } from "./messages";
 import { type BoardHit, type BoardScope, type BoardSearch, matchRanges, scopeOf, searchBoard, snippet } from "./search";
 import { hashForBoard } from "./sidebar";
 
@@ -128,7 +128,7 @@ export function SearchResults({ state, route, workspace, core }: { state: BoardS
 	const { search } = route;
 	if (!search) return null;
 	const open = workspace?.cwd ?? null;
-	const channel = workspace ? folder(workspace.cwdDisplay) : "No workspace";
+	const channel = workspace ? workspaceName(workspace.cwdDisplay) : "No workspace";
 	const routeThread = route.view.tab === "messages" ? route.view.thread : null;
 	const thread = routeThread !== null && state.tasks.some(task => task.id === routeThread && task.workspace === open) ? routeThread : null;
 	const { query } = search;
@@ -136,7 +136,6 @@ export function SearchResults({ state, route, workspace, core }: { state: BoardS
 	const hits = searchBoard(state, search, open, thread);
 	const words = searchWords(query);
 	const searchHref = (next: BoardSearch | null) => hashForBoard(open, routeThread, { search: next });
-	const workspaceName = (cwd: string): string => folder(core.workspaces.find(each => each.cwd === cwd)?.cwdDisplay ?? cwd);
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
 			<div className="flex shrink-0 items-center gap-2 px-5 pt-4 pb-2">
@@ -172,7 +171,7 @@ export function SearchResults({ state, route, workspace, core }: { state: BoardS
 					<ol aria-label="Search results" className="flex flex-col gap-2 px-5">
 						{hits.map(hit => (
 							<li key={`${hit.task.id}:${hit.reply ?? "task"}`}>
-								<SearchResult hit={hit} query={query} words={words} sessions={core.sessions} workspace={scope === "all" ? workspaceName(hit.task.workspace) : null} />
+								<SearchResult hit={hit} query={query} words={words} sessions={core.sessions} workspace={scope === "all" ? workspaceName(core.workspaces.find(each => each.cwd === hit.task.workspace)?.cwdDisplay ?? hit.task.workspace) : null} />
 							</li>
 						))}
 					</ol>

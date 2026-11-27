@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarContent, SidebarGroup, SidebarMenu } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
-import { folderName } from "../labels";
+import { workspaceName } from "../../src/shared/workspaces";
 import { withoutHidden, yourMoveCount } from "../pull-requests-model";
 import { useHiddenRepos } from "../pull-requests-state";
 import { pullRequestsStore } from "../reads";
@@ -76,7 +76,7 @@ export const AppSidebar = memo(function AppSidebar({
 		[pullRequestRead, hiddenRepos, visible.hosts],
 	);
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
-	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
+	const newSessionLabel = selectedWorkspace ? `New session in ${workspaceName(selectedWorkspace.cwdDisplay)}` : "New session";
 	const hasBoard = tabs.includes("board");
 	const boardRoute = useBoardSide(hasBoard ? page : null);
 	const onBoard = boardRoute !== null;

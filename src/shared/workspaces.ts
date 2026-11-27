@@ -18,6 +18,12 @@ export interface Workspace {
 
 export const NO_WORKSPACES: WorkspaceList = { added: [], hidden: [] };
 
+/** The General workspace as the page shows its directory: the sessions run outside every repository of the home folder count in it. */
+export const GENERAL_DISPLAY = "~/code";
+
+/** A workspace's name on the page: `general` for the General workspace, else its folder's name. */
+export const workspaceName = (cwdDisplay: string): string => (cwdDisplay === GENERAL_DISPLAY ? "general" : (cwdDisplay.split("/").filter(Boolean).pop() ?? cwdDisplay));
+
 // `/var/folders` holds macOS's per-user `$TMPDIR`, where `mktemp -d` puts its directories.
 const TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"];
 

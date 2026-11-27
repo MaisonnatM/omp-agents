@@ -8,7 +8,8 @@ import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabe
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { needsYou } from "../attention";
-import { ALL_WORKSPACES, folderName, sessionsWaiting, waitingOnYou } from "../labels";
+import { workspaceName } from "../../src/shared/workspaces";
+import { ALL_WORKSPACES, sessionsWaiting, waitingOnYou } from "../labels";
 import { type ProjectGroup, type RosterFolder, rosterFolders, rowPlacement, type SidebarSessions, type WorkspaceGroup } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredKeys, useStoredState } from "../stored-state";
@@ -46,7 +47,7 @@ function SidebarWorkspacePicker({ workspaces, onPick }: SidebarWorkspacePickerPr
 	const current = useDashboardStatus().scope.workspace;
 	useShortcuts({ workspace: () => setOpen(shown => !shown) });
 	const selected = workspaces.find(workspace => workspace.cwd === current);
-	const label = selected ? (folderName(selected.cwdDisplay) ?? selected.cwdDisplay) : ALL_WORKSPACES;
+	const label = selected ? workspaceName(selected.cwdDisplay) : ALL_WORKSPACES;
 	const pick = (cwd: string | null) => (): void => {
 		if (cwd !== current) onPick(cwd);
 	};
@@ -343,7 +344,7 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, board, 
 				const { cwd, cwdDisplay } = folder.group.workspace;
 				const key = `workspace:${cwd}`;
 				return (
-					<WorkspaceFolder key={cwd} folder={folder} board={board} name={folderName(cwdDisplay) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
+					<WorkspaceFolder key={cwd} folder={folder} board={board} name={workspaceName(cwdDisplay)} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
 						{folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false))}
 					</WorkspaceFolder>
 				);

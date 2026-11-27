@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- New: a `general` Workspace, pinned first on the Board, gathers every session you ran outside a repository, in `~/code`, `~/tmp`, or your home folder. Posting there starts the session in `~/code`, with no worktree or branch.
 - Fixed: right after the dashboard starts, a session that ran in a Board task's or other worktree folder, such as `board-61` or `home-design-fixes`, no longer shows that folder as a Workspace of its own until every past conversation has been read; it counts in its repository from the first list.
 - On the Board, a blue pill at the top or bottom edge says how many unread threads sit out of view, as Slack does. Click it to jump to the nearest one, or press Mark all read.
 - In a Board thread, replies that come while you read further up show a blue "new replies" pill at the bottom. Click it to jump to them.

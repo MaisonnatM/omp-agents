@@ -22,8 +22,6 @@ import { RoutineAuthorName } from "./routine-author";
 import { RoutineFace } from "../routines/routine-face";
 import type { Work } from "./work";
 
-export const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
-
 /** Slack starts a later message from the same author within five minutes of the last one without its avatar and name. */
 const GROUP_MS = 5 * 60_000;
 

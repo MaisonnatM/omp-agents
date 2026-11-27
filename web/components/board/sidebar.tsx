@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { parseStrings } from "../../../src/json";
 import { revealDetailsTab } from "../../details-tabs";
 import type { RosterHost } from "../../../src/shared/sessions";
-import type { Workspace } from "../../../src/shared/workspaces";
+import { GENERAL_DISPLAY, type Workspace, workspaceName } from "../../../src/shared/workspaces";
 import type { BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
-import { folderName, waitingOnYou } from "../../labels";
+import { waitingOnYou } from "../../labels";
 import { DROP_LINE, moveKey, stepTarget } from "../../order";
 import { hashForPage, type PageHash } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
@@ -51,11 +51,13 @@ export function boardWorkspaces(state: BoardState, sidebar: readonly Workspace[]
 /** The Board sidebar's Workspace order you dragged, by `cwd`; a portable preference, so it follows you to every machine. */
 export const WORKSPACE_ORDER = "omp-agents.board-workspace-order";
 
-/** `workspaces` with those `order` names first, in its order, then the rest in theirs, so a new Workspace lands at the bottom. */
+/** `workspaces` with the General workspace first, then those `order` names, in its order, then the rest in theirs, so a new Workspace lands at the bottom. */
 export function inSavedOrder(workspaces: readonly Workspace[], order: readonly string[]): Workspace[] {
 	const rank = new Map(order.map((cwd, at) => [cwd, at]));
-	const ranked = workspaces.filter(workspace => rank.has(workspace.cwd)).sort((a, b) => rank.get(a.cwd)! - rank.get(b.cwd)!);
-	return [...ranked, ...workspaces.filter(workspace => !rank.has(workspace.cwd))];
+	const general = workspaces.filter(workspace => workspace.cwdDisplay === GENERAL_DISPLAY);
+	const rest = workspaces.filter(workspace => workspace.cwdDisplay !== GENERAL_DISPLAY);
+	const ranked = rest.filter(workspace => rank.has(workspace.cwd)).sort((a, b) => rank.get(a.cwd)! - rank.get(b.cwd)!);
+	return [...general, ...ranked, ...rest.filter(workspace => !rank.has(workspace.cwd))];
 }
 
 /** The Board thread's open tabs, kept across threads. */
@@ -137,7 +139,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts 
 									title={workspace.cwdDisplay}
 									onClick={go(hashForBoard(workspace.cwd))}
 								>
-									<span className="min-w-0 flex-1 truncate">{folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
+									<span className="min-w-0 flex-1 truncate">{workspaceName(workspace.cwdDisplay)}</span>
 									{waiting > 0 && (
 										<>
 											<CountPill count={waiting} />

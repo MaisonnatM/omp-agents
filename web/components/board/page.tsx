@@ -7,7 +7,7 @@
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { PastSession, PromptImage, RosterHost, View } from "../../../src/shared/sessions";
-import type { Workspace } from "../../../src/shared/workspaces";
+import { type Workspace, workspaceName } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CountPill } from "../count-pill";
@@ -45,7 +45,7 @@ import { boardActions, SessionActions } from "./actions";
 import { BoardNoteLine, isThreadNote } from "./board-note";
 import { RoutineIds } from "./routine-author";
 import { threadSession, type Work, workOf } from "./work";
-import { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, folder, MarkUnreadButton, MessageEditor, MessageRow, sameDay, TaskBody, WorkingLine, WorkLabel, Avatar } from "./messages";
+import { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, MarkUnreadButton, MessageEditor, MessageRow, sameDay, TaskBody, WorkingLine, WorkLabel, Avatar } from "./messages";
 import { markSeen, said, unreadOf, useSeen } from "./seen";
 import { ChannelUnreadPills, taskItemId, ThreadNewReplies } from "./unread-jump";
 
@@ -72,7 +72,7 @@ function BoardChannel({ route, core, state, disabled, onChange }: BoardPageProps
 	if (state === null) return <BoardLoading />;
 	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
-	const name = openWorkspace ? folder(openWorkspace.cwdDisplay) : "No workspace";
+	const name = openWorkspace ? workspaceName(openWorkspace.cwdDisplay) : "No workspace";
 	const tasks = state.tasks.filter(task => task.workspace === open);
 	const tabs = boardTabsOn(off);
 	// A tab whose module is off is gone, so its address opens Messages.
@@ -288,7 +288,7 @@ function Composer({ workspace, core, disabled, onChange }: { workspace: Workspac
 	return (
 		<div {...activityControl("board.post")} className="shrink-0">
 			<NewSession
-				board={{ placeholder: `Message ${folder(workspace.cwdDisplay)} to start a session`, sendLabel: "Post and start a session" }}
+				board={{ placeholder: `Message ${workspaceName(workspace.cwdDisplay)} to start a session`, sendLabel: "Post and start a session" }}
 				cwd={workspace.cwd}
 				workspaces={core.workspaces}
 				launch={null}

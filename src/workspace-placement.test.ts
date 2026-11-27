@@ -126,4 +126,17 @@ describe("WorkspacePlacement", () => {
 		expect(placement.cwdOf(wip)).toBe(wip);
 		expect(await placement.workspaceOf(wip, worktreeAt)).toBe(main);
 	});
+
+	test("counts a home folder's directory outside every repository in the General workspace, unless it is General's own or app data", async () => {
+		const home = tempDir();
+		const general = join(home, "code");
+		const loose = join(home, "tmp");
+		const appData = join(home, ".cache");
+		for (const dir of [general, loose, appData]) mkdirSync(dir);
+		const main = await repoWithWorktree(general);
+		const placement = new WorkspacePlacement({ home, general: { cwd: general, cwdDisplay: "~/code" } });
+		await placement.place([home, loose, appData, general, main, join(general, "app-wip"), join(home, "gone")], worktreeAt);
+		expect([home, loose, appData, general, main, join(general, "app-wip")].map(placement.cwdOf)).toEqual([general, general, appData, general, main, main]);
+		expect(placement.gone(join(home, "gone"))).toBe(true);
+	});
 });

@@ -2,9 +2,12 @@ import { mkdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { portFromEnv } from "./server/address";
-import type { Workspace } from "./shared/workspaces";
+import { GENERAL_DISPLAY, type Workspace } from "./shared/workspaces";
 
 export const HOME = homedir();
+
+/** The General workspace's directory, `~/code`, where a session outside every repository can reach them all; {@link GENERAL_DISPLAY} as the page shows it. */
+export const GENERAL_DIR = join(HOME, GENERAL_DISPLAY.slice("~/".length));
 
 /** The dashboard's settings and lists: `$XDG_CONFIG_HOME/omp-agents`, else `~/.config/omp-agents`. */
 export const configDir = join(process.env.XDG_CONFIG_HOME || join(HOME, ".config"), "omp-agents");

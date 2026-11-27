@@ -1,9 +1,9 @@
 /** A Workspace's Routines tab on its Board: the card of its routines, one open, or a routine's editor, new or saved. */
 import { useEffect, useState } from "react";
 import type { Routine, RoutineSpec } from "../../../src/routines";
-import type { Workspace } from "../../../src/shared/workspaces";
+import { type Workspace, workspaceName } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
-import { folderName } from "../../labels";
+import { workspaceLabel } from "../workspace-picker";
 import { draftOf, newDraft, type RoutineDraft, templateOf } from "../../routines-model";
 import { hashForRoutines } from "../../routing";
 import { useAction } from "../../use-action";
@@ -89,10 +89,10 @@ export function RoutinesTab({ workspace, route, routines, held, workspaces, conn
 	if (target) return null;
 	switch (route.kind) {
 		case "list":
-			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} allRoutines={routines} held={held} openId={null} connected={connected} />;
+			return <RoutinesCard workspace={workspace} name={workspaceName(workspaceLabel(workspace, workspaces))} routines={here} allRoutines={routines} held={held} openId={null} connected={connected} />;
 		case "open":
 			if (!here.some(({ id }) => id === route.id)) return <MissingRoutine workspace={workspace} />;
-			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} allRoutines={routines} held={held} openId={route.id} connected={connected} />;
+			return <RoutinesCard workspace={workspace} name={workspaceName(workspaceLabel(workspace, workspaces))} routines={here} allRoutines={routines} held={held} openId={route.id} connected={connected} />;
 		case "new":
 			return <NewRoutine workspace={workspace} workspaces={workspaces} connected={connected} />;
 		case "edit": {
