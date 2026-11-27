@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { type PullRequestSummary, type PullRequestComment, type PullRequestDetail, type PullRequestThread, type RepoPullRequests, type Reviewer, repoKey } from "../src/shared/github";
+import type { QueuedMerge } from "../src/shared/merge-queue";
 import { type AgentOn, actionFacts, agentOn, type MoveId, moveOf } from "../src/shared/moves";
 import { pullRequestActions } from "../src/pull-request-actions";
 import type { RosterHost } from "../src/shared/sessions";
 import type { ReviewDraft } from "../src/shared/review-drafts";
+import { rebaseOrder } from "../src/shared/rebase-order";
 import {
+	readyMerges,
 	bulkMoves,
 	commentCount,
 	confirmLabel,
@@ -23,7 +26,6 @@ import {
 	placedManual,
 	reason,
 	sectionTitles,
-	rebaseOrder,
 	threadStarters,
 	withPullRequestReviewers,
 	withPullRequestState,
@@ -562,5 +564,57 @@ describe("rebaseOrder", () => {
 	test("ends on a cycle of bases", () => {
 		const prs = [above(1, 2, { behind: true }), above(2, 1)];
 		expect(numbers(prs)).toEqual([1, 2]);
+	});
+});
+
+describe("readyMerges", () => {
+	const approved = (number: number, fields: Partial<PullRequestSummary> = {}) => pr(number, { review: "approved", ...fields });
+	const above = (number: number, below: number, fields: Partial<PullRequestSummary> = {}) => approved(number, { base: `me/branch-${below}`, stackedOn: `me/branch-${below}`, ...fields });
+	const groups = (prs: PullRequestSummary[], merges: QueuedMerge[] = []) => readyMerges(prs, merges).map(group => group.map(({ number }) => number));
+	const queued = (number: number): QueuedMerge => ({
+		id: "q1",
+		method: "squash",
+		base: "main",
+		prs: [{ owner: "acme", repo: "webapp", number, title: `PR ${number}`, branch: `me/branch-${number}`, head: "abc" }],
+		merged: 0,
+		auto: false,
+		settling: null,
+		state: { kind: "waiting", why: "Queued" },
+	});
+
+	test("queues an approved stack as one merge, bottom first, whatever the list order", () => {
+		expect(groups([above(3, 2), approved(1), above(2, 1), approved(9)])).toEqual([[1, 2, 3], [9]]);
+	});
+
+	test("leaves out a stacked pull request whose parent is not approved, and what sits on it", () => {
+		expect(groups([approved(1), above(2, 1, { review: "review-required" }), above(3, 2), above(4, 3)])).toEqual([[1]]);
+		expect(groups([pr(1), above(2, 1)])).toEqual([]);
+	});
+
+	test("takes a pull request that needs no review, and leaves out one with a review thread open", () => {
+		const prs = [pr(1, { review: "none" }), approved(2, { unresolved: { count: 1, exact: true, bots: 0 } }), approved(3, { unresolved: { count: 0, exact: false, bots: 0 } })];
+		expect(groups(prs)).toEqual([[1]]);
+	});
+
+	test("leaves out drafts, failing checks, conflicts, and pull requests not yours", () => {
+		const prs = [
+			approved(1, { state: "draft" }),
+			approved(2, { checks: "failing" }),
+			approved(3, { conflicts: true }),
+			approved(4, { role: "reviewer", author: teammate }),
+			approved(5, { state: "merged" }),
+			approved(6, { checks: "pending" }),
+			approved(7, { checks: "none" }),
+		];
+		expect(groups(prs)).toEqual([[6], [7]]);
+	});
+
+	test("leaves out a pull request already in a queued merge, and what is stacked on it", () => {
+		expect(groups([approved(1), above(2, 1), approved(5)], [queued(1)])).toEqual([[5]]);
+		expect(groups([approved(1), above(2, 1)], [queued(2)])).toEqual([[1]]);
+	});
+
+	test("takes one chain when two pull requests stack on the same one", () => {
+		expect(groups([approved(1), above(2, 1), above(3, 1)])).toEqual([[1, 2]]);
 	});
 });

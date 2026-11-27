@@ -6,6 +6,7 @@
 import type { ErroredRun } from "../routine-health";
 import type { DashboardCommits, DashboardFailed } from "./dashboard-update";
 import type { PullRequestSummary } from "./github";
+import type { RebaseStop } from "./keep-rebased";
 import type { YourMove } from "./moves";
 
 export interface NamedModel {
@@ -109,7 +110,10 @@ export interface RoutineHealthSubject {
 	runs: ErroredRun[];
 }
 
-export type NoticeSubject = UpdateSubject | UndoneSubject | PullRequestSubject | SlackSubject | ProviderSubject | StoppedSubject | RoutineHealthSubject;
+/** A rebase **Keep rebased** stopped, on a conflict or a failure, which it does not try again until the pull request's head or its base moves. */
+export type RebaseStoppedSubject = { kind: "rebase-stopped" } & RebaseStop;
+
+export type NoticeSubject = UpdateSubject | UndoneSubject | PullRequestSubject | SlackSubject | ProviderSubject | StoppedSubject | RoutineHealthSubject | RebaseStoppedSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -127,6 +131,7 @@ export type Notice = { id: string; at: number; seen: boolean; read: boolean } & 
 	| ProviderSubject
 	| StoppedSubject
 	| RoutineHealthSubject
+	| RebaseStoppedSubject
 );
 
 /** `update` installs the release, rewrites the routing, or pulls omp-agents and restarts it; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */

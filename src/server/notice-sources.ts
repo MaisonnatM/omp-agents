@@ -6,6 +6,7 @@ import { readCreditRuns } from "../omp/stats";
 import { displayPath } from "../paths";
 import { loadPullRequests } from "../pull-requests";
 import { erroredRuns } from "../routine-health";
+import type { KeepRebased } from "./keep-rebased";
 import { agentOn } from "../shared/moves";
 import type { RosterHost } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
@@ -28,6 +29,8 @@ export interface NoticeSourcesDeps {
 	triggerWatch: TriggerWatch;
 	/** Hands the pull request watches the list the activity check read. */
 	learnWatches(list: PullRequestList): void;
+	/** **Keep rebased**, which rebases after each list the activity check reads and names the rebases it stopped. */
+	keepRebased: KeepRebased;
 	pushRoster(): void;
 	usage(): UsagePoll;
 	files: SessionFiles;
@@ -52,6 +55,7 @@ export function noticeSources(deps: NoticeSourcesDeps): NoticeSources {
 			const agent = agentOn(deps.hosts());
 			triggerWatch.learn(pullRequestSightings(list, agent));
 			deps.learnWatches(list);
+			deps.keepRebased.read(list);
 			// A row shows its watched pull requests' checks, which this list may have changed.
 			deps.pushRoster();
 			return { list, agent };
@@ -79,6 +83,7 @@ export function noticeSources(deps: NoticeSourcesDeps): NoticeSources {
 				return { sessionId, title: saved?.title ?? null, cwdDisplay: saved ? displayPath(saved.cwd) : null };
 			}),
 		erroredRuns: async () => erroredRuns(routines.value, Date.now(), (task, at) => boardRunTurn(deps.board(), task, at, files.pathOf)),
+		rebaseStops: () => deps.keepRebased.stops,
 		now: Date.now,
 	};
 }

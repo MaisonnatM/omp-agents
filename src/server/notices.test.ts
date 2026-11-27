@@ -132,6 +132,7 @@ function sources(state: State): NoticeSources {
 		creditRuns: async () => state.creditRuns ?? [],
 		stoppedSessions: () => (state.interrupted?.midTurn() ?? []).map(sessionId => ({ sessionId, title: state.listed?.[sessionId]?.title ?? null, cwdDisplay: state.listed?.[sessionId]?.cwdDisplay ?? null })),
 		erroredRuns: async () => state.erroredRuns ?? [],
+		rebaseStops: () => [],
 		now: () => state.now ?? 0,
 	};
 }

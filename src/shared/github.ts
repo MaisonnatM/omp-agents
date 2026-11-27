@@ -207,6 +207,9 @@ export interface PullRequestSummary extends PullRequest {
 	createdAt: number;
 	/** Last update, or the merge for a merged PR, in ms since the epoch. */
 	updatedAt: number;
+	/** Its head commit and its base branch's commit, which **Keep rebased** remembers a stop by; absent from a merged one and from lists cached before the summary carried them. */
+	headOid?: string;
+	baseOid?: string;
 }
 
 /** One GitHub repository's pull requests, for the workspaces whose `origin` it is. */
@@ -244,6 +247,8 @@ const isSummary = fields<PullRequestSummary>({
 	viewerApproved: isBoolean,
 	approvalRequired: optional(isBoolean),
 	labels: optional(isTexts),
+	headOid: optional(isString),
+	baseOid: optional(isString),
 	createdAt: isNumber,
 	updatedAt: isNumber,
 });

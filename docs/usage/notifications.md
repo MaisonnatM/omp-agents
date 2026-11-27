@@ -3,7 +3,7 @@
 - The sidebar's **Notifications** row, right under **New session**, counts the unread notices and opens the Notifications page, `#notifications`, which lists them under **New** and **Earlier**.
 - Above the list, the **All** and **Unread** tabs pick which notices show; **Filter** keeps the notices of the sources you check, each with how many of its notices the tab shows, or those received in the last day, 3 days, week, 2 weeks, or month, with a chip per filter under the bar; **Display › Grouping** lists them under **New and earlier**, by **Source**, or with **No grouping**, unread first in each.
   The tab, filters, and grouping stay in this browser.
-  The header's search keeps the notices whose headline, text, or source name holds every word you type, and **Mark all as read** marks the shown unread ones.
+  The header's search keeps the notices whose headline, text, or source name holds every word you type, **Mark all as read** marks the shown unread ones, and **Clear all** clears the shown ones after a second click on **Clear N?**.
   When the search or the filters leave nothing, the list says so with a button that clears them, and focus moves to the list.
 - Six sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
@@ -34,7 +34,7 @@
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
 - A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in your default browser, and a provider's opens **Settings › Providers**.
   Selecting an update's notice marks it read, a stopped sessions' notice opens the first session it names, and a routines' notice opens the first routine it names.
-  **Mark all as read**, at the top right of the page, marks every notice in the filter read.
+  **Mark all as read**, at the top right of the page, marks every notice in the filter read; **Clear all** beside it clears every notice in the filter, once you click it again as **Clear N?** within three seconds.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge** for one ready to merge.
   **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once the dashboard took the merge, which it makes at once or once GitHub allows it; when the dashboard refuses it, a toast says why.
 - The stopped sessions' notice offers **Continue all**, on the toast or on the Notifications page, which resumes every session it lists and sends each the prompt `continue`, as the sidebar's **Resume all** does, and marks the notice read.

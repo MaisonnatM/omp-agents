@@ -172,6 +172,21 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				toast: { kind: "news", duration: Infinity },
 			};
 		}
+		case "rebase-stopped":
+			return {
+				...NEWS,
+				source: "github",
+				headline: `Keep rebased stopped · ${notice.repo}#${notice.number}`,
+				preview:
+					notice.outcome === "conflict"
+						? `${notice.title}: conflicts with ${notice.onto} in ${notice.why.split("\n").join(", ")}. It tries again once the branch or ${notice.onto} moves.`
+						: `${notice.title}: ${notice.why}`,
+				failed: notice.outcome === "failed",
+				link: { href: hashForPullRequests({ owner: notice.owner, repo: notice.repo, number: notice.number }), external: false },
+				face: { kind: "warning" },
+				// It comes from the server's own rebase, which you may not watch.
+				toast: { kind: "news", duration: Infinity },
+			};
 		case "dashboard-failed":
 			// No Update: origin still holds the commit that did not start, which it would only refuse.
 			return {

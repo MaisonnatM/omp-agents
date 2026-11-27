@@ -2,8 +2,10 @@
 import { isObject, isString, oneOf, parseJson } from "../src/json";
 import { PULL_REQUEST_ACTIONS, type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
 import { type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestChange, type PullRequestDetail, type Repo, type RepoPullRequests, type Reviewer, prKey, repoKey, samePullRequest, type SettableState, unresolvedOf } from "../src/shared/github";
-import { type AgentOn, hasOpenThreads, type MoveId, moveOf } from "../src/shared/moves";
+import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyOnceChecksPass, readyToMerge } from "../src/shared/moves";
+import { type QueuedMerge, queuedMergeOf } from "../src/shared/merge-queue";
 import type { ReviewDraft } from "../src/shared/review-drafts";
+import { chainBelow } from "../src/shared/rebase-order";
 import { moveKey, stepTarget, type Where } from "./order";
 
 /** Whose move it is, or for your approved pull requests that need no fix, that they are approved; the list's sections, in page order. */
@@ -182,18 +184,6 @@ interface StackMember {
 	size: number;
 }
 
-/** The bottom of `pr`'s stack among `byHead`, the pull requests by head branch, and how many there are from `pr` down to it, both counted. */
-function chainBelow(pr: PullRequestSummary, byHead: ReadonlyMap<string, PullRequestSummary>): { bottom: PullRequestSummary; size: number } {
-	// GitHub cannot report a cycle of bases, but one must not hang the page.
-	const seen = new Set([pr]);
-	let bottom = pr;
-	for (let below = byHead.get(pr.stackedOn ?? ""); below && !seen.has(below); below = byHead.get(below.stackedOn ?? "")) {
-		seen.add(below);
-		bottom = below;
-	}
-	return { bottom, size: seen.size };
-}
-
 /** Each open or draft pull request in a stack of two or more that the list holds, by the chain of base branches. */
 function stackMembers(pullRequests: PullRequestSummary[]): Map<PullRequestSummary, StackMember> {
 	const live = pullRequests.filter(pr => pr.state !== "merged");
@@ -211,24 +201,23 @@ function stackMembers(pullRequests: PullRequestSummary[]): Map<PullRequestSummar
 	return members;
 }
 
-/** Your open or draft pull request without conflicts, whose branch a rebase may push; one with conflicts gets **Resolve conflicts** instead. */
-const rebasable = (pr: PullRequestSummary): boolean => pr.role === "author" && pr.state !== "merged" && !pr.conflicts;
-
-/** Whether **Rebase on** its base applies to `pr`: your pull request, behind its base and without conflicts. */
-export const rebaseApplies = (pr: PullRequestSummary): boolean => rebasable(pr) && pr.behind;
-
 /**
- * What **Rebase behind** rebases in one repository's `pullRequests`, in order: those {@link rebaseApplies} to, and every
- * rebasable one stacked on one of them, which falls behind only once the one below it is pushed. The bottom of a stack
- * comes first; otherwise they keep the order of `pullRequests`.
+ * The merges **Merge ready** queues in one repository's `pullRequests`, each bottom first. A pull request qualifies
+ * when it is yours, {@link readyToMerge} or {@link readyOnceChecksPass}, and in no queued merge. Each qualifying one on
+ * the default branch starts a merge, with the qualifying chain stacked on it. A stacked pull request whose parent does
+ * not qualify is left out, since merging it alone would land it in the parent's branch; so is a second one stacked on
+ * the same parent, since a queued merge takes one chain.
  */
-export function rebaseOrder(pullRequests: readonly PullRequestSummary[]): PullRequestSummary[] {
-	const above = Map.groupBy(pullRequests.filter(pr => rebasable(pr) && pr.stackedOn !== null), pr => pr.stackedOn);
-	const chosen = new Set(pullRequests.filter(rebaseApplies));
-	// A set's loop also visits what it adds, and adds nothing twice, so a cycle of bases ends.
-	for (const pr of chosen) for (const child of above.get(pr.head) ?? []) chosen.add(child);
-	const byHead = new Map([...chosen].map(pr => [pr.head, pr]));
-	return pullRequests.filter(pr => chosen.has(pr)).map(pr => ({ pr, depth: chainBelow(pr, byHead).size })).sort((a, b) => a.depth - b.depth).map(({ pr }) => pr);
+export function readyMerges(pullRequests: readonly PullRequestSummary[], merges: readonly QueuedMerge[]): PullRequestSummary[][] {
+	const ready = pullRequests.filter(pr => pr.role === "author" && (readyToMerge(pr) || readyOnceChecksPass(pr)) && !queuedMergeOf(merges, pr));
+	const above = Map.groupBy(ready.filter(pr => pr.stackedOn !== null), pr => pr.stackedOn);
+	return ready
+		.filter(pr => pr.stackedOn === null)
+		.map(bottom => {
+			const chain = [bottom];
+			for (let next = above.get(bottom.head)?.[0]; next; next = above.get(next.head)?.[0]) chain.push(next);
+			return chain;
+		});
 }
 
 /** How the list orders a section's pull requests, in menu order; a stack's members sit together, top first, in every sort. */

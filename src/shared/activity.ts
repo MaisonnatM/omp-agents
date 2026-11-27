@@ -121,6 +121,7 @@ export const CONTROLS = [
 	{ id: "notices.display.grouping", label: "Notifications grouping", area: "Notifications" },
 	{ id: "notices.search", label: "Search notifications", area: "Notifications" },
 	{ id: "notices.read-all", label: "Notifications, mark all as read", area: "Notifications" },
+	{ id: "notices.clear-all", label: "Notifications, clear all", area: "Notifications" },
 	{ id: "notices.item", label: "Notification", area: "Notifications" },
 	{ id: "notices.update", label: "Notification Update button", area: "Notifications" },
 	{ id: "notices.clear", label: "Notification cleared", area: "Notifications" },
@@ -176,6 +177,7 @@ export const CONTROLS = [
 	{ id: "pull-requests.repositories", label: "Repositories menu", area: "Pull requests" },
 	{ id: "pull-requests.repository.toggle", label: "Show repository switch", area: "Pull requests" },
 	{ id: "pull-requests.repository.move", label: "Move repository", area: "Pull requests" },
+	{ id: "pull-requests.repository.keep-rebased", label: "Keep rebased switch", area: "Pull requests" },
 	{ id: "pull-requests.repositories.show-all", label: "Show all repositories", area: "Pull requests" },
 	{ id: "pull-requests.view", label: "Pull requests view tab", area: "Pull requests" },
 	{ id: "pull-requests.filter", label: "Filter menu", area: "Pull requests" },
@@ -191,6 +193,7 @@ export const CONTROLS = [
 	{ id: "pull-requests.search", label: "Search pull requests", area: "Pull requests" },
 	{ id: "pull-requests.new", label: "New pull request", area: "Pull requests" },
 	{ id: "pull-requests.new.start", label: "Start the new pull request", area: "Pull requests" },
+	{ id: "pull-requests.merge-ready", label: "Merge ready pull requests", area: "Pull requests" },
 	{ id: "storage.stop", label: "Stop after this step", area: "Settings" },
 ] as const satisfies readonly { id: string; label: string; area: string }[];
 

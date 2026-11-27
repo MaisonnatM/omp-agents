@@ -4,10 +4,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
 import { type PullRequestList, type PullRequestSummary, type PullRequest, prKey, pullRequestUrl, type RepoPullRequests, repoKey, samePullRequest } from "../../../src/shared/github";
 import { type AgentOn, agentOn, moveOf } from "../../../src/shared/moves";
+import { rebaseOrder } from "../../../src/shared/rebase-order";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
+	readyMerges,
 	DEFAULT_ORDER,
 	type ListChange,
 	type MoveGroup,
@@ -20,7 +22,6 @@ import {
 	orderedRepos,
 	placedManual,
 	sectionsOfRepos,
-	rebaseOrder,
 	sectionTitles,
 	withRepoMoved,
 	withRepoStepped,
@@ -227,6 +228,8 @@ export interface PullRequests {
 	/** What **Rebase behind** rebases, in order, each from its repository's first workspace. */
 	behind: RebaseJob[];
 	onRebaseBehind: () => void;
+	/** What **Merge ready** queues: one merge per pull request or stack, bottom first. */
+	ready: PullRequestSummary[][];
 	onActionsOpenChange: RowBase["onActionsOpenChange"];
 	onChange: RowBase["onChange"];
 }
@@ -291,7 +294,7 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
 export function usePullRequests({ hosts, past, route, query = "" }: PullRequestsProps): PullRequests {
 	const targetKey = route.target ? prKey(route.target) : null;
 	const { open, start } = useDashboardActions();
-	const { starts: { quick }, pullRequestsScope: scope } = useDashboardStatus();
+	const { starts: { quick }, pullRequestsScope: scope, merges } = useDashboardStatus();
 	const poll = pullRequestsStore.use(scope);
 	const read = poll.read?.data ?? null;
 	const [hidden] = useHiddenRepos();
@@ -356,6 +359,7 @@ export function usePullRequests({ hosts, past, route, query = "" }: PullRequests
 			}),
 		[repos],
 	);
+	const ready = useMemo(() => repos.flatMap(repo => ("error" in repo ? [] : readyMerges(repo.pullRequests, merges))), [repos, merges]);
 	// Every section's pull requests, the filtered ones too, so a manual sort started under a filter keeps their places; built only when you place one.
 	const shownOrder = useCallback(
 		() => (order.sort === "manual" && order.manual.length > 0 ? order.manual : sectionsOfRepos(repos, order, agent).flatMap(sections => sections.flatMap(({ rows }) => rows.map(row => prKey(row.pr))))),
@@ -379,6 +383,7 @@ export function usePullRequests({ hosts, past, route, query = "" }: PullRequests
 		onRebase,
 		behind,
 		onRebaseBehind: () => rebasePullRequests(behind, rebaseHooks),
+		ready,
 		onActionsOpenChange,
 		onChange,
 	};

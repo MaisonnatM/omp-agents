@@ -47,6 +47,7 @@ import { isPortablePreference, parsePagePreferences, type PreferenceChange } fro
 import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { type AccountOrderEdit, MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { MergeQueueChange } from "../shared/merge-queue";
+import type { KeepRebasedChange } from "../shared/keep-rebased";
 import { canSubmitReview, FINDING_STATES, REVIEW_VERDICTS, type ReviewDraftEdit, type ReviewFinding, type ReviewSubmit } from "../shared/review-drafts";
 import { MERGE_METHODS, type SourceControlChange } from "../shared/source-control";
 import { isSyncSide, type SyncSide } from "../shared/settings-sync";
@@ -566,6 +567,12 @@ export function parseDevServerRequest(body: unknown): Parsed<DevServerRequest> {
 
 /** The most pull requests one queued merge takes: a stack taller than this is merged in parts. */
 export const MAX_QUEUED_STACK = 20;
+
+/** The body of `PUT /api/keep-rebased`: `repo` a `repoKey`, lowercase `owner/repo`. */
+export function parseKeepRebasedChange(body: unknown): Parsed<KeepRebasedChange> {
+	if (!isObject(body) || typeof body.on !== "boolean" || typeof body.repo !== "string" || !/^[^/\s]+\/[^/\s]+$/.test(body.repo) || body.repo !== body.repo.toLowerCase()) return null;
+	return { ok: { repo: body.repo, on: body.on } };
+}
 
 /** The body of `PUT /api/merge-queue`. */
 export function parseMergeQueueChange(body: unknown): Parsed<MergeQueueChange> {

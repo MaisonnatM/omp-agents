@@ -34,7 +34,7 @@ const REVIEW_FIELDS = `author { login ${AVATAR} }
 
 /** A row's fields; a merged pull request's skip its checks list, mergeability, and thread ids, which cost most of the search's time and a merged row does not use. */
 const prFields = (merged: boolean): string => `... on PullRequest {
-	number title isDraft state reviewDecision ${merged ? "" : "mergeable"} viewerCanUpdateBranch headRefName baseRefName createdAt updatedAt mergedAt additions deletions
+	number title isDraft state reviewDecision ${merged ? "" : "mergeable headRefOid baseRef { target { oid } }"} viewerCanUpdateBranch headRefName baseRefName createdAt updatedAt mergedAt additions deletions
 	labels(first: 20) { nodes { name } }
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
@@ -190,7 +190,16 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullReques
 		createdAt: Date.parse(str(node.createdAt) ?? "") || updatedAt,
 		updatedAt,
 		conversations: totalOf(node.comments) + totalOf(node.reviewThreads),
+		...commitsOf(node),
 	};
+}
+
+/** The head commit and its base branch's commit, which **Keep rebased** remembers a stop by, when GitHub gave both: an open pull request's row asks for them. */
+function commitsOf(node: Record<string, unknown>): { headOid: string; baseOid: string } | null {
+	const headOid = str(node.headRefOid);
+	const target = isObject(node.baseRef) && isObject(node.baseRef.target) ? node.baseRef.target : null;
+	const baseOid = target ? str(target.oid) : undefined;
+	return headOid && baseOid ? { headOid, baseOid } : null;
 }
 
 /** The pull requests in the searches' merged answer, each once, in search order; `botStarted` says which threads a bot started, by id. */

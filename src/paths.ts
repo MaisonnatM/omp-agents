@@ -75,6 +75,8 @@ export const noticesFile = join(configDir, "notices.json");
 export const sourceControlFile = join(configDir, "source-control.json");
 /** The merges that wait until GitHub allows them, beside {@link tokenFile}. */
 export const mergesFile = join(configDir, "merges.json");
+/** The repositories with **Keep rebased** on, and each rebase of it that stopped, beside {@link tokenFile}. */
+export const keepRebasedFile = join(configDir, "keep-rebased.json");
 /** The ids of the built-in routines the dashboard added once, so one you delete stays deleted, beside {@link tokenFile}. */
 export const builtInRoutinesFile = join(configDir, "built-in-routines.json");
 /** The Workspaces and templates the owner server already copied routines for, kept on this computer only, beside {@link tokenFile}. */

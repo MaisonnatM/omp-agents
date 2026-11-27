@@ -21,7 +21,7 @@
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request, which the Pull requests page shows.
   `web/pull-requests-model.ts` holds the pull requests' moves in one table, `MOVES`, with each move's verb, its section, and the quick action that makes it, over `moveOf` in `src/shared/moves.ts`.
   It also holds which sections start folded, sorts rows by move, and keeps each stack's rows together by the chain of base branches.
-  `rebaseApplies` decides which pull requests offer **Rebase on** their base, and `rebaseOrder` lists what **Rebase behind** rebases: those, and the pull requests stacked on them, bottom of each stack first.
+  `rebaseApplies` in `src/shared/rebase-order.ts` decides which pull requests offer **Rebase on** their base, and `rebaseOrder` lists what **Rebase behind** and the server's **Keep rebased** rebase: those, and the pull requests stacked on them, bottom of each stack first.
   `commentCount` counts the comments that the **Timeline** tab and its header show, and `withThreadResolved` keeps a thread's state and unresolved count, with how many of the open threads a bot started, together.
   `threadStarters` gives a **Reply** row's count of the open threads AI and people started, and its tooltip.
   `web/pull-request-comments.ts` combines Summary conversations, filters bot and completed discussions, and pages recent conversations before ordering them.

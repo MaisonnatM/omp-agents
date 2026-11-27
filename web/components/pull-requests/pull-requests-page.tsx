@@ -2,15 +2,20 @@
  * The Pull requests page: every pull request in a table, by repository or by **Display**'s grouping, in a card per
  * section named after whose move it is, with the details of the pull request it shows docked beside it.
  */
-import { IconArrowRotateClockwise, IconCrossMedium, IconExpand } from "central-icons";
-import { type PullRequest, prKey, repoKey, type RepoPullRequests } from "../../../src/shared/github";
+import { IconArrowRotateClockwise, IconCrossMedium, IconExpand, IconMerged } from "central-icons";
+import { type PullRequest, type PullRequestDetail, type PullRequestSummary, prKey, repoKey, type RepoPullRequests } from "../../../src/shared/github";
 import { type RefObject, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
+import { type MergeMethod, startingMethod } from "../../../src/shared/source-control";
+import { errorText } from "../../../src/json";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { filters, NO_FILTER, type PullRequestFilter } from "../../pull-requests-filter";
+import { getJson } from "../../api";
+import { useLastMergeMethod, useMergeMethodChoice } from "../../merge-method";
+import { writeMergeQueue } from "../../reads";
 import { bulkMoves, confirmLabel, fixOwner, MOVES } from "../../pull-requests-model";
 import { QUICK_ACTIONS } from "../../quick-actions";
 import { useHiddenRepos, usePullRequestDetailsPlacement, usePullRequestsDisplay, usePullRequestsFilter, usePullRequestsFolds } from "../../pull-requests-state";
@@ -29,6 +34,7 @@ import { NothingMatches } from "../list-filter-bar";
 import { QUICK_ACTION_ICON, QuickStartNotice } from "../quick-actions";
 import { SearchField } from "../search-field";
 import { Spinner } from "../spinner";
+import { loadingToast, settleToast } from "../toaster";
 import { type GroupView, type PullRequests, RepoReadError, type TableView, UnmatchedTip, usePullRequestKeys, usePullRequests, usePullRequestsList, workspacesLabel } from "./pull-requests-list";
 import type { PullRequestDetailTab } from "./pr-details";
 import { NewPullRequestButton } from "./pr-new";
@@ -297,6 +303,69 @@ function RebaseBehindButton({ pulls }: { pulls: PullRequests }) {
 	);
 }
 
+/** `1 of 1 pull request`, `2 of 5 pull requests`. */
+const ofTotal = (count: number, total: number): string => `${count} of ${total} ${total === 1 ? "pull request" : "pull requests"}`;
+
+/**
+ * **Merge ready**: once you confirm, queues one merge for each of your pull requests ready to merge, a stack as one bottom
+ * first, with the method a pull request's merge button starts on in its repository; the merge queue merges each once
+ * GitHub allows it. Nothing shows while none qualifies.
+ */
+function MergeReadyButton({ pulls }: { pulls: PullRequests }) {
+	const { pullRequestsScope } = useDashboardStatus();
+	const [choice] = useMergeMethodChoice();
+	const [last] = useLastMergeMethod();
+	const [queueing, setQueueing] = useState(false);
+	const confirm = useInlineConfirm("merge-ready");
+	const groups = pulls.ready;
+	const count = groups.reduce((sum, group) => sum + group.length, 0);
+	if (count === 0 && !queueing) return null;
+	const queue = async (): Promise<void> => {
+		setQueueing(true);
+		const toast = loadingToast({ title: `Queueing ${count === 1 ? "1 pull request" : `${count} pull requests`} to merge` });
+		// A repository's merge methods are the same on each of its pull requests, so one read per repository serves every merge in it.
+		const methods = new Map<string, Promise<MergeMethod | null>>();
+		const methodOf = (pr: PullRequestSummary): Promise<MergeMethod | null> => {
+			const key = repoKey(pr);
+			const known = methods.get(key);
+			if (known) return known;
+			const read = getJson<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`).then(detail => startingMethod(choice, last, detail.mergeMethods));
+			methods.set(key, read);
+			return read;
+		};
+		const results = await Promise.allSettled(
+			groups.map(async group => {
+				const method = await methodOf(group[0]!);
+				if (method === null) throw new Error(`${repoKey(group[0]!)} allows no merge method.`);
+				await writeMergeQueue(pullRequestsScope, { op: "add", method, prs: group.map(({ owner, repo, number }) => ({ owner, repo, number, head: null })) });
+			}),
+		);
+		const queued = results.reduce((sum, result, index) => sum + (result.status === "fulfilled" ? groups[index]!.length : 0), 0);
+		const reasons = results.flatMap(result => (result.status === "rejected" ? [errorText(result.reason)] : []));
+		settleToast(toast, { title: `Queued ${ofTotal(queued, count)} to merge`, description: reasons.length > 0 ? `${count - queued} failed to queue: ${reasons[0]}` : undefined });
+		setQueueing(false);
+		pulls.refresh();
+	};
+	const armed = confirm.isArmed("merge");
+	const label = queueing ? "Queueing merges…" : armed ? `Confirm merge of ${count}?` : `Merge ${count} ready`;
+	return (
+		<Tooltip content="Queue a merge for each of your pull requests ready to merge, or ready but for running checks: the merge queue merges each one once GitHub allows it, a stack bottom first" forceOpen={armed ? false : undefined}>
+			<Button
+				size="compact"
+				variant="outline"
+				leadingIcon={queueing ? Spinner : IconMerged}
+				disabled={queueing}
+				aria-busy={queueing}
+				aria-label={label}
+				{...activityControl("pull-requests.merge-ready")}
+				{...confirm.props("merge", () => void queue())}
+			>
+				{label}
+			</Button>
+		</Tooltip>
+	);
+}
+
 interface PullRequestsPageProps {
 	hosts: RosterHost[];
 	past: PastSession[];
@@ -348,6 +417,7 @@ function PullRequestsOverview({ hosts, past, route, onExpand }: PullRequestsPage
 						<>
 							<UnmatchedTip unmatched={unmatched} />
 							<RebaseBehindButton pulls={pulls} />
+							<MergeReadyButton pulls={pulls} />
 							<span {...activityControl("pull-requests.search")}>
 								<SearchField label="Search pull requests" placeholder="Search" query={query} onQuery={setQuery} className="w-36" />
 							</span>
