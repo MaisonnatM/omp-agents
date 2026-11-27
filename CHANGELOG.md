@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-27
+
+- A routine's run no longer posts long replies on its Board thread. It finishes like a /ship report: a bold outcome line, a few short bullets, then Needs you, Not verified, and Done lines when they apply.
+
 ## 2026-11-26
 
 - Interrupted sessions no longer show under their workspace in the sidebar. **Resume all** in the Workspaces header still brings them back.
