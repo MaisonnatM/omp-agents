@@ -68,11 +68,20 @@ function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
 	const stopped: string[] = [];
 	/** The session file in each process's environment, by pid. */
 	const sessionFiles = new Map<number, string>();
+	/** The session file each process holds open, by pid; `null` makes `lsof` fail. */
+	const openFiles = { files: new Map<number, string>() as Map<number, string> | null, reads: [] as number[][] };
+	/** Each session file's title, by path. */
+	const titles = new Map<string, string>();
 	const watch = new SessionProcessWatch({
 		readTable: async () => parsePs(state.ps.join("\n")),
 		readPorts: async () => state.listeners,
 		readCwds: async pids => new Map([...state.cwds].filter(([pid]) => pids.includes(pid))),
 		readSessionFiles: async pids => new Map([...sessionFiles].filter(([pid]) => pids.includes(pid))),
+		readOpenSessionFiles: async pids => {
+			openFiles.reads.push([...pids]);
+			return openFiles.files && new Map([...openFiles.files].filter(([pid]) => pids.includes(pid)));
+		},
+		titleOf: async file => titles.get(file) ?? null,
 		appOf: async dir => (dir === "/repo" ? "/repo/.git\n" : dir.startsWith("/repo/") ? `/repo/.git\n${dir.split("/").at(-1)}/` : null),
 		readServices: async () => state.services,
 		projectDir: async cwd => (cwd.startsWith("/repo") ? "/repo" : cwd),
@@ -112,7 +121,7 @@ function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
 	};
 	/** Session `instanceId`'s processes, as the whole list has them. */
 	const processesOf = async (instanceId: string) => (await watch.list()).find(each => each.instanceId === instanceId)?.processes;
-	return { state, stopped, sessionFiles, watch, tickAt, processesOf };
+	return { state, stopped, sessionFiles, openFiles, titles, watch, tickAt, processesOf };
 }
 
 describe("SessionProcessWatch", () => {
@@ -281,6 +290,28 @@ describe("SessionProcessWatch", () => {
 		expect(stopped.toSorted()).toEqual(["stray asked", "stray lost", "stray old"]);
 		await tickAt(60);
 		expect(stopped).toHaveLength(3);
+	});
+
+	test("names each stray by the title of the session file its omp holds open, read once per stray with one lsof for all of them", async () => {
+		const { state, openFiles, titles, tickAt, watch } = computer([]);
+		state.minutes = null;
+		state.sessions = [{ ...A, status: "working" }];
+		const keeperRow = (pid: number) => `  ${pid}     1   ${pid}   1024   0.0 Fri Oct  3 09:00:00 2026     bun keeper.ts`;
+		const ompRow = (pid: number, keeperPid: number) => `  ${pid}   ${keeperPid}   ${pid}  40960   0.0 Fri Oct  3 09:00:00 2026     omp`;
+		state.ps = [...PS, keeperRow(160), ompRow(161, 160), keeperRow(170), ompRow(171, 170)];
+		const keeper = (instanceId: string, keeperPid: number): KeptProcess => ({ port: PORT, instanceId, keeperPid, private: false, startedAt: T0 });
+		state.keepers = [keeper("named", 160), keeper("untitled", 170)];
+		titles.set("/sessions/-repo-/1_s1.jsonl", "Fix the login");
+		const strayTitles = async () => new Map((await watch.view()).footprints.flatMap(({ owner }) => (owner.kind === "stray" ? [[owner.keeperId, owner.title] as const] : [])));
+		// A failed lsof leaves both untitled and reads them again at the next sample.
+		openFiles.files = null;
+		await tickAt(0);
+		expect(await strayTitles()).toEqual(new Map([["named", null], ["untitled", null]]));
+		openFiles.files = new Map([[161, "/sessions/-repo-/1_s1.jsonl"]]);
+		await tickAt(1);
+		await tickAt(2);
+		expect(await strayTitles()).toEqual(new Map([["named", "Fix the login"], ["untitled", null]]));
+		expect(openFiles.reads).toEqual([[161, 171], [161, 171]]);
 	});
 
 	test("unattended work waits until memory is read at normal pressure, and while it is not; the user's work never waits", async () => {

@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cwdsIn, descendants, listeningPortsIn, openPathsIn, ProcessCensus, parseFootprints, parseListeners, parsePs, parseSessionFiles, sessionFilesIn, sessionGroups, stopTree } from "./process-census";
+import { cwdsIn, descendants, listeningPortsIn, openPathsIn, ProcessCensus, parseFootprints, parseListeners, parseOpenSessionFiles, parsePs, parseSessionFiles, sessionFilesIn, sessionGroups, stopTree } from "./process-census";
 
 /** omp (100) with an MCP server in its process group, two jobs, and a shared worker it spawned, which has a child of its own. */
 const PS = `
@@ -49,6 +49,16 @@ test("lsof's listeners read as each pid's ports, sorted and unique across IPv4 a
 		[300, [9222]],
 	]);
 	expect(parseListeners("").size).toBe(0);
+});
+
+test("lsof's open files read as each pid's first session file one directory below the sessions root, never a sidecar or a subagent's", () => {
+	const root = "/u/.omp/agent/sessions";
+	const lsof = [
+		"p161", "fcwd", "n/repo", "f12", `n${root}/-repo-/.1_a.jsonl.lock`, "f13", `n${root}/-repo-/1_a/2_sub.jsonl`, "f14", `n${root}/-repo-/1_a.jsonl`, "f15", `n${root}/-repo-/0_b.jsonl`,
+		"p171", "f9", "n/tmp/notes.jsonl",
+		"",
+	].join("\n");
+	expect([...parseOpenSessionFiles(lsof, root)]).toEqual([[161, `${root}/-repo-/1_a.jsonl`]]);
 });
 
 /** A root that exits on SIGTERM, with a child that ignores it, which prints its pid once it ignores it. */

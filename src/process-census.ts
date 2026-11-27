@@ -5,7 +5,7 @@
  * The server's session process list (`src/server/session-processes.ts`) reads the same table, so this stays a leaf the keeper bundle loads.
  */
 import { readdirSync, readFileSync, readlinkSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 /** One process as `ps` lists it. */
 export interface ProcessRow {
@@ -91,6 +91,26 @@ export function parseCwds(text: string): Map<number, string> {
 		else if (line.startsWith("n") && pid !== null) cwds.set(pid, line.slice(1));
 	}
 	return cwds;
+}
+
+/** `lsof` listing every file each of `pids` holds open, in the fields {@link parseOpenSessionFiles} reads. */
+export const openFilesArgv = (pids: readonly number[]): string[] => ["lsof", "-nP", "-w", "-Fpn", "-p", pids.join(",")];
+
+/**
+ * The first omp session file each pid holds open, from {@link openFilesArgv}'s output: a `<root>/<dir>/<file>.jsonl`, one
+ * directory below omp's sessions root `root`, so a subagent's deeper file or a `.lock` sidecar never counts.
+ */
+export function parseOpenSessionFiles(text: string, root: string): Map<number, string> {
+	const files = new Map<number, string>();
+	let pid: number | null = null;
+	for (const line of text.split("\n")) {
+		if (line.startsWith("p")) pid = Number(line.slice(1));
+		else if (line.startsWith("n") && pid !== null && !files.has(pid)) {
+			const path = line.slice(1);
+			if (path.endsWith(".jsonl") && !basename(path).startsWith(".") && dirname(dirname(path)) === root) files.set(pid, path);
+		}
+	}
+	return files;
 }
 
 /** `ps` printing each of `pids` with its environment after its command, in the form {@link parseSessionFiles} reads; macOS only. */

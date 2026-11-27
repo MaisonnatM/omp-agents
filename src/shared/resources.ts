@@ -23,7 +23,8 @@ export type StrayReason = "unattached" | "orphan-port" | "foreign-live";
 /** Who holds memory. */
 export type Owner =
 	| { kind: "session"; instanceId: string; title: string; private: boolean }
-	| { kind: "stray"; keeperId: string; port: number; reason: StrayReason; startedAt: number }
+	/** `title` is that of the session file its omp holds open, as the Past list names it; `null` when none was found. */
+	| { kind: "stray"; keeperId: string; port: number; reason: StrayReason; startedAt: number; title: string | null }
 	| { kind: "mcp"; server: string; instanceId: string }
 	/** One of a live session's jobs or services; `id` is what `PUT /api/session-processes/stop` takes. */
 	| { kind: "process"; id: string; instanceId: string; label: string }

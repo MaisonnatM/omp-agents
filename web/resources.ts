@@ -27,7 +27,7 @@ export function ownerName(owner: Owner): string {
 		case "process":
 			return owner.label;
 		case "stray":
-			return `Unlisted session on port ${owner.port}`;
+			return owner.title ?? `Unlisted session on port ${owner.port}`;
 		case "mcp":
 			return owner.server;
 		case "heavy":
@@ -49,7 +49,8 @@ export function ownerKind(owner: Owner): string {
 		case "process":
 			return "Job or service";
 		case "stray":
-			return `Stray, ${STRAY_REASON[owner.reason]}`;
+			// Without a title, the name already says the port.
+			return owner.title === null ? `Stray, ${STRAY_REASON[owner.reason]}` : `Stray on port ${owner.port}, ${STRAY_REASON[owner.reason]}`;
 		case "mcp":
 			return "MCP server";
 		case "heavy":

@@ -37,6 +37,7 @@ const stray = (instanceId: string, seenMin: number, reason: PolicyStray["reason"
 	reason,
 	firstSeen: NOW - seenMin * MIN,
 	memoryBytes: mb * MB,
+	title: null,
 });
 
 const input = (pressure: Pressure | null, parts: Partial<PolicyInput>): PolicyInput => ({

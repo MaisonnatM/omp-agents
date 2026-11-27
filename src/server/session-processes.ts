@@ -17,8 +17,10 @@ import {
 	LISTENERS_ARGV,
 	listeningPortsIn,
 	OMP_WORKER_PREFIX,
+	openFilesArgv,
 	parseCwds,
 	parseListeners,
+	parseOpenSessionFiles,
 	parseSessionFiles,
 	type Processes,
 	type ProcessRow,
@@ -32,7 +34,7 @@ import type { LiveSessionProcesses, ProcessSettings, SessionProcess, SessionProc
 import type { AutoStop, Footprint, MemoryReading, Owner, ResourceSample, ResourcesView, StrayReason } from "../shared/resources";
 import type { HostStatus } from "../shared/sessions";
 import { errorText } from "../json";
-import { decide, type Decision, type PolicyStray, type Stop } from "./memory-policy";
+import { decide, type Decision, type PolicyStray, type Stop, strayOwner } from "./memory-policy";
 
 /** How long a stopped job gets to exit on SIGTERM before SIGKILL. */
 const STOP_GRACE_MS = 3_000;
@@ -78,6 +80,10 @@ export interface SessionProcessWatchDeps {
 	readCwds(pids: readonly number[]): Promise<Map<number, string>>;
 	/** The omp session file in the environment of each of `pids` that an omp bash tool started; `null` when the read failed. */
 	readSessionFiles(pids: readonly number[]): Promise<Map<number, string> | null>;
+	/** The omp session file each of `pids` holds open, read with one `lsof` for them all; `null` when the read failed. */
+	readOpenSessionFiles(pids: readonly number[]): Promise<Map<number, string> | null>;
+	/** The title of the session file at `file`, as the Past list names it; `null` when it has none or cannot be read. */
+	titleOf(file: string): Promise<string | null>;
 	/** What app `dir` holds, the same for each checkout of it, such as `front/` of one repository; `null` outside git. */
 	appOf(dir: string): Promise<string | null>;
 	/** The services omp's daemon runs now, without the ones that ended or that it does not supervise. */
@@ -167,6 +173,8 @@ export class SessionProcessWatch {
 	#strays: PolicyStray[] = [];
 	/** When this server first saw each stray, by port, keeper id, and keeper pid. */
 	#straysSeen = new Map<string, number>();
+	/** Each stray's session title, `null` for none, by port, keeper id, and keeper pid, read once per stray. */
+	#strayTitles = new Map<string, string | null>();
 	/** The memory each owner held at the last sample. */
 	#footprints: Footprint[] = [];
 	/** The automatic stops made, newest first, at most {@link KEPT_STOPS}. */
@@ -331,6 +339,7 @@ export class SessionProcessWatch {
 		for (const each of found.values()) for (const item of each.items) items.set(item.id, item);
 		const keepers = this.#deps.readKeepers();
 		const strays = (this.#strays = this.#findStrays(keepers, table, listeners, live, now));
+		await this.#titleStrays(strays, table);
 		const decision = (this.#decision = decide({
 			now,
 			reading,
@@ -382,13 +391,36 @@ export class SessionProcessWatch {
 			const own = keeper.port === this.#deps.port;
 			if (own && listed.has(keeper.instanceId)) return [];
 			const reason: StrayReason = own ? "unattached" : listeners && !listening.has(keeper.port) ? "orphan-port" : "foreign-live";
-			const key = `${keeper.port} ${keeper.instanceId} ${keeper.keeperPid}`;
+			const key = strayKey(keeper);
 			const firstSeen = this.#straysSeen.get(key) ?? now;
 			seen.set(key, firstSeen);
-			return [{ ...keeper, reason, firstSeen, memoryBytes: memoryOf(treeOf(table, keeper.keeperPid)) }];
+			return [{ ...keeper, reason, firstSeen, memoryBytes: memoryOf(treeOf(table, keeper.keeperPid)), title: this.#strayTitles.get(key) ?? null }];
 		});
 		this.#straysSeen = seen;
 		return strays;
+	}
+
+	/**
+	 * Gives each of `strays` the title of the session file its omp, the keeper's child, holds open, as the Past list names it.
+	 * A stray's title is read once, with one `lsof` over every stray first seen in this sample; a failed `lsof` reads them again next sample.
+	 */
+	async #titleStrays(strays: PolicyStray[], table: ProcessTable): Promise<void> {
+		const keys = new Set(strays.map(strayKey));
+		for (const key of this.#strayTitles.keys()) if (!keys.has(key)) this.#strayTitles.delete(key);
+		const unread = strays.filter(stray => !this.#strayTitles.has(strayKey(stray)));
+		if (unread.length === 0) return;
+		const keepers = new Set(unread.map(stray => stray.keeperPid));
+		const omps = [...table.values()].filter(row => keepers.has(row.ppid));
+		const files = omps.length > 0 ? await this.#deps.readOpenSessionFiles(omps.map(row => row.pid)) : new Map<number, string>();
+		if (!files) return;
+		await Promise.all(
+			unread.map(async stray => {
+				const file = omps.flatMap(row => (row.ppid === stray.keeperPid ? (files.get(row.pid) ?? []) : []))[0];
+				const title = file ? await this.#deps.titleOf(file).catch(() => null) : null;
+				this.#strayTitles.set(strayKey(stray), title);
+				stray.title = title;
+			}),
+		);
 	}
 
 	#apply(stop: Stop, items: ReadonlyMap<string, Item>): Promise<void> {
@@ -469,6 +501,9 @@ export class SessionProcessWatch {
 /** Whether a command that names session file `file` ran in session `own` or in one of its subagents, whose files omp keeps in a directory named after `own`. */
 const startedIn = (file: string, own: string): boolean => file === own || file.startsWith(`${own.replace(/\.jsonl$/, "")}/`);
 
+/** What a stray's first sighting and its title are kept by: its port, keeper id, and keeper pid. */
+const strayKey = (keeper: KeptProcess): string => `${keeper.port} ${keeper.instanceId} ${keeper.keeperPid}`;
+
 /** Process `pid` and every process under it that still runs. */
 const treeOf = (table: ProcessTable, pid: number): ProcessRow[] => [pid, ...descendants(table, pid).keys()].flatMap(each => table.get(each) ?? []);
 
@@ -485,12 +520,7 @@ function footprintsOf(sessions: readonly WatchedSession[], found: Sample, strays
 		footprints.push({ owner: { kind: "process", id: item.id, instanceId: item.serves[0]!.instanceId, label: item.label }, memoryBytes: item.memoryBytes, processCount: item.processCount, stoppable: true });
 	}
 	for (const stray of strays) {
-		footprints.push({
-			owner: { kind: "stray", keeperId: stray.instanceId, port: stray.port, reason: stray.reason, startedAt: stray.startedAt },
-			memoryBytes: stray.memoryBytes,
-			processCount: treeOf(table, stray.keeperPid).length,
-			stoppable: stray.reason !== "foreign-live",
-		});
+		footprints.push({ owner: strayOwner(stray), memoryBytes: stray.memoryBytes, processCount: treeOf(table, stray.keeperPid).length, stoppable: stray.reason !== "foreign-live" });
 	}
 	// A keeper this server started is its child until the server restarts; its tree is the session's or the stray's.
 	const kept = new Set(keepers.flatMap(keeper => treeOf(table, keeper.keeperPid).map(row => row.pid)));
@@ -560,6 +590,18 @@ export async function readCwds(pids: readonly number[]): Promise<Map<number, str
 	} catch {
 		return new Map();
 	}
+}
+
+/** The omp session file under `root` each of `pids` holds open, read with one `lsof` without blocking the server; `null` when `lsof` failed. */
+export async function readOpenSessionFiles(pids: readonly number[], root: string): Promise<Map<number, string> | null> {
+	try {
+		const lsof = await run(openFilesArgv(pids), { timeoutMs: 10_000 });
+		// lsof exits 1 when one of the pids has exited since.
+		if (lsof.code === 0 || lsof.code === 1) return parseOpenSessionFiles(lsof.stdout, root);
+	} catch {
+		// `lsof` is not installed or timed out.
+	}
+	return null;
 }
 
 /** The omp session file in the environment of each of `pids` that an omp bash tool started, read without blocking the server; `null` when the read failed. */
