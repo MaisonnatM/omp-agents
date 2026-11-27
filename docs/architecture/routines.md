@@ -41,19 +41,14 @@ A file already migrated changes nothing.
 
 ## Routine heartbeat
 
-`earlyRuns` in `src/routine-health.ts` lists the runs that exited early, as `EarlyRun`s: the routine's Workspace, id, and name, the run's key, and why, one of `EARLY_EXITS`.
+`erroredRuns` in `src/routine-health.ts` lists the runs that errored, as `ErroredRun`s: the routine's Workspace, id, and name, and the run's key.
 It judges the runs claimed in the day before the last half hour (`HEALTH_WINDOW_MS`, `SETTLE_MS`), so a run still under way waits for the next look.
-
-- `errored`: the run has errors, its outcome is `failed`, its command did not exit 0, or its Board task's session failed.
-  A command whose routine has `post: "failures"` hands its output to a session by exiting non-zero, so that exit, and the `exitedWith` error it records, is no error.
-- `no-reply`: its Board task's session ended without replying on the Board thread and without a quiet `done`.
-- `short`: it took less than `SHORT_SHARE`, a quarter, of the median of the routine's other runs, once at least `MIN_USUAL_RUNS` of them have a time; a command's time is its run's, and a posted run's is its session's turn.
-- `missed`: a slot's run was claimed `LATE_AFTER_MS`, an hour, or more after the slot the previous scheduled run gave, or stayed queued that long.
-  A routine that `runsHere` and whose next slot is that overdue with no claim is listed at that slot too.
-  Lateness counts only the time the Mac was awake: `macSleeps` in `src/sleep-log.ts` reads the spans from a Sleep to the next full Wake out of `pmset -g log`, so a catch-up run at wake is not missed.
+A run errored when it has errors, its outcome is `failed`, its command stopped, failed, or did not exit 0, or its Board task's session failed.
+A command whose routine has `post: "failures"` hands its output to a session by exiting non-zero, so that exit, and the `exitedWith` error it records, is no error.
+A run that took far less than usual, was claimed late, or whose session ended with no reply is not listed: those flagged too many healthy runs.
 
 `boardRunTurn` in `src/server/routine-turns.ts` reads a posted run's turn, a `RunTurn`, from its Board task, from what the run posted, the Board task or the routine's reply, to the first done after it: the session that took it (`start`, or the `startedOn` of the reply the run posted), whether that session replied or marked the Board task done quietly, whether its start failed, how long it took, and its `usage`, every assistant message's input, output, and cache tokens, and its `usage.cost.total`, read from that session's file.
-A run whose Board task or session file is not found has no turn, so it is judged on its outcome alone.
+A run whose Board task or session file is not found has no turn, so it is judged on its outcome and errors alone.
 The runner records that `usage` on each posted run that has none yet once its session's turn ended, in `routines.json`, so the page shows each run's tokens and cost and a routine's total over its kept runs.
 The `Dashboard` checks `HEALTH_KINDS` on the owner at startup and on the daily tick, and the bell shows one `routine-health` notice for what it found; see [Notifications](notifications.md).
 

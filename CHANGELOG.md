@@ -8,8 +8,17 @@ The dashboard shows the same lines in Settings › What's new.
 - The blue count beside a workspace now says everything waiting on you there: its sessions that need you plus its Board threads with replies you have not read. The Sessions tab, the Board tab, and the Dock badge all show the same count.
 - The Board tab's sidebar shows the count of what waits on you instead of ready Board tasks, marks each Workspace with a # as the Board's header does, and no longer lists sessions under each Workspace; they stay on the Sessions tab and in each Board thread.
 - The Dock badge no longer counts sessions the sidebar hides, such as ones in `/tmp` or a hidden workspace.
+- On the Board, a long message a routine posted now shows its first lines only, with Show more to read the rest.
+- On the Board, a message whose thread has replies you haven't read now has a light blue background.
+
+- The Routines notification now appears only when a routine run errors.
+- A routine run that was shorter than usual, started late, or ended with no reply no longer raises a notification.
+- Replying on a done Board task, or picking one of its suggestions, now goes back to the session that did the work, with its whole conversation, instead of starting a new session that re-reads the thread. A new session still starts when that one cannot come back, or after you closed the task.
+- Settings › Providers can now order two sign-ins of the same email, such as a team and a personal organization; omp tells them apart by organization.
+- Suggested prompts above the composer now use the row's full width. The send, edit, and mark keys show over the end of the hovered row instead of cutting every prompt short.
 - A routine's run no longer posts long replies on its Board thread. It finishes like a /ship report: a bold outcome line, a few short bullets, then Needs you, Not verified, and Done lines when they apply.
 - A Workspace's Board tabs now run Messages, Pull requests, Projects, Routines, Memory, Settings.
+- Fixed: the ship workflow no longer refuses a session's draft or ready step when the session started outside the pull request's folder. It now checks the folder where the session ran its tests.
 
 ## 2026-11-26
 

@@ -186,6 +186,7 @@ function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onC
 	const work = workOf(state, task, sessions.hosts);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const [editing, setEditing] = useState(false);
+	const unread = open ? 0 : unreadOf(task, seenMap[task.id]);
 	const toolbar = (
 		<>
 			{task.by.kind === "user" && !editing && <EditButton disabled={disabled} onEdit={() => setEditing(true)} />}
@@ -206,10 +207,10 @@ function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onC
 		</>
 	);
 	return (
-		<MessageRow by={task.by} at={task.at} sessions={sessions} state={state} workspace={task.workspace} grouped={grouped} highlighted={open} toolbar={toolbar}>
-			<TaskBody task={task} editor={editing ? <MessageEditor text={task.text || task.title} onSave={text => onChange({ op: "edit", by: { kind: "user" }, task: task.id, text })} onClose={() => setEditing(false)} /> : undefined} />
+		<MessageRow by={task.by} at={task.at} sessions={sessions} state={state} workspace={task.workspace} grouped={grouped} highlighted={open} unread={unread > 0} toolbar={toolbar}>
+			<TaskBody short task={task} editor={editing ? <MessageEditor text={task.text || task.title} onSave={text => onChange({ op: "edit", by: { kind: "user" }, task: task.id, text })} onClose={() => setEditing(false)} /> : undefined} />
 			{replies.length > 0 ? (
-				<ThreadSummary replies={replies} unread={open ? 0 : unreadOf(task, seenMap[task.id])} work={work} sessions={sessions} href={href} />
+				<ThreadSummary replies={replies} unread={unread} work={work} sessions={sessions} href={href} />
 			) : (
 				work && <WorkingLine work={work} sessions={sessions} href={href} />
 			)}

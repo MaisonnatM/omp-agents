@@ -17,10 +17,12 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   Each tab has its own address, such as `#board/routines?workspace=<cwd>`, and so does each settings section, such as `#board/settings/worktrees?workspace=<cwd>`; the Board thread opens only on **Messages**.
 - A routine, a project, or a pull request opened from **Routines**, **Projects**, or **Pull requests** shows inside that tab, at an address such as `#board/routines/<id>?workspace=<cwd>`, `#board/projects/<id>?workspace=<cwd>`, or `#board/pull-requests/<owner>/<repo>/<number>?workspace=<cwd>`: for a project or a pull request, the rest after `#board/` is the page's own address, and every link on the page stays in the tab.
 - A Board task a routine posted shows the routine's name as its author, with a repeat icon for its picture; the name opens the routine in the **Routines** tab, and reads as plain text once the routine is deleted.
+  On **Messages** a long routine message shows its first lines faded out, with **Show more** to read it whole; its Board thread shows it whole.
 - A quiet done, the one line a session leaves when a routine's Board task found nothing to report, adds nothing to the thread's unread count.
 - The **Projects** tab lists its projects in a resizable column at the left, with **Search projects**, **All projects**, which shows the table at the right, and **New project**; open projects come first, archived ones under **Archived**, and the project you pick opens at the right.
 - A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **Starting a session…**, **Working on it…** or what its session waits on you for, **Couldn't start a session** with the reason and **Reply to try again**, or **done**.
 - Under a message with replies, a line shows who replied, how many replies, its unread count, and when the last came; hovering it adds an arrow and keeps that text in place.
+  While its thread has unread replies, the message has a light blue background.
 - Hovering a message shows a toolbar: **Reply in thread** opens its Board thread, the arrow opens the session working on it, and on a Board task not done yet **Close task**, the check mark, marks it done as you.
   Closing ends the session working on it, and the Board thread notes that you closed it; a reply reopens it as it does any done Board task.
 - On your own messages the toolbar also has **Edit message**, the pencil, on the Board and in a Board thread: it puts the text in a box where Enter or **Save** saves it, Shift+Enter starts a new line, and Escape or **Cancel** leaves it as it was.
@@ -68,8 +70,8 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   A session running in a terminal keeps its own model; the skill still applies.
 - The reply goes to the session that holds the Board task, or the session that posted it. It wakes that session if it stopped.
   The box says who it reaches.
-- On a done Board task, or one whose session did not start, your reply reopens it and a new session starts on it, on the model, thinking level, and skill picked in the box.
-  The new session reads the whole Board thread and the names of the sessions before it, so it carries on from their branch.
+- On a done Board task, or one whose session did not start, your reply reopens it on the model, thinking level, and skill picked in the box.
+  When the session that marked it done can resume, it takes your reply with its whole earlier conversation and the Board thread since; otherwise a new session starts, reads the whole Board thread and the names of the sessions before it, and carries on from their branch.
   The reply box says so: **Reply to try again…** on a Board task whose session did not start.
 
 ## How a session finishes
@@ -77,9 +79,9 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - A session started on a Board task finishes it on its own: it commits its work on its branch, or opens a draft PR in a repository that ships through pull requests, and never merges unasked.
 - It marks the Board task done with a message that says what it did, names its branch or pull request, and ends on suggested next steps; once that turn ends, the Board ends the session, so nothing stays running.
   It suggests **Merge on main** only where the repository has a `.omp/land.json` to land with.
-- The suggested next steps show under the thread's reply box, as under a session's composer, with the same keys: Enter sends one, Tab fills it in to edit first. Sending one is your reply, which starts a new session that does it; typing your own reply does the same.
+- The suggested next steps show under the thread's reply box, as under a session's composer, with the same keys: Enter sends one, Tab fills it in to edit first. Sending one is your reply, which the session that marked the Board task done picks up; typing your own reply does the same.
 - A bare **Merge on main** on a done Board task with a branch starts no session: the Board lands the branch itself, as the `land` tool does, once you trust the project, and notes the outcome in the Board thread.
-  A landed branch, or one with nothing left to merge, keeps the Board task done; a failed merge reopens it and a new session takes it; a repository with no `.omp/land.json`, or a project you have not trusted, keeps it done with a note saying why it did not merge.
+  A landed branch, or one with nothing left to merge, keeps the Board task done; a failed merge reopens it and the session that marked it done takes it again; a repository with no `.omp/land.json`, or a project you have not trusted, keeps it done with a note saying why it did not merge.
 
 ## What sessions do
 

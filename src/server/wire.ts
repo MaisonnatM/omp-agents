@@ -5,7 +5,7 @@
  * casts what it received; a parser whose refusal the page shows returns `{ error }` in place of `null`.
  * A shape the server also keeps in a file, such as a routine, a scheduled send, or an event's time, is parsed by its domain module.
  */
-import { BASE64, isNonEmpty, isObject, isSafeInteger, isTexts, oneOf, parseAll, type Parsed, str } from "../json";
+import { BASE64, isNonEmpty, isObject, isSafeInteger, oneOf, parseAll, type Parsed, str } from "../json";
 import { parseRoutineSpec, type RoutineChange } from "../routines";
 import {
 	type IntegrationTarget,
@@ -644,9 +644,9 @@ export const parseLoginAnswer = (body: unknown): Parsed<{ prompt: number; value:
 export const parseProviderSignOut = (body: unknown): Parsed<{ provider: string; credentialId: number }> =>
 	isObject(body) && isNonEmpty(body.provider) && isSafeInteger(body.credentialId) ? { ok: { provider: body.provider, credentialId: body.credentialId } } : null;
 
-/** The body of `PUT /api/providers/account-order`: `{ provider, emails }`, that provider's accounts by email, the one omp tries first first. */
+/** The body of `PUT /api/providers/account-order`: `{ provider, credentialIds }`, that provider's accounts, the one omp tries first first. */
 export const parseAccountOrder = (body: unknown): Parsed<AccountOrderEdit> =>
-	isObject(body) && isNonEmpty(body.provider) && isTexts(body.emails) && body.emails.every(isNonEmpty) ? { ok: { provider: body.provider, emails: body.emails } } : null;
+	isObject(body) && isNonEmpty(body.provider) && Array.isArray(body.credentialIds) && body.credentialIds.every(isSafeInteger) ? { ok: { provider: body.provider, credentialIds: body.credentialIds } } : null;
 
 const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 

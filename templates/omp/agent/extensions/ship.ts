@@ -7,7 +7,7 @@ import { commands, located } from "./shell/commands";
 import { quotaExhausted } from "./github/access";
 import { GhRunner } from "./github/runner";
 import { descriptionSnapshot, editDescription } from "./github/description";
-import { contractSourceRefusal, declaredChecks, parseBranchLog, planBrief, plannedTestEdits, repoRelative, scopeRefusal, testFirstRefusal, toolRuns, VERIFIED_STAGES, verificationRefusal, withRejected } from "./ship/checks";
+import { checkedCheckout, contractSourceRefusal, declaredChecks, parseBranchLog, planBrief, plannedTestEdits, repoRelative, scopeRefusal, testFirstRefusal, toolRuns, VERIFIED_STAGES, verificationRefusal, withRejected } from "./ship/checks";
 import { appendTrace, FIX_BUDGET, isFixWork, liveSummary, PR_QUERY, parsePr, renderLines, report, settleFixes, type Spent, STALL_ROUNDS, startFix, statusText } from "./ship/live";
 import { authDiagnosis, checkoutReader, dotenvFiles, FAST_PATH, ghPr, opensLivePr, otherOwner, prSelector, publishBlocker, reviewsBefore, reviewsOf, selectorOwner } from "./ship/publish";
 import { byReview, type Contract, isReviewStage, LABEL, LIVE_WORK, type LiveWork, missingOutput, NEEDS_CURRENT_STATUS, type Post, prOfUrl, REVIEW_STAGES, REVIEWS, type ShipState, STAGES, type Stage, type StageOutputs, withFastPath, withPost } from "./ship/stages";
@@ -349,7 +349,7 @@ export default function ship(pi: ExtensionAPI) {
 			"Call with stop: true when the user says 'no ship'; the widget, the gates, and the dashboard's Ship card then drop the run.",
 			`fix_ci and fix_comments run in rounds per PR: pass count each round; after ${FIX_BUDGET} rounds, or when count did not shrink for ${STALL_ROUNDS} rounds in a row, the round is refused until the user approves moreRounds.`,
 			"Pass contract at the plan stage: implement is refused without one. Pass rejected for each approach a reviewer or the user rejects. Both show on every read and come back after a compaction or a resume.",
-			"draft_pr and ready_gate are refused until a test, typecheck, or lint bash command exits 0 in this session after the last edit, write, or task call, and while the branch changes a file outside the contract's files_to_change other than a lockfile or generated file, unless a constraint names scope-change; with a contract's test_first, draft_pr is also refused until a branch commit changing only that test comes before the first commit changing code.",
+			"draft_pr and ready_gate are refused until a test, typecheck, or lint bash command exits 0 in this session after the last edit, write, or task call, and while the branch changes a file outside the contract's files_to_change other than a lockfile or generated file, unless a constraint names scope-change; with a contract's test_first, draft_pr is also refused until a branch commit changing only that test comes before the first commit changing code. These branch checks read the checkout that passing command ran in, from its cd or bash cwd.",
 			"Advancing to draft_pr, interface_review, thermonuclear, ready_gate, or live is refused until the stage before it has its output, passed as output keyed by that stage; `gh pr ready` is blocked until the ready gate's output is recorded. draft_pr reuses the branch's open PR when one exists.",
 			`A PR changing at most ${FAST_PATH.lines} lines in ${FAST_PATH.files} files, none a schema, public-interface, or \`${REVIEWS.thermonuclear.pathsFile}\` file, takes the fast path: neither review is needed, and advancing past them records each as an empty verdict list marked skipped.`,
 			"Pass posted after each Slack post or Linear link you make for a PR; every read lists them, and recording one again is a no-op.",
@@ -437,10 +437,15 @@ export default function ship(pi: ExtensionAPI) {
 			return { content: [{ type: "text" as const, text: `${stage} is not recorded: it starts from the ${LABEL[missing.stage]} stage's output, and ship has not recorded it. Pass it with this call: output: ${missing.argument}.` }], isError: true };
 		}
 		const verified = VERIFIED_STAGES.find(claim => claim === stage);
+		// The branch gates read the checkout the passing check ran in, the PR's worktree, rather than the session's directory, which can be a main checkout or no repository at all.
+		let checkout = ctx.cwd;
 		if (verified) {
-			const refusal = verificationRefusal(verified, toolRuns(ctx.sessionManager.getBranch()), declaredChecks(checkoutReader(ctx.cwd)(".omp/land.json")))
-				?? (state?.contract ? await scopeCheck(verified, state.contract, ctx.cwd) : undefined)
-				?? (verified === "draft_pr" && state?.contract ? await testOrderRefusal(state.contract, ctx.cwd) : undefined);
+			const runs = toolRuns(ctx.sessionManager.getBranch());
+			const declared = declaredChecks(checkoutReader(ctx.cwd)(".omp/land.json"));
+			checkout = checkedCheckout(runs, declared, ctx.cwd) ?? ctx.cwd;
+			const refusal = verificationRefusal(verified, runs, declared)
+				?? (state?.contract ? await scopeCheck(verified, state.contract, checkout) : undefined)
+				?? (verified === "draft_pr" && state?.contract ? await testOrderRefusal(state.contract, checkout) : undefined);
 			if (refusal) return { content: [{ type: "text" as const, text: refusal }], isError: true };
 		}
 		let checked = "";
@@ -511,7 +516,7 @@ export default function ship(pi: ExtensionAPI) {
 			});
 			outcome.recorded = stage !== undefined;
 			if (stage === "draft_pr" && state && !state.pr) {
-				const found = await branchPr(ctx.cwd);
+				const found = await branchPr(checkout);
 				const at = found && prOfUrl(found.url);
 				if (found && at) {
 					save(ctx, { ...state, pr: at.pr, repo: at.repo, prStatus: undefined, fixes: undefined, outputs: { ...state.outputs, draft_pr: { pr: at.pr, url: found.url } } });
@@ -565,7 +570,7 @@ export default function ship(pi: ExtensionAPI) {
 	async function testOrderRefusal(contract: Contract, cwd: string): Promise<string | undefined> {
 		if (!contract.test_first) return undefined;
 		const base = await branchBase(cwd);
-		if (!base) return `draft_pr is not recorded: the contract's test_first is "${contract.test_first}", and this checkout has no main or master branch to read the branch's commits from. Fetch the default branch, then record draft_pr again.`;
+		if (!base) return `draft_pr is not recorded: the contract's test_first is "${contract.test_first}", and ${cwd}, where the last check ran, has no main or master branch to read the branch's commits from. Fetch the default branch there, or run the checks in the PR's checkout, then record draft_pr again.`;
 		const log = await pi.exec("git", ["log", "--reverse", "--no-merges", "--format=%x00%h", "--name-only", `${base}..HEAD`], { cwd });
 		if (log.code !== 0) return `draft_pr is not recorded: \`git log ${base}..HEAD\` failed, so the test-first order cannot be checked: ${log.stderr.trim()}`;
 		return testFirstRefusal(contract, parseBranchLog(log.stdout), base);
@@ -574,7 +579,7 @@ export default function ship(pi: ExtensionAPI) {
 	/** Why `stage` may not be recorded: the branch changes files outside `contract`'s files_to_change. */
 	async function scopeCheck(stage: Stage, contract: Contract, cwd: string): Promise<string | undefined> {
 		const base = await branchBase(cwd);
-		if (!base) return `${stage} is not recorded: this checkout has no main or master branch to diff the branch against, so its files cannot be checked against the contract's files_to_change. Fetch the default branch, then record ${stage} again.`;
+		if (!base) return `${stage} is not recorded: ${cwd}, where the last check ran, has no main or master branch to diff the branch against, so its files cannot be checked against the contract's files_to_change. Fetch the default branch there, or run the checks in the PR's checkout, then record ${stage} again.`;
 		const diff = await pi.exec("git", ["-c", "core.quotePath=false", "diff", "--name-only", base, "HEAD"], { cwd });
 		if (diff.code !== 0) return `${stage} is not recorded: \`git diff --name-only ${base} HEAD\` failed, so the branch's files cannot be checked against the contract's files_to_change: ${diff.stderr.trim()}`;
 		return scopeRefusal(stage, contract, diff.stdout.split("\n").filter(Boolean), base);

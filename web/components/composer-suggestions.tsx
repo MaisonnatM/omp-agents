@@ -75,11 +75,26 @@ interface RowProps extends ComponentProps<"div"> {
 	sendKey: number;
 	marked: boolean;
 	label: string;
+	/** Whether `children`, laid over the row's right end, show; the label then fades out under them. */
+	covered?: boolean;
 }
 
-/** A row's look, shared by the prompts and the hint under them: its key, its text, then `children`. */
-function Row({ sendKey, marked, label, className, children, ...props }: RowProps) {
+/**
+ * A row's look, shared by the prompts and the hint under them: its key, its text, then `children` laid over the text's
+ * right end, so the text runs the row's full width and only fades under them while they show.
+ */
+function Row({ sendKey, marked, label, covered = false, className, children, ...props }: RowProps) {
 	const compactStep = useSize().variant === "compact";
+	const overlayRef = useRef<HTMLSpanElement>(null);
+	const [overlayWidth, setOverlayWidth] = useState(0);
+	useEffect(() => {
+		const overlay = overlayRef.current;
+		if (!overlay) return;
+		const observer = new ResizeObserver(() => setOverlayWidth(overlay.offsetWidth));
+		observer.observe(overlay);
+		return () => observer.disconnect();
+	}, []);
+	const fade = covered && overlayWidth > 0 ? `linear-gradient(to left, transparent ${overlayWidth}px, black ${overlayWidth + 24}px)` : undefined;
 	return (
 		<div
 			{...props}
@@ -101,8 +116,14 @@ function Row({ sendKey, marked, label, className, children, ...props }: RowProps
 				{sendKey}
 			</Kbd>
 			{/* py-1/-my-1 keeps truncate's overflow:hidden from clipping ascenders/descenders outside the trimmed box. */}
-			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{label}</span>
-			{children}
+			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1" style={{ maskImage: fade }}>
+				{label}
+			</span>
+			{children && (
+				<span ref={overlayRef} className={cn("absolute inset-y-0 right-0 flex items-center gap-2", compactStep ? "pr-2" : "pr-2.5")}>
+					{children}
+				</span>
+			)}
 		</div>
 	);
 }
@@ -144,6 +165,7 @@ function SuggestionRow({ label, index, active, marked, optionId, registerItem, o
 			marked={marked}
 			label={label}
 			className={active || marked ? "text-foreground" : "text-muted-foreground"}
+			covered={active || isTouch}
 		>
 			{/* On the highlighted row: the keys that send, edit, or mark it, then the edit button. */}
 			<span

@@ -8,21 +8,14 @@ export interface ProviderAccount {
 	/** What else tells it apart, such as `oauth #12`. */
 	detail: string;
 	kind: "oauth" | "api_key";
-	/** The sign-in's email, which Settings saves the account order by; `null` for an API key or a sign-in without one. */
-	email: string | null;
+	/** Whether Settings can put it in order: an OAuth sign-in that a policy can name without naming another sign-in too. */
+	orderable: boolean;
 }
 
-/**
- * The accounts Settings can put in order: those with an email no other of the list shares, in the list's order. A
- * policy naming a shared email would match two sign-ins, which omp refuses.
- */
-export const orderableAccounts = <T extends { email: string | null }>(accounts: readonly T[]): (T & { email: string })[] =>
-	accounts.filter((account): account is T & { email: string } => account.email !== null && accounts.filter(other => other.email === account.email).length === 1);
-
-/** `PUT /api/providers/account-order`: `provider`'s orderable accounts by email, the one omp tries first first. */
+/** `PUT /api/providers/account-order`: `provider`'s orderable accounts by credential id, the one omp tries first first. */
 export interface AccountOrderEdit {
 	provider: string;
-	emails: string[];
+	credentialIds: number[];
 }
 
 /** One way `/login` signs in to a provider, such as Codex's browser and device-code sign-ins. */

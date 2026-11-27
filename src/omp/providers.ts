@@ -3,13 +3,13 @@
  * credentials are filed under, the sign-in itself, and removing one stored credential. The credential store opens and
  * closes on each call, so a sign-in from a terminal shows at the next read.
  */
-import { rankAccounts, readAccountPolicies, writeAccountOrder } from "./account-order";
+import { type OrderableIdentity, rankAccounts, readAccountPolicies, uniqueSelector, writeAccountOrder } from "./account-order";
 import { addApiCreditsProvider, removeApiCreditsProvider, replaceAnthropicApiKey, settleApiCredits } from "./api-credits";
 import { dropModelList } from "./models";
 import type { AccountSelector, AuthStorage, CredentialOrigin, OAuthLoginController } from "./module-types/models";
 import { auth, browserSession, logout, modelRegistry, oauth, oauthTerminal } from "./modules";
 import { API_CREDITS_PROVIDER, PROVIDER_NAMES } from "../shared/models";
-import { ANTHROPIC_API_KEY_METHOD, MAX_LOGIN_ANSWER, type ModelProvider, orderableAccounts, type ProviderAccount } from "../shared/providers";
+import { ANTHROPIC_API_KEY_METHOD, MAX_LOGIN_ANSWER, type ModelProvider, type ProviderAccount } from "../shared/providers";
 
 /** The callbacks a sign-in reports through; omp adds the isolated browser that a cookie sign-in opens. */
 export type LoginHooks = Omit<OAuthLoginController, "onBrowserSession">;
@@ -26,13 +26,25 @@ async function anthropicModelIds(storage: AuthStorage): Promise<string[]> {
 	return registry.getAll().flatMap(model => (model.provider === "anthropic" ? [model.id] : []));
 }
 
+/** `provider`'s OAuth sign-ins that Settings can order, by credential id, each with the selector that names it alone. */
+function orderableIdentities(storage: AuthStorage, provider: string): Map<number, OrderableIdentity> {
+	const identities = storage.credentials.list(provider).flatMap(({ id, credential }) => (credential.type === "oauth" ? [{ id, identity: credential as AccountSelector }] : []));
+	return new Map(
+		identities.flatMap(({ id, identity }) => {
+			const selector = uniqueSelector(identity, identities.flatMap(other => (other.id === id ? [] : [other.identity])));
+			return selector ? [[id, { identity, selector }]] : [];
+		}),
+	);
+}
+
 /** `provider`'s stored credentials as `/logout` lists them, in the order omp tries them under `policies`. */
 function accountsOf(storage: AuthStorage, provider: string, policies: readonly unknown[]): ProviderAccount[] {
 	const rows = storage.credentials.list(provider);
 	const identities = new Map(rows.map(({ id, credential }) => [id, credential.type === "oauth" ? credential : null]));
+	const orderable = orderableIdentities(storage, provider);
 	const accounts = logout
 		.toLogoutAccounts(provider, rows)
-		.map(({ credentialId, label, detail, type }) => ({ credentialId, label, detail, kind: type, email: identities.get(credentialId)?.email || null }));
+		.map(({ credentialId, label, detail, type }) => ({ credentialId, label, detail, kind: type, orderable: orderable.has(credentialId) }));
 	return rankAccounts(accounts, provider, policies, ({ credentialId }) => identities.get(credentialId) ?? null);
 }
 
@@ -146,20 +158,19 @@ export async function logoutProvider(provider: string, credentialId: number): Pr
 }
 
 /**
- * Saves `emails`, `provider`'s orderable sign-ins the one omp tries first first, as their `auth.accountPolicies`
+ * Saves `credentialIds`, `provider`'s orderable sign-ins the one omp tries first first, as their `auth.accountPolicies`
  * priorities. False, writing nothing, when they are no longer exactly the sign-ins Settings can order.
  */
-export async function orderProviderAccounts(provider: string, emails: readonly string[]): Promise<boolean> {
+export async function orderProviderAccounts(provider: string, credentialIds: readonly number[]): Promise<boolean> {
 	const storage = await auth.discoverAuthStorage();
-	let identities: AccountSelector[];
+	let orderable: Map<number, OrderableIdentity>;
 	try {
-		identities = storage.credentials.list(provider).flatMap(({ credential }) => (credential.type === "oauth" ? [credential] : []));
+		orderable = orderableIdentities(storage, provider);
 	} finally {
 		storage.close();
 	}
-	const byEmail = new Map(orderableAccounts(identities.map(identity => ({ ...identity, email: identity.email || null }))).map(identity => [identity.email, identity]));
-	const ordered = emails.flatMap(email => byEmail.get(email) ?? []);
-	if (new Set(emails).size !== byEmail.size || ordered.length !== byEmail.size) return false;
+	const ordered = credentialIds.flatMap(id => orderable.get(id) ?? []);
+	if (new Set(credentialIds).size !== orderable.size || ordered.length !== orderable.size) return false;
 	await writeAccountOrder(provider, ordered);
 	return true;
 }

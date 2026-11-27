@@ -8,7 +8,6 @@ import { folderName, providerLabel } from "./labels";
 import { moveAction } from "./pull-requests-model";
 import type { PullRequestActionId } from "../src/pull-request-actions";
 import { hashForPullRequests, hashForRoutines, hashForSettings } from "./routing";
-import type { EarlyExit } from "../src/routine-health";
 
 /** The bell's filters, each a source of notices. */
 export type NoticeSource = "github" | "slack" | "providers" | "sessions" | "routines" | "updates";
@@ -61,9 +60,6 @@ export interface NoticePresentation {
 
 /** How long a news toast stays. */
 export const TOAST_MS = 6_000;
-
-/** Why a routine's run exited early, as the bell words it after the routine's name. */
-const EXIT_LABEL: Record<EarlyExit, string> = { errored: "errored", "no-reply": "ended with no reply", short: "ended far sooner than usual", missed: "missed its schedule" };
 
 /** Each of your moves as the bell words it. */
 export const MOVE_HEADLINE: Record<YourMove, string> = {
@@ -167,8 +163,8 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 			return {
 				...NEWS,
 				source: "routines",
-				headline: count === 1 ? "1 routine run exited early" : `${count} routine runs exited early`,
-				preview: notice.runs.map(({ name, exit }) => `${name} ${EXIT_LABEL[exit]}`).join(" · "),
+				headline: count === 1 ? "1 routine run errored" : `${count} routine runs errored`,
+				preview: notice.runs.map(({ name }) => name).join(" · "),
 				// The first routine it names, whose runs show what went wrong.
 				link: first ? { href: hashForRoutines(first.workspace, { kind: "open", id: first.routineId }), external: false } : null,
 				face: { kind: "warning" },

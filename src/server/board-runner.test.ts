@@ -14,7 +14,7 @@ function gate(): { wait: Promise<void>; open: () => void } {
  * merges it ran. `/w` is a repository, whose Board tasks get a worktree at `/w-wt/board-<id>`; `/plain` is outside git.
  * `checkouts`, `merges`, and `waking` hold each checkout, merge, or wake on that promise.
  */
-function harness({ owner = true, stopped = new Set<string>(), working = new Set<string>(), outcome = "landed" as LandOutcome, landable = true } = {}) {
+function harness({ owner = true, stopped = new Set<string>(), working = new Set<string>(), unreachable = new Set<string>(), outcome = "landed" as LandOutcome, landable = true } = {}) {
 	let state: BoardState = emptyBoard();
 	let now = 1000;
 	let next = 0;
@@ -46,7 +46,9 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 		async wake(sessionId, text, _launch, interrupt = false) {
 			wakesBegun.push(text);
 			await holds.waking;
+			if (unreachable.has(sessionId)) throw new Error(`${sessionId} does not resume`);
 			wakes.push({ sessionId, text, interrupt });
+			alive.add(sessionId);
 			return { resumed: stopped.has(sessionId) };
 		},
 		working: sessionId => working.has(sessionId),
@@ -213,27 +215,61 @@ describe("BoardRunner", () => {
 		expect(() => board.apply({ op: "edit", by: { kind: "user" }, task: 1, reply: 0, text: "Mine now" })).toThrow("Only the user's own messages can be edited.");
 	});
 
-	test("a reply on a done Board task that asks for more starts a new session in the same worktree that reads the thread, once the one that finished has ended", async () => {
+	test("a reply on a done Board task that asks for more resumes the session that marked it done, with the thread since, once its turn has ended", async () => {
 		const board = harness();
 		await board.doneTask("Committed on board/1.\n\nSuggestions:\n1. Merge on main");
 		board.apply({ op: "reply", by: { kind: "user" }, task: 1, text: "Rename it, then merge on main" });
 		await settle();
 		expect(board.wakes).toEqual([]);
 		expect(board.lands).toEqual([]);
-		// s1 still runs in the worktree until the sweep ends it, so the next session waits for it.
-		expect(board.starts).toHaveLength(1);
+		// s1 still runs in the worktree until the sweep ends it, so the next round waits for it.
 		await board.runner.sweep();
 		await settle();
 		expect(board.ended).toEqual(["s1"]);
+		expect(board.starts).toHaveLength(1);
+		expect(board.wakes.map(wake => wake.sessionId)).toEqual(["s1"]);
+		expect(board.wakes[0]?.text).toContain("Board task #1 (First) is open again after you marked it done");
+		expect(board.wakes[0]?.text).toContain("The user: Rename it, then merge on main");
+		expect(board.wakes[0]?.text).not.toContain("Session s1: Committed on board/1.");
+		expect(board.state().tasks[0]?.start?.sessionId).toBe("s1");
+		// The resumed round ends as the first did: once its done turn ends.
+		board.apply({ op: "done", sessionId: "s1", task: 1, text: "Renamed." });
+		await board.runner.sweep();
+		await settle();
+		expect(board.ended).toEqual(["s1", "s1"]);
+	});
+
+	test("a reply on a done Board task whose session no longer resumes starts a new session that reads the thread", async () => {
+		const board = harness({ unreachable: new Set(["s1"]) });
+		await board.doneTask("Committed on board/1.");
+		await board.runner.sweep();
+		board.apply({ op: "reply", by: { kind: "user" }, task: 1, text: "Rename it" });
+		await settle();
+		await settle();
 		expect(board.starts).toHaveLength(2);
 		expect(board.starts[1]?.cwd).toBe("/w-wt/board-1");
 		expect(board.starts[1]?.prompt).toContain("Earlier sessions worked on it and ended: s1.");
 		expect(board.starts[1]?.prompt).toContain("Session s1: Committed on board/1.");
-		expect(board.starts[1]?.prompt).toContain("The user: Rename it, then merge on main");
+		expect(board.starts[1]?.prompt).toContain("The user: Rename it");
 		expect(board.state().tasks[0]?.start?.sessionId).toBe("s2");
 	});
 
-	test("a reply while the session that marked the Board task done still finishes its turn starts the next session only once that one ended", async () => {
+	test("a reply on a Board task the user closed starts a new session rather than resuming the one it stopped", async () => {
+		const board = harness();
+		board.runner.changed();
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "First" });
+		await settle();
+		board.apply({ op: "close", by: { kind: "user" }, task: 1 });
+		await board.runner.sweep();
+		await settle();
+		board.apply({ op: "reply", by: { kind: "user" }, task: 1, text: "Try again" });
+		await settle();
+		await settle();
+		expect(board.wakes).toEqual([]);
+		expect(board.state().tasks[0]?.start?.sessionId).toBe("s2");
+	});
+
+	test("a reply while the session that marked the Board task done still finishes its turn resumes it only once that turn ended", async () => {
 		const board = harness();
 		board.working.add("s1");
 		await board.doneTask();
@@ -241,12 +277,13 @@ describe("BoardRunner", () => {
 		await settle();
 		await board.runner.sweep();
 		await settle();
-		expect(board.starts).toHaveLength(1);
+		expect(board.wakes).toEqual([]);
 		board.working.delete("s1");
 		await board.runner.sweep();
 		await settle();
 		expect(board.ended).toEqual(["s1"]);
-		expect(board.starts).toHaveLength(2);
+		expect(board.wakes.map(wake => wake.sessionId)).toEqual(["s1"]);
+		expect(board.starts).toHaveLength(1);
 	});
 
 	test("a bare Merge on main lands the branch with no session and keeps the Board task done", async () => {
@@ -266,7 +303,7 @@ describe("BoardRunner", () => {
 		expect(board.state().tasks[0]?.replies.at(-1)).toMatchObject({ note: { kind: "landed", text: "Landed abc on main." } });
 	});
 
-	test("a merge that fails reopens the Board task, and its new session reads why", async () => {
+	test("a merge that fails reopens the Board task, and the session that marked it done resumes and reads why", async () => {
 		const board = harness({ outcome: "failed" });
 		await board.doneTask("Committed.");
 		await board.runner.sweep();
@@ -274,10 +311,10 @@ describe("BoardRunner", () => {
 		await settle();
 		await settle();
 		expect(board.lands).toHaveLength(1);
-		expect(board.starts).toHaveLength(2);
-		expect(board.starts[1]?.cwd).toBe("/w-wt/board-1");
-		expect(board.starts[1]?.prompt).toContain("The Board's merge failed: Not landed: `bun test` failed on the merged result.");
-		expect(board.state().tasks[0]?.start?.sessionId).toBe("s2");
+		expect(board.starts).toHaveLength(1);
+		expect(board.wakes[0]?.sessionId).toBe("s1");
+		expect(board.wakes[0]?.text).toContain("The Board's merge failed: Not landed: `bun test` failed on the merged result.");
+		expect(board.state().tasks[0]?.start?.sessionId).toBe("s1");
 	});
 
 	test("a merge the repository has no land config for keeps the Board task done and says why", async () => {
@@ -319,7 +356,7 @@ describe("BoardRunner", () => {
 		expect(board.state().tasks[0]?.replies.at(-1)).toMatchObject({ note: { kind: "landed" } });
 	});
 
-	test("a reply that reopens the Board task while its merge runs starts the next session once the merge ends", async () => {
+	test("a reply that reopens the Board task while its merge runs resumes its session once the merge ends", async () => {
 		const board = harness();
 		const merge = gate();
 		board.holds.merges = merge.wait;
@@ -329,12 +366,13 @@ describe("BoardRunner", () => {
 		await settle();
 		board.apply({ op: "reply", by: { kind: "user" }, task: 1, text: "Also rename it" });
 		await settle();
-		expect(board.starts).toHaveLength(1);
+		expect(board.wakes).toEqual([]);
 		merge.open();
 		await settle();
 		await settle();
-		expect(board.starts).toHaveLength(2);
-		expect(board.starts[1]?.prompt).toContain("The Board merged the branch: Landed abc on main.");
+		expect(board.starts).toHaveLength(1);
+		expect(board.wakes[0]?.text).toContain("The Board merged the branch: Landed abc on main.");
+		expect(board.wakes[0]?.text).toContain("The user: Also rename it");
 	});
 
 	test("the start reads the Board task again after its checkout: a reply meanwhile is in the prompt, a claim or a close meanwhile starts nothing", async () => {
