@@ -1,14 +1,19 @@
 /** The Board's half of the left sidebar, under its Board tab: the Workspaces, each with a count of what waits on you there. */
 import { IconHashtag } from "central-icons";
 import { useState } from "react";
+import { parseStrings } from "../../../src/json";
 import { revealDetailsTab } from "../../details-tabs";
 import type { RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import type { BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { folderName, waitingOnYou } from "../../labels";
+import { DROP_LINE, moveKey } from "../../order";
 import { hashForPage, type PageHash } from "../../routing";
+import { useStoredState } from "../../stored-state";
+import { useDragOrder } from "../../use-drag-order";
 import { CountPill } from "../count-pill";
 import { type BoardRoute, pageView } from "./module";
 import { useSeen, waitingIn } from "./seen";
@@ -42,6 +47,16 @@ export function boardWorkspaces(state: BoardState, sidebar: readonly Workspace[]
 	return { workspaces, open: open === null ? null : (known.get(open) ?? null) };
 }
 
+/** The Board sidebar's Workspace order you dragged, by `cwd`; a portable preference, so it follows you to every machine. */
+export const WORKSPACE_ORDER = "omp-agents.board-workspace-order";
+
+/** `workspaces` with those `order` names first, in its order, then the rest in theirs, so a new Workspace lands at the bottom. */
+export function inSavedOrder(workspaces: readonly Workspace[], order: readonly string[]): Workspace[] {
+	const rank = new Map(order.map((cwd, at) => [cwd, at]));
+	const ranked = workspaces.filter(workspace => rank.has(workspace.cwd)).sort((a, b) => rank.get(a.cwd)! - rank.get(b.cwd)!);
+	return [...ranked, ...workspaces.filter(workspace => !rank.has(workspace.cwd))];
+}
+
 /** The Board thread's open tabs, kept across threads. */
 export const THREAD_TABS = "omp-agents.board-thread-tabs";
 
@@ -72,8 +87,12 @@ interface BoardSidebarProps {
 export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts }: BoardSidebarProps) {
 	const [folded, setFolded] = useState(false);
 	const seen = useSeen();
+	const [order, setOrder] = useStoredState(WORKSPACE_ORDER, parseStrings, JSON.stringify);
+	const drag = useDragOrder();
 	if (state === null) return <p className="px-4 py-2 text-xs text-muted-foreground">Loading the Board…</p>;
-	const { workspaces, open } = boardWorkspaces(state, sidebar, picked, route);
+	const { workspaces: listed, open } = boardWorkspaces(state, sidebar, picked, route);
+	const workspaces = inSavedOrder(listed, order);
+	const cwds = workspaces.map(workspace => workspace.cwd);
 	return (
 		<SidebarContent>
 			<SidebarGroup collapsible open={!folded} onOpenChange={() => setFolded(was => !was)}>
@@ -82,8 +101,14 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts 
 					{workspaces.map(workspace => {
 						const waiting = waitingIn(state, seen, hosts, workspace.cwd);
 						const current = workspace.cwd === open?.cwd;
+						const item = drag("workspaces", workspace.cwd, (dragged, where) => setOrder(moveKey(cwds, dragged, workspace.cwd, where)));
 						return (
-							<SidebarMenuItem key={workspace.cwd}>
+							<SidebarMenuItem
+								key={workspace.cwd}
+								{...item.handle}
+								{...item.target}
+								className={cn("relative", item.dragging && "opacity-50", item.dropAt && DROP_LINE[item.dropAt])}
+							>
 								<SidebarMenuButton
 									{...activityControl("board.workspace")}
 									icon={IconHashtag}
