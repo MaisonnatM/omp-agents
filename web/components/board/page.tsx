@@ -14,7 +14,7 @@ import { CountPill } from "../count-pill";
 import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardReply, type BoardState, type BoardTask, MAX_TITLE, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 import { splitSuggestions } from "../../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
-import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from "@/components/ui/message-scroller";
+import { MessageScroller, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
 import { putJson } from "../../api";
 import { useShowConversation } from "../../pane-store";
@@ -47,6 +47,7 @@ import { RoutineIds } from "./routine-author";
 import { threadSession, type Work, workOf } from "./work";
 import { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, folder, MarkUnreadButton, MessageEditor, MessageRow, sameDay, TaskBody, WorkingLine, WorkLabel, Avatar } from "./messages";
 import { markSeen, said, unreadOf, useSeen } from "./seen";
+import { ChannelUnreadPills, taskItemId, ThreadNewReplies } from "./unread-jump";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -109,14 +110,16 @@ function BoardChannel({ route, core, state, disabled, onChange }: BoardPageProps
 												return (
 													<li key={task.id}>
 														{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
-														<TaskMessage state={state} task={task} sessions={core.sessions} held={core.held.board ?? null} open={task.id === thread?.id} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} disabled={disabled} onChange={onChange} />
+														<MessageScrollerItem messageId={taskItemId(task.id)}>
+															<TaskMessage state={state} task={task} sessions={core.sessions} held={core.held.board ?? null} open={task.id === thread?.id} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} disabled={disabled} onChange={onChange} />
+														</MessageScrollerItem>
 													</li>
 												);
 											})}
 										</ol>
 									</MessageScrollerContent>
 								</MessageScrollerViewport>
-								<MessageScrollerButton />
+								<ChannelUnreadPills tasks={tasks} open={thread?.id ?? null} />
 							</MessageScroller>
 							{openWorkspace && <Composer key={openWorkspace.cwd} workspace={openWorkspace} core={core} disabled={disabled} onChange={onChange} />}
 						</MessageScrollerProvider>
@@ -532,7 +535,7 @@ function ThreadMessages({ state, task, reply, follow, sessions, held, disabled, 
 						)}
 					</MessageScrollerContent>
 				</MessageScrollerViewport>
-				<MessageScrollerButton />
+				<ThreadNewReplies task={task} />
 			</MessageScroller>
 			{reply !== null && <ScrollToReply reply={reply} />}
 			{children}
