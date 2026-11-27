@@ -1,6 +1,6 @@
 /** The Board's half of the left sidebar, under its Board tab: the Workspaces, each with a count of what waits on you there. */
 import { IconHashtag } from "central-icons";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseStrings } from "../../../src/json";
 import { revealDetailsTab } from "../../details-tabs";
 import type { RosterHost } from "../../../src/shared/sessions";
@@ -10,8 +10,9 @@ import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMe
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { folderName, waitingOnYou } from "../../labels";
-import { DROP_LINE, moveKey } from "../../order";
+import { DROP_LINE, moveKey, stepTarget } from "../../order";
 import { hashForPage, type PageHash } from "../../routing";
+import { useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { useDragOrder } from "../../use-drag-order";
 import { CountPill } from "../count-pill";
@@ -89,15 +90,33 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts 
 	const seen = useSeen();
 	const [order, setOrder] = useStoredState(WORKSPACE_ORDER, parseStrings, JSON.stringify);
 	const drag = useDragOrder();
-	if (state === null) return <p className="px-4 py-2 text-xs text-muted-foreground">Loading the Board…</p>;
-	const { workspaces: listed, open } = boardWorkspaces(state, sidebar, picked, route);
+	const { workspaces: listed, open } = state === null ? { workspaces: [], open: null } : boardWorkspaces(state, sidebar, picked, route);
 	const workspaces = inSavedOrder(listed, order);
 	const cwds = workspaces.map(workspace => workspace.cwd);
+	const list = useRef<HTMLUListElement>(null);
+	const refocus = useRef<string | null>(null);
+	useEffect(() => {
+		const cwd = refocus.current;
+		refocus.current = null;
+		if (cwd !== null) list.current?.querySelector<HTMLElement>(`[data-board-workspace="${CSS.escape(cwd)}"] button`)?.focus();
+	});
+	/** Moves the focused Workspace one place `by`; a key press with no Workspace focused passes on. */
+	const moveFocused = (by: 1 | -1): boolean => {
+		const cwd = document.activeElement?.closest<HTMLElement>("[data-board-workspace]")?.dataset.boardWorkspace;
+		if (cwd === undefined || !list.current?.contains(document.activeElement)) return false;
+		const step = stepTarget(cwds, cwd, by);
+		if (step === null) return true;
+		refocus.current = cwd;
+		setOrder(moveKey(cwds, cwd, step.target, step.where));
+		return true;
+	};
+	useShortcuts({ moveUp: () => moveFocused(-1), moveDown: () => moveFocused(1) });
+	if (state === null) return <p className="px-4 py-2 text-xs text-muted-foreground">Loading the Board…</p>;
 	return (
 		<SidebarContent>
 			<SidebarGroup collapsible open={!folded} onOpenChange={() => setFolded(was => !was)}>
 				<SidebarGroupLabel>Workspaces</SidebarGroupLabel>
-				<SidebarMenu aria-label="Board workspaces" className="gap-px">
+				<SidebarMenu ref={list} aria-label="Board workspaces" className="gap-px">
 					{workspaces.map(workspace => {
 						const waiting = waitingIn(state, seen, hosts, workspace.cwd);
 						const current = workspace.cwd === open?.cwd;
@@ -105,6 +124,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts 
 						return (
 							<SidebarMenuItem
 								key={workspace.cwd}
+								data-board-workspace={workspace.cwd}
 								{...item.handle}
 								{...item.target}
 								className={cn("relative", item.dragging && "opacity-50", item.dropAt && DROP_LINE[item.dropAt])}
