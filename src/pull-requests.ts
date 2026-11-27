@@ -284,13 +284,14 @@ function awaitsApproval(node: unknown): boolean {
  * The head commit's checks, leaving out the failing ones that wait on approval, so the pull request files under **Approval** rather than CI to fix.
  * An approved gate still counts: it stays red until it reruns. GitHub's rollup stands when it has more checks than the query returned.
  */
-function checksOf(rollup: Record<string, unknown>): { checks: CheckState; approvalRequired: boolean } {
+function checksOf(rollup: Record<string, unknown>): { checks: CheckState; approvalRequired: boolean; failingChecks: string[] } {
 	const state = STATUS[str(rollup.state) ?? ""] ?? "none";
 	const nodes = nodesOf(rollup.contexts);
-	if (state !== "failing" || totalOf(rollup.contexts) > nodes.length || !nodes.some(awaitsApproval)) return { checks: state, approvalRequired: false };
 	const rest = nodes.filter(node => !awaitsApproval(node)).map(parseCheck).filter(check => check !== null);
-	const checks = rest.some(check => check.state === "failing") ? "failing" : rest.some(check => check.state === "pending") ? "pending" : "passing";
-	return { checks, approvalRequired: true };
+	const failingChecks = [...new Set(rest.filter(check => check.state === "failing").map(check => check.name))];
+	if (state !== "failing" || totalOf(rollup.contexts) > nodes.length || !nodes.some(awaitsApproval)) return { checks: state, approvalRequired: false, failingChecks };
+	const checks = failingChecks.length > 0 ? "failing" : rest.some(check => check.state === "pending") ? "pending" : "passing";
+	return { checks, approvalRequired: true, failingChecks };
 }
 
 const CHECK_ORDER: CheckRunState[] = ["failing", "pending", "passing", "skipped"];

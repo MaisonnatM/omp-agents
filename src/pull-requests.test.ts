@@ -120,7 +120,25 @@ describe("parseListAnswer", () => {
 								deletions: 125,
 								reviewDecision: "APPROVED",
 								mergeable: "CONFLICTING",
-								commits: { nodes: [{ commit: { statusCheckRollup: { state: "FAILURE" } } }] },
+								commits: {
+									nodes: [
+										{
+											commit: {
+												statusCheckRollup: {
+													state: "FAILURE",
+													contexts: {
+														totalCount: 3,
+														nodes: [
+															{ name: "lint", status: "COMPLETED", conclusion: "SUCCESS" },
+															{ name: "pytest", status: "COMPLETED", conclusion: "FAILURE" },
+															{ name: "pytest", status: "COMPLETED", conclusion: "FAILURE" },
+														],
+													},
+												},
+											},
+										},
+									],
+								},
 							}),
 							node(2, { isDraft: true, reviewDecision: null, commits: { nodes: [{ commit: { statusCheckRollup: null } }] } }),
 						],
@@ -154,6 +172,7 @@ describe("parseListAnswer", () => {
 				conversations: 0,
 				viewerApproved: false,
 				approvalRequired: false,
+				failingChecks: ["pytest"],
 				labels: [],
 				createdAt: Date.parse("2026-09-29T10:00:00Z"),
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
@@ -179,6 +198,7 @@ describe("parseListAnswer", () => {
 				conversations: 0,
 				viewerApproved: false,
 				approvalRequired: false,
+				failingChecks: [],
 				labels: [],
 				createdAt: Date.parse("2026-09-29T10:00:00Z"),
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
@@ -204,6 +224,7 @@ describe("parseListAnswer", () => {
 				conversations: 0,
 				viewerApproved: false,
 				approvalRequired: false,
+				failingChecks: [],
 				labels: [],
 				createdAt: Date.parse("2026-09-29T10:00:00Z"),
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
@@ -229,6 +250,7 @@ describe("parseListAnswer", () => {
 				conversations: 0,
 				viewerApproved: false,
 				approvalRequired: false,
+				failingChecks: [],
 				labels: [],
 				createdAt: Date.parse("2026-09-29T10:00:00Z"),
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
