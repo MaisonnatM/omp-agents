@@ -8,7 +8,7 @@ The Board fills the left sidebar: under the page rows and your pinned sessions i
 
 - The sidebar lists your Workspaces; a count beside one says what waits on you there: its sessions that need you, plus its Board threads with replies you have not read. The Dock badge counts the same way.
   The Workspace of the session in front stays marked in the sidebar, and next and previous session walk that Workspace's sessions.
-  A Workspace's **Sessions** tab lists its live, interrupted, waiting, and past sessions, with search and **Resume all**, in a column at the left, without the projects its **Projects** tab shows, so a project's sessions list with the rest; a click shows that session's conversation at the right, and `#board/sessions/<session id>?workspace=<encoded dir>` opens it there. With none picked, the latest session shows.
+  A Workspace's **Sessions** tab lists its live, interrupted, waiting, and past sessions, with search and **Resume all**, in a column at the left, with no Workspace folder and without the projects its **Projects** tab shows, so a project's sessions list with the rest; a click shows that session's conversation at the right, and `#board/sessions/<session id>?workspace=<encoded dir>` opens it there. With none picked, the latest session shows.
   The sessions behind a Workspace's Board tasks also show in each Board thread; a click on one in a thread opens the Board thread of the Board task it works on with that session's tab in front, even when a later session took the Board task over.
   The address names the session as `session=<id>`, so a reload keeps it.
 - With the Board turned off in Settings › Modules, the sidebar lists the sessions under the page rows instead, as before the Board.
