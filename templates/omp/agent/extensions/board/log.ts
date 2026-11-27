@@ -152,7 +152,7 @@ export const landsOnReply = (task: BoardTask, by: BoardAuthor, text: string): bo
 /**
  * The session a reply on `task` by `by` wakes: the claimer, else the session started on it, else the thread's author
  * when a session wrote it; never the replier itself. A done Board task wakes nobody: a reply from the user reopens it,
- * and a new session starts on its thread, unless it is a bare {@link MERGE_REPLY}, which the server lands.
+ * and the runner resumes the session that marked it done, unless it is a bare {@link MERGE_REPLY}, which the server lands.
  */
 export function wakeTarget(task: BoardTask, by: BoardAuthor): string | null {
 	if (task.doneAt !== null) return null;
@@ -167,8 +167,19 @@ export function wakeTarget(task: BoardTask, by: BoardAuthor): string | null {
 export const doneQuietly = (state: BoardState, sessionId: string, since: number): boolean =>
 	state.tasks.some(task => task.replies.some(entry => "note" in entry && entry.note.kind === "done" && entry.note.sessionId === sessionId && entry.note.quiet === true && entry.at >= since));
 
-/** The sessions started on `task`, oldest first: one per round, since a reply on a done Board task starts a new one. */
+/** The sessions started on `task`, oldest first: one per round, so a session resumed for another round shows up again. */
 export const startedOn = (task: BoardTask): string[] => task.replies.flatMap(entry => ("note" in entry && entry.note.kind === "started" ? [entry.note.sessionId] : []));
+
+/**
+ * The session the next round of reopened Board task `task` resumes: the one its last round started, when that round
+ * ended with that session marking it done; `null` when the round failed to start, exited, was closed, or another
+ * session marked it done, so a new session starts instead.
+ */
+export function resumable(task: BoardTask): string | null {
+	const last = task.replies.findLast(entry => "note" in entry && ["started", "start-failed", "done", "closed", "unclaimed", "expired"].includes(entry.note.kind));
+	if (last === undefined || !("note" in last) || last.note.kind !== "done") return null;
+	return last.note.sessionId === startedOn(task).at(-1) ? last.note.sessionId : null;
+}
 
 /** The text of `change` an event keeps, on one line for a title, trimmed for a body. */
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
