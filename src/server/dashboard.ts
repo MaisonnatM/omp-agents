@@ -20,7 +20,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, stopStats } from "../omp/stats";
-import { activityDb, endedWorktreesFile, HOME, interruptedFile, machineFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, endedWorktreesFile, HOME, interruptedFile, keepRebasedFile, machineFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, workspaceFor, workspacesFile } from "../paths";
 import { type ModuleChanges, type ModuleRun, isStoredModuleId, moduleJoins, openModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { worktreeAt } from "../git";
@@ -46,7 +46,9 @@ import { liveUpdateHandler } from "./live-update";
 import { Loops, repeat } from "./loops";
 import type { MergeCleanup } from "./merge-cleanup";
 import type { MergeQueue } from "./merge-queue";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, HEALTH_KINDS, Notices, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, HEALTH_KINDS, Notices, PROVIDER_KINDS, REBASE_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import { KeepRebased } from "./keep-rebased";
+import { rebasePullRequest } from "../pull-request-rebase";
 import { noticeSources } from "./notice-sources";
 import { OwnerLock } from "../../templates/omp/agent/extensions/github/owner-lock";
 import { PinsFile } from "./pins-file";
@@ -141,6 +143,8 @@ export class Dashboard {
 	});
 	/** The pull requests sessions watch, which the activity check's list wakes them about; the constructor builds it once it can reach a session. */
 	readonly #prWatches: PullRequestWatches;
+	/** **Keep rebased**: the switch per repository, and the rebases the owner runs after each pull request read. */
+	readonly #keepRebased: KeepRebased;
 	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #settingsSync: SettingsSync;
 	readonly #integrations: Integrations = createIntegrations();
@@ -223,6 +227,13 @@ export class Dashboard {
 		const interrupted = this.#interrupted;
 		const ownerLock = (this.#ownerLock = new OwnerLock(serverLockFile, port));
 		const prWatchesFile = new PullRequestWatchesFile(pullRequestWatchesFile);
+		const keepRebased = (this.#keepRebased = new KeepRebased({
+			path: keepRebasedFile,
+			rebase: request => rebasePullRequest(request, () => {}),
+			active: () => ownerLock.held,
+			now: Date.now,
+			onChange: () => void this.#notices.check(REBASE_KINDS),
+		}));
 		const scheduledCheck = (sessionId: string): ScheduledCheck | null => {
 			const at = nextSendTo(scheduled.value, sessionId);
 			if (at !== null) return { kind: "send", at };
@@ -253,6 +264,7 @@ export class Dashboard {
 				hosts: () => sessions.rows(factsOf),
 				triggerWatch: this.#triggerWatch,
 				learnWatches: list => this.#prWatches.learn(list),
+				keepRebased,
 				pushRoster: () => this.#broadcasts.pushRoster(),
 				usage: () => this.#usage,
 				files,
@@ -445,8 +457,11 @@ export class Dashboard {
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
 			onActivityTick: async () => {
-				// The routines' triggers and the pull request watches read these checks, so the server that runs them checks without a page too, but only what they watch.
-				const watched = ownerLock.held ? [...watchedKinds(routines.value), ...(this.#prWatches.watching() ? ["pull-request" as const] : [])] : [];
+				// A switch or a stop another server saved; a change checks the Keep rebased notices.
+				this.#keepRebased.reload();
+				// The routines' triggers, the pull request watches, and Keep rebased read these checks, so the server that runs them checks without a page too, but only what they watch.
+				const reads = this.#prWatches.watching() || this.#keepRebased.repos.length > 0;
+				const watched = ownerLock.held ? [...watchedKinds(routines.value), ...(reads ? ["pull-request" as const] : [])] : [];
 				const kinds = broadcasts.listening() ? ACTIVITY_KINDS : ACTIVITY_KINDS.filter(kind => watched.includes(kind));
 				this.#activityFresh = kinds.length === ACTIVITY_KINDS.length;
 				if (kinds.length > 0) await notices.check(kinds);
@@ -541,6 +556,7 @@ export class Dashboard {
 					processSettings: this.#processSettings,
 					knownWorkspaces: () => this.knownWorkspaces(),
 					workspaceCwds: () => this.#workspaceCwds(),
+					keepRebased: this.#keepRebased,
 				},
 				guards,
 				build,
@@ -587,6 +603,7 @@ export class Dashboard {
 			// A restart starts the daily loop over, so the heartbeat runs now too; the runs it finds name its one notice, which a second look at them keeps.
 			void this.#notices.check(HEALTH_KINDS);
 		}
+		void this.#notices.check(REBASE_KINDS);
 		this.#loops.start();
 		this.#stopMergeQueue = repeat("merge queue", () => this.#mergeQueue.tick(), MERGE_QUEUE_TICK_MS, 0);
 	}

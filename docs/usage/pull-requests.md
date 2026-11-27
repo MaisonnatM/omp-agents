@@ -116,6 +116,12 @@
   One toast with a spinner and a running clock counts the run, such as `Rebasing 2 of 5 pull requests`, and names the branch rebasing now with its step, such as `me/fix: Pushing through the pre-push checks`; when the last one ends, it sums up the run, such as `Rebased 3 of 5 pull requests`, with how many already had their base, stopped at a conflict, failed, or were skipped.
   A conflict or a failure also toasts on its own as it happens.
   The button reads **Rebasing…** beside a spinner and waits while any rebase is queued or running.
+- **Merge N ready** beside it shows while N of your pull requests can be queued to merge: those a **Merge** badge or a **CI running** one would merge, that is open, approved or needing no review, checks passed, absent, or still running, no merge conflicts, no review thread waiting for a resolution, and no queued merge.
+  A pull request stacked on another joins its merge only when that one qualifies too, so a stack merges as one queued merge, the bottom first; a stacked pull request whose parent does not qualify is left out, since merging it alone would land it in its parent's branch, and so is a second one stacked on the same parent.
+  The first click arms **Confirm merge of N?**, and a second click within three seconds queues one merge per pull request or stack, with the method a pull request's merge button starts on in its repository: Settings' **Default merge method**, or your last merge's method under **Last selected**, when the repository allows it, else the first method it allows.
+  The merge queue then merges each one once GitHub allows it, as a merge confirmed from a **Merge** badge does, and each row shows its queued merge.
+  One toast with a spinner counts the run, then sums it up, such as `Queued 3 of 3 pull requests to merge`, with how many failed to queue and the first reason.
+  It counts the pull requests the filter, the search, and folded sections hide, and leaves out hidden repositories, as **Rebase N behind** does.
 - A **Your move** table's heading ends with one button per fix its pull requests wait on, such as **Reply 3**, **Fix CI 2**, and **Rebase 1**, counting those with no session starting.
   The first click arms **Confirm N?** followed by how many pull requests list a session and how many list none, such as **Confirm 4? · 3 to sessions, 1 new**, and a second within three seconds runs the move's quick action on each of them, as clicking each row's move badge does: **Address comments**, **Fix CI**, and **Fix CI and conflicts** or **Resolve conflicts**, each sent to the session that owns its pull request, else in a new session per pull request.
 - Tabs above the list show part of it: **Open** every section but **Recently merged**, **Your move**, **Approved**, and **Merged** that one section, and **All**, the default, every section.
@@ -143,12 +149,17 @@
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The app keeps the order across reloads, and **Reset the order** under **Ordering** restores the default.
 - **Repositories…** in **Display** lists every repository the page covers, each with a switch that shows or hides it and buttons that move it up or down.
-  Its line under the title says that a hidden repository also leaves the tab's count, and that the browser keeps the choice.
+  Its line under the title says that a hidden repository also leaves the tab's count, that the browser keeps that choice, and that the server keeps **Keep rebased**.
   While you hide any, the **Display** button's tooltip reads **Display: N repositories hidden**.
   A hidden repository leaves the table, **Rebase N behind**, ↓ and ↑, and the **Pull requests** tab's count, and keeps its place in the order, so it comes back where it was.
   E still works on the details of a hidden repository's pull request.
   **Reset the order** leaves the hidden repositories hidden, and the browser keeps the choice across reloads.
   When every repository is hidden, the page says "Every repository is hidden. Show them from Display, then Repositories." above a **Show all repositories** button.
+- Each repository in **Repositories…** also has a **Keep rebased** switch under its name, which the server keeps, for every browser.
+  While it is on, the server rebases your pull requests in that repository whenever they fall behind their base, as **Rebase N behind** would, one at a time and the bottom of each stack first, even with no page open, at most a few minutes after they fall behind.
+  It never starts a session: a rebase that stops at a conflict or fails becomes a notification, **Keep rebased stopped**, which names the conflicting files or why it failed and opens the pull request, where **Resolve conflicts** stays your move.
+  It does not try that pull request again, or the ones stacked on it, until its branch or its base gets a new commit.
+  Turning the switch off stops any further rebase there and forgets the stopped ones.
 - **+** in the page header opens **New pull request**: pick a workspace, named by its repository and by its folder when the repository has several, say what should change, and **Start** opens a new session there that makes the change on a new branch and opens a pull request for it.
   The session opens in the focused pane, and the New session page keeps its own draft.
 

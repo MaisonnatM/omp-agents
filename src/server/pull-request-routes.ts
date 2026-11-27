@@ -23,6 +23,7 @@ import type { ReviewDraft, ReviewPreview, ReviewSubmit } from "../shared/review-
 import { answer, answerSteps, checked, fail } from "./http";
 import {
 	MAX_QUEUED_STACK,
+	parseKeepRebasedChange,
 	parseMergeQueueChange,
 	parsePullRequestAttachment,
 	parsePullRequestCheckout,
@@ -35,6 +36,7 @@ import {
 	parseReviewDraftPost,
 } from "./wire";
 import type { MergeQueueAnswer, MergeQueueChange } from "../shared/merge-queue";
+import type { KeepRebasedAnswer, KeepRebasedChange } from "../shared/keep-rebased";
 import type { Handler, RouteKit, Routes } from "./route-kit";
 
 /** What the pull request routes hand on: the merge queue, through which every merge goes, review drafts, checkouts, which can start a session, and rebases, one repository at a time. */
@@ -49,6 +51,10 @@ export interface PullRequestRoutesEnv {
 	checkOutPullRequest(checkout: PullRequestCheckout): Promise<CheckedOutPullRequest>;
 	/** Rebases the pull request's branch onto its base and pushes it through the repository's pre-push hook, calling `onStep` as each step starts; rejects with why it refused or failed. */
 	rebasePullRequest(rebase: PullRequestRebase, onStep: OnRebaseStep): Promise<RebasedPullRequest>;
+	/** The repositories with **Keep rebased** on. */
+	keepRebased(): KeepRebasedAnswer;
+	/** Turns **Keep rebased** on or off for one repository; answers the repositories with it on after it. */
+	changeKeepRebased(change: KeepRebasedChange): KeepRebasedAnswer;
 }
 
 /** GitHub pull requests in full: details, stack, options, edits, merges that wait until they are ready, review drafts' preview and post, and their changed files. */
@@ -146,6 +152,15 @@ export function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequ
 		(err) => fail(409, errorText(err)),
 	);
 
+	/** `GET /api/keep-rebased`: a `KeepRebasedAnswer`, the repositories whose pull requests the server rebases when they fall behind. */
+	const keepRebased = get(() => Response.json(env.keepRebased()));
+
+	/** `PUT /api/keep-rebased`: `KeepRebasedChange`, **Keep rebased** on or off for one repository; answers a `KeepRebasedAnswer`. */
+	const keepRebasedChange = write(
+		(body) => checked(parseKeepRebasedChange(body), "Expected { repo, on } with repo a lowercase owner/repo and on true or false"),
+		async (change) => env.changeKeepRebased(change),
+	);
+
 	/** `GET /api/review-draft/preview?owner=<o>&repo=<r>&number=<n>`: the `ReviewPreview` of that pull request's review draft, against its head now. */
 	const reviewDraftPreview = pullRequestGet("Expected ?owner=&repo=&number=", (pr) => answer(() => env.previewReviewDraft(pr)));
 
@@ -200,6 +215,7 @@ export function pullRequestRoutes({ get, media, write }: RouteKit, env: PullRequ
 		"/api/pull-request/rebase": { PUT: pullRequestRebase },
 		"/api/pull-request/viewed": { PUT: pullRequestViewed },
 		"/api/merge-queue": { PUT: mergeQueue },
+		"/api/keep-rebased": { GET: keepRebased, PUT: keepRebasedChange },
 		"/api/review-draft/preview": { GET: reviewDraftPreview },
 		"/api/review-draft/post": { PUT: reviewDraftPost },
 		"/api/pull-request/title": { GET: pullRequestTitle },

@@ -10,6 +10,7 @@ import type { DashboardNews, DashboardUpdateOutcome } from "../shared/dashboard-
 import type { PlanUsage } from "../shared/models";
 import type { CreditsSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
 import { usesClause } from "../shared/notices";
+import type { RebaseStop } from "../shared/keep-rebased";
 import type { ErroredRun } from "../routine-health";
 import type { SlackFound } from "../slack-messages";
 
@@ -41,6 +42,8 @@ export interface NoticeSources {
 	stoppedSessions(): StoppedSession[];
 	/** The routine runs that errored, which the daily heartbeat lists. */
 	erroredRuns(): Promise<ErroredRun[]>;
+	/** The rebases **Keep rebased** stopped, which it does not try again until the pull request's head or its base moves. */
+	rebaseStops(): RebaseStop[];
 	now(): number;
 }
 
@@ -56,6 +59,8 @@ export const PROVIDER_KINDS = ["plan", "credits"] as const satisfies readonly No
 export const STOPPED_KINDS = ["stopped"] as const satisfies readonly NoticeKind[];
 /** The kinds the routines' daily heartbeat looks for. */
 export const HEALTH_KINDS = ["routine-health"] as const satisfies readonly NoticeKind[];
+/** The kinds the **Keep rebased** check looks for. */
+export const REBASE_KINDS = ["rebase-stopped"] as const satisfies readonly NoticeKind[];
 
 const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
@@ -103,6 +108,7 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	credits: "providers out of credits",
 	stopped: "sessions that stopped mid-turn",
 	"routine-health": "routine runs that errored",
+	"rebase-stopped": "rebases Keep rebased stopped",
 };
 
 /**
@@ -317,6 +323,11 @@ export class Notices {
 				return all(stoppedNotices(this.#sources.stoppedSessions(), this.#sources.now()), false);
 			case "routine-health":
 				return all(healthNotices(await this.#sources.erroredRuns(), this.#sources.now()), false);
+			case "rebase-stopped":
+				return all(
+					this.#sources.rebaseStops().map(stop => ({ id: `rebase-stopped:${prKey(stop)}:${stop.head}:${stop.base}`, ...stop, kind: "rebase-stopped" as const })),
+					true,
+				);
 		}
 	}
 

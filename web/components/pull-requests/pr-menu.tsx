@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuL
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { appendToComposer, NEW_DRAFT_KEY } from "../../composer-drafts";
-import { rebaseApplies } from "../../pull-requests-model";
+import { rebaseApplies } from "../../../src/shared/rebase-order";
 import { useRebaseState } from "../../pull-request-rebases";
 import { QUICK_ACTIONS } from "../../quick-actions";
 import { useAction } from "../../use-action";

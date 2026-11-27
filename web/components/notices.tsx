@@ -11,6 +11,7 @@ import { PageFrame } from "./list-page";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../activity";
+import { useInlineConfirm } from "../use-inline-confirm";
 import { type NoticeAction as Action, type NoticeFace, follow, presentNotice } from "../notice-model";
 import {
 	DEFAULT_DISPLAY,
@@ -70,6 +71,7 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 			return { logo: sparkles, label: "omp-agents" };
 		case "stopped":
 		case "routine-health":
+		case "rebase-stopped":
 			return { logo: <IconExclamationCircle className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
 		default: {
 			const unhandled: never = notice;
@@ -315,6 +317,7 @@ export function NotificationsPage({ notices }: { notices: Notice[] }) {
 	const [display, setDisplay] = useNoticesDisplay();
 	const [query, setQuery] = useState("");
 	const listRef = useRef<HTMLDivElement>(null);
+	const clearAll = useInlineConfirm("notices-clear-all");
 	const now = Date.now();
 	const listed = notices.map(notice => listNotice(notice, now));
 	const unreadCount = listed.filter(({ notice }) => !notice.read).length;
@@ -362,6 +365,16 @@ export function NotificationsPage({ notices }: { notices: Notice[] }) {
 					</span>
 					<Button {...activityControl("notices.read-all")} variant="ghost" size="compact" leadingIcon={IconDoubleCheckmark1} disabled={!connected || shownUnread.length === 0} onClick={() => send({ t: "notice", ids: shownUnread.map(({ notice }) => notice.id), op: "read" })}>
 						Mark all as read
+					</Button>
+					<Button
+						{...activityControl("notices.clear-all")}
+						variant="ghost"
+						size="compact"
+						leadingIcon={IconCrossMedium}
+						disabled={!connected || shown.length === 0}
+						{...clearAll.props("clear", () => send({ t: "notice", ids: shown.map(({ notice }) => notice.id), op: "clear" }))}
+					>
+						{clearAll.isArmed("clear") ? `Clear ${shown.length}?` : "Clear all"}
 					</Button>
 				</>
 			}

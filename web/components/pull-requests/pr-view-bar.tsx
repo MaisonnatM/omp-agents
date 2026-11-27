@@ -26,7 +26,13 @@ import { activityControl } from "../../activity";
 import { useHiddenRepos } from "../../pull-requests-state";
 import { dayField, DisplayWithPanel, type FilterField, GroupingSubmenu, ListFilterBar, setField, ViewTabs } from "../list-filter-bar";
 import { ShownOrderList } from "../shown-order-list";
+import { ToggleSwitch } from "../toggle-switch";
+import { putJson } from "../../api";
+import { useEditableRead } from "../../editable-read";
+import type { KeepRebasedAnswer } from "../../../src/shared/keep-rebased";
 import type { PullRequests } from "./pull-requests-list";
+
+const KEEP_REBASED_URL = "/api/keep-rebased";
 
 /** Each field of **Filter**, in menu order, from the pull requests of the repositories you did not hide. */
 function useFilterFields(pulls: PullRequests, filter: PullRequestFilter, onFilter: (filter: PullRequestFilter) => void): FilterField[] {
@@ -74,25 +80,42 @@ function useFilterFields(pulls: PullRequests, filter: PullRequestFilter, onFilte
 	];
 }
 
-/** The repositories, each with a switch that hides it and buttons that move it among all of them, so a hidden one can move too. */
+/**
+ * The repositories, each with a switch that hides it and buttons that move it among all of them, so a hidden one can move
+ * too, and under its name **Keep rebased**, which the server keeps for every page.
+ */
 function RepositoriesPanel({ pulls }: { pulls: PullRequests }) {
 	const [hidden, toggleHidden] = useHiddenRepos();
+	const keepRebased = useEditableRead<KeepRebasedAnswer>(KEEP_REBASED_URL);
 	const { everyRepo, order, setOrder } = pulls;
+	const on = new Set(keepRebased.data?.repos ?? []);
 	const rows = everyRepo.map(repo => {
 		const key = repoKey(repo);
-		return { key, label: repoName(repo), shown: !hidden.has(key) };
+		const label = repoName(repo);
+		const keep = (checked: boolean): void =>
+			keepRebased.edit({ repos: checked ? [...on, key] : [...on].filter(other => other !== key) }, () => putJson<KeepRebasedAnswer>(KEEP_REBASED_URL, { repo: key, on: checked }));
+		const note = keepRebased.data && (
+			<label className="mt-0.5 flex w-fit items-center gap-1.5">
+				<ToggleSwitch {...activityControl("pull-requests.repository.keep-rebased")} checked={on.has(key)} onCheckedChange={keep} aria-label={`Keep ${label} rebased`} />
+				Keep rebased
+			</label>
+		);
+		return { key, label, shown: !hidden.has(key), note };
 	});
 	const keys = rows.map(({ key }) => key);
 	return (
-		<ShownOrderList
-			rows={rows}
-			onShow={key => toggleHidden(key)}
-			onMove={(key, by) => {
-				const next = withRepoStepped(order, keys, keys, key, by);
-				if (next) setOrder(next);
-			}}
-			controls={{ show: "pull-requests.repository.toggle", move: "pull-requests.repository.move" }}
-		/>
+		<>
+			<ShownOrderList
+				rows={rows}
+				onShow={key => toggleHidden(key)}
+				onMove={(key, by) => {
+					const next = withRepoStepped(order, keys, keys, key, by);
+					if (next) setOrder(next);
+				}}
+				controls={{ show: "pull-requests.repository.toggle", move: "pull-requests.repository.move" }}
+			/>
+			{keepRebased.saveError && <p className="mt-2 text-xs text-destructive">{keepRebased.saveError}</p>}
+		</>
 	);
 }
 
@@ -144,7 +167,7 @@ function DisplayMenu({ pulls, display, onDisplay }: { pulls: PullRequests; displ
 				</>
 			)}
 			title="Repositories"
-			description="Hidden repositories also leave the tab's count. Saved in this browser."
+			description="Hidden repositories also leave the tab's count, saved in this browser. Keep rebased rebases your pull requests in that repository whenever they fall behind, even with no page open, saved on the server."
 			panelClassName="w-96"
 		>
 			<RepositoriesPanel pulls={pulls} />

@@ -34,11 +34,14 @@ The heartbeat check (`HEALTH_KINDS`) runs on the server that owns the unattended
   Its **Continue all** sends the sidebar's `resume-all` with the notice's session ids.
 - The heartbeat notice lists `erroredRuns` in `src/routine-health.ts`, the routine runs that errored, oldest first; none gives no notice.
   `presentNotice` heads it **N routine runs errored**, lists each routine's name, and links to the first routine's open row.
+- The **Keep rebased** notice lists `KeepRebased.stops` in `src/server/keep-rebased.ts`, each rebase it stopped, one notice each, dated when it stopped; see [Keep rebased](keep-rebased.md).
+  `presentNotice` heads it **Keep rebased stopped** with the pull request's number, names a conflict's files or why it failed, and links to the pull request.
+  It is checked after each change to the switch or the stops, and at the server's start.
 
 A check that fails keeps what the last one found for its kind, and the marks for it, and logs each distinct error once.
 A repository GitHub did not answer for keeps its pull requests' notices the same way.
 A notice whose update runs or ran stays after a check stops finding it, so the page shows how the update ended.
-A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `dashboard:<running commit>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, `credits:<provider>`, `stopped:<session ids>`, sorted and joined with commas, or `routine-health:<routine id>@<run>:<why>` for each run it lists, joined with commas.
+A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `dashboard:<running commit>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, `credits:<provider>`, `stopped:<session ids>`, sorted and joined with commas, `routine-health:<routine id>@<run>:<why>` for each run it lists, joined with commas, or `rebase-stopped:<owner>/<repo>#<number>:<head>:<base>` with the commits the rebase stopped on.
 The dashboard notice names the running commit rather than origin's, so new commits raise its count instead of toasting again, and only a restart onto another commit makes a new one.
 A stopped notice that only lists fewer sessions than the one it replaces takes that one's seen, read, and cleared marks (`#carryStoppedMarks`), so a session that runs again does not toast the rest again, while a session that stops makes news.
 A plan notice's id leaves out the reset time, which a provider may report a little differently on each run, and a credits notice's leaves out its first failure, which moves once that failure is older than the day the check reads; the window's reset or a request that works ends the notice, and the next time it comes after its marks lapse is news.

@@ -49,6 +49,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 - [Notifications](architecture/notifications.md)
   - [Session notifications](architecture/notifications.md#session-notifications)
 - [Merges, and the cleanup after one](architecture/merges-and-the-cleanup-after-one.md)
+- [Keep rebased](architecture/keep-rebased.md)
 - [Review drafts](architecture/review-drafts.md)
 - [Updating the dashboard](architecture/updating-the-dashboard.md)
 - [Settings sync](architecture/settings-sync.md)

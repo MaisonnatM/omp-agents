@@ -19,6 +19,7 @@ import type { IsolationSweep } from "./isolation-sweep";
 import type { ListRegistry } from "./list-registry";
 import type { LiveSessions } from "./live-sessions";
 import type { MergeQueue } from "./merge-queue";
+import type { KeepRebased } from "./keep-rebased";
 import type { PhoneAccessRoutesEnv } from "./phone-access-routes";
 import type { ProcessSettingsFile } from "./process-settings-file";
 import type { ReviewDrafts } from "./review-drafts";
@@ -43,6 +44,8 @@ export interface DashboardRouteParts {
 	terminals: Terminals;
 	isolationSweep: IsolationSweep;
 	mergeQueue: MergeQueue;
+	/** **Keep rebased**, whose switch `/api/keep-rebased` reads and changes. */
+	keepRebased: KeepRebased;
 	reviewDrafts: ReviewDrafts;
 	startSession(request: StartRequest): Promise<StartResult>;
 	selfUpdate: SelfUpdate;
@@ -100,6 +103,11 @@ export function dashboardRouteEnv(parts: DashboardRouteParts, guards: Guards, bu
 			postReviewDraft: (pr, submit) => reviewDrafts.post(pr, submit),
 			checkOutPullRequest: checkout => checkOutPullRequest(checkout, parts.startSession),
 			rebasePullRequest,
+			keepRebased: () => ({ repos: [...parts.keepRebased.repos] }),
+			changeKeepRebased: change => {
+				parts.keepRebased.apply(change);
+				return { repos: [...parts.keepRebased.repos] };
+			},
 		},
 		dashboard: { build, status: () => selfUpdate.status(), update: () => selfUpdate.update(), changelog: () => selfUpdate.changelog() },
 		sync: parts.settingsSync,

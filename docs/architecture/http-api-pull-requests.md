@@ -104,5 +104,8 @@ Each address's answer, without its fragment, is cached for a day, up to 256 addr
 It answers a `MergeQueueAnswer`, the queued merges after it, which every socket also hears as a `merges` message, and the pull requests it merged on the way, which `writeMergeQueue` in `web/reads.ts` marks merged in the list at once; a refusal, such as a branch that moved or a pull request already queued, is a 409 with the reason.
 The details' answer carries GitHub's `mergeStateStatus` as `mergeState`, which `mergesNow` in `src/shared/github.ts` reads to word the confirmation as a merge now or once it is ready.
 
+`GET /api/keep-rebased` answers a `KeepRebasedAnswer` from `src/shared/keep-rebased.ts`, `{ repos }`, each repository with **Keep rebased** on as a `repoKey`.
+`PUT /api/keep-rebased` takes a `KeepRebasedChange`, `{ repo, on }`, checked by `parseKeepRebasedChange` in `src/server/wire.ts`, `repo` a lowercase `owner/repo`, and answers the repositories after it; see [Keep rebased](keep-rebased.md).
+
 `GET /api/review-draft/preview?owner=<o>&repo=<r>&number=<n>` answers a `ReviewPreview` from `src/shared/review-drafts.ts`: the `payload` posting would send, the pull request's `head` now, and the `refusal`, or `null`; see [Review drafts](review-drafts.md).
 `PUT /api/review-draft/post` takes `{ owner, repo, number }`, and optionally the composer's `submit: { verdict, summary }`, which the server checks the post against and writes into the draft, accepting its pending findings, once the post is not refused, so a refusal leaves the draft as it was; it posts that pull request's draft as one review, and answers the draft marked posted, which every socket also hears; a refusal, or GitHub's own, is a 409 with the reason.

@@ -11,6 +11,9 @@ The dashboard shows the same lines in Settings › What's new.
 - The Dock badge no longer counts sessions the sidebar hides, such as ones in `/tmp` or a hidden workspace.
 - Your agents now keep a short list of your own words and what you mean by them, and add to it whenever you correct one, so every new session understands you the same way.
 - A new routine, Learn my words, reads what you typed each day at 7 pm and adds the words you use your own way to that list, with words that only hold in one Workspace under its name.
+- Notifications has a Clear all button beside Mark all as read: click it, then Clear N? within three seconds, to clear every notification the tab, filters, and search show.
+- Pull requests has a Merge N ready button: it puts every pull request of yours that is ready to merge, or will be once its checks pass, into the merge queue, stacks bottom first, and each one merges once GitHub allows it.
+- On Pull requests, each repository under Display, Repositories… has a Keep rebased switch: while it is on, the dashboard rebases your pull requests there once they fall behind, within a couple of minutes and even with the page closed, and a notification says when one conflicts or fails.
 - On the Board, a long message a routine posted now shows its first lines only, with Show more to read the rest.
 - On the Board, a message whose thread has replies you haven't read now has a light blue background.
 
