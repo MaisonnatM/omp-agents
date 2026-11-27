@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-27-the-main-content-has-no-tabs
 date: 2026-11-16
 decision-makers: Maxence
 supersedes: 2026-11-13-a-header-tab-follows-where-you-go-in-it
@@ -24,7 +25,7 @@ Some moves add no entry to the window's history: a page that picks what it opens
 
 ## Consequences
 
-- A tab keeps `back` and `forward` beside its `hash` in the row `web/header-tabs.ts` stores in localStorage, so a tab's history survives a reload; a tab stored before this starts with none.
+- A tab keeps `back` and `forward` beside its `hash` in the row the header tabs' model stored in localStorage, so a tab's history survives a reload; a tab stored before this starts with none.
 - Whether a move pushed comes from the Navigation API: the window's current entry has a new `key` after a push and the same one after a replace, which Chromium's 50-entry cap on the window's history does not change.
 - Back and Forward, the buttons, Cmd+[ and Cmd+], and the mouse's back and forward buttons, step through the tab on screen with `location.replace`, and so do picking, closing, and reopening a tab, so the window's history no longer grows from them.
 - Going to a session another tab shows still focuses that tab without adding to either tab's history, while Back to a session another tab now shows stays in the tab on screen.
@@ -34,7 +35,7 @@ Some moves add no entry to the window's history: a page that picks what it opens
 
 ## Confirmation
 
-`web/header-tabs.test.ts` checks that Back and Forward move through the tab on screen and leave the others alone, that a push drops Forward, that a replace keeps both, that pinning and reopening a tab keep its history, and that the stored row keeps each tab's history, a closed tab's too.
+The header tabs' test, deleted with them on 2026-11-27, checked that Back and Forward move through the tab on screen and leave the others alone, that a push drops Forward, that a replace keeps both, that pinning and reopening a tab keep its history, and that the stored row keeps each tab's history, a closed tab's too.
 A headless browser smoke opened Todo then Bots in the first tab, Pull requests in a second, went back to the first, and saw Back show Todo through the button, Cmd+[, and the mouse's back button, with the second tab untouched, also after a reload.
 
 ## Revisit when

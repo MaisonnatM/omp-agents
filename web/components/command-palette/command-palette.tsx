@@ -1,6 +1,6 @@
 import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandInput, CommandItem, CommandList } from "@ui-sdk/react/command";
 import { Dialog, DialogBackdrop, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowRotateCounterClockwise, IconArrowUp, IconCmd, IconCrossMedium, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPin, IconPlusSmall, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconToolbox, IconWindowApp } from "central-icons";
+import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowRotateClockwise, IconArrowUp, IconCmd, IconExpand, IconFolder1, IconHistory, IconKeyboard, IconLayersTwo, IconMagnifyingGlass, IconPlusSmall, IconPullRequest, IconSidebarSimpleLeftWide, IconSidebarSimpleRightWide, IconTarget, IconToolbox, IconWindowApp } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type DashboardUpdateStatus, didNotStart, shortCommit } from "../../../src/shared/dashboard-update";
@@ -49,12 +49,6 @@ const COMMAND_ICON: Partial<Record<ShortcutId, IconComponent>> = {
 	newSession: IconPlusSmall,
 	previousSession: IconArrowUp,
 	nextSession: IconArrowDown,
-	newTab: IconPlusSmall,
-	previousTab: IconArrowLeft,
-	nextTab: IconArrowRight,
-	closeOtherTabs: IconCrossMedium,
-	reopenClosedTab: IconArrowRotateCounterClockwise,
-	pinTab: IconPin,
 	back: IconArrowLeft,
 	forward: IconArrowRight,
 	openPullRequest: IconPullRequest,

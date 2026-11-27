@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- The tabs across the top of the window are gone: one page shows at a time, and Back and Forward walk the window's history again. The details sidebar keeps its tabs. Cmd+W, Cmd+T, Cmd+1 to 9, Ctrl+Tab, and the other tab keys no longer do anything in the dashboard.
 - In the `general` Workspace's Sessions tab, each session shows the folder it ran in, such as `~/tmp` or `~`, beside its name; sessions run in `~/code` itself show none.
 - The Board is now the left sidebar's only view: the Sessions | Board switch is gone. The page rows and your pinned sessions sit above the Workspaces, and with no session open the window shows the Board.
 - Each Workspace's Board has a Sessions tab with its live, interrupted, waiting, and past sessions, search, and Resume all. Opening a session marks its Workspace in the sidebar, and next and previous session stay in that Workspace.

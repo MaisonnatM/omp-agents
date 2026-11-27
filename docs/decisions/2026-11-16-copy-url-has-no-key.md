@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-27-the-main-content-has-no-tabs
 date: 2026-11-16
 decision-makers: Maxence
 ---

@@ -396,7 +396,7 @@ function BrowserPage({ view, sessionId, page, active, pages, onReview, screen, o
 		<section
 			ref={sectionRef}
 			aria-label="Browser"
-			// Maximized, it covers the window below the header's tabs (`HeaderTabs`, one header height tall), whose window buttons and drag strip stay usable.
+			// Maximized, it covers the window below the header (`WindowHeader`, one header height tall), whose window buttons and drag strip stay usable.
 			className={cn("@container/browser flex min-h-0 flex-col bg-background", maximized ? "fixed inset-x-0 top-(--title-bar-height) bottom-0 z-30" : "flex-1")}
 		>
 			{/* In a narrow Browser, such as the sidebar at its default width, the address field takes a row of its own below the buttons. */}

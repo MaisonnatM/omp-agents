@@ -5,7 +5,7 @@ import type { Page } from "./routing";
 
 export const APP_NAME = "omp agents";
 
-/** What page `page` is called: its own name, or what it shows, such as a pull request. The tab title and a header tab both read it. */
+/** What page `page` is called: its own name, or what it shows, such as a pull request. The window's title reads it. */
 export function pageTitle(page: Page): string {
 	if (isModulePage(page)) return moduleOf(page).title(page);
 	switch (page.kind) {
@@ -29,7 +29,7 @@ export function pageTitle(page: Page): string {
 }
 
 /**
- * What the conversation `view` is called, `null` for none. The tab title and a header tab both read it.
+ * What the conversation `view` is called, `null` for none. The window's title reads it.
  * `host` and `past` are the rows of `view`, `null` once the roster no longer lists them.
  */
 export function viewTitle(view: View | null, host: RosterHost | null, past: PastSession | null): string | null {

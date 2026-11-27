@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-27-the-main-content-has-no-tabs
 date: 2026-11-16
 decision-makers: Maxence
 ---
@@ -31,7 +32,7 @@ Its Copy tab URL copies the tab's full address, with Cmd+L and Cmd+Shift+C as ke
 
 ## Confirmation
 
-`web/header-tabs.test.ts` checks where a duplicate goes, that going to a duplicated session stays in the copy, and which tabs Close tabs to the right keeps; `web/shortcuts.test.ts` checks Cmd+L.
+The header tabs' test, deleted with them on 2026-11-27, checked where a duplicate goes, that going to a duplicated session stays in the copy, and which tabs Close tabs to the right keeps; `web/shortcuts.test.ts` checked Cmd+L.
 A headless browser opened each menu item on a tab.
 
 ## Revisit when

@@ -30,9 +30,3 @@ export const DROP_LINE: Record<Where, string> = {
 	before: "before:absolute before:inset-x-1 before:-top-px before:h-0.5 before:rounded-full before:bg-ring",
 	after: "after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full after:bg-ring",
 };
-
-/** {@link DROP_LINE} for items laid out in a row, such as the header tabs: the line stands at the item's left or right edge. */
-export const SIDE_DROP_LINE: Record<Where, string> = {
-	before: "before:absolute before:inset-y-1 before:-left-px before:w-0.5 before:rounded-full before:bg-ring",
-	after: "after:absolute after:inset-y-1 after:-right-px after:w-0.5 after:rounded-full after:bg-ring",
-};
