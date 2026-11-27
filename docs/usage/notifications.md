@@ -26,7 +26,7 @@
       A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
   - **Sessions**: the sessions the dashboard started that stopped mid-turn, working or waiting on a question, without **Archive session**, as one notice, **2 sessions stopped mid-turn**, that names them as the sidebar's past sessions do.
     They are the interrupted sessions of the sessions sidebar whose turn ran, checked as the dashboard starts, every minute, and each time one stops, resumes, or moves to past.
-  - **Routines**: the routine runs that exited early, as one notice, **2 routine runs exited early**, that names each routine and why: it **errored**, **ended with no reply**, **ended far sooner than usual**, or **missed its schedule**.
+  - **Routines**: the routine runs that errored, as one notice, **2 routine runs errored**, that names each routine.
     The dashboard that runs the routines checks the runs of the last day once a day and as it starts; see [Routines](routines.md).
 - **All**, **GitHub**, **Slack**, **Providers**, **Sessions**, **Routines**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.
   The tabs scroll sideways when they do not fit, and the one you pick scrolls into view.
@@ -39,7 +39,7 @@
   **Merge** asks before it merges, with the merge methods the repository allows, as the pull request's details do, and marks the notice read once the dashboard took the merge, which it makes at once or once GitHub allows it; when the dashboard refuses it, a toast says why.
 - The stopped sessions' notice offers **Continue all**, on the toast or on the Notifications page, which resumes every session it lists and sends each the prompt `continue`, as the sidebar's **Resume all** does, and marks the notice read.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
-  Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, omp for an update of omp or a model, or omp-agents for its own, for stopped sessions, and for routine runs that exited early.
+  Over its title, a toast names where it came from beside that source's logo: GitHub, Slack, the provider, omp for an update of omp or a model, or omp-agents for its own, for stopped sessions, and for routine runs that errored.
   A pull request's, Slack message's, provider's, stopped sessions', or routines' toast shows only within 15 minutes of its news, and **Open** opens what it is about.
   A pull request's, Slack message's, or provider's toast closes after a few seconds; an update's, stopped sessions', or routines' stays until you dismiss it.
 - **Update**, on the toast or in the bell, runs the update; the notice shows its progress, then what changed or why it failed, and a failed update can run again.

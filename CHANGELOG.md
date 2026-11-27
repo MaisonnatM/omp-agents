@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- The Routines notification now appears only when a routine run errors.
+- A routine run that was shorter than usual, started late, or ended with no reply no longer raises a notification.
 - A routine's run no longer posts long replies on its Board thread. It finishes like a /ship report: a bold outcome line, a few short bullets, then Needs you, Not verified, and Done lines when they apply.
 
 ## 2026-11-26

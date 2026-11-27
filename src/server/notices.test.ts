@@ -10,7 +10,7 @@ import type { FailedUpdate } from "../shared/dashboard-update";
 import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
 import { InterruptedSessions } from "./interrupted";
-import type { EarlyRun } from "../routine-health";
+import type { ErroredRun } from "../routine-health";
 import { ACTIVITY_KINDS, DASHBOARD_KINDS, HEALTH_KINDS, Notices, type NoticeSources, PROVIDER_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
 
 const dirs: string[] = [];
@@ -85,8 +85,8 @@ interface State {
 	interrupted?: InterruptedSessions;
 	/** What each listed session file gives the stopped check. */
 	listed?: Record<string, { title: string | null; cwdDisplay: string }>;
-	/** The routine runs the heartbeat finds exited early. */
-	earlyRuns?: EarlyRun[];
+	/** The routine runs the heartbeat finds errored. */
+	erroredRuns?: ErroredRun[];
 	now?: number;
 }
 
@@ -131,7 +131,7 @@ function sources(state: State): NoticeSources {
 		},
 		creditRuns: async () => state.creditRuns ?? [],
 		stoppedSessions: () => (state.interrupted?.midTurn() ?? []).map(sessionId => ({ sessionId, title: state.listed?.[sessionId]?.title ?? null, cwdDisplay: state.listed?.[sessionId]?.cwdDisplay ?? null })),
-		earlyRuns: async () => state.earlyRuns ?? [],
+		erroredRuns: async () => state.erroredRuns ?? [],
 		now: () => state.now ?? 0,
 	};
 }
@@ -456,16 +456,16 @@ describe("Notices", () => {
 		expect(marks(notices)).toEqual([{ id: "stopped:s-b,s-c", seen: false, read: false }]);
 	});
 
-	test("the heartbeat lists the routine runs that exited early in one notice, and a heartbeat that finds none takes it away", async () => {
-		const errored: EarlyRun = { workspace: "/work/webapp", routineId: "r1", name: "Digest", at: 1_000, exit: "errored" };
-		const missed: EarlyRun = { workspace: "/work/webapp", routineId: "r2", name: "Prune", at: 2_000, exit: "missed" };
-		const state: State = { latest: null, installed: "18.8.0", models: [], earlyRuns: [errored, missed], now: 5 * MINUTE };
+	test("the heartbeat lists the routine runs that errored in one notice, and a heartbeat that finds none takes it away", async () => {
+		const digest: ErroredRun = { workspace: "/work/webapp", routineId: "r1", name: "Digest", at: 1_000 };
+		const prune: ErroredRun = { workspace: "/work/webapp", routineId: "r2", name: "Prune", at: 2_000 };
+		const state: State = { latest: null, installed: "18.8.0", models: [], erroredRuns: [digest, prune], now: 5 * MINUTE };
 		const notices = new Notices(noticesPath(), sources(state), () => {});
 
 		await notices.check(HEALTH_KINDS);
-		expect(notices.list).toEqual([{ id: "routine-health:r1@1000:errored,r2@2000:missed", at: 5 * MINUTE, seen: false, read: false, kind: "routine-health", runs: [errored, missed] }]);
+		expect(notices.list).toEqual([{ id: "routine-health:r1@1000,r2@2000", at: 5 * MINUTE, seen: false, read: false, kind: "routine-health", runs: [digest, prune] }]);
 
-		state.earlyRuns = [];
+		state.erroredRuns = [];
 		await notices.check(HEALTH_KINDS);
 		expect(notices.list).toEqual([]);
 	});

@@ -1,9 +1,9 @@
 /**
  * What the bell lists: a newer omp, routed model, or omp-agents build, a pull request whose next move is yours, a Slack message that
  * waits on you, a provider that stopped serving (a used-up plan window or prepaid credits that ran out), the dashboard
- * sessions that stopped mid-turn, and the routine runs that exited early.
+ * sessions that stopped mid-turn, and the routine runs that errored.
  */
-import type { EarlyRun } from "../routine-health";
+import type { ErroredRun } from "../routine-health";
 import type { DashboardCommits, DashboardFailed } from "./dashboard-update";
 import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
@@ -103,10 +103,10 @@ export interface StoppedSubject {
 	sessions: StoppedSession[];
 }
 
-/** The routine runs the daily heartbeat found that exited early, oldest first. */
+/** The routine runs the daily heartbeat found that errored, oldest first. */
 export interface RoutineHealthSubject {
 	kind: "routine-health";
-	runs: EarlyRun[];
+	runs: ErroredRun[];
 }
 
 export type NoticeSubject = UpdateSubject | UndoneSubject | PullRequestSubject | SlackSubject | ProviderSubject | StoppedSubject | RoutineHealthSubject;

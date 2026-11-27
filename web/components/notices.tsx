@@ -90,7 +90,7 @@ export function NoticeOrigin({ notice }: { notice: Notice }) {
 }
 const BADGE = "absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full ring-2 ring-popover";
 
-/** A notice's picture: who it comes from with a badge for its source; an update's, a warning's (a stopped session or a routine run that exited early), or a move nobody made's source tile; or a provider's logo with a warning badge. */
+/** A notice's picture: who it comes from with a badge for its source; an update's, a warning's (a stopped session or a routine run that errored), or a move nobody made's source tile; or a provider's logo with a warning badge. */
 function Face({ face }: { face: NoticeFace }) {
 	switch (face.kind) {
 		case "update":

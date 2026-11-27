@@ -65,9 +65,9 @@
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
-- Once a day, and as it starts, the dashboard that runs the routines checks the runs of the last day and raises one notification, under **Routines** in [Notifications](notifications.md), for the runs that exited early.
-  A run exited early when it errored, its Board task's session ended with no reply and without marking it done quietly, it took less than a quarter of the routine's usual time, or it started an hour or more after its schedule said.
-  A routine whose next run is an hour or more overdue counts as missing its schedule too.
+- Once a day, and as it starts, the dashboard that runs the routines checks the runs of the last day and raises one notification, under **Routines** in [Notifications](notifications.md), for the runs that errored.
+  A run errored when it hit an error, its command failed, or its Board task's session ended on a provider's error.
+  A run that was short, late, or ended with no reply raises no notification.
 - The dashboard adds two routines of its own, each once, each paused until you turn it on, and each in the omp-agents checkout's Workspace.
 - **Friday routine receipt** runs on Fridays at 17:00 once on.
   It reads the week's runs and their cost from `routines.json` and replies with one table: each routine's runs, useful runs (not marked done quietly, skipped, or failed), tokens, cost, and a verdict to keep it, slow it down, or retire it. It changes no routine.

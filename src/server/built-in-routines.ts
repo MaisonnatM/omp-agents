@@ -35,7 +35,7 @@ export const HARNESS_REVIEW_PROMPT = [
 	"  Count as escalated a pull request whose fix hit its round budget (a refusal saying the fix has run its rounds) or stalled (a refusal saying the count did not shrink), since both need me to approve more rounds with `moreRounds`, and say when a fix round was recorded after one, which means I did.",
 	"- `LEARNINGS.md` in this workspace, the omp-agents checkout: the lessons already written down.",
 	`- The failed lands: the merges whose \`state.kind\` is \`failed\` in \`${mergesFile}\`.`,
-	`- The failed sessions: the routine runs with \`errors\` or a \`failed\` outcome in \`${routinesFile}\`, and the dashboard's "exited early" and "stopped mid-turn" notifications.`,
+	`- The failed sessions: the routine runs with \`errors\` or a \`failed\` outcome in \`${routinesFile}\`, and the dashboard's "routine runs errored" and "stopped mid-turn" notifications.`,
 	"",
 	"Then reply with:",
 	"1. Last week's verdict, as above.",
