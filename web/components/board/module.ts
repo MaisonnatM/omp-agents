@@ -9,10 +9,10 @@ import { type BoardSearch, scopeOf } from "./search";
 /** The tabs across the top of a Workspace's Board, as across a Slack channel: its Board tasks, then what else the Workspace holds; `module` names the module whose page a tab shows, which hides the tab while it is off. */
 export const BOARD_TABS = [
 	{ id: "messages", label: "Messages", icon: IconBubbleText, module: null },
-	{ id: "routines", label: "Routines", icon: IconArrowsRepeat, module: null },
 	{ id: "pull-requests", label: "Pull requests", icon: IconPullRequest, module: null },
-	{ id: "memory", label: "Memory", icon: IconBrain, module: "memory" },
 	{ id: "projects", label: "Projects", icon: IconFlag1, module: "projects" },
+	{ id: "routines", label: "Routines", icon: IconArrowsRepeat, module: null },
+	{ id: "memory", label: "Memory", icon: IconBrain, module: "memory" },
 	{ id: "settings", label: "Settings", icon: IconSettingsGear1, module: null },
 ] as const;
 

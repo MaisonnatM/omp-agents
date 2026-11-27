@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-27
+
+- A Workspace's Board tabs now run Messages, Pull requests, Projects, Routines, Memory, Settings.
+
 ## 2026-11-26
 
 - Interrupted sessions no longer show under their workspace in the sidebar. **Resume all** in the Workspaces header still brings them back.
