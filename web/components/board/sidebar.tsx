@@ -1,4 +1,4 @@
-/** The Board's half of the left sidebar, under its Board tab: the Workspaces, each with a count of what waits on you there. */
+/** The Board's half of the left sidebar, under the page rows and the pinned sessions: the Workspaces, each with a count of what waits on you there. */
 import { IconHashtag } from "central-icons";
 import { useEffect, useRef, useState } from "react";
 import { parseStrings } from "../../../src/json";

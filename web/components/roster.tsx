@@ -204,6 +204,8 @@ function ProjectsGroup({ projects, current, open, onOpenChange, row }: ProjectsG
 }
 
 interface RosterProps {
+	/** Set where it fills the sidebar, while the Board is off: it then holds the workspace picker, which calls this. Unset in a Workspace's **Sessions** tab on the Board. */
+	onPickWorkspace?: (cwd: string | null) => void;
 	/** The workspaces, as {@link listWorkspaces} lists them, which the picker offers. */
 	workspaces: Workspace[];
 	/** The sessions under the selected workspace that match `query`, less those in an open project. */
@@ -223,9 +225,37 @@ interface RosterProps {
 	open: View[];
 	/** The project whose page is open, highlighted in Projects; `null` for none. */
 	projectOpen: string | null;
-	onPickWorkspace: (cwd: string | null) => void;
 	/** The Board, `null` until the server sends it. */
 	board: BoardState | null;
+}
+
+interface PinnedGroupProps {
+	pinned: SidebarSessions["pinned"];
+	/** Views on screen, whose rows are highlighted. */
+	open: View[];
+	/** Each row names its workspace, as with all workspaces shown. */
+	showWorkspace: boolean;
+	onTogglePin: (sessionId: string) => void;
+}
+
+/** The pinned sessions, a group that folds; nothing while none is pinned. */
+export function PinnedGroup({ pinned, open, showWorkspace, onTogglePin }: PinnedGroupProps) {
+	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
+	const count = pinned.hosts.length + pinned.past.length;
+	if (count === 0) return null;
+	return (
+		<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
+			<SidebarGroupLabel icon={IconPin}>{`${count} pinned`}</SidebarGroupLabel>
+			<SidebarMenu aria-label="Pinned omp sessions" className="gap-px">
+				{pinned.hosts.map(host => (
+					<HostRow key={host.instanceId} session={host} pinned placement={rowPlacement(open, { kind: "live", instanceId: host.instanceId, agentId: null })} showWorkspace={showWorkspace} onTogglePin={onTogglePin} />
+				))}
+				{pinned.past.map(session => (
+					<PastRow key={session.sessionId} session={session} pinned placement={rowPlacement(open, { kind: "past", sessionId: session.sessionId })} showWorkspace={showWorkspace} onTogglePin={onTogglePin} />
+				))}
+			</SidebarMenu>
+		</SidebarGroup>
+	);
 }
 
 /**
@@ -277,12 +307,12 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, board, 
 	};
 	return (
 		<>
-			{!modulesOff.has("projects") && (!filtering || projects.length > 0) && (
+			{!modulesOff.has("projects") && (!filtering || projects.length > 0) && (onPickWorkspace !== undefined || projects.length > 0) && (
 				<ProjectsGroup projects={projects} current={projectOpen} open={!collapsed.has("projects")} onOpenChange={() => toggleGroup("projects")} row={projectRow} />
 			)}
 			<SidebarGroup className="gap-1 pt-4 pb-1">
 				<div className="flex h-6 min-w-0 items-center gap-0.5">
-					<SidebarWorkspacePicker workspaces={workspaces} onPick={onPickWorkspace} />
+					{onPickWorkspace && <SidebarWorkspacePicker workspaces={workspaces} onPick={onPickWorkspace} />}
 					<SidebarGroupActions className="relative top-auto right-auto ml-auto h-6 shrink-0 pr-1.5">
 						{!searchShown && (
 							<Tooltip content="Search sessions" shortcut={shortcutLabels("sessionSearch")}>
@@ -330,15 +360,7 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, board, 
 				)}
 			</SidebarGroup>
 			{filtering && nothing && <p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>}
-			{pinned.hosts.length + pinned.past.length > 0 && (
-				<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
-					<SidebarGroupLabel icon={IconPin}>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
-					<SidebarMenu aria-label="Pinned omp sessions" className="gap-px">
-						{pinned.hosts.map(host => hostRow(host, true, showWorkspace))}
-						{pinned.past.map(session => pastRow(session, true, showWorkspace))}
-					</SidebarMenu>
-				</SidebarGroup>
-			)}
+			<PinnedGroup pinned={pinned} open={open} showWorkspace={showWorkspace} onTogglePin={onTogglePin} />
 			{folders.shown.map(folder => {
 				const { cwd, cwdDisplay } = folder.group.workspace;
 				const key = `workspace:${cwd}`;

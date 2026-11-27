@@ -2,14 +2,16 @@
 
 The **Board** is where you and your sessions hand each other work, one list per Workspace, like a Slack channel whose messages are Board tasks.
 Each message you send is a **Board task**, and a new session starts on it straight away.
-Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, at `#board`; **Sessions** brings back the page list and the sessions.
+The Board fills the left sidebar: under the page rows and your pinned sessions it lists your Workspaces, and with no session open the window shows the selected Workspace's Board at `#board`.
 
 ## The page
 
-- Under the Board tab, the sidebar lists your Workspaces; a count beside one says what waits on you there: its sessions that need you, plus its Board threads with replies you have not read. The Sessions tab's workspace folders and the Dock badge count the same way.
-  The sessions behind a Workspace's Board tasks show on the Sessions tab and in each Board thread, not under the Workspace; a click on one in a thread opens the Board thread of the Board task it works on with that session's tab in front, even when a later session took the Board task over.
+- The sidebar lists your Workspaces; a count beside one says what waits on you there: its sessions that need you, plus its Board threads with replies you have not read. The Dock badge counts the same way.
+  The Workspace of the session in front stays marked in the sidebar, and next and previous session walk that Workspace's sessions.
+  A Workspace's **Sessions** tab lists its live, interrupted, waiting, and past sessions, with search and **Resume all**; a click opens the session in the panes, beside others as before.
+  The sessions behind a Workspace's Board tasks also show in each Board thread; a click on one in a thread opens the Board thread of the Board task it works on with that session's tab in front, even when a later session took the Board task over.
   The address names the session as `session=<id>`, so a reload keeps it.
-- **Notifications** and **Settings**, above the Workspaces, open their page with the sidebar still on the Board; **Sessions** switches it back.
+- With the Board turned off in Settings › Modules, the sidebar lists the sessions under the page rows instead, as before the Board.
 - The page reads like a Slack channel: a `#` header with the Workspace's name, then its Board tasks as messages, oldest first and newest at the foot, split by day.
   Each message shows its author's picture, name, and time, its text, its `#` number, its status, and its `key=value` labels; a session's name carries a **Session** tag and opens that session.
   A later message from the same author within five minutes drops the picture and name, and shows its time on hover.

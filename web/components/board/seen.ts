@@ -54,7 +54,7 @@ export function unreadOutOfView(ids: readonly number[], unread: ReadonlySet<numb
 
 /**
  * What waits on you in Workspace `workspace`, or in every Workspace for `null`: its live sessions among `hosts` that need you,
- * plus its Board threads with unread replies. The Sessions tab's workspace count, the Board tab's, and the Dock badge all read it.
+ * plus its Board threads with unread replies. The Board sidebar's Workspace count, the roster's workspace count while the Board is off, and the Dock badge all read it.
  */
 export function waitingIn(board: BoardState | null, seen: Seen, hosts: readonly RosterHost[], workspace: string | null): number {
 	const inIt = (cwd: string) => workspace === null || cwd === workspace;

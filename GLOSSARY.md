@@ -110,7 +110,7 @@ Opening a page or session shows it in the tab on screen, and a session another t
 _Avoid_: Title bar, tab strip, browser tabs
 
 **Roster**:
-The sessions in the sidebar under **Workspaces** and **Past**: each workspace's running, interrupted, and pinned sessions, and the ended ones.
+The sessions of the selected Workspace, as a Workspace's **Sessions** tab on the Board lists them, or the sidebar while the Board is off: its running, interrupted, and pinned sessions, and the ended ones under **Past**.
 _Avoid_: Session list, inbox
 
 
