@@ -55,10 +55,12 @@ function useShownItems() {
 	return { anchor: <span ref={anchor} hidden />, shown };
 }
 
-/** A pill floating at the scroller's top or bottom edge, centred, as the scroll-to-end arrow does. */
+/** A solid blue pill floating at the scroller's top or bottom edge, centred, as Slack's new messages bar and the scroll-to-end arrow do. */
 function Pill({ edge, children }: { edge: "top" | "bottom"; children: ReactNode }) {
-	return <div className={`absolute start-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-border bg-background p-0.5 shadow-md rtl:translate-x-1/2 ${edge === "top" ? "top-4" : "bottom-4"}`}>{children}</div>;
+	return <div className={`absolute start-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-lg bg-sky-600 p-0.5 text-white shadow-md rtl:translate-x-1/2 dark:bg-sky-500 ${edge === "top" ? "top-4" : "bottom-4"}`}>{children}</div>;
 }
+
+const ON_BLUE = "hover:bg-white/15 hover:text-white active:bg-white/25";
 
 /** The channel's pills: `↑ N unread threads` while unread ones sit above what shows, `↓` below, each with **Mark all read**; the open thread's task counts as read. */
 export function ChannelUnreadPills({ tasks, open }: { tasks: readonly BoardTask[]; open: number | null }) {
@@ -77,10 +79,11 @@ export function ChannelUnreadPills({ tasks, open }: { tasks: readonly BoardTask[
 	};
 	const pill = (edge: "top" | "bottom", ids: number[]) => (
 		<Pill edge={edge}>
-			<Button {...activityControl("board.unread.jump")} variant="ghost" size="compact" className="font-medium text-foreground" leadingIcon={edge === "top" ? IconArrowUp : IconArrowDown} onClick={() => jump(taskItemId(ids[0]!), "center")}>
+			<Button {...activityControl("board.unread.jump")} variant="ghost" size="compact" className={`font-medium text-white ${ON_BLUE}`} leadingIcon={edge === "top" ? IconArrowUp : IconArrowDown} onClick={() => jump(taskItemId(ids[0]!), "center")}>
 				{ids.length} unread {ids.length === 1 ? "thread" : "threads"}
 			</Button>
-			<Button {...activityControl("board.unread.read-all")} variant="ghost" size="compact" className="text-muted-foreground" onClick={markAllRead}>
+			<span aria-hidden className="h-4 w-px bg-white/30" />
+			<Button {...activityControl("board.unread.read-all")} variant="ghost" size="compact" className={`text-white/85 ${ON_BLUE}`} onClick={markAllRead}>
 				Mark all read
 			</Button>
 		</Pill>
@@ -119,7 +122,7 @@ export function ThreadNewReplies({ task }: { task: BoardTask }) {
 				<MessageScrollerButton />
 			) : (
 				<Pill edge="bottom">
-					<Button {...activityControl("board.thread.new-replies")} variant="ghost" size="compact" className="font-medium text-foreground" leadingIcon={IconArrowDown} onClick={() => jump(fresh[0]!, "start")}>
+					<Button {...activityControl("board.thread.new-replies")} variant="ghost" size="compact" className={`font-medium text-white ${ON_BLUE}`} leadingIcon={IconArrowDown} onClick={() => jump(fresh[0]!, "start")}>
 						{fresh.length} new {fresh.length === 1 ? "reply" : "replies"}
 					</Button>
 				</Pill>

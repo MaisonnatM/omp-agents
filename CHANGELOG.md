@@ -5,8 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
-- On the Board, a pill at the top or bottom edge says how many unread threads sit out of view, as Slack does. Click it to jump to the nearest one, or press Mark all read.
-- In a Board thread, replies that come while you read further up show a "new replies" pill at the bottom. Click it to jump to them.
+- On the Board, a blue pill at the top or bottom edge says how many unread threads sit out of view, as Slack does. Click it to jump to the nearest one, or press Mark all read.
+- In a Board thread, replies that come while you read further up show a blue "new replies" pill at the bottom. Click it to jump to them.
 - Settings › Resources now shows what each session really holds, counting memory macOS compressed or moved to swap; an idle session used to look ten times smaller than it is.
 - A Board task or routine run that waits because memory is low now says so on the Board, with the reason, until it starts.
 - Sessions a dashboard can no longer list, such as old Bot conversations, now end on their own 10 minutes after the dashboard starts, instead of holding memory forever. Their conversation stays under Past.
