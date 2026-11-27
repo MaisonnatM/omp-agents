@@ -20,7 +20,7 @@ export function providerRoutes({ get, write }: RouteKit): Routes {
 		"/api/providers/login/cancel": { PUT: write(() => null, cancelProviderLogin) },
 		/** `{ provider, credentialId }`: removes that stored credential, as `/logout` does. */
 		"/api/providers/sign-out": { PUT: write((body) => checked(parseProviderSignOut(body), "Expected { provider, credentialId }"), signOutProvider) },
-		/** `{ provider, emails }`: saves the order omp tries that provider's accounts in; 409 once they changed. */
-		"/api/providers/account-order": { PUT: write((body) => checked(parseAccountOrder(body), "Expected { provider, emails }"), setAccountOrder, refuse) },
+		/** `{ provider, credentialIds }`: saves the order omp tries that provider's accounts in; 409 once they changed. */
+		"/api/providers/account-order": { PUT: write((body) => checked(parseAccountOrder(body), "Expected { provider, credentialIds }"), setAccountOrder, refuse) },
 	};
 }

@@ -629,12 +629,12 @@ describe("parseIntegrationTarget", () => {
 });
 
 describe("parseAccountOrder", () => {
-	test("takes a provider and its accounts' emails, and refuses a missing provider or an email that is not text", () => {
-		expect(parseAccountOrder({ provider: "anthropic", emails: ["maxence@maisonnat.com", "maisonnatmax@gmail.com"], extra: 1 })?.ok).toEqual({ provider: "anthropic", emails: ["maxence@maisonnat.com", "maisonnatmax@gmail.com"] });
-		expect(parseAccountOrder({ emails: ["maxence@maisonnat.com"] })).toBeNull();
-		expect(parseAccountOrder({ provider: "anthropic", emails: ["maxence@maisonnat.com", ""] })).toBeNull();
-		expect(parseAccountOrder({ provider: "anthropic", emails: [7] })).toBeNull();
-		expect(parseAccountOrder({ provider: "anthropic", emails: "maxence@maisonnat.com" })).toBeNull();
+	test("takes a provider and its accounts' credential ids, and refuses a missing provider or an id that is not an integer", () => {
+		expect(parseAccountOrder({ provider: "anthropic", credentialIds: [28, 22], extra: 1 })?.ok).toEqual({ provider: "anthropic", credentialIds: [28, 22] });
+		expect(parseAccountOrder({ credentialIds: [28] })).toBeNull();
+		expect(parseAccountOrder({ provider: "anthropic", credentialIds: [28, 1.5] })).toBeNull();
+		expect(parseAccountOrder({ provider: "anthropic", credentialIds: ["28"] })).toBeNull();
+		expect(parseAccountOrder({ provider: "anthropic", credentialIds: 28 })).toBeNull();
 	});
 });
 

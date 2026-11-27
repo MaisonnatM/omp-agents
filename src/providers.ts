@@ -36,8 +36,8 @@ export async function signOutProvider({ provider, credentialId }: { provider: st
 	return loadProviders();
 }
 
-/** Saves the order omp tries `provider`'s accounts in, `emails` the first tried first, and answers the providers after. */
-export async function setAccountOrder({ provider, emails }: AccountOrderEdit): Promise<ProvidersAnswer> {
-	if (!(await orderProviderAccounts(provider, emails))) throw new Rejected(409, "The signed-in accounts changed. Refresh Providers and try again.");
+/** Saves the order omp tries `provider`'s accounts in, `credentialIds` the first tried first, and answers the providers after. */
+export async function setAccountOrder({ provider, credentialIds }: AccountOrderEdit): Promise<ProvidersAnswer> {
+	if (!(await orderProviderAccounts(provider, credentialIds))) throw new Rejected(409, "The signed-in accounts changed. Refresh Providers and try again.");
 	return loadProviders();
 }
