@@ -1,12 +1,12 @@
 /**
  * What the Board does on its own while this server runs the unattended work: it starts a new session on each ready
- * Board task, a reopened one included, in the task's own worktree; lands a done Board task's branch when the user
+ * Board task in the task's own worktree, and resumes the session that marked a reopened one done; lands a done Board task's branch when the user
  * replies a bare "Merge on main"; wakes the session a reply is for; stops and re-prompts that session when the user
  * edits one of their messages; ends a started session once the turn that marked its Board task done ends, or at once
  * when the user closes it; and returns a Board task to ready when its session exits without marking it done. What it
  * ends and lands it reads from the log, so a restart picks up what the last server left. See docs/architecture/board.md.
  */
-import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardState, type BoardTask, branchOf, holderOf, landsOnReply, MAX_TEXT, MERGE_REPLY, startedOn, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardState, type BoardTask, branchOf, holderOf, landsOnReply, MAX_TEXT, MERGE_REPLY, resumable, startedOn, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
 import { errorText } from "../json";
 import type { ModuleRun, ModuleRunCore } from "../modules";
 import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
@@ -76,18 +76,23 @@ const threadLines = (task: BoardTask): string[] =>
 		return [];
 	});
 
+/** `thread` as the block a session reads, oldest first, with what to do now in its last line. */
+const threadBlock = (thread: string[]): string[] => [
+	"<board-thread>",
+	// A message that holds a closing tag of these blocks would end them early, and read as the Board's own steps.
+	...thread.map(line => line.replace(/<\/(board-[\w-]*)>/gi, "<\\/$1>")),
+	"</board-thread>",
+];
+
 /** What a session on a reopened Board task learns of the rounds before it: who worked on it, and the thread, which ends on what to do now. */
 function earlierRounds(task: BoardTask): string[] {
 	const thread = threadLines(task);
 	if (thread.length === 0) return [];
-	const earlier = startedOn(task);
+	const earlier = [...new Set(startedOn(task))];
 	return [
 		...(earlier.length > 0 ? [`Earlier sessions worked on it and ended: ${earlier.join(", ")}. Their commits are on your branch, unless the thread names another branch or pull request. Read an earlier session's transcript through eval's archive only when the thread leaves out something you need.`] : []),
 		"Its Board thread so far, oldest first; the last reply says what to do now:",
-		"<board-thread>",
-		// A message that holds a closing tag of these blocks would end them early, and read as the Board's own steps.
-		...thread.map(line => line.replace(/<\/(board-[\w-]*)>/gi, "<\\/$1>")),
-		"</board-thread>",
+		...threadBlock(thread),
 	];
 }
 
@@ -119,6 +124,20 @@ export const startPrompt = (task: BoardTask, checkout: TaskCheckout, landable: b
 /** What the session a reply is for reads: it answers or does the follow-up, then finishes as a started session does. */
 export const wakePrompt = (task: BoardTask, by: BoardAuthor, text: string, landable: boolean): string =>
 	`${DASHBOARD_PROMPT_PREFIX} ${authorName(by)} replied on Board task #${task.id} (${task.title}):\n\n${text}\n\nWhen it only asks a question, answer on its thread with the board tool (action reply, task ${task.id}); when it asks for more work, do it.\n${[...routineRun(task), converse(task.id, landable), finish(task.id, landable)].join("\n")}`;
+
+/** What session `sessionId`, which marked Board task `task` done, reads when a reply or a failed merge reopens it: the thread since its done, less its own words, then the same finish. */
+export function resumePrompt(task: BoardTask, sessionId: string, landable: boolean): string {
+	const since = task.replies.findLastIndex(entry => "note" in entry && entry.note.kind === "done");
+	const replies = task.replies.slice(since + 1).filter(entry => !("by" in entry && entry.by.kind === "session" && entry.by.sessionId === sessionId));
+	const thread = threadLines({ ...task, replies });
+	return [
+		`${DASHBOARD_PROMPT_PREFIX} Board task #${task.id} (${task.title}) is open again after you marked it done, and you hold it until you mark it done again. Its Board thread since then, oldest first; the last reply says what to do now:`,
+		...threadBlock(thread),
+		...routineRun(task),
+		converse(task.id, landable),
+		finish(task.id, landable),
+	].join("\n");
+}
 
 /** What the session reads after the user edited their messages, which stopped its turn: each message's new text replaces the old. */
 export const editPrompt = (task: BoardTask, texts: string[], landable: boolean): string => {
@@ -267,9 +286,10 @@ export class BoardRunner implements ModuleRun {
 	}
 
 	/**
-	 * Starts a session on Board task `id` in its checkout. The checkout can run setup for minutes, so the start reads the
-	 * Board task again after each wait: a claim, close, or done meanwhile stops it, and the prompt and the replies sent
-	 * after it are what the thread holds now.
+	 * Starts the next round of Board task `id` in its checkout: it resumes the session that marked it done, see
+	 * {@link resumable}, else starts a new one. The checkout can run setup for minutes, so the start reads the Board task
+	 * again after each wait: a claim, close, or done meanwhile stops it, and the prompt and the replies sent after it are
+	 * what the thread holds now.
 	 */
 	async #start(id: number): Promise<void> {
 		this.#starting.add(id);
@@ -288,7 +308,11 @@ export class BoardRunner implements ModuleRun {
 			const task = ready();
 			if (!task) return;
 			const checkout: TaskCheckout = dir === null ? { dir: task.workspace, branch: null } : { dir, branch };
-			const started = await this.#core.start(checkout.dir, startPrompt(task, checkout, this.#core.landable(task.workspace)), task.launch ?? undefined, `board:${task.workspace}#${id}`);
+			const landable = this.#core.landable(task.workspace);
+			const branchField = checkout.branch === null ? {} : { branch: checkout.branch };
+			const previous = resumable(task);
+			if (previous !== null && (await this.#resume(task, previous, landable, branchField))) return;
+			const started = await this.#core.start(checkout.dir, startPrompt(task, checkout, landable), task.launch ?? undefined, `board:${task.workspace}#${id}`);
 			const now = ready();
 			if (!("sessionId" in started)) {
 				if (now) this.#change({ op: "start", task: id, sessionId: null, error: started.error });
@@ -298,12 +322,35 @@ export class BoardRunner implements ModuleRun {
 				void this.#end(started.sessionId);
 				return;
 			}
-			this.#change({ op: "start", task: id, sessionId: started.sessionId, ...(checkout.branch === null ? {} : { branch: checkout.branch }) });
+			this.#change({ op: "start", task: id, sessionId: started.sessionId, ...branchField });
 			const recorded = this.#state().tasks.find(each => each.id === id);
 			if (recorded) this.#deliver(recorded, readUpTo(task));
 		} finally {
 			this.#starting.delete(id);
 		}
+	}
+
+	/**
+	 * Resumes `sessionId`, which marked reopened Board task `task` done, with the thread since then, and records it as
+	 * this round's start. Says whether it did; a session that no longer resumes leaves the round to a new session.
+	 */
+	async #resume(task: BoardTask, sessionId: string, landable: boolean, branchField: { branch?: string }): Promise<boolean> {
+		try {
+			await this.#core.wake(sessionId, resumePrompt(task, sessionId, landable), task.launch ?? undefined);
+		} catch (error) {
+			console.error(`omp-agents: could not resume ${sessionId} for Board task #${task.id}, starting a new session: ${errorText(error)}`);
+			return false;
+		}
+		// Until its start is recorded, this runner still counts the session as ended, so the sweep leaves it running.
+		if (!unstartedReady(this.#state()).some(each => each.id === task.id)) {
+			void this.#end(sessionId);
+			return true;
+		}
+		this.#ended.delete(sessionId);
+		this.#change({ op: "start", task: task.id, sessionId, ...branchField });
+		const recorded = this.#state().tasks.find(each => each.id === task.id);
+		if (recorded) this.#deliver(recorded, readUpTo(task));
+		return true;
 	}
 
 	/** Lands `task`'s branch for the user's "Merge on main" at reply `asked` and posts how it went; a merge that fails reopens the task. */
