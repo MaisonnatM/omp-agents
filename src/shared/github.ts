@@ -201,6 +201,8 @@ export interface PullRequestSummary extends PullRequest {
 	viewerApproved: boolean;
 	/** Some failing check waits on someone's approval, not a CI fix; absent from lists cached before the summary carried it. */
 	approvalRequired?: boolean;
+	/** The names of the head commit's failing checks, approval gates left out, among the first ones GitHub listed; absent from lists cached before the summary carried it. */
+	failingChecks?: string[];
 	/** Its label names; absent from lists cached before the summary carried them. */
 	labels?: string[];
 	/** When it was opened, in ms since the epoch. */
@@ -246,6 +248,7 @@ const isSummary = fields<PullRequestSummary>({
 	conversations: isNumber,
 	viewerApproved: isBoolean,
 	approvalRequired: optional(isBoolean),
+	failingChecks: optional(isTexts),
 	labels: optional(isTexts),
 	headOid: optional(isString),
 	baseOid: optional(isString),

@@ -71,7 +71,7 @@ const AND = new Intl.ListFormat("en", { type: "conjunction" });
 const REASON: Record<MoveId, (pr: PullRequestSummary) => string> = {
 	review: pr => `@${pr.author.login}`,
 	merge: pr => `${pr.review === "none" ? "no review needed" : "approved"} · ${pr.checks === "none" ? "no checks" : "checks green"}`,
-	"fix-ci": () => "checks failing",
+	"fix-ci": pr => (pr.failingChecks?.length ? `failing: ${pr.failingChecks.join(", ")}` : "checks failing"),
 	rebase: pr => `conflicts with ${pr.stackedOn ?? "base"}`,
 	reply: pr => {
 		const { count, exact } = pr.unresolved;

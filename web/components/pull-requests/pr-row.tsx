@@ -587,7 +587,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 					{why && (
 						<>
 							<span aria-hidden className="max-phone:hidden">·</span>
-							<span className="min-w-0 truncate">{why}</span>
+							<span className="min-w-0 truncate" title={why}>{why}</span>
 							<ThreadStartersTag pr={pr} move={move} />
 						</>
 					)}

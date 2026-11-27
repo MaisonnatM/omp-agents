@@ -144,6 +144,7 @@ describe("next move", () => {
 			reason(pr(6, { stackedOn: "me/base" }), "rebase"),
 			reason(pr(7), "rebase"),
 			reason(pr(8, { review: "none", checks: "none" }), "merge"),
+			reason(pr(10, { checks: "failing", failingChecks: ["pytest", "lint"] }), "fix-ci"),
 			reason(pr(9, { role: "reviewer", author: teammate }), "review"),
 		]).toEqual([
 			"waiting on @bob and @cy",
@@ -154,6 +155,7 @@ describe("next move", () => {
 			"conflicts with me/base",
 			"conflicts with base",
 			"no review needed · no checks",
+			"failing: pytest, lint",
 			"@teammate",
 		]);
 	});

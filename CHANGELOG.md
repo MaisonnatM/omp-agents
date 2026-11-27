@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- On Pull requests, a row whose CI fails now names the failing checks, such as "failing: pytest, lint", instead of only "checks failing". Hover to read the full list.
 - On the Board, a blue pill at the top or bottom edge says how many unread threads sit out of view, as Slack does. Click it to jump to the nearest one, or press Mark all read.
 - In a Board thread, replies that come while you read further up show a blue "new replies" pill at the bottom. Click it to jump to them.
 - Settings › Resources now names a session no dashboard lists by its title, as Past does, with its port beside it, instead of only its port.
