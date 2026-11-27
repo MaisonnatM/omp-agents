@@ -10,6 +10,9 @@ import type { OpenMode } from "./routing";
 /** A count of sessions that need you, as a badge's accessible name and tooltip say it: "1 session waiting on you". */
 export const sessionsWaiting = (count: number): string => `${count} ${count === 1 ? "session" : "sessions"} waiting on you`;
 
+/** What waits on you in a Workspace, sessions and unread Board threads together, as its count's accessible name says it: "3 waiting on you". */
+export const waitingOnYou = (count: number): string => `${count} waiting on you`;
+
 /** What a workspace picker calls choosing no workspace. */
 export const ALL_WORKSPACES = "All workspaces";
 

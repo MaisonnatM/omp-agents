@@ -82,7 +82,7 @@ export function App() {
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send, start);
-	useAttention(state, send);
+	useAttention(state, send, scope.visible.hosts);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const [goalEditor, setGoalEditor] = useState<{ instanceId: string; focus: "objective" | "budget" } | null>(null);
 	const editGoal = useCallback((instanceId: string, focus: "objective" | "budget") => setGoalEditor({ instanceId, focus }), []);
@@ -91,7 +91,6 @@ export function App() {
 	const { absent: absentTabs, shown: tabs } = useSidebarTabs();
 	const settings = useSettingsRoute(page);
 	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, navigate, show });
-	const known = useMemo(() => ({ hosts: state.hosts, past: state.past }), [state.hosts, state.past]);
 	const maximized = layout.maximized && !page;
 	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
@@ -251,7 +250,6 @@ export function App() {
 										onTab={showTab}
 										tabs={tabs}
 										board={state.modules.board}
-										known={known}
 										list={placement?.at === "sidebar" ? pageList : null}
 										settings={settings}
 										unreadNotices={unreadNotices}

@@ -67,7 +67,7 @@
   **Move to project** in a row's menu puts the session in an open project, and **Remove from project** takes it out.
 - Under the **Workspaces** label each workspace is a folder that holds its live and interrupted sessions, its idle ones first, then those running, then those waiting on subagents, and then the interrupted ones.
   The folders that hold a session come first, then the others, each in the picker's order, so opening a session never moves a folder; eight show, or as many as hold a session, and **N more workspaces** shows the rest.
-  Hovering a folder shows its **New session in** button, and a blue count after its name says how many of its sessions need you.
+  Hovering a folder shows its **New session in** button, and a blue count after its name says what waits on you there: its sessions that need you, plus its Board threads with replies you have not read.
   A pinned session stays under **Pinned** whatever its state.
   A live session whose subagents still run while its main agent's turn has ended, or sits only in a `wait` or `task` call waiting on them, counts as waiting on subagents until its turn ends with no subagent running, its main agent runs another tool or asks a question, or its last subagent finishes while its turn still runs.
   Thinking or writing between two `wait` calls keeps it waiting.

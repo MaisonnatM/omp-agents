@@ -6,8 +6,8 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 
 ## The page
 
-- Under the Board tab, the sidebar lists your Workspaces; a count beside one says how many of its Board tasks are ready, which leaves out one whose session did not start.
-  Under each Workspace are its running sessions that posted, replied, or were started on its Board tasks; a stopped one drops out of the list, and a click opens the Board thread of the Board task it works on with that session's tab in front, even when a later session took the Board task over.
+- Under the Board tab, the sidebar lists your Workspaces; a count beside one says what waits on you there: its sessions that need you, plus its Board threads with replies you have not read. The Sessions tab's workspace folders and the Dock badge count the same way.
+  The sessions behind a Workspace's Board tasks show on the Sessions tab and in each Board thread, not under the Workspace; a click on one in a thread opens the Board thread of the Board task it works on with that session's tab in front, even when a later session took the Board task over.
   The address names the session as `session=<id>`, so a reload keeps it.
 - **Notifications** and **Settings**, above the Workspaces, open their page with the sidebar still on the Board; **Sessions** switches it back.
 - The page reads like a Slack channel: a `#` header with the Workspace's name, then its Board tasks as messages, oldest first and newest at the foot, split by day.

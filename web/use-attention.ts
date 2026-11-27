@@ -6,7 +6,9 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { isNotificationSound, type DesktopBridge, type NotificationSound } from "../src/shared/desktop-bridge";
 import type { ClientMsg } from "../src/shared/protocol";
-import { type Attention, attend, needsYou, shownViews, unreadShown } from "./attention";
+import type { RosterHost } from "../src/shared/sessions";
+import { type Attention, attend, shownViews, unreadShown } from "./attention";
+import { useSeen, waitingIn } from "./components/board/seen";
 import type { DashboardState } from "./dashboard-state";
 import { useStoredState } from "./stored-state";
 
@@ -65,12 +67,13 @@ function subscribeFocus(change: () => void): () => void {
 	};
 }
 
-/** Keeps the Dock badge, the notifications, and the read turns in step with the roster. */
-export function useAttention(state: DashboardState, send: (msg: ClientMsg) => void): void {
+/** Keeps the Dock badge, the notifications, and the read turns in step with the roster; the badge counts what waits on you among `listed`, the sessions the sidebar lists, and the Board threads. */
+export function useAttention(state: DashboardState, send: (msg: ClientMsg) => void, listed: readonly RosterHost[]): void {
 	const { hosts, connected, layout, cover } = state;
 	const { on, turns, sound, soundWhenFocused } = useSessionNotifications();
 	const focused = useSyncExternalStore(subscribeFocus, () => document.hasFocus());
-	const count = connected ? hosts.filter(needsYou).length : 0;
+	const seen = useSeen();
+	const count = connected ? waitingIn(state.modules.board, seen, listed, null) : 0;
 	useEffect(() => desktop?.badge(count), [count]);
 
 	const attention = useRef<Attention>(new Map());

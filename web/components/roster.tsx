@@ -3,11 +3,12 @@ import { IconArrowLoopDownLeft, IconCalendarClock, IconDotGrid1x3Horizontal, Ico
 import { type ReactNode, useContext, useState } from "react";
 import { awaitsScheduled, type PastSession, type RosterHost, type View } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
+import type { BoardState } from "../../templates/omp/agent/extensions/board/log";
 import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { needsYou } from "../attention";
-import { ALL_WORKSPACES, folderName, sessionsWaiting } from "../labels";
+import { ALL_WORKSPACES, folderName, sessionsWaiting, waitingOnYou } from "../labels";
 import { type ProjectGroup, type RosterFolder, rosterFolders, rowPlacement, type SidebarSessions, type WorkspaceGroup } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredKeys, useStoredState } from "../stored-state";
@@ -23,6 +24,7 @@ import { createProject } from "./projects/new-project";
 import { SidebarOpen } from "./sidebar-panel";
 import { SidebarSearch } from "./sidebar-search";
 import { workspaceItems } from "./workspace-picker";
+import { useSeen, waitingIn } from "./board/seen";
 
 const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
 /** Past stays folded under the workspaces until you unfold it, which this browser keeps. */
@@ -83,6 +85,8 @@ interface WorkspaceFolderProps {
 	name: string;
 	/** The folder shows its rows; you fold it with its label. */
 	open: boolean;
+	/** The Board, whose threads with unread replies in this workspace count with its sessions that need you. */
+	board: BoardState | null;
 	onOpenChange: () => void;
 	onNewSession: () => void;
 	/** The folder's session rows, in order. */
@@ -90,8 +94,8 @@ interface WorkspaceFolderProps {
 }
 
 /** A workspace in the roster: a folder of its session rows, or with none its name alone; hovering it offers a new session there. */
-function WorkspaceFolder({ folder: { group, rows }, name, open, onOpenChange, onNewSession, children }: WorkspaceFolderProps) {
-	const waiting = group.hosts.filter(needsYou).length;
+function WorkspaceFolder({ folder: { group, rows }, board, name, open, onOpenChange, onNewSession, children }: WorkspaceFolderProps) {
+	const waiting = waitingIn(board, useSeen(), group.hosts, group.workspace.cwd);
 	const newHere = (
 		<SidebarGroupActions className="top-0 h-7 opacity-0 transition-opacity group-hover/workspace:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
 			<Tooltip content={`New session in ${name}`} side="right">
@@ -108,7 +112,7 @@ function WorkspaceFolder({ folder: { group, rows }, name, open, onOpenChange, on
 				{waiting > 0 && (
 					<>
 						<CountPill count={waiting} />
-						<span className="sr-only">{`, ${sessionsWaiting(waiting)}`}</span>
+						<span className="sr-only">{`, ${waitingOnYou(waiting)}`}</span>
 					</>
 				)}
 			</SidebarGroupLabel>
@@ -220,13 +224,15 @@ interface RosterProps {
 	/** The project whose page is open, highlighted in Projects; `null` for none. */
 	projectOpen: string | null;
 	onPickWorkspace: (cwd: string | null) => void;
+	/** The Board, `null` until the server sends it. */
+	board: BoardState | null;
 }
 
 /**
  * The roster: each workspace holds its live and interrupted sessions, the busy ones first, and Past lists the ended ones,
  * even one on screen that Past does not show.
  */
-export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, onQuery, onTogglePin, open, projectOpen, onPickWorkspace }: RosterProps) {
+export function Roster({ workspaces, lists, projects, pinnedIds, groups, board, query, onQuery, onTogglePin, open, projectOpen, onPickWorkspace }: RosterProps) {
 	const [modulesOff] = useModulesOff();
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll }, scope: { workspace } } = useDashboardStatus();
@@ -337,7 +343,7 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, query, 
 				const { cwd, cwdDisplay } = folder.group.workspace;
 				const key = `workspace:${cwd}`;
 				return (
-					<WorkspaceFolder key={cwd} folder={folder} name={folderName(cwdDisplay) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
+					<WorkspaceFolder key={cwd} folder={folder} board={board} name={folderName(cwdDisplay) ?? cwdDisplay} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
 						{folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false))}
 					</WorkspaceFolder>
 				);

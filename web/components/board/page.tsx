@@ -45,7 +45,8 @@ import { boardActions, SessionActions } from "./actions";
 import { BoardNoteLine, isThreadNote } from "./board-note";
 import { RoutineIds } from "./routine-author";
 import { threadSession, type Work, workOf } from "./work";
-import { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, folder, MarkUnreadButton, markSeen, MessageEditor, MessageRow, said, sameDay, TaskBody, unreadOf, useSeen, WorkingLine, WorkLabel, Avatar } from "./messages";
+import { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, folder, MarkUnreadButton, MessageEditor, MessageRow, sameDay, TaskBody, WorkingLine, WorkLabel, Avatar } from "./messages";
+import { markSeen, said, unreadOf, useSeen } from "./seen";
 
 interface BoardPageProps {
 	route: BoardRoute;

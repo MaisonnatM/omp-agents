@@ -125,7 +125,6 @@ function viewRest(view: BoardView, pages: PageAddresses): string | null {
 export type BoardControlId =
 	| "board.workspace"
 	| "board.tab"
-	| "board.workspace.fold"
 	| "board.task.open"
 	| "board.post"
 	| "board.reply"
@@ -199,14 +198,13 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	controls: [
 		{ id: "board.tab", label: "Board tab across the top of a Workspace", area: "Board" },
 		{ id: "board.workspace", label: "Board sidebar workspace row", area: "Board" },
-		{ id: "board.workspace.fold", label: "Board sidebar workspace chevron, folds its sessions", area: "Board" },
 		{ id: "board.task.open", label: "Board task message, which opens its thread", area: "Board" },
 		{ id: "board.post", label: "Board composer Send button or Enter", area: "Board" },
 		{ id: "board.reply", label: "Board thread reply Send button or Enter", area: "Board" },
 		{ id: "board.thread.close", label: "Board thread close button", area: "Board" },
 		{ id: "board.thread.tab.thread", label: "Board thread Thread tab", area: "Board" },
 		{ id: "board.thread.tab.session", label: "Board thread Session tab", area: "Board" },
-		{ id: "board.session.open", label: "Board session link, in the sidebar or a thread", area: "Board" },
+		{ id: "board.session.open", label: "Board session link in a thread", area: "Board" },
 		{ id: "board.task.close", label: "Board task Close task button, which marks an open Board task done and ends its session", area: "Board" },
 		{ id: "board.search", label: "Board search field", area: "Board" },
 		{ id: "board.search.scope", label: "Board search scope menu", area: "Board" },
