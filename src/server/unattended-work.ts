@@ -158,7 +158,7 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		owner: ownerHeld,
 		holdsUnattended: deps.holdsUnattended,
 		now: Date.now,
-	});
+	}, id => broadcasts.pushList(id));
 	const autoContinue = new AutoContinue({
 		file: scheduled,
 		plans: async () => {

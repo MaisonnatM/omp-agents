@@ -72,11 +72,13 @@ interface RoutinesTabProps {
 	route: RoutineRoute;
 	/** Every routine; the tab shows the Workspace's. */
 	routines: Routine[];
+	/** Why the queued runs wait to start, such as memory pressure; `null` when none waits. */
+	held: string | null;
 	workspaces: Workspace[];
 	connected: boolean;
 }
 
-export function RoutinesTab({ workspace, route, routines, workspaces, connected }: RoutinesTabProps) {
+export function RoutinesTab({ workspace, route, routines, held, workspaces, connected }: RoutinesTabProps) {
 	const here = routines.filter(routine => routine.workspace === workspace);
 	const named = route.kind === "open" || route.kind === "edit" ? route.id : null;
 	const elsewhere = named === null || here.some(({ id }) => id === named) ? null : (routines.find(({ id }) => id === named) ?? null);
@@ -87,10 +89,10 @@ export function RoutinesTab({ workspace, route, routines, workspaces, connected 
 	if (target) return null;
 	switch (route.kind) {
 		case "list":
-			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} allRoutines={routines} openId={null} connected={connected} />;
+			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} allRoutines={routines} held={held} openId={null} connected={connected} />;
 		case "open":
 			if (!here.some(({ id }) => id === route.id)) return <MissingRoutine workspace={workspace} />;
-			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} allRoutines={routines} openId={route.id} connected={connected} />;
+			return <RoutinesCard workspace={workspace} name={folderName(workspace) ?? workspace} routines={here} allRoutines={routines} held={held} openId={route.id} connected={connected} />;
 		case "new":
 			return <NewRoutine workspace={workspace} workspaces={workspaces} connected={connected} />;
 		case "edit": {

@@ -20,7 +20,7 @@ export interface RoutineRunnerDeps {
 	exec(command: string, cwd: string, env: Record<string, string>): Promise<ShellResult>;
 	/** Whether the Mac is fully awake: a dark wake lasts seconds, so a run started in one stalls until the next full wake. */
 	fullyAwake(): Promise<boolean>;
-	/** The routines changed; every socket should hear them. */
+	/** The routines, or why their queued runs wait, changed; every socket should hear them. */
 	onChange(): void;
 	/** The Board as it stands. */
 	board(): BoardState;
@@ -49,11 +49,16 @@ export class RoutineRunner {
 	readonly #lane = new SerialLane();
 	/** Command reports that ended outside a full wake, for the next tick at a full wake to post. */
 	readonly #reports: HeldReport[] = [];
-	/** Why queued runs last waited, so the log says it once. */
+	/** Why the queued runs wait to start, which every page shows on them; `null` when none waits. */
 	#held: string | null = null;
 
 	constructor(deps: RoutineRunnerDeps) {
 		this.#deps = deps;
+	}
+
+	/** Why the queued runs wait to start, such as memory pressure; `null` when none waits. Kept only in memory, never in the routines file. */
+	held(): string | null {
+		return this.#held;
 	}
 
 	/**
@@ -97,6 +102,7 @@ export class RoutineRunner {
 			if (!routine) return;
 			this.#claim(routine, this.#deps.now(), []);
 			await this.#drain();
+			this.#hold(null);
 		});
 	}
 
@@ -124,14 +130,18 @@ export class RoutineRunner {
 
 	/** Starts the queued runs unless unattended work waits, which leaves them queued for a later tick; a run the user asked for with **Run now** does not wait. */
 	async #drainUnlessHeld(): Promise<void> {
-		const holds = this.#deps.holdsUnattended();
-		if (holds !== null) {
-			if (holds !== this.#held && this.#deps.file.value.some(routine => routine.runs.some(run => run.outcome.kind === "queued"))) console.error(`omp-agents: routine runs wait to start: ${holds}`);
-			this.#held = holds;
-			return;
-		}
-		this.#held = null;
-		await this.#drain();
+		const queued = this.#deps.file.value.some(routine => routine.runs.some(run => run.outcome.kind === "queued"));
+		const holds = queued ? this.#deps.holdsUnattended() : null;
+		this.#hold(holds);
+		if (holds === null) await this.#drain();
+	}
+
+	/** Records why the queued runs wait to start, and has every page hear it once it changed; a drain leaves none queued. */
+	#hold(holds: string | null): void {
+		if (holds === this.#held) return;
+		if (holds !== null) console.error(`omp-agents: routine runs wait to start: ${holds}`);
+		this.#held = holds;
+		this.#deps.onChange();
 	}
 
 	/** Saves the run before anything starts from it, so a crash after the claim loses no slot. */

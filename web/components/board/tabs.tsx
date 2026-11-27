@@ -74,7 +74,7 @@ function TabPage({ view, workspace, core, disabled }: { view: Exclude<BoardView,
 	const slice = workspaceSlice(core, workspace);
 	switch (view.tab) {
 		case "routines":
-			return <RoutinesTab workspace={workspace ?? core.defaultWorkspace} route={view.routine} routines={core.routines} workspaces={core.workspaces} connected={core.connected} />;
+			return <RoutinesTab workspace={workspace ?? core.defaultWorkspace} route={view.routine} routines={core.routines} held={core.held.routines ?? null} workspaces={core.workspaces} connected={core.connected} />;
 		case "pull-requests":
 			return <WorkspacePullRequests workspace={workspace} hosts={slice.hosts} past={slice.past} route={view.page} />;
 		case "memory":

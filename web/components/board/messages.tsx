@@ -141,7 +141,7 @@ function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted =
 	);
 }
 
-/** What a Board task in work shows: shimmering while a session starts or works, in red why its session did not start with how to retry, else in amber what its session waits on you for, then `detail`. */
+/** What a Board task in work shows: shimmering while a session starts or works, in red why its session did not start with how to retry, in muted text why the server holds its start, else in amber what its session waits on you for, then `detail`. */
 function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 	if (work.kind === "failed")
 		return (
@@ -151,6 +151,15 @@ function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 					{work.error}
 				</span>
 				<span className="shrink-0 text-muted-foreground">Reply to try again</span>
+			</span>
+		);
+	if (work.kind === "held")
+		return (
+			<span className="flex min-w-0 items-baseline gap-1.5 text-xs">
+				<span className="shrink-0 font-medium text-muted-foreground">Waiting for memory:</span>
+				<span title={work.reason} className="truncate text-muted-foreground">
+					{work.reason}
+				</span>
 			</span>
 		);
 	const [label, rest] =

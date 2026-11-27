@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cwdsIn, descendants, listeningPortsIn, openPathsIn, ProcessCensus, parseListeners, parsePs, parseSessionFiles, sessionFilesIn, sessionGroups, stopTree } from "./process-census";
+import { cwdsIn, descendants, listeningPortsIn, openPathsIn, ProcessCensus, parseFootprints, parseListeners, parsePs, parseSessionFiles, sessionFilesIn, sessionGroups, stopTree } from "./process-census";
 
 /** omp (100) with an MCP server in its process group, two jobs, and a shared worker it spawned, which has a child of its own. */
 const PS = `
@@ -136,4 +136,9 @@ test("a process's environment names the session file of an omp command, but not 
 	mkdirSync(join(dir, "42"));
 	writeFileSync(join(dir, "42", "environ"), "PATH=/bin\0PI_SESSION_FILE=/s/a/Explorer.jsonl\0");
 	expect(sessionFilesIn(dir, [42, 7])).toEqual(new Map([[42, "/s/a/Explorer.jsonl"]]));
+});
+
+test("parseFootprints reads top's footprint column in its units and skips the header", () => {
+	const text = "Processes: 660 total\nPID    MEM\n35795  4151M\n81246  1247M+\n12  512K\n7  2G-\n";
+	expect(parseFootprints(text)).toEqual(new Map([[35795, 4151 * 1024], [81246, 1247 * 1024], [12, 512], [7, 2 * 1024 ** 2]]));
 });

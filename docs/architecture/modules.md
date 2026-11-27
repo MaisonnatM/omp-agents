@@ -36,7 +36,9 @@ A `ServerModule` has an `id` and four optional parts.
 - `shipped`: the files `scripts/build-desktop-artifact.ts` bundles into a packaged app.
 
 The core reads these through `openModules`, `parseModuleChange`, `moduleInboxes`, `moduleJoins`, `moduleRoutes`, and `SHIPPED_FILES`.
-`ListRegistry` sends each stored module's state as `{ t: "module", id, value }` on the roster topic, after the core's lists.
+`ListRegistry` sends each stored module's state as `{ t: "module", id, value, held }` on the roster topic, after the core's lists.
+`held` is why the module's own unattended work waits to start, such as memory pressure holding the Board's ready Board tasks, read from its `ModuleRun.held()` on the owner and `null` elsewhere; it lives only in memory, never in the module's file.
+A run calls `ModuleRunCore.heldChanged()` when its `held()` changes, which sends every page the module's state again.
 A page changes it with `{ t: "module-change", id, change }`, which `src/server/wire.ts` checks through the module's `parse`.
 Settings › Activity counts every such change as action `module-change`.
 

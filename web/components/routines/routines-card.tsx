@@ -28,12 +28,14 @@ interface RoutinesCardProps {
 	routines: Routine[];
 	/** Every Workspace's routines, where a copy's template is found. */
 	allRoutines: readonly Routine[];
+	/** Why the queued runs wait to start, such as memory pressure; `null` when none waits. */
+	held: string | null;
 	/** The routine whose row is open, `null` for none. */
 	openId: string | null;
 	connected: boolean;
 }
 
-export function RoutinesCard({ workspace, name, routines, allRoutines, openId, connected }: RoutinesCardProps) {
+export function RoutinesCard({ workspace, name, routines, allRoutines, held, openId, connected }: RoutinesCardProps) {
 	const now = useMinute();
 	const runningHere = routines.filter(runsHere).length;
 	return (
@@ -56,7 +58,7 @@ export function RoutinesCard({ workspace, name, routines, allRoutines, openId, c
 					) : (
 						<ul onKeyDown={moveBetweenNames} className="divide-y divide-border">
 							{routines.map(routine => (
-								<RoutineRow key={routine.id} routine={routine} template={templateOf(routine, allRoutines)} open={routine.id === openId} connected={connected} now={now} />
+								<RoutineRow key={routine.id} routine={routine} template={templateOf(routine, allRoutines)} held={held} open={routine.id === openId} connected={connected} now={now} />
 							))}
 						</ul>
 					)}

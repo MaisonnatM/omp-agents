@@ -20,7 +20,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   On **Messages** a long routine message shows its first lines faded out, with **Show more** to read it whole; its Board thread shows it whole.
 - A quiet done, the one line a session leaves when a routine's Board task found nothing to report, adds nothing to the thread's unread count.
 - The **Projects** tab lists its projects in a resizable column at the left, with **Search projects**, **All projects**, which shows the table at the right, and **New project**; open projects come first, archived ones under **Archived**, and the project you pick opens at the right.
-- A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **Starting a session…**, **Working on it…** or what its session waits on you for, **Couldn't start a session** with the reason and **Reply to try again**, or **done**.
+- A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **Starting a session…**, **Waiting for memory:** with the reason while memory pressure holds its start, **Working on it…** or what its session waits on you for, **Couldn't start a session** with the reason and **Reply to try again**, or **done**.
 - Under a message with replies, a line shows who replied, how many replies, its unread count, and when the last came; hovering it adds an arrow and keeps that text in place.
   While its thread has unread replies, the message has a light blue background.
 - Hovering a message shows a toolbar: **Reply in thread** opens its Board thread, the arrow opens the session working on it, and on a Board task not done yet **Close task**, the check mark, marks it done as you.

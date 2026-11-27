@@ -109,7 +109,7 @@ function BoardChannel({ route, core, state, disabled, onChange }: BoardPageProps
 												return (
 													<li key={task.id}>
 														{(!previous || !sameDay(previous.at, task.at)) && <DayDivider at={task.at} />}
-														<TaskMessage state={state} task={task} sessions={core.sessions} open={task.id === thread?.id} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} disabled={disabled} onChange={onChange} />
+														<TaskMessage state={state} task={task} sessions={core.sessions} held={core.held.board ?? null} open={task.id === thread?.id} grouped={!!previous && continues(previous, task)} href={hashForBoard(open, task.id)} disabled={disabled} onChange={onChange} />
 													</li>
 												);
 											})}
@@ -180,10 +180,10 @@ function ChannelIntro({ name }: { name: string }) {
 	);
 }
 
-function TaskMessage({ state, task, sessions, open, grouped, href, disabled, onChange }: { state: BoardState; task: BoardTask; sessions: KnownSessions; open: boolean; grouped: boolean; href: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+function TaskMessage({ state, task, sessions, held, open, grouped, href, disabled, onChange }: { state: BoardState; task: BoardTask; sessions: KnownSessions; held: string | null; open: boolean; grouped: boolean; href: string; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const replies = said(task);
 	const seenMap = useSeen();
-	const work = workOf(state, task, sessions.hosts);
+	const work = workOf(state, task, sessions.hosts, held);
 	const session = task.claim?.sessionId ?? task.start?.sessionId ?? null;
 	const [editing, setEditing] = useState(false);
 	const unread = open ? 0 : unreadOf(task, seenMap[task.id]);
@@ -373,6 +373,7 @@ function Thread({ state, task, reply, session, core, workspace, channel, closeHr
 				reply={reply}
 				follow={follow}
 				sessions={sessions}
+				held={core.held.board ?? null}
 				disabled={disabled}
 				onChange={onChange}
 				onMarkUnread={from => {
@@ -443,8 +444,8 @@ function SessionThreadTabs({ label, thread, close, sessionId, name, view, host, 
 }
 
 /** The **Thread** tab's messages: the Board task, a line with the reply count, then the replies, with reply `reply` (an index of `task.replies`) highlighted, and a working line while the task runs; each reply's **Mark unread** passes how many replies come before it. Of the Board's notes only those `isThreadNote` picks show, between the replies: the merges it ran, a session that did not start, and your closing it. */
-function ThreadMessages({ state, task, reply, follow, sessions, disabled, onChange, onMarkUnread, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onMarkUnread: (from: number) => void; children: ReactNode }) {
-	const work = workOf(state, task, sessions.hosts);
+function ThreadMessages({ state, task, reply, follow, sessions, held, disabled, onChange, onMarkUnread, children }: { state: BoardState; task: BoardTask; reply: number | null; follow: boolean; sessions: KnownSessions; held: string | null; disabled: boolean; onChange: (change: BoardChange) => Promise<void>; onMarkUnread: (from: number) => void; children: ReactNode }) {
+	const work = workOf(state, task, sessions.hosts, held);
 	const replies = said(task);
 	const count = replies.length;
 	let previous: { at: number; by: BoardAuthor } = task;

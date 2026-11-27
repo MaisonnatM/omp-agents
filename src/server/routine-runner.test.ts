@@ -65,6 +65,8 @@ function harness(file: RoutinesFile) {
 		/** Why the Board refuses every change, while set. */
 		refuse: null as string | null,
 		turns: new Map<number, RunTurn>(),
+		/** How many times the runner said the routines, or why their queued runs wait, changed. */
+		changed: 0,
 	};
 	const apply = (change: BoardChange): void => {
 		const result = applyChange(fake.board, change, fake.now);
@@ -80,7 +82,9 @@ function harness(file: RoutinesFile) {
 			return promise;
 		},
 		fullyAwake: async () => fake.awake,
-		onChange: () => {},
+		onChange: () => {
+			fake.changed++;
+		},
 		board: () => fake.board,
 		postBoard(change) {
 			if (fake.refuse !== null) throw new Error(fake.refuse);
@@ -123,6 +127,33 @@ describe("RoutineRunner", () => {
 		fake.holds = null;
 		await runner.tick();
 		expect(file.value[0]?.runs.every(run => run.outcome.kind !== "queued")).toBe(true);
+	});
+
+	test("a held queued run's reason is what the pages hear, until the run starts", async () => {
+		const file = fileWith(routinesPath());
+		const { runner, fake } = harness(file);
+		const reason = "Memory is under pressure, so unattended work waits until it eases.";
+		fake.holds = reason;
+		expect(runner.held()).toBeNull();
+		await runner.tick();
+		expect(runner.held()).toBe(reason);
+		const heard = fake.changed;
+		expect(heard).toBeGreaterThan(0);
+		fake.holds = null;
+		await runner.tick();
+		expect(file.value[0]?.runs.every(run => run.outcome.kind !== "queued")).toBe(true);
+		expect(runner.held()).toBeNull();
+		expect(fake.changed).toBeGreaterThan(heard);
+	});
+
+	test("Run now clears the held reason with the queued runs it drains", async () => {
+		const file = fileWith(routinesPath());
+		const { runner, fake } = harness(file);
+		fake.holds = "Memory is under pressure, so unattended work waits until it eases.";
+		await runner.tick();
+		expect(runner.held()).not.toBeNull();
+		await runner.runNow("r1");
+		expect(runner.held()).toBeNull();
 	});
 
 	test("a due run posts a Board task in the routine's Workspace, as the routine, and records it", async () => {

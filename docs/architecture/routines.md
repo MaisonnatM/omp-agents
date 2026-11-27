@@ -100,6 +100,7 @@ Each tick at a full wake does three things, in order:
 2. It claims each due slot: it saves a new queued run before it starts anything.
    Slots missed while the dashboard was closed or the Mac slept coalesce into one run at the next tick at a full wake.
 3. It starts the queued runs, oldest first, unless memory pressure holds unattended work, which leaves them queued for the next tick; see [Unattended work waits on memory](session-processes.md#unattended-work-waits-on-memory).
+   While it holds them, its `held()` returns the reason, kept only in memory and cleared once the runs start, and the `routines` message carries it as `held`.
    A prompt run posts to the Board of its Workspace through the runner's `postBoard`, which writes it at once and returns the Board task it posted or replied on, the path the Board page and tool take, as the routine author `{ kind: "routine", routineId, name }`, which only the server may post as; see [Board](board.md).
    The post's title is the routine's name, its `launch` the routine's, and its text, from `postText`, the prompt, then the trigger events fenced as data.
    When the routine's newest Board task in its Workspace, the newest one posted there as that routine, is not done, the run replies on it instead, which wakes its session; otherwise it posts a new Board task.
@@ -127,6 +128,7 @@ No command resumes after a restart: the server that owns routines turns each run
 
 A `routine` socket message carries one change: `save`, `remove`, `enable`, or `run-now`, which claims a slot now, whatever the schedules, and drains it.
 Every socket hears the routines after each change and each step of a run as a `routines` message on the roster topic, also sent when a socket opens.
+Its `held` is why the queued runs wait to start, sent only by the owner, else `null`; a routine whose runs include a queued one shows it in place of **Running…**.
 
 ## Triggers
 

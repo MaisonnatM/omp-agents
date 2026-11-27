@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- Settings › Resources now shows what each session really holds, counting memory macOS compressed or moved to swap; an idle session used to look ten times smaller than it is.
+- A Board task or routine run that waits because memory is low now says so on the Board, with the reason, until it starts.
 - Sessions a dashboard can no longer list, such as old Bot conversations, now end on their own 10 minutes after the dashboard starts, instead of holding memory forever. Their conversation stays under Past.
 - Idle private sessions now stop after the same hours as other idle sessions. A notification says so 5 minutes before, because ending a private session deletes it.
 - When the Mac runs low on memory, the dashboard stops idle things one at a time, cheapest first, until memory is fine again. Board tasks and routine runs wait meanwhile. Busy sessions are never stopped, and a session you start yourself is never refused.

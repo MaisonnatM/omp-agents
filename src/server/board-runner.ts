@@ -202,7 +202,7 @@ export class BoardRunner implements ModuleRun {
 	 */
 	#seen: Map<number, ReadUpTo> | null = null;
 	#stopSweep: (() => void) | null = null;
-	/** Why the ready Board tasks wait to start, which the sweep checks again; `null` when none waits on it. */
+	/** Why the ready Board tasks wait to start, which the sweep checks again and every page shows on them; `null` when none waits on it. */
 	#held: string | null = null;
 
 	constructor(state: () => BoardState, apply: (change: BoardChange) => boolean, core: ModuleRunCore) {
@@ -218,6 +218,11 @@ export class BoardRunner implements ModuleRun {
 
 	stop(): void {
 		this.#stopSweep?.();
+		this.#hold(null);
+	}
+
+	held(): string | null {
+		return this.#held;
 	}
 
 	/** Starts what became ready, lands what the user asked to merge, wakes who a new reply is for, and re-prompts who an edit is for; called after every change to the Board. */
@@ -225,7 +230,10 @@ export class BoardRunner implements ModuleRun {
 		const state = this.#state();
 		const seen = this.#seen;
 		this.#seen ??= new Map(state.tasks.map(task => [task.id, readUpTo(task)]));
-		if (!this.#core.owner()) return;
+		if (!this.#core.owner()) {
+			this.#hold(null);
+			return;
+		}
 		this.#seen = new Map(state.tasks.map(task => [task.id, readUpTo(task)]));
 		const ready = unstartedReady(state);
 		// A reply or edit on a Board task about to start, such as the reply that reopened it, reaches its new session through the start prompt, or once its start is recorded.
@@ -236,8 +244,7 @@ export class BoardRunner implements ModuleRun {
 			if (seen && !starting.has(task.id)) this.#deliver(task, seen.get(task.id) ?? { replies: 0, edited: 0 });
 		}
 		const holds = ready.length > 0 ? this.#core.holdsUnattended() : null;
-		if (holds !== null && holds !== this.#held) console.error(`omp-agents: Board tasks wait to start: ${holds}`);
-		this.#held = holds;
+		this.#hold(holds);
 		if (holds !== null) return;
 		for (const task of ready) {
 			// A merge running on the branch, or the last round's session finishing its turn in the worktree, holds the start; each calls this again when it ends.
@@ -410,6 +417,14 @@ export class BoardRunner implements ModuleRun {
 		void sent.then(() => {
 			if (this.#wakes.get(sessionId) === sent) this.#wakes.delete(sessionId);
 		});
+	}
+
+	/** Records why the ready Board tasks wait to start, and has every page hear it once it changed. */
+	#hold(holds: string | null): void {
+		if (holds === this.#held) return;
+		if (holds !== null) console.error(`omp-agents: Board tasks wait to start: ${holds}`);
+		this.#held = holds;
+		this.#core.heldChanged();
 	}
 
 	#change(change: BoardChange): void {
