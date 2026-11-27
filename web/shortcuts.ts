@@ -367,8 +367,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		label: "Review the focused session's changes from its first changed file, while the details sidebar shows its Overview",
 		keys: [{ chord: { key: "g", mod: true, shift: true }, scope: "anywhere" }],
 	},
-	{ id: "moveUp", category: "pull-requests", label: "Move the focused repository, section, or pull request of the pull request list up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
-	{ id: "moveDown", category: "pull-requests", label: "Move the focused repository, section, or pull request of the pull request list down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "moveUp", category: "general", label: "Move the focused Board Workspace, or repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "moveDown", category: "general", label: "Move the focused Board Workspace, or repository, section, or pull request of the pull request list, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 ];
 
 const GO = "g";

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { hashForPage, type Page, type Route, routeFromHash } from "../../routing";
 import type { BoardView } from "./module";
-import { boardPageHash } from "./sidebar";
+import { boardPageHash, inSavedOrder } from "./sidebar";
 
 const workspace = "/Users/me/code";
 const W = "workspace=%2FUsers%2Fme%2Fcode";
@@ -57,5 +57,13 @@ describe("Board addresses", () => {
 		if (route.kind !== "page") throw new Error("no page");
 		expect(routeFromHash(hashForPage(route.page))).toEqual(route);
 		expect(routeFromHash(`#board?${W}&session=s2`)).toEqual(board({ tab: "messages", thread: null }));
+	});
+});
+
+describe("the Board sidebar's Workspace order", () => {
+	const at = (cwd: string) => ({ cwd, cwdDisplay: cwd });
+	test("lists the dragged order first and a Workspace it does not name after, in the sidebar's order", () => {
+		const shown = inSavedOrder([at("/a"), at("/b"), at("/c"), at("/new")], ["/c", "/gone", "/a"]);
+		expect(shown.map(workspace => workspace.cwd)).toEqual(["/c", "/a", "/b", "/new"]);
 	});
 });
