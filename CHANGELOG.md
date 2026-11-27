@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- Your agents now keep a short list of your own words and what you mean by them, and add to it whenever you correct one, so every new session understands you the same way.
 - On the Board, a long message a routine posted now shows its first lines only, with Show more to read the rest.
 - On the Board, a message whose thread has replies you haven't read now has a light blue background.
 

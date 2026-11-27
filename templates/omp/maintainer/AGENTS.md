@@ -54,3 +54,8 @@ When the user pastes a secret, such as an API key, a password, or a database URL
   Check `omp usage` at the start of a long session.
 - Reviews: before marking a PR ready, merging one, a thermonuclear or interface review, or writing or editing a PR description, read `~/.omp/agent/docs/review-workflow.md`.
 - Decisions: when you choose between options that would each work, when the user settles a choice, or before you change code a decision record may cover, read `~/.omp/agent/skills/decision-records/SKILL.md`.
+
+## My words
+
+What the user means by their own words, one line each: `**word**: meaning`, prefixed with `(repo)` when it holds in one repository only.
+When the user corrects what one of their words means, or you find you misread one, add or fix its line here, in `~/.omp/agent/AGENTS.md`, in the same turn and without asking.
