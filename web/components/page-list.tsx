@@ -44,12 +44,15 @@ export function useWidth(ref: RefObject<HTMLElement | null>): number {
 	return width;
 }
 
+/** The name of `page`'s list, which its column's landmark and resize handle read. */
+export const pageListLabel = (page: ListPage): string => (page.kind === "settings" ? "Settings" : TAB_ROWS[page.kind].label);
+
 /**
- * The column at the page's left that holds its {@link PageList}, the full height of the page; drag its right edge to size
- * it. The width the user picked holds for every page, and `max`, what leaves the page beside it its floor, caps it.
+ * The column at the page's left that holds its list, such as a {@link PageList}, the full height of the page; drag its
+ * right edge to size it. The width the user picked holds for every page, and `max`, what leaves the page beside it its
+ * floor, caps it.
  */
-export function PageListColumn({ page, max, children }: { page: ListPage; max: number; children: ReactNode }) {
-	const label = page.kind === "settings" ? "Settings" : TAB_ROWS[page.kind].label;
+export function PageListColumn({ label, max, children }: { label: string; max: number; children: ReactNode }) {
 	const [stored, setStored] = useStoredState("omp-agents.page-list-width", raw => {
 		const value = Number(raw);
 		return value >= COLUMN_MIN && value <= COLUMN_MAX ? value : COLUMN_DEFAULT;

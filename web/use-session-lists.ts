@@ -20,6 +20,8 @@ export interface SessionLists {
 	projects: ProjectGroup[];
 	/** The live and interrupted sessions of `lists` by workspace, as the roster groups them. */
 	groups: WorkspaceGroup[];
+	/** The selected workspace's sessions that match `query` with those in a project kept in their own lists, and their live sessions by workspace: what a Workspace's Sessions tab lists, beside its Projects tab. */
+	byWorkspace: { lists: SidebarSessions; groups: WorkspaceGroup[] };
 	/** The views of `lists`, in the order the sidebar shows them. */
 	listed: View[];
 	/** Live sessions in the selected workspace that wait on your move. */
@@ -51,8 +53,9 @@ export function useSessionLists(
 	const { groups: projects, rest: lists } = useMemo(() => projectGroups(searched, openProjects), [searched, openProjects]);
 	const shownWorkspaces = useMemo(() => (workspace === null ? workspaces : workspaces.filter(({ cwd }) => cwd === workspace)), [workspace, workspaces]);
 	const groups = useMemo(() => workspaceGroups(lists, shownWorkspaces), [lists, shownWorkspaces]);
+	const byWorkspace = useMemo(() => ({ lists: searched, groups: workspaceGroups(searched, shownWorkspaces) }), [searched, shownWorkspaces]);
 	const listed = useMemo(() => listedViews(lists, projects, groups), [lists, projects, groups]);
 	const waiting = useMemo(() => waitingCount(workspaceLists), [workspaceLists]);
 	const latest = useMemo(() => latestSession(workspaceLists), [workspaceLists]);
-	return useMemo(() => ({ pinned, togglePin, query, setQuery, lists, projects, groups, listed, waiting, latest }), [pinned, togglePin, query, lists, projects, groups, listed, waiting, latest]);
+	return useMemo(() => ({ pinned, togglePin, query, setQuery, lists, projects, groups, byWorkspace, listed, waiting, latest }), [pinned, togglePin, query, lists, projects, groups, byWorkspace, listed, waiting, latest]);
 }

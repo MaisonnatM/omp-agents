@@ -51,7 +51,7 @@ export function useSidebarTab({ page, absentTabs, layout, latestSession, workspa
 		(next: SidebarTab | "sessions"): void => {
 			if (next !== "sessions") return navigate(isWebModuleId(next) ? moduleHome(next) : TAB_PAGE[next]);
 			const { layout: panes, latestSession: session, workspace, absentTabs } = latest.current;
-			if (!absentTabs.has("board")) return navigate({ kind: "board", ...BOARD_PAGE.home, workspace, view: { tab: "sessions" } });
+			if (!absentTabs.has("board")) return navigate({ kind: "board", ...BOARD_PAGE.home, workspace, view: { tab: "sessions", session: null } });
 			show(panes.panes.length === 0 && session ? openView(panes, session, "replace") : panes);
 		},
 		[navigate, show],
