@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { SidebarContent } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
-import { workspaceName } from "../../src/shared/workspaces";
 import { withoutHidden, yourMoveCount } from "../pull-requests-model";
 import { useHiddenRepos } from "../pull-requests-state";
 import { pullRequestsStore } from "../reads";
@@ -19,7 +18,7 @@ import { BOARD_PAGE } from "./board/module";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";
-import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { useDashboardStatus } from "./dashboard-context";
 import { PinnedGroup, Roster } from "./roster";
 import { type NavCount, SidebarNav } from "./sidebar-nav";
 
@@ -65,7 +64,6 @@ export const AppSidebar = memo(function AppSidebar({
 	onPickWorkspace,
 	onSearch,
 }: AppSidebarProps) {
-	const { openNewSession } = useDashboardActions();
 	const { connected, pullRequestsScope } = useDashboardStatus();
 	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
 	const [hiddenRepos] = useHiddenRepos();
@@ -75,8 +73,6 @@ export const AppSidebar = memo(function AppSidebar({
 		}),
 		[pullRequestRead, hiddenRepos, visible.hosts],
 	);
-	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
-	const newSessionLabel = selectedWorkspace ? `New session in ${workspaceName(selectedWorkspace.cwdDisplay)}` : "New session";
 	const hasBoard = tabs.includes("board");
 	const pageTabs = useMemo(() => tabs.filter(tab => tab !== "board"), [tabs]);
 	return (
@@ -101,8 +97,6 @@ export const AppSidebar = memo(function AppSidebar({
 				current={row}
 				counts={counts}
 				list={list}
-				newSessionLabel={newSessionLabel}
-				onNewSession={() => openNewSession()}
 				onTab={onTab}
 				settingsRoute={settings}
 				unreadNotices={unreadNotices}
