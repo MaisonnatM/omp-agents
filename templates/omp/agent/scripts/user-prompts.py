@@ -43,6 +43,7 @@ def prompt_text(raw: str) -> str:
 def session_prompts(path: Path, since: datetime):
     title = path.stem
     last_reply = ""
+    cwd = ""
     with path.open(errors="ignore") as lines:
         for line in lines:
             try:
@@ -51,6 +52,8 @@ def session_prompts(path: Path, since: datetime):
                 continue
             if entry.get("type") in ("title", "session") and entry.get("title"):
                 title = entry["title"]
+            if entry.get("type") == "session" and entry.get("cwd"):
+                cwd = entry["cwd"].replace(str(Path.home()), "~")
             if entry.get("customType") == "skill-prompt":
                 message = {"role": "user", "content": entry.get("content", "")}
             else:
@@ -66,7 +69,7 @@ def session_prompts(path: Path, since: datetime):
             at = datetime.fromisoformat(entry.get("timestamp", "1970-01-01T00:00:00Z").replace("Z", "+00:00"))
             text = prompt_text(text_of(message.get("content", "")))
             if at >= since and len(text) > 3 and not text.startswith(SKIP_PREFIXES) and "<irc" not in text:
-                yield at, title, last_reply[-REPLY_TAIL:], text[:PROMPT_MAX]
+                yield at, f"{title} · {cwd}", last_reply[-REPLY_TAIL:], text[:PROMPT_MAX]
 
 
 def main() -> int:

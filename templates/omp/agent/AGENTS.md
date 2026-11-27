@@ -20,5 +20,6 @@ When an instruction file and the code disagree, follow the code and name each mi
 
 ## My words
 
-What the user means by their own words, one line each: `**word**: meaning`, prefixed with `(repo)` when it holds in one repository only.
+What the user means by their own words, one line each: `**word**: meaning`.
+Words that hold in one Workspace only go under a `### <repository folder name>` heading at the end of this section.
 When the user corrects what one of their words means, or you find you misread one, add or fix its line here, in `~/.omp/agent/AGENTS.md`, in the same turn and without asking.
