@@ -10,11 +10,11 @@ test("the foot names why plan usage cannot be read and draws no plan rows", () =
 	const markup = markupOf(<SidebarFoot usage={{ plans: [apiCredits], error: "omp not found" }} />);
 	expect(markup).toContain("Cannot read plan usage: omp not found");
 	expect(markup).not.toContain("API credits");
-	expect(markup).not.toContain("<ul");
+	expect(markup).not.toContain(`aria-label="Plan usage"`);
 });
 
 test("with plan usage not read yet, the foot shows its note and no empty list", () => {
 	const markup = markupOf(<SidebarFoot usage={null} />);
 	expect(markup).toContain("Checking plans…");
-	expect(markup).not.toContain("<ul");
+	expect(markup).not.toContain(`aria-label="Plan usage"`);
 });

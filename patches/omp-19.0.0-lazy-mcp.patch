@@ -1,0 +1,576 @@
+diff --git a/packages/coding-agent/src/mcp/manager.ts b/packages/coding-agent/src/mcp/manager.ts
+index ae1db767ec99d31b464da2f9529a48beb94516d3..ae045db6ad6b007cbfdb5769bd853697c1331ca2 100644
+--- a/packages/coding-agent/src/mcp/manager.ts
++++ b/packages/coding-agent/src/mcp/manager.ts
+@@ -44,8 +44,8 @@ import type { McpConnectionStatusEvent } from "./startup-events";
+ import { resolveMCPStartupTimeoutMs } from "./timeout";
+ 
+ import type { MCPToolDetails } from "@oh-my-pi/pi-tui/tools/mcp";
+-import { DeferredMCPTool, MCPTool, type MCPToolCallObserver } from "./tool-bridge";
+-import type { MCPToolCache } from "./tool-cache";
++import { DeferredMCPTool, type MCPReconnect, MCPTool, type MCPToolCallObserver } from "./tool-bridge";
++import type { MCPToolCache, MCPToolManifest } from "./tool-cache";
+ import type { MCPDroppedServer, MCPTransformContext } from "./transforms";
+ import { setGeneratedHeader } from "./transports/header-policy";
+ import type {
+@@ -63,6 +63,27 @@ import type {
+ } from "./types";
+ import { MCPNotificationMethods } from "./types";
+ 
++/** `1` starts stdio servers on their first call instead of with the session (the omp-agents dashboard sets it). */
++const MCP_LAZY_ENV = "OMP_MCP_LAZY";
++/** Idle time after which a lazily started stdio server stops again; default {@link DEFAULT_LAZY_IDLE_MS}. */
++const MCP_LAZY_IDLE_ENV = "OMP_MCP_LAZY_IDLE_MS";
++const DEFAULT_LAZY_IDLE_MS = 10 * 60_000;
++/** Browser servers outside {@link isBrowserMCPServer}'s list whose pages and logins live in the server process. */
++const STATEFUL_MCP_PATTERN = /chrome-devtools-mcp|obscura/i;
++
++function lazyIdleMs(): number {
++	const raw = Bun.env[MCP_LAZY_IDLE_ENV]?.trim();
++	const parsed = raw ? Number(raw) : Number.NaN;
++	return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_LAZY_IDLE_MS;
++}
++
++/** A server whose process holds session state (a browser), so only the session's end stops it once it served a call. */
++function keepsSessionState(name: string, config: MCPServerConfig): boolean {
++	if (isBrowserMCPServer(name, config)) return true;
++	if (config.type && config.type !== "stdio") return false;
++	return [name, config.command, ...(config.args ?? [])].some(part => STATEFUL_MCP_PATTERN.test(part));
++}
++
+ export type McpCatalogChangeEvent = { serverName: string; kind: "resources" | "prompts" };
+ export type MCPConfigLoader = (cwd: string, options?: LoadMCPConfigsOptions) => Promise<LoadMCPConfigsResult>;
+ 
+@@ -484,6 +505,14 @@ export class MCPManager implements MCPManagerApi {
+ 	#scopedTools = new Map<string, Map<string, Set<MCPToolScope>>>();
+ 	/** Bumped whenever any session's view of the tools may have changed; starts above a worker's empty cache (0). */
+ 	#toolViewsRevision = 1;
++	/** Stdio servers started on first use ({@link MCP_LAZY_ENV}); their tools stay registered while no process runs. */
++	#lazyServers = new Set<string>();
++	/** Lazy servers with no process now; the next call or {@link waitForConnection} starts one. */
++	#lazyStopped = new Set<string>();
++	/** Pending idle stop per connected lazy server. */
++	#idleStops = new Map<string, NodeJS.Timeout>();
++	/** Instructions of each lazy server, kept while it is stopped so the system prompt does not change. */
++	#lazyInstructions = new Map<string, string>();
+ 
+ 	constructor(
+ 		private cwd: string,
+@@ -998,6 +1027,26 @@ export class MCPManager implements MCPManagerApi {
+ 				continue;
+ 			}
+ 
++			// A known lazy stdio server registers its tools from the cached manifest and starts on its first call.
++			if (this.toolCache && Bun.env[MCP_LAZY_ENV]?.trim() === "1" && (!config.type || config.type === "stdio")) {
++				this.#lazyServers.add(name);
++				const epoch = this.#epoch;
++				const manifest =
++					validateServerConfig(name, config).length === 0 ? await this.toolCache.getManifest(name, config) : null;
++				if (
++					manifest &&
++					this.#epoch === epoch &&
++					this.#lazyServers.has(name) &&
++					!this.#connections.has(name) &&
++					!this.#pendingConnections.has(name) &&
++					!this.#pendingToolLoads.has(name) &&
++					!this.#pendingReconnections.has(name)
++				) {
++					this.#registerStoppedServer(name, config, manifest);
++					continue;
++				}
++			}
++
+ 			statusServerNames.push(name);
+ 
+ 			// Validate config
+@@ -1054,6 +1103,10 @@ export class MCPManager implements MCPManagerApi {
+ 					// Re-establish connection if the transport closes (server restart,
+ 					// network interruption).
+ 					connection.transport.onClose = () => {
++						if (this.#lazyServers.has(name)) {
++							void this.#stopLazyServer(name, connection);
++							return;
++						}
+ 						logger.debug("MCP transport lost, triggering reconnect", { path: `mcp:${name}` });
+ 						this.#emitConnectionStatus({ type: "reconnecting", serverName: name });
+ 						void this.reconnectServer(name);
+@@ -1096,13 +1149,15 @@ export class MCPManager implements MCPManagerApi {
+ 					this.#pendingToolLoads.delete(name);
+ 					const reconnect = (options?: { authChallenge?: MCPAuthChallenge }) =>
+ 						this.reconnectServer(name, options);
+-					const customTools = MCPTool.fromTools(connection, serverTools, reconnect, this.#observeToolCall(name));
++					const customTools = this.#connectedTools(name, connection, serverTools, reconnect);
+ 					this.#replaceServerTools(name, customTools);
+ 					await this.#notifyOwnerToolsChanged();
+-					void this.toolCache?.set(name, config, serverTools);
++					void this.toolCache?.set(name, config, serverTools, connection.instructions);
+ 
+ 					notify({ type: "connected", serverName: name });
+-					void this.#loadServerResourcesAndPrompts(name, connection);
++					const loaded = this.#loadServerResourcesAndPrompts(name, connection);
++					// Discovery of a lazy server ends once its manifest is cached: stop it until its first call.
++					if (this.#lazyServers.has(name)) void loaded.then(() => this.#scheduleIdleStop(name, 0));
+ 				})
+ 				.catch(error => {
+ 					// disconnectAll aborted this handshake: torn down, not failed.
+@@ -1154,9 +1209,9 @@ export class MCPManager implements MCPManagerApi {
+ 			if (pendingTasks.length > 0 && this.toolCache) {
+ 				await Promise.all(
+ 					pendingTasks.map(async task => {
+-						const cached = await this.toolCache?.get(task.name, task.config);
++						const cached = await this.toolCache?.getManifest(task.name, task.config);
+ 						if (cached) {
+-							cachedTools.set(task.name, cached);
++							cachedTools.set(task.name, cached.tools);
+ 						}
+ 					}),
+ 				);
+@@ -1178,10 +1233,7 @@ export class MCPManager implements MCPManagerApi {
+ 					const { connection, serverTools } = value;
+ 					connectedServers.add(name);
+ 					const reconnect = () => this.reconnectServer(name);
+-					this.#replaceServerTools(
+-						name,
+-						MCPTool.fromTools(connection, serverTools, reconnect, this.#observeToolCall(name)),
+-					);
++					this.#replaceServerTools(name, this.#connectedTools(name, connection, serverTools, reconnect));
+ 				} else if (task.tracked.status === "rejected") {
+ 					// disconnectAll aborted this handshake inside the startup window: torn down, not failed.
+ 					if (isAbortedHandshake(task.connectSignal, task.tracked.reason)) continue;
+@@ -1251,6 +1303,7 @@ export class MCPManager implements MCPManagerApi {
+ 		return toolCallId => {
+ 			const scope = this.#toolCallScopes.get(toolCallId) ?? OWNER_TOOL_SCOPE;
+ 			this.#inFlightToolCalls.set(name, (this.#inFlightToolCalls.get(name) ?? 0) + 1);
++			this.#clearIdleStop(name);
+ 			return async () => {
+ 				const remaining = (this.#inFlightToolCalls.get(name) ?? 1) - 1;
+ 				if (remaining > 0) this.#inFlightToolCalls.set(name, remaining);
+@@ -1258,10 +1311,111 @@ export class MCPManager implements MCPManagerApi {
+ 				// A `list_changed` sent during the call already started this refresh.
+ 				await this.#toolRefreshes.get(name)?.promise.catch(() => {});
+ 				this.#grantServerTools(name, scope);
++				if (remaining <= 0) this.#scheduleIdleStop(name, this.#idleStopMs(name));
+ 			};
+ 		};
+ 	}
+ 
++	/** Tools of a live connection: bound to it, or for a lazy server resolved per call so they survive its stops. */
++	#connectedTools(
++		name: string,
++		connection: MCPServerConnection,
++		serverTools: MCPToolDefinition[],
++		reconnect: MCPReconnect,
++	): CustomTool<TSchema, MCPToolDetails>[] {
++		if (!this.#lazyServers.has(name)) {
++			return MCPTool.fromTools(connection, serverTools, reconnect, this.#observeToolCall(name));
++		}
++		if (connection.instructions) this.#lazyInstructions.set(name, connection.instructions);
++		else this.#lazyInstructions.delete(name);
++		return DeferredMCPTool.fromTools(
++			name,
++			serverTools,
++			() => this.waitForConnection(name),
++			connection._source,
++			reconnect,
++			this.#observeToolCall(name),
++		);
++	}
++
++	/** Register a lazy server from its cached manifest, with no process. */
++	#registerStoppedServer(name: string, config: MCPServerConfig, manifest: MCPToolManifest): void {
++		this.#forgetLostServer(name);
++		this.#serverConfigs.set(name, config);
++		this.#lazyStopped.add(name);
++		if (manifest.instructions) this.#lazyInstructions.set(name, manifest.instructions);
++		else this.#lazyInstructions.delete(name);
++		const reconnect: MCPReconnect = options => this.reconnectServer(name, options);
++		this.#replaceServerTools(
++			name,
++			DeferredMCPTool.fromTools(
++				name,
++				manifest.tools,
++				() => this.waitForConnection(name),
++				this.#sources.get(name),
++				reconnect,
++				this.#observeToolCall(name),
++			),
++		);
++	}
++
++	/** Start a stopped lazy server; concurrent callers share the start through {@link #pendingReconnections}. */
++	async #startLazyServer(name: string): Promise<MCPServerConnection> {
++		this.#lazyStopped.delete(name);
++		// One quiet attempt: a failing call's own reconnect then runs the retry ladder and reports the failure.
++		const connection = await this.#trackReconnect(name, this.#doReconnect(name, { scheduled: true }));
++		if (connection) return connection;
++		if (this.#lazyServers.has(name) && this.#serverConfigs.has(name) && !this.#connections.has(name)) {
++			this.#lazyStopped.add(name);
++		}
++		throw new Error(this.#describeNotConnected(name));
++	}
++
++	/** Idle wait before a lazy server stops; none for one that keeps session state. */
++	#idleStopMs(name: string): number | undefined {
++		const config = this.#serverConfigs.get(name);
++		if (!config || keepsSessionState(name, config)) return undefined;
++		return lazyIdleMs();
++	}
++
++	#clearIdleStop(name: string): void {
++		clearTimeout(this.#idleStops.get(name));
++		this.#idleStops.delete(name);
++	}
++
++	/** Stop lazy server `name` after `delayMs` with no call running; `undefined` keeps it running. */
++	#scheduleIdleStop(name: string, delayMs: number | undefined): void {
++		this.#clearIdleStop(name);
++		if (delayMs === undefined || !this.#lazyServers.has(name) || this.#inFlightToolCalls.has(name)) return;
++		const timer = setTimeout(() => {
++			if (this.#idleStops.get(name) !== timer) return;
++			this.#idleStops.delete(name);
++			const connection = this.#connections.get(name);
++			if (!connection || this.#inFlightToolCalls.has(name) || this.#toolRefreshes.has(name)) return;
++			void this.#stopLazyServer(name, connection);
++		}, delayMs);
++		timer.unref();
++		this.#idleStops.set(name, timer);
++	}
++
++	/**
++	 * End a lazy server's process and keep its tools, which start it again on their next call. Also the
++	 * transport-close path, so a server that exits or is killed is not respawned until something needs it.
++	 */
++	async #stopLazyServer(name: string, connection: MCPServerConnection): Promise<void> {
++		this.#clearIdleStop(name);
++		if (this.#connections.get(name) !== connection) return;
++		const uris = this.#subscribedResources.get(name);
++		if (uris && uris.size > 0) void unsubscribeFromResources(connection, [...uris]).catch(() => {});
++		this.#subscribedResources.delete(name);
++		this.#pendingResourceRefresh.delete(name);
++		this.#lazyStopped.add(name);
++		logger.debug("MCP server stopped until its next call", { path: `mcp:${name}` });
++		await this.#discardConnection(name, connection).catch(() => {});
++		// Its prompts went with the connection; drop the stale prompt commands.
++		if (connection.prompts?.length) this.#onPromptsChanged?.(name);
++	}
++
+ 	/** Let `scope` see every tool `name` serves; notify it when that changed its view. */
+ 	#grantServerTools(name: string, scope: MCPToolScope): void {
+ 		const scoped = this.#scopedTools.get(name);
+@@ -1455,7 +1609,7 @@ export class MCPManager implements MCPManagerApi {
+ 				this.#pendingReconnections.has(name)
+ 			) {
+ 				status.pending.push(name);
+-			} else if (this.#connections.get(name)?.tools !== undefined) {
++			} else if (this.#connections.get(name)?.tools !== undefined || this.#lazyStopped.has(name)) {
+ 				status.connected.push(name);
+ 			} else {
+ 				status.failed.push({
+@@ -1553,6 +1707,7 @@ export class MCPManager implements MCPManagerApi {
+ 			const result = await reconnecting;
+ 			if (result) return result;
+ 		}
++		if (this.#lazyStopped.has(name)) return this.#startLazyServer(name);
+ 		throw new Error(this.#describeNotConnected(name));
+ 	}
+ 
+@@ -1669,6 +1824,10 @@ export class MCPManager implements MCPManagerApi {
+ 		this.#forgetLostServer(name);
+ 		this.#callProvokedToolRefreshes.delete(name);
+ 		this.#scopedTools.delete(name);
++		this.#clearIdleStop(name);
++		this.#lazyServers.delete(name);
++		this.#lazyStopped.delete(name);
++		this.#lazyInstructions.delete(name);
+ 
+ 		const connection = this.#connections.get(name);
+ 
+@@ -1708,6 +1867,11 @@ export class MCPManager implements MCPManagerApi {
+ 		this.#connectAbort.abort();
+ 		this.#connectAbort = new AbortController();
+ 		for (const name of this.#lostRemoteServers.keys()) this.#forgetLostServer(name);
++		for (const timer of this.#idleStops.values()) clearTimeout(timer);
++		this.#idleStops.clear();
++		this.#lazyServers.clear();
++		this.#lazyStopped.clear();
++		this.#lazyInstructions.clear();
+ 		const promises = Array.from(this.#connections, ([name, connection]) => this.#discardConnection(name, connection));
+ 		await Promise.allSettled(promises);
+ 
+@@ -2001,9 +2165,14 @@ export class MCPManager implements MCPManagerApi {
+ 		}
+ 
+ 		this.#connections.set(name, connection);
++		this.#lazyStopped.delete(name);
+ 
+ 		this.#wireAuthRefresh(connection, config);
+ 		connection.transport.onClose = () => {
++			if (this.#lazyServers.has(name)) {
++				void this.#stopLazyServer(name, connection);
++				return;
++			}
+ 			logger.debug("MCP transport lost, triggering reconnect", { path: `mcp:${name}` });
+ 			this.#emitConnectionStatus({ type: "reconnecting", serverName: name });
+ 			void this.reconnectServer(name);
+@@ -2011,11 +2180,12 @@ export class MCPManager implements MCPManagerApi {
+ 		try {
+ 			const serverTools = await listTools(connection);
+ 			const reconnect = (options?: { authChallenge?: MCPAuthChallenge }) => this.reconnectServer(name, options);
+-			const customTools = MCPTool.fromTools(connection, serverTools, reconnect, this.#observeToolCall(name));
+-			void this.toolCache?.set(name, config, serverTools);
++			const customTools = this.#connectedTools(name, connection, serverTools, reconnect);
++			void this.toolCache?.set(name, config, serverTools, connection.instructions);
+ 			this.#replaceServerTools(name, customTools);
+ 			this.#notifyOwnerToolsChanged().catch(error => logger.debug("MCP tools-changed handler failed", { error }));
+ 			void this.#loadServerResourcesAndPrompts(name, connection);
++			this.#scheduleIdleStop(name, this.#idleStopMs(name));
+ 			return connection;
+ 		} catch (error) {
+ 			// Detach synchronously and close in the background so a slow close
+@@ -2108,9 +2278,9 @@ export class MCPManager implements MCPManagerApi {
+ 			throw error;
+ 		}
+ 		const reconnect = () => this.reconnectServer(name);
+-		const customTools = MCPTool.fromTools(connection, serverTools, reconnect, this.#observeToolCall(name));
++		const customTools = this.#connectedTools(name, connection, serverTools, reconnect);
+ 		if (callProvoked) this.#scopeAddedTools(name, customTools);
+-		void this.toolCache?.set(name, connection.config, serverTools);
++		void this.toolCache?.set(name, connection.config, serverTools, connection.instructions);
+ 
+ 		// Replace tools from this server
+ 		this.#replaceServerTools(name, customTools);
+@@ -2314,6 +2484,10 @@ export class MCPManager implements MCPManagerApi {
+ 				instructions.push([name, connection.instructions]);
+ 			}
+ 		}
++		for (const name of this.#lazyStopped) {
++			const text = this.#lazyInstructions.get(name);
++			if (text && this.#serverConfigs.get(name)?.instructions !== false) instructions.push([name, text]);
++		}
+ 		instructions.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+ 		return new Map(instructions);
+ 	}
+diff --git a/packages/coding-agent/src/mcp/tool-cache.ts b/packages/coding-agent/src/mcp/tool-cache.ts
+index cbfe1e5383dfebe60edf516cc2ddea8e2dc7bb47..594889585cafda7dce7a561f29945511bd0588b2 100644
+--- a/packages/coding-agent/src/mcp/tool-cache.ts
++++ b/packages/coding-agent/src/mcp/tool-cache.ts
+@@ -1,7 +1,8 @@
+ /**
+  * MCP tool cache.
+  *
+- * Stores tool definitions per server in agent.db for fast startup.
++ * Stores each server's tool manifest (tool definitions and instructions) in agent.db, keyed by
++ * server name and checked against a hash of its config, for fast startup and lazy stdio servers.
+  */
+ import { isRecord, logger, stableStringifyJson } from "@oh-my-pi/pi-utils";
+ import type { AgentStorageApi } from "../session/agent-storage";
+@@ -11,10 +12,16 @@ const CACHE_VERSION = 1;
+ const CACHE_PREFIX = "mcp_tools:";
+ const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+ 
+-type MCPToolCachePayload = {
++/** What a server's last `initialize` and `tools/list` reported. */
++export type MCPToolManifest = {
++	tools: MCPToolDefinition[];
++	/** Server instructions; absent in entries written before they were cached. */
++	instructions?: string;
++};
++
++type MCPToolCachePayload = MCPToolManifest & {
+ 	version: number;
+ 	configHash: string;
+-	tools: MCPToolDefinition[];
+ };
+ 
+ function hashConfig(config: MCPServerConfig): string {
+@@ -28,7 +35,7 @@ function cacheKey(serverName: string): string {
+ export class MCPToolCache {
+ 	constructor(private storage: AgentStorageApi) {}
+ 
+-	async get(serverName: string, config: MCPServerConfig): Promise<MCPToolDefinition[] | null> {
++	async getManifest(serverName: string, config: MCPServerConfig): Promise<MCPToolManifest | null> {
+ 		const key = cacheKey(serverName);
+ 		const raw = this.storage.getCache(key);
+ 		if (!raw) return null;
+@@ -56,10 +63,16 @@ export class MCPToolCache {
+ 
+ 		if (parsed.configHash !== currentHash) return null;
+ 
+-		return parsed.tools as MCPToolDefinition[];
++		const tools = parsed.tools as MCPToolDefinition[];
++		return typeof parsed.instructions === "string" ? { tools, instructions: parsed.instructions } : { tools };
+ 	}
+ 
+-	async set(serverName: string, config: MCPServerConfig, tools: MCPToolDefinition[]): Promise<void> {
++	async set(
++		serverName: string,
++		config: MCPServerConfig,
++		tools: MCPToolDefinition[],
++		instructions?: string,
++	): Promise<void> {
+ 		let configHash: string;
+ 		try {
+ 			configHash = hashConfig(config);
+@@ -72,6 +85,7 @@ export class MCPToolCache {
+ 			version: CACHE_VERSION,
+ 			configHash,
+ 			tools,
++			instructions,
+ 		};
+ 
+ 		let serialized: string;
+diff --git a/packages/coding-agent/test/mcp-lazy-stdio.test.ts b/packages/coding-agent/test/mcp-lazy-stdio.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8796d997f91ce66f11e4b2b13b211b8040e7aeb7
+--- /dev/null
++++ b/packages/coding-agent/test/mcp-lazy-stdio.test.ts
+@@ -0,0 +1,149 @@
++/**
++ * With `OMP_MCP_LAZY=1`, a stdio server runs only while something uses it: a server
++ * seen before registers its tools from the cached manifest with no process, its first
++ * call starts it, and it stops again once idle. A server never seen before is
++ * discovered once (connect, list, cache, stop).
++ */
++import { afterEach, beforeEach, describe, expect, it } from "bun:test";
++import * as fs from "node:fs";
++import * as os from "node:os";
++import * as path from "node:path";
++import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
++import type { CustomToolContext } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
++import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp/manager";
++import { MCPToolCache } from "@oh-my-pi/pi-coding-agent/mcp/tool-cache";
++import type { MCPStdioServerConfig } from "@oh-my-pi/pi-coding-agent/mcp/types";
++import type { AgentStorageApi } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
++import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
++import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
++import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
++import { SERVER_INSTRUCTIONS, TOOL_RESULT } from "./fixtures/instructions-mcp";
++
++const SERVER = "lazy";
++const config: MCPStdioServerConfig = {
++	type: "stdio",
++	command: process.execPath,
++	args: [path.join(import.meta.dir, "fixtures", "instructions-mcp.ts")],
++};
++
++function memoryCache(): MCPToolCache {
++	const entries = new Map<string, string>();
++	const storage = {
++		getCache: (key: string) => entries.get(key) ?? null,
++		setCache: (key: string, value: string) => void entries.set(key, value),
++	} as unknown as AgentStorageApi;
++	return new MCPToolCache(storage);
++}
++
++async function waitFor(predicate: () => boolean): Promise<boolean> {
++	const deadline = Date.now() + 10_000;
++	while (!predicate()) {
++		if (Date.now() >= deadline) return false;
++		await Bun.sleep(10);
++	}
++	return true;
++}
++
++describe("lazy stdio MCP servers", () => {
++	const saved = { lazy: Bun.env.OMP_MCP_LAZY, idle: Bun.env.OMP_MCP_LAZY_IDLE_MS };
++	let workDir: string;
++	let auth: AuthStorage;
++	let context: CustomToolContext;
++	const managers: MCPManager[] = [];
++
++	beforeEach(async () => {
++		Bun.env.OMP_MCP_LAZY = "1";
++		Bun.env.OMP_MCP_LAZY_IDLE_MS = "200";
++		workDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-mcp-lazy-"));
++		auth = await AuthStorage.create(":memory:");
++		context = {
++			sessionManager: SessionManager.inMemory(),
++			modelRegistry: new ModelRegistry(auth),
++			model: undefined,
++			isIdle: () => true,
++			hasQueuedMessages: () => false,
++			abort: () => {},
++		};
++	});
++
++	afterEach(async () => {
++		for (const manager of managers) await manager.disconnectAll();
++		managers.length = 0;
++		auth.close();
++		removeSyncWithRetries(workDir);
++		for (const [key, value] of [
++			["OMP_MCP_LAZY", saved.lazy],
++			["OMP_MCP_LAZY_IDLE_MS", saved.idle],
++		] as const) {
++			if (value === undefined) delete Bun.env[key];
++			else Bun.env[key] = value;
++		}
++	});
++
++	function manager(cache: MCPToolCache): MCPManager {
++		const created = new MCPManager(workDir, cache);
++		managers.push(created);
++		return created;
++	}
++
++	it("discovers a new server once, then starts it on its first call and stops it when idle", async () => {
++		const cache = memoryCache();
++		const first = manager(cache);
++		await first.connectServers({ [SERVER]: config }, {}, undefined, 0);
++		expect(first.getTools().map(tool => tool.mcpServerName)).toEqual([SERVER]);
++		// Discovery ends with the server stopped and its manifest cached.
++		expect(await waitFor(() => first.getConnection(SERVER) === undefined)).toBe(true);
++		expect(await cache.getManifest(SERVER, config)).toMatchObject({ instructions: SERVER_INSTRUCTIONS });
++
++		const second = manager(cache);
++		await second.connectServers({ [SERVER]: config }, {}, undefined, 0);
++		expect(second.getConnection(SERVER)).toBeUndefined();
++		expect((await second.waitForStartup(0)).connected).toEqual([SERVER]);
++		expect(second.getServerInstructions().get(SERVER)).toBe(SERVER_INSTRUCTIONS);
++
++		const [tool] = second.getTools();
++		const result = await tool!.execute("call-1", {}, undefined, context);
++		expect(result.content).toEqual([{ type: "text", text: TOOL_RESULT }]);
++		expect(second.getConnection(SERVER)).toBeDefined();
++		expect(second.getServerInstructions().get(SERVER)).toBe(SERVER_INSTRUCTIONS);
++
++		expect(await waitFor(() => second.getConnection(SERVER) === undefined)).toBe(true);
++		expect(second.getTools()).toHaveLength(1);
++		expect(second.getServerInstructions().get(SERVER)).toBe(SERVER_INSTRUCTIONS);
++
++		// A call after the idle stop starts it again.
++		const again = await second.getTools()[0]!.execute("call-2", {}, undefined, context);
++		expect(again.content).toEqual([{ type: "text", text: TOOL_RESULT }]);
++	}, 20_000);
++
++	it("keeps a browser server running after its first call", async () => {
++		const browser: MCPStdioServerConfig = { ...config, args: [...config.args!, "--chrome-devtools-mcp"] };
++		const cache = memoryCache();
++		await manager(cache).connectServers({ [SERVER]: browser }, {}, undefined, 0);
++		const session = manager(cache);
++		await session.connectServers({ [SERVER]: browser }, {}, undefined, 0);
++		await session.getTools()[0]!.execute("call-1", {}, undefined, context);
++		// The subject is a real idle timer against a subprocess fixture: wait past OMP_MCP_LAZY_IDLE_MS.
++		await Bun.sleep(500);
++		expect(session.getConnection(SERVER)).toBeDefined();
++	}, 20_000);
++
++	it("respawns nothing when a started server exits", async () => {
++		const cache = memoryCache();
++		await manager(cache).connectServers({ [SERVER]: config }, {}, undefined, 0);
++		const session = manager(cache);
++		await session.connectServers({ [SERVER]: config }, {}, undefined, 0);
++		await session.getTools()[0]!.execute("call-1", {}, undefined, context);
++		session.getConnection(SERVER)?.transport.onClose?.();
++		// An eager server would be "connecting" here: reconnectServer registers its attempt synchronously.
++		expect(session.getConnectionStatus(SERVER)).toBe("disconnected");
++		expect(session.getTools()).toHaveLength(1);
++	}, 20_000);
++
++	it("connects eagerly without OMP_MCP_LAZY", async () => {
++		delete Bun.env.OMP_MCP_LAZY;
++		const session = manager(memoryCache());
++		await session.connectServers({ [SERVER]: config }, {}, undefined, 0);
++		expect(session.getConnection(SERVER)).toBeDefined();
++	}, 20_000);
++});
