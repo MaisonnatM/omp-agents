@@ -1,7 +1,8 @@
 import type { DashboardState } from "../dashboard-state";
+import { MemoryCard } from "./memory-card";
 import { NO_PLANS, PlanNote, PlanTiles } from "./plan-usage";
 
-/** The sidebar's foot: the note on plan usage, then one bar row per plan account. */
+/** The sidebar's foot: the note on plan usage, one bar row per plan account, then this Mac's memory. */
 export function SidebarFoot({ usage }: { usage: DashboardState["usage"] }) {
 	const plans = usage?.error === null ? usage.plans : NO_PLANS;
 	return (
@@ -12,6 +13,9 @@ export function SidebarFoot({ usage }: { usage: DashboardState["usage"] }) {
 					<PlanTiles plans={plans} />
 				</ul>
 			)}
+			<ul aria-label="Memory" className="flex flex-col gap-0.5">
+				<MemoryCard />
+			</ul>
 		</footer>
 	);
 }

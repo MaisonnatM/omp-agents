@@ -22,6 +22,7 @@ A Bot's conversation already stops itself after 24 hours idle (`Bots.stopIdle`) 
 - End the live session through `DashboardSession.end`, as a Bot's idle stop does: the keeper stops omp and the processes under it, the exit reports as ended, and nothing of `session-end.ts` runs. Chosen.
 - Defaults of 4, 24, or 72 hours: 4 stops sessions mid-afternoon; 24, the Bots' stop, and 72 leave forgotten sessions running a day or more. The user picked 12 hours, which clears a session left overnight, with the others offered.
 - Stop every live session: a terminal session runs in the user's terminal, a private session's end deletes it, and a Bot's conversation has its own stop. Only sessions this server started, neither private nor a Bot's conversation, stop.
+  [A private session ends at the idle hours after a notice](2026-11-27-a-private-session-ends-at-the-idle-hours-after-a-notice.md) supersedes the private exclusion.
 
 ## Consequences
 

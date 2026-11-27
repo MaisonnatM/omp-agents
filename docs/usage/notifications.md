@@ -26,6 +26,7 @@
       A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
   - **Sessions**: the sessions the dashboard started that stopped mid-turn, working or waiting on a question, without **Archive session**, as one notice, **2 sessions stopped mid-turn**, that names them as the sidebar's past sessions do.
     They are the interrupted sessions of the sessions sidebar whose turn ran, checked as the dashboard starts, every minute, and each time one stops, resumes, or moves to past.
+    A private session the idle session stop deletes within five minutes gets its own notice, with when it goes; sending it a message keeps it.
   - **Routines**: the routine runs that errored, as one notice, **2 routine runs errored**, that names each routine.
     The dashboard that runs the routines checks the runs of the last day once a day and as it starts; see [Routines](routines.md).
 - **All**, **GitHub**, **Slack**, **Providers**, **Sessions**, **Routines**, and **Updates** filter the list, each but **All** with its source's logo and each with its count of unread notices.

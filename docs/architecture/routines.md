@@ -99,7 +99,7 @@ Each tick at a full wake does three things, in order:
 1. It posts the command reports held since a command ended outside a full wake.
 2. It claims each due slot: it saves a new queued run before it starts anything.
    Slots missed while the dashboard was closed or the Mac slept coalesce into one run at the next tick at a full wake.
-3. It starts the queued runs, oldest first.
+3. It starts the queued runs, oldest first, unless memory pressure holds unattended work, which leaves them queued for the next tick; see [Unattended work waits on memory](session-processes.md#unattended-work-waits-on-memory).
    A prompt run posts to the Board of its Workspace through the runner's `postBoard`, which writes it at once and returns the Board task it posted or replied on, the path the Board page and tool take, as the routine author `{ kind: "routine", routineId, name }`, which only the server may post as; see [Board](board.md).
    The post's title is the routine's name, its `launch` the routine's, and its text, from `postText`, the prompt, then the trigger events fenced as data.
    When the routine's newest Board task in its Workspace, the newest one posted there as that routine, is not done, the run replies on it instead, which wakes its session; otherwise it posts a new Board task.

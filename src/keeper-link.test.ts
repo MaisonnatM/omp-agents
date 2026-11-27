@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { join } from "node:path";
-import { attachKeeper, type KeeperLink, listKeepers, startKeeper } from "./keeper-link";
+import { attachKeeper, type KeeperLink, listAllKeepers, listKeepers, startKeeper } from "./keeper-link";
 import { STOP } from "./keeper-wire";
 import { rpc, rpcFrameFile, utils } from "./omp/modules";
 import type { RpcHostTool } from "./omp/module-types/rpc";
@@ -305,5 +305,29 @@ server.listen(${JSON.stringify(join(dir, "s1.sock"))}, () => {
 		expect(listKeepers(dir)).toEqual(["s1"]);
 		await expect(attachKeeper(dir, "s1")).rejects.toThrow();
 		expect(readdirSync(dir).sort()).toEqual(["omp.ts"]);
+	});
+});
+
+describe("listAllKeepers", () => {
+	test("lists every port's keeper whose process runs, private when its port's private directory holds its session, and skips a dead or unrecorded pid", () => {
+		const sessions = scratch();
+		const privates = scratch();
+		const keeper = (port: string, id: string, pid: string | null) => {
+			mkdirSync(join(sessions, port), { recursive: true });
+			writeFileSync(join(sessions, port, `${id}.sock`), "");
+			if (pid !== null) writeFileSync(join(sessions, port, `${id}.pid`), pid);
+		};
+		keeper("4317", "mine", String(process.pid));
+		keeper("4400", "secret", String(process.pid));
+		keeper("4400", "dead", "999999");
+		keeper("4400", "unrecorded", null);
+		keeper("not-a-port", "odd", String(process.pid));
+		mkdirSync(join(privates, "4400", "secret"), { recursive: true });
+		mkdirSync(join(privates, "4317", "secret"), { recursive: true });
+		const found = listAllKeepers(sessions, privates).map(({ port, instanceId, keeperPid, private: isPrivate }) => ({ port, instanceId, keeperPid, private: isPrivate }));
+		expect(found.toSorted((a, b) => a.port - b.port)).toEqual([
+			{ port: 4317, instanceId: "mine", keeperPid: process.pid, private: false },
+			{ port: 4400, instanceId: "secret", keeperPid: process.pid, private: true },
+		]);
 	});
 });

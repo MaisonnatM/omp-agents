@@ -8,7 +8,7 @@ import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, yourMoves } from "../shared/moves";
 import type { DashboardNews, DashboardUpdateOutcome } from "../shared/dashboard-update";
 import type { PlanUsage } from "../shared/models";
-import type { CreditsSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
+import type { CreditsSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, PrivateDeleting, StoppedSession, UpdateSubject } from "../shared/notices";
 import { usesClause } from "../shared/notices";
 import type { RebaseStop } from "../shared/keep-rebased";
 import type { ErroredRun } from "../routine-health";
@@ -44,6 +44,8 @@ export interface NoticeSources {
 	erroredRuns(): Promise<ErroredRun[]>;
 	/** The rebases **Keep rebased** stopped, which it does not try again until the pull request's head or its base moves. */
 	rebaseStops(): RebaseStop[];
+	/** The private sessions the idle session stop deletes within five minutes. */
+	privateDeletes(): PrivateDeleting[];
 	now(): number;
 }
 
@@ -61,6 +63,9 @@ export const STOPPED_KINDS = ["stopped"] as const satisfies readonly NoticeKind[
 export const HEALTH_KINDS = ["routine-health"] as const satisfies readonly NoticeKind[];
 /** The kinds the **Keep rebased** check looks for. */
 export const REBASE_KINDS = ["rebase-stopped"] as const satisfies readonly NoticeKind[];
+
+/** The kinds the idle session stop's check looks for. */
+export const PRIVATE_KINDS = ["private-deleting"] as const satisfies readonly NoticeKind[];
 
 const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
@@ -109,6 +114,7 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	stopped: "sessions that stopped mid-turn",
 	"routine-health": "routine runs that errored",
 	"rebase-stopped": "rebases Keep rebased stopped",
+	"private-deleting": "private sessions about to be deleted",
 };
 
 /**
@@ -327,6 +333,11 @@ export class Notices {
 				return all(
 					this.#sources.rebaseStops().map(stop => ({ id: `rebase-stopped:${prKey(stop)}:${stop.head}:${stop.base}`, ...stop, kind: "rebase-stopped" as const })),
 					true,
+				);
+			case "private-deleting":
+				return all(
+					this.#sources.privateDeletes().map(each => ({ id: `private-deleting:${each.sessionId}:${each.deletesAt}`, at: this.#sources.now(), kind: "private-deleting" as const, ...each })),
+					false,
 				);
 		}
 	}

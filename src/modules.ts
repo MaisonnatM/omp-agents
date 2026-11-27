@@ -72,6 +72,8 @@ export interface ModuleRunCore {
 	landable(workspace: string): boolean;
 	/** Whether this server runs the unattended work, the one that may start and wake sessions. */
 	owner(): boolean;
+	/** Why unattended work waits now, such as memory pressure; `null` when a Board task may start. */
+	holdsUnattended(): string | null;
 	now(): number;
 }
 

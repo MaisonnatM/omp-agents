@@ -26,6 +26,7 @@ import type { ReviewDrafts } from "./review-drafts";
 import type { RouteEnv } from "./routes";
 import type { SelfUpdate } from "./self-update";
 import type { SessionFiles } from "./session-files";
+import type { ResourceHistory } from "./resource-history";
 import type { SessionProcessWatch } from "./session-processes";
 import type { WorkspacesFile } from "./workspaces-file";
 
@@ -53,6 +54,7 @@ export interface DashboardRouteParts {
 	activity: ActivityStore;
 	processWatch: SessionProcessWatch;
 	processSettings: ProcessSettingsFile;
+	resourceHistory: ResourceHistory;
 	/** The workspaces sessions count in: live ones first, then saved ones newest first. */
 	knownWorkspaces(): string[];
 	/** The known workspaces and the ones Settings added, without the hidden ones. */
@@ -61,7 +63,7 @@ export interface DashboardRouteParts {
 
 /** The HTTP API's env over `parts`, admitted by `guards`; `build` is what the server serves. */
 export function dashboardRouteEnv(parts: DashboardRouteParts, guards: Guards, build: ServedBuild, phoneAccess: PhoneAccessRoutesEnv): RouteEnv {
-	const { files, sessions, broadcasts, lists, sourceControl, mergeQueue, reviewDrafts, selfUpdate, processWatch, processSettings } = parts;
+	const { files, sessions, broadcasts, lists, sourceControl, mergeQueue, reviewDrafts, selfUpdate, processWatch, processSettings, resourceHistory } = parts;
 	return {
 		guards,
 		modules: { workspaces: () => parts.workspaceCwds() },
@@ -115,6 +117,8 @@ export function dashboardRouteEnv(parts: DashboardRouteParts, guards: Guards, bu
 		processes: {
 			list: () => processWatch.list(),
 			stop: ({ instanceId, id }) => processWatch.stop(instanceId, id),
+			resources: () => processWatch.view(),
+			history: hours => resourceHistory.read(hours),
 			startServer: async instanceId => {
 				const session = sessions.get(instanceId);
 				if (!session) throw new Error("That session no longer runs.");

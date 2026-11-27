@@ -56,6 +56,8 @@ function harness(file: RoutinesFile) {
 		now: T0 + HOUR,
 		/** Whether the Mac is fully awake rather than in a dark wake. */
 		awake: true,
+		/** Why unattended work waits, while set. */
+		holds: null as string | null,
 		execs: [] as FakeExec[],
 		board: emptyBoard() as BoardState,
 		/** Each change the runner applied to the Board. */
@@ -87,6 +89,7 @@ function harness(file: RoutinesFile) {
 			return change.op === "reply" ? change.task : fake.board.tasks.at(-1)!.id;
 		},
 		turnOf: task => fake.turns.get(task) ?? null,
+		holdsUnattended: () => fake.holds,
 	});
 	/** Marks Board task `task` done, as its session would. */
 	const done = (task: number): void => {
@@ -108,6 +111,20 @@ function settled(): Promise<void> {
 }
 
 describe("RoutineRunner", () => {
+	test("a due run waits queued while unattended work waits, and starts at the first tick after; Run now does not wait", async () => {
+		const file = fileWith(routinesPath());
+		const { runner, fake } = harness(file);
+		fake.holds = "Memory is under pressure, so unattended work waits until it eases.";
+		await runner.tick();
+		expect(fake.changes).toEqual([]);
+		expect(file.value[0]?.runs.map(run => run.outcome.kind)).toEqual(["queued"]);
+		await runner.runNow("r1");
+		expect(fake.changes.map(change => change.op)).toEqual(["post"]);
+		fake.holds = null;
+		await runner.tick();
+		expect(file.value[0]?.runs.every(run => run.outcome.kind !== "queued")).toBe(true);
+	});
+
 	test("a due run posts a Board task in the routine's Workspace, as the routine, and records it", async () => {
 		const file = fileWith(routinesPath());
 		file.apply({ op: "save", routine: { ...file.value[0]!, launch: { model: { provider: "anthropic", id: "claude" }, thinking: "high", skill: null } } }, T0);

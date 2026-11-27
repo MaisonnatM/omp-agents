@@ -49,7 +49,7 @@
   It never shows under the past sessions, never resumes, and cannot be forked, and omp's memory and autolearn stay off for it.
   While it is on, the pill fills dark, the composer gets a dark outline, and the page shows under it what ending deletes and what stays: files it changes and commits it makes stay in the project.
   A private session shows a dark **Private** chip in its sidebar row and its header.
-  It ends when its omp process stops, whether through **Archive session**, `end_session`, or a crash; a dashboard that was not running then deletes it at its next start.
+  It ends when its omp process stops, whether through **Archive session**, `end_session`, the idle session stop after **Stop idle sessions** in [Settings](settings.md) with a notice five minutes before, or a crash; a dashboard that was not running then deletes it at its next start.
 - When a scheduled start's directory is in a git checkout, a branch picker sits after the directory picker; a new session's draft shows none and runs on the checked-out branch.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.

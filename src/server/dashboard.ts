@@ -20,7 +20,7 @@ import { ompSandboxes } from "../omp/isolation";
 import { keptSessions } from "../omp/rpc";
 import { renameSessionFile } from "../omp/sessions";
 import { listPrice, stopStats } from "../omp/stats";
-import { activityDb, endedWorktreesFile, HOME, interruptedFile, keepRebasedFile, machineFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, workspaceFor, workspacesFile } from "../paths";
+import { activityDb, endedWorktreesFile, HOME, interruptedFile, keepRebasedFile, machineFile, noticesFile, oldWorkspacesFile, pinsFile, preferencesFile, privateSessionsDir, processesFile, projectTrustFile, pullRequestWatchesFile, resourcesDir, reviewDraftsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, settingsSyncFile, settingsSyncRepo, sourceControlFile, workspaceFor, workspacesFile } from "../paths";
 import { type ModuleChanges, type ModuleRun, isStoredModuleId, moduleJoins, openModules, type StoredModuleId } from "../modules";
 import { listReviewComments, listReviews, postReview, readReviewTarget, viewerLogin } from "../pull-request-review";
 import { worktreeAt } from "../git";
@@ -46,7 +46,8 @@ import { liveUpdateHandler } from "./live-update";
 import { Loops, repeat } from "./loops";
 import type { MergeCleanup } from "./merge-cleanup";
 import type { MergeQueue } from "./merge-queue";
-import { ACTIVITY_KINDS, DASHBOARD_KINDS, HEALTH_KINDS, Notices, PROVIDER_KINDS, REBASE_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, DASHBOARD_KINDS, HEALTH_KINDS, Notices, PRIVATE_KINDS, PROVIDER_KINDS, REBASE_KINDS, STOPPED_KINDS, UPDATE_KINDS } from "./notices";
+import type { PrivateDeleting } from "../shared/notices";
 import { KeepRebased } from "./keep-rebased";
 import { rebasePullRequest } from "../pull-request-rebase";
 import { noticeSources } from "./notice-sources";
@@ -55,6 +56,7 @@ import { PinsFile } from "./pins-file";
 import { PrivateSessions } from "./private-sessions";
 import { PreferencesFile } from "./preferences-file";
 import { ProcessSettingsFile } from "./process-settings-file";
+import { ResourceHistory } from "./resource-history";
 import type { SessionProcessWatch } from "./session-processes";
 import { sessionProcessWatch } from "./session-process-watch";
 import { ReviewDrafts } from "./review-drafts";
@@ -111,6 +113,7 @@ export class Dashboard {
 	readonly #pins = new PinsFile(pinsFile);
 	readonly #privateSessions = new PrivateSessions({ root: privateSessionsDir, unpin: sessionIds => void this.#lists.apply("pins", { op: "unpin", sessionIds }) });
 	readonly #processSettings = new ProcessSettingsFile(processesFile);
+	readonly #resourceHistory = new ResourceHistory(resourcesDir);
 	readonly #preferences = new PreferencesFile(preferencesFile);
 	readonly #reviewDrafts = new ReviewDrafts({
 		file: new ReviewDraftsFile(reviewDraftsFile),
@@ -168,8 +171,10 @@ export class Dashboard {
 	readonly #worktrees: Worktrees;
 	/** omp's isolation sandboxes whose omp exited, removed once a day by the owner. */
 	readonly #isolationSweep: IsolationSweep;
-	/** What each live session runs besides omp, which it stops on request, when idle, and once the session left; it also ends sessions left idle for hours. */
+	/** What each live session runs besides omp and the omps no server lists, which it stops on request, when idle, under memory pressure, and once the session left; it also ends sessions left idle for hours. */
 	readonly #processWatch: SessionProcessWatch;
+	/** The private sessions the idle session stop deletes within five minutes, as the process watch last found them. */
+	#privateDeletes: PrivateDeleting[] = [];
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
 	readonly #reattached = Promise.withResolvers<void>();
 	readonly #endInbox: EndInbox;
@@ -271,6 +276,7 @@ export class Dashboard {
 				interrupted,
 				routines,
 				board: () => modules.board.value,
+				privateDeletes: () => this.#privateDeletes,
 			}),
 			() => this.#broadcasts.pushList("notices"),
 		));
@@ -354,6 +360,14 @@ export class Dashboard {
 			pathOf: files.pathOf,
 			owner: () => ownerLock.held,
 			processSettings: this.#processSettings,
+			privateSessions: this.#privateSessions,
+			history: this.#resourceHistory,
+			port,
+			warn: warnings => {
+				const changed = JSON.stringify(warnings) !== JSON.stringify(this.#privateDeletes);
+				this.#privateDeletes = warnings;
+				if (changed) void notices.check(PRIVATE_KINDS);
+			},
 		});
 		const startSession = (this.#startSession = async request => {
 			// Outside the checkout chain: resuming an owner restores its worktree through that chain.
@@ -408,6 +422,10 @@ export class Dashboard {
 			admit: this.#admit,
 			stopping: this.#stopping.signal,
 			workspaces: () => this.#workspaceCwds(),
+			holdsUnattended: () => {
+				const admitted = this.#processWatch.admit("unattended");
+				return admitted.go ? null : admitted.reason;
+			},
 		});
 		const { runner, scheduledRunner, autoContinue } = work;
 		this.#runner = runner;
@@ -554,6 +572,7 @@ export class Dashboard {
 					activity: this.#activity,
 					processWatch: this.#processWatch,
 					processSettings: this.#processSettings,
+					resourceHistory: this.#resourceHistory,
 					knownWorkspaces: () => this.knownWorkspaces(),
 					workspaceCwds: () => this.#workspaceCwds(),
 					keepRebased: this.#keepRebased,

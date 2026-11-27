@@ -20,6 +20,7 @@ import type { RoutinesFile } from "./routines-file";
 import type { SelfUpdate } from "./self-update";
 import type { SessionFiles } from "./session-files";
 import type { UsagePoll } from "./usage-poll";
+import type { PrivateDeleting } from "../shared/notices";
 
 /** The dashboard's parts the bell's checks read. */
 export interface NoticeSourcesDeps {
@@ -38,6 +39,8 @@ export interface NoticeSourcesDeps {
 	routines: RoutinesFile;
 	/** The Board as it stands, whose routine Board tasks tell how each run went. */
 	board(): BoardState;
+	/** The private sessions the idle session stop deletes within five minutes, as the process watch last found them. */
+	privateDeletes(): PrivateDeleting[];
 }
 
 export function noticeSources(deps: NoticeSourcesDeps): NoticeSources {
@@ -84,6 +87,7 @@ export function noticeSources(deps: NoticeSourcesDeps): NoticeSources {
 			}),
 		erroredRuns: async () => erroredRuns(routines.value, Date.now(), (task, at) => boardRunTurn(deps.board(), task, at, files.pathOf)),
 		rebaseStops: () => deps.keepRebased.stops,
+		privateDeletes: deps.privateDeletes,
 		now: Date.now,
 	};
 }

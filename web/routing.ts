@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { IconAgentNetwork, IconAiBotHead, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage, IconWidgets } from "central-icons";
+import { IconAgentNetwork, IconAiBotHead, IconArrowRotateCounterClockwise, IconBlocks, IconBrain, IconBranch, IconChart3, IconChip, IconCursorClick, IconDirection1, IconFileText, IconFolders, IconKey1, IconKeyboard, IconLaw, IconMerged, IconPhone, IconPlugin1, IconSettingsSliderHor, IconSparklesTwo, IconStorage, IconWidgets } from "central-icons";
 import type { IconComponent } from "@/lib/icon-context";
 import type { PullRequest } from "../src/shared/github";
 import { hashForSession, type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
@@ -63,6 +63,7 @@ export const SETTINGS_GROUP_LABEL = Object.fromEntries(SETTINGS_GROUPS.map(group
 export const SETTINGS_SECTIONS = [
 	{ value: "analytics", label: "Analytics", icon: IconChart3, group: "usage", keywords: ["usage", "cost", "tokens", "spend"] },
 	{ value: "activity", label: "Activity", icon: IconCursorClick, group: "usage", keywords: ["features", "used", "time"] },
+	{ value: "resources", label: "Resources", icon: IconChip, group: "usage", keywords: ["memory", "ram", "swap", "pressure", "jetsam", "processes", "stop"] },
 	{ value: "preferences", label: "Preferences", icon: IconSettingsSliderHor, group: "general", keywords: ["theme", "dark mode", "notifications", "sound", "sidebar tabs", "transcript", "idle processes", "idle sessions"] },
 	{ value: "keyboard", label: "Keyboard", icon: IconKeyboard, group: "general", keywords: ["shortcuts", "keys", "hotkeys", "keybindings"] },
 	{ value: "modules", label: "Modules", icon: IconWidgets, group: "general", keywords: [...MODULE_LIST.map(({ tab }) => tab.label.toLowerCase()), "turn off", "enable", "disable", "add", "new"] },

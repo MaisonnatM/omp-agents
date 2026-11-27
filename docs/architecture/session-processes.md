@@ -8,6 +8,7 @@ The server lists what every live session runs besides omp, for the Browser's dev
 omp's bash tool runs in omp's own process: each command it runs, foreground or async, is a child of omp that leads its own process group, and so do omp's Python kernels and private browsers.
 Each such group is a job, listed by its top process, the group's leader, and stopped as a whole.
 omp's stdio MCP servers are children of omp in omp's own process group: they are omp's helpers, not something the session started, so the list only counts their memory and CPU with omp's, and they end with the session.
+Under the [lazy MCP patch](omp-modules.md), which the dashboard turns on with `OMP_MCP_LAZY=1`, a session runs a stdio MCP server only from its first call to that server's tools until 10 idle minutes pass, so most sessions run none; a browser server, once called, runs until the session ends.
 omp starts its shared workers, whose commands begin with `__omp_worker_`, such as its per-user daemon, the blob broker, or the LSP multiplexer, as children of whichever omp first needs them, and they serve every omp of the project or the machine.
 `descendants` in `src/process-census.ts` skips them and everything under them, for the list, the keeper's census, and `stopTree` alike; `OMP_WORKER_PREFIX` names the prefix omp's `cli/worker-selectors.ts` gives every worker.
 A service is a `proc` unit omp's per-user daemon runs in a project's scope: a dev server the bash tool or the Browser's **Start dev server** started with a `name`, or omp's shared headless browser.
@@ -44,8 +45,49 @@ On Linux, a missing `lsof` is read from `/proc` instead, for the ports, the work
 `otherPorts` lists every listening port but those of the session's unshared jobs and services and those another checkout of the same app listens on: the same `git` common directory and path in it as one of the session's servers, read from each listener's working directory with `lsof` and kept per directory.
 The memory and CPU of omp, a job, or a service are sums over its processes, and a shared service shows under every session it serves.
 `PUT /api/session-processes/stop` takes `{ instanceId, id }`, checked by `parseProcessStop` in `src/server/wire.ts`, and answers the same list after the stop; a stop for a session that no longer runs stops nothing.
+With `id` `"stray"` (`STRAY_STOP_ID`), it ends the [stray](#strays) whose keeper id is `instanceId`, unless another live server holds it.
 `PUT /api/session-processes/start-server` takes `{ instanceId }`, checked by `parseDevServerRequest`, starts that live session's dev server as [Start dev server](#start-dev-server) says, and answers a `DevServerStart`: `{ started: { port, command } }`, or `{ fallback }` with why it could not; a session that no longer runs answers an error.
 `GET /api/process-settings` answers the `ProcessSettings`, and `PUT /api/process-settings` takes them, checked by `parseProcessSettings`, and answers them as saved.
+`GET /api/resources` answers a `ResourcesView` from `src/shared/resources.ts`: the latest `MemoryReading`, a `Footprint` per owner with its memory, process count, and whether **Stop** applies, the ladder of what stops next under pressure, the automatic stops since the server started, and the build and test slots.
+`GET /api/resources/history?hours=` answers the `ResourceSample`s of the last `hours`, 24 when absent, at most the 14 days the history keeps, oldest first.
+
+## Memory reading and history
+
+Each sample also reads this Mac's memory: `readMemory` in `src/memory-reading.ts` runs one `sysctl -n kern.memorystatus_vm_pressure_level kern.memorystatus_level vm.swapusage hw.memsize` and one `vm_stat`, and takes the swap-out rate from the change in `vm_stat`'s Swapouts since the last reading.
+`pressureOf` turns the kernel's level, the share of memory available, and the swap-out rate into `normal`, `warn`, or `critical`: below 20% available, 128 MB a minute swapped out, or the kernel's warning reads `warn`, and below 8%, 512 MB a minute, or the kernel's critical level reads `critical`.
+A rise counts at once, a fall only after two calm readings in a row, so the pressure does not flap; a read that fails reads `unknown`, which stops nothing on the ladder but holds unattended work.
+`ResourceHistory` in `src/server/resource-history.ts` keeps one `ResourceSample` a minute in `~/.config/omp-agents/resources/`, one JSON Lines file per UTC day, and deletes the files older than 14 days on the first write of a day.
+Each sample carries the Jetsam events since the one before, read from macOS's `/Library/Logs/DiagnosticReports/JetsamEvent-*.ips` reports: when, the largest process, and how many processes macOS killed for memory rather than idle exit; a report it cannot read is skipped.
+
+## The memory policy
+
+Each sample hands what it found to `decide` in `src/server/memory-policy.ts`, a pure function of the time, the reading, the settings, the live sessions with their clocks, their jobs and services, and the strays.
+It answers the stops to make now, the ladder of what pressure stops next, each job's and service's `stopsAt`, the private sessions about to be deleted, and why unattended work waits.
+Whatever the pressure, the idle stop and the idle session stop run on the settings' timers, and a stray ends once it has been seen for 10 minutes (`STRAY_GRACE_MS`), long enough for a restarted server to attach to its sessions.
+Under `warn` the first owner of the ladder stops each sample, under `critical` the first three, so the next reading says whether more must go; under `normal` and `unknown` the ladder only shows on the Resources page.
+The ladder goes cheapest loss first:
+
+- Rung 0: strays seen for a minute (`STRAY_SETTLE_MS`), biggest first, since a session's keeper is unlisted while it starts.
+- Rung 1: MCP servers of settled sessions, empty until omp starts them lazily.
+- Rung 2: jobs and services whose every session has been idle 5 minutes and waits on no subagent or scheduled check, biggest first.
+- Rung 3: dashboard sessions settled 20 minutes under `warn`, 2 under `critical`, oldest first, which then show under Past with their worktree kept.
+- Rung 4, under `critical` only: private sessions settled an hour.
+
+A session that works, asks a question, or waits on its work, and what it runs, is never on the ladder.
+Each automatic stop is kept, the last 100, with its owner, memory, and why: `idle`, `stray`, or the pressure.
+
+## Strays
+
+`listAllKeepers` in `src/keeper-link.ts` reads every port's keeper directory under the sessions root and keeps the keepers whose recorded pid runs, private when that port's private sessions directory holds the session.
+A keeper is a stray when no server lists its session: one in this server's directory that the roster does not list is `unattached`, one of a port no process listens on is `orphan-port`, and one of a port another server listens on is `foreign-live`, which is that server's and never stops here.
+`endKept` ends a stray as **End session** does, through its keeper, which reaps what omp started; a keeper that does not greet or exit in 10 seconds is stopped with its tree, and its files go.
+A private stray's session is then deleted through `PrivateSessions.purge` of its port; an ordinary one shows under Past.
+
+## Unattended work waits on memory
+
+`SessionProcessWatch.admit` lets what the user starts always go, and holds unattended work, a Board task's session or a routine's run, under any pressure but `normal`, and before the first reading.
+`BoardRunner` leaves a held Board task ready and logs why once; its sweep starts it once the hold ends.
+`RoutineRunner` leaves due runs queued and logs why once; the next tick starts them, and **Run now** does not wait.
 
 ## Start dev server
 
@@ -77,8 +119,9 @@ A server that first sees a session settled starts the clock at the last write of
 Once the setting's hours have passed on that clock, the watch ends the session through `DashboardSession.end`: the keeper stops omp and the processes under it, and the exit reports as ended.
 The session then leaves the roster and shows under Past with its worktree kept, and **Resume** continues it; nothing of **End session** runs, so no worktree is removed and no auto-continue is cancelled.
 A bare signal to omp would report as an exit that was no end, and put the session under Interrupted instead.
-Only a session this server started stops so: a terminal session runs in your terminal, and a private session's end deletes it.
-See [the decision](../decisions/2026-11-16-an-idle-session-stops-its-omp-and-keeps-its-worktree.md).
+Only a session this server started stops so: a terminal session runs in your terminal.
+A private session stops too, which deletes it, so the bell names it from five minutes before as a `private-deleting` notice, and any use in between resets its clock.
+See [the decision](../decisions/2026-11-16-an-idle-session-stops-its-omp-and-keeps-its-worktree.md) and [the private one](../decisions/2026-11-27-a-private-session-ends-at-the-idle-hours-after-a-notice.md).
 
 ## Sessions that leave the roster
 
@@ -89,6 +132,6 @@ The keeper already stops a dashboard session's jobs when it ends; stopping them 
 
 ## One server stops
 
-Only the server that holds the owner lock stops idle processes, ends idle sessions, and stops what a gone session left, as with the rest of the unattended work; see [One server runs the unattended work](routines.md#one-server-runs-the-unattended-work).
+Only the server that holds the owner lock stops idle processes, ends idle sessions and strays, applies the ladder, and stops what a gone session left, as with the rest of the unattended work; see [One server runs the unattended work](routines.md#one-server-runs-the-unattended-work).
 Another server samples only when a page asks, lists no stop time, and still stops a process when you press **Stop**.
 A server lists omp's registry of terminal sessions again only while a page listens, so with no page open a terminal session that ended stays on the roster, and its cleanup waits, until a page opens.

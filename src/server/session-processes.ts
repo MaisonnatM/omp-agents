@@ -1,10 +1,12 @@
 /**
  * What each live session runs besides omp: its jobs, the process groups under its omp, and its services, the `proc` units
- * omp's daemon runs in its project. The watch lists them, stops one on request, stops the ones every session they serve
- * left idle for the setting's minutes, stops what a session that left the roster leaves behind, and ends a session left
- * idle for the setting's hours. Every stop of a session's processes goes through it; `docs/architecture/session-processes.md`
- * says what counts and why.
+ * omp's daemon runs in its project; and the strays, the omps a keeper runs that no server lists. The watch lists them,
+ * stops one on request, reads the computer's memory each sample, and applies what the memory policy (`memory-policy.ts`)
+ * decides: the idle stops, the end of a stray past its grace, and the pressure ladder. It also stops what a session that
+ * left the roster leaves behind. Every automatic stop goes through it; `docs/architecture/session-processes.md` says
+ * what counts and why.
  */
+import type { KeptProcess } from "../keeper-link";
 import type { UnitSnapshot } from "../omp/module-types/processes";
 import { run } from "../proc";
 import {
@@ -27,8 +29,10 @@ import {
 } from "../process-census";
 import { SerialLane } from "../serial-lane";
 import type { LiveSessionProcesses, ProcessSettings, SessionProcess, SessionProcesses } from "../shared/processes";
+import type { AutoStop, Footprint, MemoryReading, Owner, ResourceSample, ResourcesView, StrayReason } from "../shared/resources";
 import type { HostStatus } from "../shared/sessions";
 import { errorText } from "../json";
+import { decide, type Decision, type PolicyStray, type Stop } from "./memory-policy";
 
 /** How long a stopped job gets to exit on SIGTERM before SIGKILL. */
 const STOP_GRACE_MS = 3_000;
@@ -36,9 +40,19 @@ const STOP_GRACE_MS = 3_000;
 /** How old a sample {@link SessionProcessWatch.list} answers from may be, so every open window's CPU card shares one `ps` and `lsof`. */
 export const LIST_REUSE_MS = 2_000;
 
+/** The process id `PUT /api/session-processes/stop` takes, with a stray's keeper id as the instance id, to end that stray. */
+export const STRAY_STOP_ID = "stray";
+
+/** How many automatic stops {@link SessionProcessWatch.view} lists, newest first. */
+const KEPT_STOPS = 100;
+
+const OWNER_KINDS: readonly Owner["kind"][] = ["session", "stray", "mcp", "process", "heavy", "dashboard"];
+
 /** A live session, as the roster has it. */
 export interface WatchedSession {
 	instanceId: string;
+	/** What the roster calls it. */
+	title: string;
 	/** omp's session id, which a service names as its owner. */
 	sessionId: string;
 	/** omp's session file, which omp's bash tool names in each command's environment; `null` before omp wrote one. */
@@ -49,8 +63,10 @@ export interface WatchedSession {
 	status: HostStatus;
 	/** Its main agent only waits on a subagent that still runs or on a scheduled check, which the idle session stop counts as busy. */
 	waitsOnWork: boolean;
-	/** The idle session stop may end it: a session this server started that is not private. */
+	/** The idle session stop may end it: a session this server started, private or not. */
 	stopsWhenIdle: boolean;
+	/** Ending it deletes it. */
+	private: boolean;
 }
 
 export interface SessionProcessWatchDeps {
@@ -81,6 +97,18 @@ export interface SessionProcessWatchDeps {
 	/** This server holds the owner lock, so it stops processes no one asked it to. */
 	owner(): boolean;
 	settings(): ProcessSettings;
+	/** The computer's memory, from the reading before it; pressure `unknown` when it cannot be read. */
+	readMemory(previous: MemoryReading | null): Promise<MemoryReading>;
+	/** Every keeper running on this computer, whichever port's server started it. */
+	readKeepers(): KeptProcess[];
+	/** The port this server listens on, whose keepers the roster does not list are its own strays. */
+	port: number;
+	/** Ends a stray's omp through its keeper, and deletes its session when it is private; holds when repeated. */
+	endStray(keeper: KeptProcess): Promise<void>;
+	/** Keeps a sample, with the first automatic stop it made; the history thins samples to one a minute. */
+	record(sample: ResourceSample, stop: AutoStop | null): void;
+	/** The private sessions the idle session stop deletes within five minutes, as each sample with the owner lock finds them. */
+	warn(warnings: Decision["warnings"]): void;
 }
 
 type Target = { kind: "job"; members: Processes } | { kind: "service"; unit: UnitSnapshot };
@@ -131,6 +159,18 @@ export class SessionProcessWatch {
 	#adoptedFiles = new Map<string, string | null>();
 	/** The last sample and when it was taken, which {@link list} reuses while it is under {@link LIST_REUSE_MS} old. */
 	#last: { at: number; sample: Sample } | null = null;
+	/** The last memory reading, which the next reading reads its swap rate and calm count from. */
+	#reading: MemoryReading | null = null;
+	/** What the memory policy answered the last sample. */
+	#decision: Decision | null = null;
+	/** The strays the last sample found. */
+	#strays: PolicyStray[] = [];
+	/** When this server first saw each stray, by port, keeper id, and keeper pid. */
+	#straysSeen = new Map<string, number>();
+	/** The memory each owner held at the last sample. */
+	#footprints: Footprint[] = [];
+	/** The automatic stops made, newest first, at most {@link KEPT_STOPS}. */
+	#stops: AutoStop[] = [];
 
 	constructor(deps: SessionProcessWatchDeps) {
 		this.#deps = deps;
@@ -151,12 +191,39 @@ export class SessionProcessWatch {
 		});
 	}
 
-	/** Stops session `instanceId`'s process `id`, unless either no longer runs, and answers what every live session runs after. */
+	/** Stops session `instanceId`'s process `id`, or ends stray `instanceId` when `id` is {@link STRAY_STOP_ID}, unless it no longer runs; answers what every live session runs after. */
 	stop(instanceId: string, id: string): Promise<LiveSessionProcesses[]> {
 		return this.#lane.run(async () => {
-			const item = (await this.#fresh()).get(instanceId)?.items.find(each => each.id === id);
-			if (item) await this.#stopTarget(item.target);
+			const sample = await this.#fresh();
+			if (id === STRAY_STOP_ID) {
+				// Another live server's keeper is that server's to end.
+				const stray = this.#strays.find(each => each.instanceId === instanceId && each.reason !== "foreign-live");
+				if (stray) await this.#deps.endStray(stray);
+			} else {
+				const item = sample.get(instanceId)?.items.find(each => each.id === id);
+				if (item) await this.#stopTarget(item.target);
+			}
 			return answerOf(await this.#fresh());
+		});
+	}
+
+	/**
+	 * Whether work may start now: what the user starts always does, while unattended work, a Board task's or a routine's
+	 * run, waits under any pressure but normal, with the reason the memory policy gives.
+	 */
+	admit(kind: "interactive" | "unattended"): { go: true } | { go: false; reason: string } {
+		if (kind === "interactive") return { go: true };
+		const holds = this.#decision ? this.#decision.holdsUnattended : "Memory has not been read yet, so unattended work waits until it is.";
+		return holds === null ? { go: true } : { go: false, reason: holds };
+	}
+
+	/** The memory reading, who holds memory, what pressure stops next, and the automatic stops, from a sample under {@link LIST_REUSE_MS} old. */
+	view(): Promise<ResourcesView> {
+		const asked = this.#deps.now();
+		return this.#lane.run(async () => {
+			const last = this.#last;
+			if (!last || last.at <= asked - LIST_REUSE_MS) await this.#fresh();
+			return { reading: this.#reading, footprints: this.#footprints, ladder: this.#decision?.ladder ?? [], stops: this.#stops, heavy: { slots: 0, running: 0, queued: 0 } };
 		});
 	}
 
@@ -170,17 +237,18 @@ export class SessionProcessWatch {
 
 	async #sample(): Promise<Sample> {
 		const sessions = this.#deps.sessions();
-		const [table, services, projectDirs, listeners] = await Promise.all([
+		const [table, services, projectDirs, listeners, reading] = await Promise.all([
 			this.#deps.readTable(),
 			this.#deps.readServices(),
 			Promise.all(sessions.map(session => this.#deps.projectDir(session.cwd))),
 			this.#deps.readPorts(),
+			this.#deps.readMemory(this.#reading),
 		]);
+		this.#reading = reading;
 		if (!table) throw new Error("ps failed, so no session's processes are known");
 		const portsOf = (rows: ProcessRow[]): number[] => [...new Set(rows.flatMap(row => listeners?.get(row.pid) ?? []))].sort((a, b) => a - b);
 		const now = this.#deps.now();
 		const owner = this.#deps.owner();
-		const { stopIdleAfterMinutes: timeout, stopIdleSessionsAfterHours: sessionTimeout } = this.#deps.settings();
 		const live = new Set(sessions.map(session => session.instanceId));
 		for (const clock of [this.#idleSince, this.#settledSince]) for (const id of clock.keys()) if (!live.has(id)) clock.delete(id);
 		for (const { instanceId, status, waitsOnWork } of sessions) {
@@ -259,24 +327,74 @@ export class SessionProcessWatch {
 			for (const session of serves) found.get(session.instanceId)?.items.push(item);
 		}
 
-		const due = new Map<string, Target>();
-		for (const { items } of found.values()) {
-			for (const item of items) {
-				item.stopsAt = owner && timeout !== null ? this.#stopsAt(item, timeout) : null;
-				if (item.stopsAt !== null && item.stopsAt <= now) due.set(item.id, item.target);
+		const items = new Map<string, Item>();
+		for (const each of found.values()) for (const item of each.items) items.set(item.id, item);
+		const keepers = this.#deps.readKeepers();
+		const strays = (this.#strays = this.#findStrays(keepers, table, listeners, live, now));
+		const decision = (this.#decision = decide({
+			now,
+			reading,
+			settings: this.#deps.settings(),
+			sessions: sessions.map(session => ({
+				...session,
+				idleSince: this.#idleSince.get(session.instanceId)!,
+				settledSince: this.#settledSince.get(session.instanceId)!,
+				memoryBytes: found.get(session.instanceId)!.omp.memoryBytes,
+			})),
+			items: [...items.values()].map(item => ({ id: item.id, label: item.label, instanceIds: item.serves.map(session => session.instanceId), memoryBytes: item.memoryBytes, startedAt: item.startedAt, shared: item.shared })),
+			strays,
+		}));
+		for (const item of items.values()) item.stopsAt = owner ? (decision.stopsAt.get(item.id) ?? null) : null;
+		// Only the owner stops what no one asked it to; a server that never holds the lock still ends the omps it started and no longer lists.
+		const applied = decision.stops.filter(stop => owner || (stop.kind === "stray" && stop.keeper.port === this.#deps.port && stop.because === "stray"));
+		if (owner) this.#deps.warn(decision.warnings);
+		const cleanup = owner ? [...orphans, ...left.flatMap((seen): Target[] => (seen.jobs.size > 0 ? [{ kind: "job", members: seen.jobs }] : []))] : [];
+		const results = await Promise.allSettled([...applied.map(stop => this.#apply(stop, items)), ...cleanup.map(target => this.#stopTarget(target))]);
+		const made: AutoStop[] = [];
+		const stopped = new Set<string>();
+		results.forEach((result, index) => {
+			const stop = applied[index];
+			if (result.status === "rejected") console.error(`omp-agents: ${stop ? "an automatic stop" : "stopping a session's process"} failed: ${errorText(result.reason)}`);
+			else if (stop) {
+				made.push({ owner: stop.owner, at: now, memoryBytes: stop.memoryBytes, because: stop.because });
+				if (stop.kind === "item") stopped.add(stop.id);
 			}
-		}
-		if (owner) {
-			const stops = [...due.values(), ...orphans, ...left.flatMap((seen): Target[] => (seen.jobs.size > 0 ? [{ kind: "job", members: seen.jobs }] : []))];
-			const idle = sessionTimeout === null ? [] : sessions.filter(session => session.stopsWhenIdle && this.#settledSince.get(session.instanceId)! + sessionTimeout * 3_600_000 <= now);
-			const stopping = [...stops.map(target => this.#stopTarget(target)), ...idle.map(session => this.#deps.endSession(session.instanceId))];
-			for (const result of await Promise.allSettled(stopping)) {
-				if (result.status === "rejected") console.error(`omp-agents: stopping a session's process failed: ${errorText(result.reason)}`);
-			}
-		}
-		for (const each of found.values()) each.items = each.items.filter(item => !due.has(item.id)).sort((a, b) => b.memoryBytes - a.memoryBytes);
+		});
+		this.#stops = [...made, ...this.#stops].slice(0, KEPT_STOPS);
+		for (const each of found.values()) each.items = each.items.filter(item => !stopped.has(item.id)).sort((a, b) => b.memoryBytes - a.memoryBytes);
+		this.#footprints = footprintsOf(sessions, found, strays, keepers, table);
+		const byClass = Object.fromEntries(OWNER_KINDS.map(kind => [kind, 0])) as Record<Owner["kind"], number>;
+		for (const { owner: who, memoryBytes } of this.#footprints) byClass[who.kind] += memoryBytes;
+		this.#deps.record({ at: now, reading, byClass, jetsam: [] }, made[0] ?? null);
 		if (listeners) await this.#fillOtherPorts(found, listeners);
 		return found;
+	}
+
+	/**
+	 * The keepers no server lists, with why and since when this server sees them: one in this port's directory whose
+	 * session the roster does not list, one of a port no process listens on, or one of a port another server listens on,
+	 * which is that server's. Without `lsof`, every other port counts as listened on.
+	 */
+	#findStrays(keepers: KeptProcess[], table: ProcessTable, listeners: Map<number, number[]> | null, listed: ReadonlySet<string>, now: number): PolicyStray[] {
+		const listening = new Set([...(listeners?.values() ?? [])].flat());
+		const seen = new Map<string, number>();
+		const strays = keepers.flatMap((keeper): PolicyStray[] => {
+			const own = keeper.port === this.#deps.port;
+			if (own && listed.has(keeper.instanceId)) return [];
+			const reason: StrayReason = own ? "unattached" : listeners && !listening.has(keeper.port) ? "orphan-port" : "foreign-live";
+			const key = `${keeper.port} ${keeper.instanceId} ${keeper.keeperPid}`;
+			const firstSeen = this.#straysSeen.get(key) ?? now;
+			seen.set(key, firstSeen);
+			return [{ ...keeper, reason, firstSeen, memoryBytes: memoryOf(treeOf(table, keeper.keeperPid)) }];
+		});
+		this.#straysSeen = seen;
+		return strays;
+	}
+
+	#apply(stop: Stop, items: ReadonlyMap<string, Item>): Promise<void> {
+		if (stop.kind === "item") return this.#stopTarget(items.get(stop.id)!.target);
+		if (stop.kind === "session") return this.#deps.endSession(stop.instanceId);
+		return this.#deps.endStray(stop.keeper);
 	}
 
 	/**
@@ -317,6 +435,9 @@ export class SessionProcessWatch {
 		const appOfPid = new Map<number, string>();
 		if ([...ownPorts.values()].some(ports => ports.size > 0)) {
 			const cwds = await this.#deps.readCwds([...listeners.keys()]);
+			// Only the listeners' directories stay cached, so a long-running server does not keep every directory it ever read.
+			const dirs = new Set(cwds.values());
+			for (const dir of this.#apps.keys()) if (!dirs.has(dir)) this.#apps.delete(dir);
 			await Promise.all(
 				[...cwds].map(async ([pid, cwd]) => {
 					const app = await this.#appOf(cwd);
@@ -340,12 +461,6 @@ export class SessionProcessWatch {
 		return app;
 	}
 
-	/** When the idle stop ends `item`: `timeout` minutes after it started or the last session it serves went idle; `null` while one of them is busy. */
-	#stopsAt(item: Item, timeout: number): number | null {
-		if (item.serves.some(session => session.status !== "idle")) return null;
-		return Math.max(item.startedAt, ...item.serves.map(session => this.#idleSince.get(session.instanceId) ?? item.startedAt)) + timeout * 60_000;
-	}
-
 	#stopTarget(target: Target): Promise<void> {
 		return target.kind === "job" ? this.#deps.stopProcesses(new Map(target.members)) : this.#deps.stopService(target.unit);
 	}
@@ -353,6 +468,36 @@ export class SessionProcessWatch {
 
 /** Whether a command that names session file `file` ran in session `own` or in one of its subagents, whose files omp keeps in a directory named after `own`. */
 const startedIn = (file: string, own: string): boolean => file === own || file.startsWith(`${own.replace(/\.jsonl$/, "")}/`);
+
+/** Process `pid` and every process under it that still runs. */
+const treeOf = (table: ProcessTable, pid: number): ProcessRow[] => [pid, ...descendants(table, pid).keys()].flatMap(each => table.get(each) ?? []);
+
+/** Who held memory at a sample: each live session's omp, each of its processes once, each stray, and the server outside its keepers. */
+function footprintsOf(sessions: readonly WatchedSession[], found: Sample, strays: readonly PolicyStray[], keepers: readonly KeptProcess[], table: ProcessTable): Footprint[] {
+	const footprints: Footprint[] = [];
+	const items = new Map<string, Item>();
+	for (const session of sessions) {
+		const each = found.get(session.instanceId)!;
+		footprints.push({ owner: { kind: "session", instanceId: session.instanceId, title: session.title, private: session.private }, memoryBytes: each.omp.memoryBytes, processCount: each.omp.processCount, stoppable: false });
+		for (const item of each.items) if (!items.has(item.id)) items.set(item.id, item);
+	}
+	for (const item of items.values()) {
+		footprints.push({ owner: { kind: "process", id: item.id, instanceId: item.serves[0]!.instanceId, label: item.label }, memoryBytes: item.memoryBytes, processCount: item.processCount, stoppable: true });
+	}
+	for (const stray of strays) {
+		footprints.push({
+			owner: { kind: "stray", keeperId: stray.instanceId, port: stray.port, reason: stray.reason, startedAt: stray.startedAt },
+			memoryBytes: stray.memoryBytes,
+			processCount: treeOf(table, stray.keeperPid).length,
+			stoppable: stray.reason !== "foreign-live",
+		});
+	}
+	// A keeper this server started is its child until the server restarts; its tree is the session's or the stray's.
+	const kept = new Set(keepers.flatMap(keeper => treeOf(table, keeper.keeperPid).map(row => row.pid)));
+	const server = treeOf(table, process.pid).filter(row => !kept.has(row.pid));
+	footprints.push({ owner: { kind: "dashboard", part: "server" }, memoryBytes: memoryOf(server), processCount: server.length, stoppable: false });
+	return footprints.sort((a, b) => b.memoryBytes - a.memoryBytes);
+}
 
 /** Job `pgid` of `session`, named by its top process: the group's leader, else the first under omp. */
 function jobItem(session: WatchedSession, pgid: number, rows: ProcessRow[], ports: number[]): Item {
