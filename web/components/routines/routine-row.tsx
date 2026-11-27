@@ -1,7 +1,7 @@
-/** One row of a Workspace's routines card: its name, Run now, and switch; when it runs; what starts it and what it does, with its run strip; and, open, the rest in place. */
+/** A routine in the Routines tab: its line in the sidebar, and, open on the right, its name, Run now, and switch; when it runs; what starts it and what it does, with its run strip; then the rest. */
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { IconArrowRight, IconChevronDownSmall, IconPlay } from "central-icons";
-import { type KeyboardEvent, type MouseEvent, useId, useState } from "react";
+import { IconArrowRight, IconPlay } from "central-icons";
+import { type KeyboardEvent, useState } from "react";
 import { type Routine, type RoutineRun, runsHere } from "../../../src/routines";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -26,12 +26,9 @@ import { useAction } from "../../use-action";
 import { useCountdownNow } from "../../use-minute";
 import { useDashboardActions } from "../dashboard-context";
 import { ToggleSwitch } from "../toggle-switch";
-import { HEALTH_TICK, INSTANT, OPEN_SPRING, RunIcon, TaskIcon, TemplateMark, TRIGGER_MARKS } from "./routine-marks";
+import { HEALTH_TICK, INSTANT, RunIcon, TaskIcon, TemplateMark, TRIGGER_MARKS } from "./routine-marks";
 import { RoutineOpen } from "./routine-open";
 import { RoutineFace } from "./routine-face";
-
-/** A click on one of these inside a row works the control, and leaves the row as it is. */
-const ROW_CONTROLS = "button, a, input, [role='switch'], [role='group']";
 
 /** When the routine runs next, counting down each second once that is under an hour away. */
 function NextRun({ routine }: { routine: Routine }) {
@@ -125,79 +122,100 @@ function RunStrip({ runs, picked, now, onPick }: RunStripProps) {
 	);
 }
 
-/** A row's third line for the screen reader, in place of its marks: what else starts it, and what it does. */
+/** The detail's third line for the screen reader, in place of its marks: what else starts it, and what it does. */
 function marksSentence(routine: Routine): string {
 	const triggers = routine.triggers.map(({ kind }) => TRIGGER_MARKS[kind].name);
 	const does = routine.task.kind === "prompt" ? "Posts the instructions" : "Runs the command";
 	return triggers.length > 0 ? `Starts on ${triggers.join(", ")}. ${does}:` : `${does}:`;
 }
 
-interface RoutineRowProps {
+/** Whether the routine's last run is under way, and why the server holds its queued run, `null` when it does not. */
+function runState(routine: Routine, held: string | null, pending: boolean): { running: boolean; waitsFor: string | null } {
+	const health = routine.runs[0] && runHealth(routine.runs[0]);
+	// A run the server holds queued, sending, or running takes no second Run now: it would claim another run beside it.
+	const running = pending || health === "running" || health === "waiting";
+	// The server holds this routine's queued run from starting while unattended work waits, which says so instead of Running….
+	const waitsFor = held !== null && routine.runs.some(run => run.outcome.kind === "queued") ? held : null;
+	return { running, waitsFor };
+}
+
+interface RoutineListItemProps {
+	routine: Routine;
+	/** Why the server holds the queued runs from starting, such as memory pressure; `null` when it does not. */
+	held: string | null;
+	open: boolean;
+}
+
+/** The routine's line in the sidebar: its face, its name, when it runs or that it runs now, and how its last run went; it opens the routine on the right. */
+export function RoutineListItem({ routine, held, open }: RoutineListItemProps) {
+	const reduceMotion = useReducedMotion() ?? false;
+	const { id, workspace, name, runs } = routine;
+	const here = runsHere(routine);
+	const latest = runs[0];
+	const { running, waitsFor } = runState(routine, held, false);
+	return (
+		<li>
+			<a
+				data-routine-name
+				href={hashForRoutines(workspace, { kind: "open", id })}
+				aria-current={open ? "page" : undefined}
+				className={cn(
+					"flex items-center gap-2.5 rounded-md px-2 py-1.5 outline-none hover:bg-hover/50 focus-visible:ring-2 focus-visible:ring-ring",
+					open && "bg-hover hover:bg-hover",
+				)}
+			>
+				<RoutineFace id={id} className={cn("size-7 shrink-0", !here && "opacity-60")} />
+				<span className="min-w-0 flex-1">
+					<span className="block truncate text-sm font-medium">{name}</span>
+					<span className={cn("block truncate text-xs text-muted-foreground", !here && "opacity-60")}>
+						{waitsFor !== null ? "Waiting for memory" : running ? <span className={cn(!reduceMotion && "shimmer-text")}>Running…</span> : schedulesWords(routine)}
+					</span>
+				</span>
+				{latest && <RunIcon run={latest} className="shrink-0" />}
+			</a>
+		</li>
+	);
+}
+
+interface RoutineDetailProps {
 	routine: Routine;
 	/** The routine this one was copied from, while it still exists; `null` for none. */
 	template: Routine | null;
 	/** Why the server holds the queued runs from starting, such as memory pressure; `null` when it does not. */
 	held: string | null;
-	open: boolean;
 	connected: boolean;
 	now: number;
 }
 
-export function RoutineRow({ routine, template, held, open, connected, now }: RoutineRowProps) {
-	const detailsId = useId();
+/** The open routine on the right: its name, Run now, and switch, when it runs, what starts it and what it does with its run strip, then the picked run and the rest. */
+export function RoutineDetail({ routine, template, held, connected, now }: RoutineDetailProps) {
 	const reduceMotion = useReducedMotion() ?? false;
 	const { request, send } = useDashboardActions();
 	const runNow = useAction(() => request({ t: "routine", change: { op: "run-now", id: routine.id } }), "Could not run the routine");
 	const [pickedAt, setPickedAt] = useState<number | null>(null);
-	const { id, workspace, name, machine, runs, task, triggers } = routine;
+	const { id, name, machine, runs, task, triggers } = routine;
 	const here = runsHere(routine);
 	const latest = runs[0];
 	const picked = runs.find(({ at }) => at === pickedAt) ?? latest;
 	const spent = spentWords(runs);
-	const health = latest && runHealth(latest);
-	// A run the server holds queued, sending, or running takes no second Run now: it would claim another run beside it.
-	const running = runNow.pending || health === "running" || health === "waiting";
-	// The server holds this routine's queued run from starting while unattended work waits, which the row says instead of Running….
-	const waitsFor = held !== null && runs.some(run => run.outcome.kind === "queued") ? held : null;
-	const toggle = (): void => {
-		// Opened afresh, the row shows the latest run until a tick picks another.
-		if (!open) setPickedAt(null);
-		location.hash = hashForRoutines(workspace, open ? { kind: "list" } : { kind: "open", id });
-	};
-	const clickRow = (event: MouseEvent<HTMLDivElement>): void => {
-		if (!(event.target as Element).closest(ROW_CONTROLS)) toggle();
-	};
+	const { running, waitsFor } = runState(routine, held, runNow.pending);
 	return (
-		<li className="group/row relative">
-			{/* The name's button is the row's control for the keyboard and the screen reader; a click elsewhere on the row is the pointer's shortcut to it. */}
-			<div onClick={clickRow} className="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 px-4 py-3 hover:bg-hover/50">
-				<RoutineFace id={id} className={cn("row-span-3 mt-0.5 size-9", !here && "opacity-60")} />
-				<div className="flex min-h-7 items-center gap-2">
-					<button
-						type="button"
-						data-routine-name
-						aria-expanded={open}
-						aria-controls={open ? detailsId : undefined}
-						onClick={toggle}
-						className="-ml-1.5 inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					>
-						<span className="truncate">{name}</span>
-						<IconChevronDownSmall className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", !open && "-rotate-90")} />
-					</button>
+		<div className="@container/card mx-auto w-full max-w-[720px] px-6 py-6">
+			<div className="relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 pb-4">
+				<RoutineFace id={id} className={cn("row-span-3 mt-0.5 size-10", !here && "opacity-60")} />
+				<div className="flex min-h-8 items-center gap-2">
+					<h2 className="truncate text-base font-semibold">{name}</h2>
 					{routine.everyWorkspace && <TemplateMark />}
 					<div className="ml-auto flex shrink-0 items-center gap-3">
 						<Button
-							variant="ghost"
+							variant="outline"
 							size="compact"
 							leadingIcon={IconPlay}
 							aria-label={`Run ${name} now`}
 							disabled={!connected || running}
 							loading={runNow.pending}
 							onClick={() => runNow.run()}
-							className={cn(
-								"opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 @max-[420px]/card:gap-0 @max-[420px]/card:px-1.5",
-								(open || runNow.pending) && "opacity-100",
-							)}
+							className="@max-[420px]/card:gap-0 @max-[420px]/card:px-1.5"
 						>
 							<span className="@max-[420px]/card:hidden">Run now</span>
 						</Button>
@@ -255,45 +273,17 @@ export function RoutineRow({ routine, template, held, open, connected, now }: Ro
 						<span className="min-w-0 truncate">{taskWords(task)}</span>
 					</p>
 					{spent && <span className="shrink-0 tabular-nums">{spent}</span>}
-					<RunStrip
-						runs={runs}
-						picked={open ? (picked ?? null) : null}
-						now={now}
-						onPick={run => {
-							if (!open) toggle();
-							setPickedAt(run.at);
-						}}
-					/>
+					<RunStrip runs={runs} picked={picked ?? null} now={now} onPick={run => setPickedAt(run.at)} />
 				</div>
-			</div>
-			{running && waitsFor === null && (
-				<div aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden">
-					<div className={cn("h-full bg-primary/60", reduceMotion ? "w-full opacity-50" : "w-1/3 animate-[routine-progress_1.2s_ease-in-out_infinite]")} />
-				</div>
-			)}
-			<AnimatePresence initial={false}>
-				{open && (
-					<motion.div
-						key="open"
-						id={detailsId}
-						initial={{ height: 0 }}
-						animate={{ height: "auto" }}
-						exit={{ height: 0 }}
-						transition={reduceMotion ? INSTANT : OPEN_SPRING}
-						className="overflow-hidden"
-					>
-						<motion.div
-							initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-							animate={{ opacity: 1, y: 0 }}
-							exit={{ opacity: 0 }}
-							transition={reduceMotion ? INSTANT : { duration: 0.2, delay: 0.08, ease: "easeOut" }}
-							className="px-4 pb-4"
-						>
-							<RoutineOpen routine={routine} template={template} run={picked} connected={connected} now={now} />
-						</motion.div>
-					</motion.div>
+				{running && waitsFor === null && (
+					<div aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden rounded-full">
+						<div className={cn("h-full bg-primary/60", reduceMotion ? "w-full opacity-50" : "w-1/3 animate-[routine-progress_1.2s_ease-in-out_infinite]")} />
+					</div>
 				)}
-			</AnimatePresence>
-		</li>
+			</div>
+			<div className="border-t border-border">
+				<RoutineOpen routine={routine} template={template} run={picked} connected={connected} now={now} />
+			</div>
+		</div>
 	);
 }

@@ -11,8 +11,7 @@ import { hashForRoutines } from "../../routing";
 import { BrandMark, SLACK_LOGO } from "../integrations/brand-logos";
 import { OrgIcon } from "../org-icon";
 
-/** How an open routine row's or run card's details unfold, and how they do under reduced motion. */
-export const OPEN_SPRING = { type: "spring", duration: 0.34, bounce: 0 } as const;
+/** How a run tick moves under reduced motion. */
 export const INSTANT = { duration: 0 } as const;
 
 const TASK_ICON: Record<RoutineTask["kind"], IconComponent> = { prompt: IconBubbleText, command: IconConsole };
