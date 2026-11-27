@@ -2,7 +2,7 @@ import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, test } from "bun:test";
 import type { RosterHost } from "../../../src/shared/sessions";
 import type { BoardReply, BoardState, BoardTask } from "../../../templates/omp/agent/extensions/board/log";
-import { waitingIn } from "./seen";
+import { unreadOutOfView, waitingIn } from "./seen";
 
 const reply = (kind: "user" | "session"): BoardReply => fromPartial<BoardReply>({ by: kind === "user" ? { kind } : { kind, sessionId: "s1" }, at: 1, text: "…" });
 const thread = (id: number, workspace: string, replies: BoardReply[]) => fromPartial<BoardTask>({ id, workspace, replies });
@@ -32,5 +32,18 @@ describe("what waits on you in a Workspace", () => {
 	test("counts every Workspace for none, and only sessions before the Board loads", () => {
 		expect(waitingIn(board, {}, hosts, null)).toBe(5);
 		expect(waitingIn(null, {}, hosts, "/b")).toBe(1);
+	});
+});
+
+describe("unread threads out of view", () => {
+	const ids = [1, 2, 3, 4, 5, 6, 7];
+	const unread = new Set([1, 3, 4, 7]);
+
+	test("lists the unread ones above and below what shows, nearest first, and none of those showing", () => {
+		expect(unreadOutOfView(ids, unread, new Set([4, 5]))).toEqual({ above: [3, 1], below: [7] });
+	});
+
+	test("lists none before anything shows", () => {
+		expect(unreadOutOfView(ids, unread, new Set())).toEqual({ above: [], below: [] });
 	});
 });

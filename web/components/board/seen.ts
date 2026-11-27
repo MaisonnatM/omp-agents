@@ -44,6 +44,14 @@ export const unreadOf = (task: BoardTask, seenCount: number | undefined): number
 	return said(task).slice(seenCount ?? 0).filter(reply => reply.by.kind !== "user" && !quiet.has(reply)).length;
 };
 
+/** Of the Board tasks `ids`, in screen order, those in `unread` before the first and after the last of `visible`: the unread threads out of view above and below, each list nearest first. Before anything shows, none. */
+export function unreadOutOfView(ids: readonly number[], unread: ReadonlySet<number>, visible: ReadonlySet<number>): { above: number[]; below: number[] } {
+	const first = ids.findIndex(id => visible.has(id));
+	if (first === -1) return { above: [], below: [] };
+	const last = ids.findLastIndex(id => visible.has(id));
+	return { above: ids.slice(0, first).filter(id => unread.has(id)).reverse(), below: ids.slice(last + 1).filter(id => unread.has(id)) };
+}
+
 /**
  * What waits on you in Workspace `workspace`, or in every Workspace for `null`: its live sessions among `hosts` that need you,
  * plus its Board threads with unread replies. The Sessions tab's workspace count, the Board tab's, and the Dock badge all read it.

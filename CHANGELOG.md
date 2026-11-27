@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- On the Board, a pill at the top or bottom edge says how many unread threads sit out of view, as Slack does. Click it to jump to the nearest one, or press Mark all read.
+- In a Board thread, replies that come while you read further up show a "new replies" pill at the bottom. Click it to jump to them.
 - Sessions a dashboard can no longer list, such as old Bot conversations, now end on their own 10 minutes after the dashboard starts, instead of holding memory forever. Their conversation stays under Past.
 - Idle private sessions now stop after the same hours as other idle sessions. A notification says so 5 minutes before, because ending a private session deletes it.
 - When the Mac runs low on memory, the dashboard stops idle things one at a time, cheapest first, until memory is fine again. Board tasks and routine runs wait meanwhile. Busy sessions are never stopped, and a session you start yourself is never refused.

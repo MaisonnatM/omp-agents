@@ -23,6 +23,8 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
 - A Board task's status reads **ready**, **waiting on #N** while a Board task it needs is not done, **Starting a session…**, **Working on it…** or what its session waits on you for, **Couldn't start a session** with the reason and **Reply to try again**, or **done**.
 - Under a message with replies, a line shows who replied, how many replies, its unread count, and when the last came; hovering it adds an arrow and keeps that text in place.
   While its thread has unread replies, the message has a light blue background.
+  While threads with unread replies sit above or below what shows, a pill at that edge of the list says how many, as Slack's does: click it to scroll to the nearest one, which flashes, or press **Mark all read** to read every thread in the Workspace.
+  The bottom pill takes the place of the scroll-to-end arrow while it shows.
 - Hovering a message shows a toolbar: **Reply in thread** opens its Board thread, the arrow opens the session working on it, and on a Board task not done yet **Close task**, the check mark, marks it done as you.
   Closing ends the session working on it, and the Board thread notes that you closed it; a reply reopens it as it does any done Board task.
 - On your own messages the toolbar also has **Edit message**, the pencil, on the Board and in a Board thread: it puts the text in a box where Enter or **Save** saves it, Shift+Enter starts a new line, and Escape or **Cancel** leaves it as it was.
@@ -30,6 +32,7 @@ Open it from the **Board** tab at the top of the sidebar, beside **Sessions**, a
   A Board task no session started on yet just takes the new text, which its session reads when it starts; a done one stays done.
 - The **Board thread** opens in the right pane under the same tab row as a session's right sidebar, with × to close the thread.
   **Thread** shows the Board task, a line with the reply count, and the replies: what you and its sessions said, and grey lines for a session that did not start, your closing the Board task, and the Board's merges, but nothing about claims or wakes.
+  Replies others write while you read further up show a **N new replies** pill at the thread's foot, in place of the scroll-to-end arrow; clicking it scrolls to the first of them, and it goes once one shows or you reach the end.
   Under each session's last reply, a line per thing that session did shows its company's logo, Git, GitHub, or Linear, and its name, so you see it before you merge: the Linear issues it saved, the branch it worked on, and the pull requests it opened or worked on. Hover a line to see which it was.
   A session that has not replied yet shows its lines at the foot of the thread.
   A pull request opens on GitHub; a Linear issue opens the **Linear** tab.
