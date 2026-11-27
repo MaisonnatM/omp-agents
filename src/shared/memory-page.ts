@@ -41,6 +41,35 @@ export interface ProjectMemoryEdit {
 	ops: RawOp[];
 }
 
+/** One term of a repository's `GLOSSARY.md`. */
+export interface GlossaryTerm {
+	/** The term, as its bold heading writes it. */
+	term: string;
+	/** What it means, Markdown, one source line per line. */
+	definition: string;
+	/** The words its `_Avoid_:` line says not to use for it; none without that line. */
+	avoid: string[];
+}
+
+/** A `##` heading of the glossary and its terms; `title` is `null` for the terms above every heading. */
+export interface GlossarySection {
+	title: string | null;
+	terms: GlossaryTerm[];
+}
+
+/** One git repository among the workspaces with a `GLOSSARY.md`, as {@link ProjectMemoryRepo} names it. */
+export interface GlossaryRepo {
+	root: string;
+	rootDisplay: string;
+	name: string;
+	sections: GlossarySection[];
+}
+
+/** `GET /api/glossary`: every workspace repository with a glossary, by folder name. */
+export interface GlossaryView {
+	repos: GlossaryRepo[];
+}
+
 /** A Zen browser bookmark. */
 export interface ZenBookmark {
 	source: "zen";

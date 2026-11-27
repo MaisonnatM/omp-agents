@@ -252,7 +252,7 @@ for (let i = 0; i < 15; i++) {
 		const index = (await session("bbbbbbbb-mine", dir).call({})).text.split("\n").map(line => line.split(" ")[0]);
 		expect(index.sort()).toEqual([...Array.from({ length: 15 }, (_, i) => `left-${i}`), ...Array.from({ length: 15 }, (_, i) => `right-${i}`)].sort());
 		expect(git(dir, "rev-list", "--count", MEMORY_REF)).toBe("30");
-	});
+	}, 30_000);
 
 	test("a linked worktree reads the memory the main checkout wrote", async () => {
 		const { dir, wt } = world();

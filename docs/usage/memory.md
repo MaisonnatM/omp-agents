@@ -1,7 +1,7 @@
 # Memory
 
-- The **Memory** tab in the sidebar, a `#memory` address, or **Go to memory** in the command menu shows what your projects remember, and your bookmarks, in place of the panes.
-  The header's **Project memory** and **Bookmarks** tabs switch between the two; omp's own memory lives in Settings › omp memory, see [Settings](settings.md).
+- The **Memory** tab in the sidebar, a `#memory` address, or **Go to memory** in the command menu shows what your projects remember, their glossaries, and your bookmarks, in place of the panes.
+  The header's **Project memory**, **Glossary**, and **Bookmarks** tabs switch between the three; omp's own memory lives in Settings › omp memory, see [Settings](settings.md).
 
 ## Project memory
 
@@ -20,6 +20,16 @@
 - **New memory** asks for a slug, a kind, a line, and a body, and **Add memory** records it.
 - **Delete**, clicked twice, removes the open memory.
 - Each change is recorded in the repository's `refs/omp/memory` as made by this page, and a change the memory refuses, such as a slug already taken, shows why under the form.
+
+## Glossary
+
+- The **Glossary** tab shows one repository's `GLOSSARY.md`, the words its interface, docs, and code use, as a table of each term, the first line of its definition, and the words to avoid for it, under a header per section with its count.
+  On a narrow page the table drops the words to avoid.
+- The repository picker lists every workspace's git repository that has a `GLOSSARY.md`, each with how many terms it defines; the tab opens on the first, and `#memory/glossary?repo=<path>` opens one.
+- **Search** narrows the table to terms whose name, definition, or words to avoid hold every word you type.
+- Click a row, or move to it with the up and down arrows or `j` and `k` and press Enter, to read the term beside the table: its definition in full and its words to avoid.
+  The arrows at the panel's top, or the same keys, open the previous and next term, and **×** or Escape closes it.
+- The tab only reads: change a term by editing the repository's `GLOSSARY.md`.
 
 ## Bookmarks
 

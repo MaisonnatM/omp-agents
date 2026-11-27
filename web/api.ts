@@ -141,6 +141,7 @@ export async function putJson<T>(url: string, body: unknown, signal?: AbortSigna
 }
 
 export const PROJECT_MEMORY_URL = "/api/project-memory";
+export const GLOSSARY_URL = "/api/glossary";
 export const BOOKMARKS_URL = "/api/bookmarks";
 
 /** Applies `edit` to its repository's project memory, all or nothing, and answers every repository's. */

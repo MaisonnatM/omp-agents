@@ -7,6 +7,8 @@ test("memory routes open a repository's project memory and a bookmark search, an
 	const routes: [MemoryRoute, string][] = [
 		[{ tab: "project", repo: null }, "#memory"],
 		[{ tab: "project", repo: "/Users/me/code/omp agents" }, "#memory?repo=%2FUsers%2Fme%2Fcode%2Fomp%20agents"],
+		[{ tab: "glossary", repo: null }, "#memory/glossary"],
+		[{ tab: "glossary", repo: "/r" }, "#memory/glossary?repo=%2Fr"],
 		[{ tab: "bookmarks", q: "" }, "#memory/bookmarks"],
 		[{ tab: "bookmarks", q: "spring & design" }, "#memory/bookmarks?q=spring%20%26%20design"],
 	];

@@ -125,6 +125,7 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 		{ id: "browserRestore", scope: "anywhere", key: 0 },
 		{ id: "sportJournalClose", scope: "outside-fields", key: 0 },
 		{ id: "memoryProjectClose", scope: "outside-fields", key: 0 },
+		{ id: "memoryGlossaryClose", scope: "outside-fields", key: 0 },
 		{ id: "memoryBookmarksClose", scope: "outside-fields", key: 0 },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([{ id: "attachFiles", scope: "composer", key: 0 }]);
@@ -135,11 +136,11 @@ test("a key matches only its intended scope, with no Esc interrupt, and Cmd+/ at
 	expect(shortcutsFor(keyEvent("s", "KeyS"), null, false)).toEqual([{ id: "newSession", scope: "outside-fields", key: 1 }]);
 });
 
-test("↓ and ↑, or J and K, step through sessions, pull requests, sport logs, memories, bookmarks, and changed files, and ↑ also takes back a queued message", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "sportJournalNext", "memoryProjectNext", "memoryBookmarksNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "sportJournalPrevious", "memoryProjectPrevious", "memoryBookmarksPrevious", "previousChangedFile"]);
-	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "sportJournalNext", "memoryProjectNext", "memoryBookmarksNext", "nextChangedFile"]);
-	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "sportJournalPrevious", "memoryProjectPrevious", "memoryBookmarksPrevious", "previousChangedFile"]);
+test("↓ and ↑, or J and K, step through sessions, pull requests, sport logs, memories, glossary terms, bookmarks, and changed files, and ↑ also takes back a queued message", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "sportJournalNext", "memoryProjectNext", "memoryGlossaryNext", "memoryBookmarksNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "sportJournalPrevious", "memoryProjectPrevious", "memoryGlossaryPrevious", "memoryBookmarksPrevious", "previousChangedFile"]);
+	expect(press("j", "KeyJ")).toEqual(["sessionsNext", "nextPullRequest", "sportJournalNext", "memoryProjectNext", "memoryGlossaryNext", "memoryBookmarksNext", "nextChangedFile"]);
+	expect(press("k", "KeyK")).toEqual(["sessionsPrevious", "previousPullRequest", "sportJournalPrevious", "memoryProjectPrevious", "memoryGlossaryPrevious", "memoryBookmarksPrevious", "previousChangedFile"]);
 	expect(shortcutsFor(keyEvent("j", "KeyJ"), null, false).map(({ scope }) => scope)).not.toContain("anywhere");
 });
 
