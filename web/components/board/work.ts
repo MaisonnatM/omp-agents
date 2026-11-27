@@ -1,4 +1,4 @@
-/** What the Board page and its sidebar read from a Board task beyond its fold: how its work stands, which session its thread shows, and the ready count. */
+/** What the Board page and its sidebar read from a Board task beyond its fold: how its work stands, and which session its thread shows. */
 import { type RosterHost, type Stop, stopOf } from "../../../src/shared/sessions";
 import { type BoardState, type BoardTask, startedOn, statusOf, wakeTarget } from "../../../templates/omp/agent/extensions/board/log";
 
@@ -31,6 +31,3 @@ export function namedIn(task: BoardTask): string[] {
 /** The session Board task `task`'s thread shows: `picked`, the one the address names, when the task names it; else the one a reply wakes, or on a done Board task the last one started on it. */
 export const threadSession = (task: BoardTask, picked: string | null): string | null =>
 	(picked !== null && namedIn(task).includes(picked) ? picked : null) ?? wakeTarget(task, { kind: "user" }) ?? (task.doneAt !== null ? (startedOn(task).at(-1) ?? null) : null);
-
-/** How many of Workspace `workspace`'s Board tasks are ready, the count beside it in the sidebar; one whose start failed waits on your reply, so it is not. */
-export const readyIn = (state: BoardState, workspace: string): number => state.tasks.filter(task => task.workspace === workspace && statusOf(state, task).kind === "ready").length;

@@ -1,12 +1,11 @@
 /**
  * The pieces a Board message is made of, on the Board and in its Board thread alike: when messages group and split by
  * day, the author's picture and name, the message row with its hover toolbar's buttons, the text and labels, the line
- * of a Board task in work, the editor that edits your own message, and the replies of each Board thread you have seen.
- * The page that lays them out is `./page.tsx`.
+ * of a Board task in work, and the editor that edits your own message. The page that lays them out is `./page.tsx`.
  */
 import { IconAiBotHead, IconBubbleWideNotification, IconCircleCheck, IconPencil, IconUser } from "central-icons";
-import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { BoardAuthor, BoardChange, BoardReply, BoardState, BoardTask } from "../../../templates/omp/agent/extensions/board/log";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { BoardAuthor, BoardChange, BoardState, BoardTask } from "../../../templates/omp/agent/extensions/board/log";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -335,38 +334,4 @@ function MessageEditor({ text, onSave, onClose }: { text: string; onSave: (text:
 	);
 }
 
-const said = (task: BoardTask): Extract<BoardReply, { by: BoardAuthor }>[] => task.replies.filter((entry): entry is Extract<BoardReply, { by: BoardAuthor }> => "by" in entry);
-
-/** How many replies of each Board task's thread you have seen, by task id, kept in this browser. */
-const SEEN_KEY = "omp-agents.board-thread-seen";
-const seenListeners = new Set<() => void>();
-let seen: Record<string, number> = {};
-try {
-	seen = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "{}") as Record<string, number>;
-} catch {}
-function markSeen(id: number, count: number) {
-	if (seen[id] === count) return;
-	seen = { ...seen, [id]: count };
-	localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
-	for (const listener of seenListeners) listener();
-}
-const useSeen = (): Record<string, number> =>
-	useSyncExternalStore(
-		listener => {
-			seenListeners.add(listener);
-			return () => seenListeners.delete(listener);
-		},
-		() => seen,
-	);
-/** Replies past the ones seen that someone else wrote: the unread count, as Slack's thread pill. The line a session leaves with a quiet done, having found nothing to report, counts for nothing. */
-const unreadOf = (task: BoardTask, seenCount: number | undefined): number => {
-	const quiet = new Set(
-		task.replies.filter((entry, index) => {
-			const before = task.replies[index - 1];
-			return "by" in entry && before !== undefined && "note" in before && before.note.kind === "done" && before.note.quiet === true;
-		}),
-	);
-	return said(task).slice(seenCount ?? 0).filter(reply => reply.by.kind !== "user" && !quiet.has(reply)).length;
-};
-
-export { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, MarkUnreadButton, markSeen, MessageEditor, MessageRow, said, sameDay, TaskBody, unreadOf, useSeen, WorkingLine, WorkLabel };
+export { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, MarkUnreadButton, MessageEditor, MessageRow, sameDay, TaskBody, WorkingLine, WorkLabel };

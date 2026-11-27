@@ -1,16 +1,18 @@
-/** The Board's half of the left sidebar, under its Board tab: the Workspaces with each one's Board sessions nested under it, each Workspace folding its sessions with a chevron. */
-import { IconChevronDownSmall, IconFolder1, IconFolderOpen } from "central-icons";
+/** The Board's half of the left sidebar, under its Board tab: the Workspaces, each with a count of what waits on you there. */
+import { IconHashtag } from "central-icons";
 import { useState } from "react";
 import { revealDetailsTab } from "../../details-tabs";
+import type { RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import type { BoardState } from "../../../templates/omp/agent/extensions/board/log";
-import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { activityControl } from "../../activity";
-import { folderName, type KnownSessions, sessionLabel } from "../../labels";
+import { folderName, waitingOnYou } from "../../labels";
 import { hashForPage, type PageHash } from "../../routing";
 import { CountPill } from "../count-pill";
 import { type BoardRoute, pageView } from "./module";
-import { namedIn, readyIn, threadSession } from "./work";
+import { useSeen, waitingIn } from "./seen";
+import { namedIn, threadSession } from "./work";
 
 /** The Board's Messages address: Workspace `workspace`, Board task `thread`'s thread open, with `search`'s results shown, its reply `reply` highlighted, or session `session`'s tabs in it. */
 export const hashForBoard = (workspace: string | null, thread: number | null = null, { search = null, reply = null, session = null }: Partial<Pick<BoardRoute, "search" | "reply" | "session">> = {}): string =>
@@ -63,82 +65,41 @@ interface BoardSidebarProps {
 	state: BoardState | null;
 	workspaces: readonly Workspace[];
 	picked: string | null;
-	sessions: KnownSessions;
+	/** The live sessions the Sessions tab lists, whose count of those that need you each Workspace's count includes. */
+	hosts: readonly RosterHost[];
 }
 
-export function BoardSidebar({ route, state, workspaces: sidebar, picked, sessions }: BoardSidebarProps) {
-	const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
-	const toggle = (key: string) => setCollapsed(prev => {
-		const next = new Set(prev);
-		if (!next.delete(key)) next.add(key);
-		return next;
-	});
+export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts }: BoardSidebarProps) {
+	const [folded, setFolded] = useState(false);
+	const seen = useSeen();
 	if (state === null) return <p className="px-4 py-2 text-xs text-muted-foreground">Loading the Board…</p>;
 	const { workspaces, open } = boardWorkspaces(state, sidebar, picked, route);
 	return (
 		<SidebarContent>
-			<SidebarGroup collapsible open={!collapsed.has("workspaces")} onOpenChange={() => toggle("workspaces")}>
+			<SidebarGroup collapsible open={!folded} onOpenChange={() => setFolded(was => !was)}>
 				<SidebarGroupLabel>Workspaces</SidebarGroupLabel>
 				<SidebarMenu aria-label="Board workspaces" className="gap-px">
 					{workspaces.map(workspace => {
-						const inIt = state.tasks.filter(task => task.workspace === workspace.cwd);
-						const ready = readyIn(state, workspace.cwd);
-						const ids = [...new Set(inIt.flatMap(namedIn))]
-							.map(id => ({ id, ...sessionLabel(id, sessions) }))
-							.filter(row => row.host);
+						const waiting = waitingIn(state, seen, hosts, workspace.cwd);
 						const current = workspace.cwd === open?.cwd;
-						const name = folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay;
-						const foldKey = `workspace:${workspace.cwd}`;
-						const folded = collapsed.has(foldKey);
 						return (
 							<SidebarMenuItem key={workspace.cwd}>
 								<SidebarMenuButton
 									{...activityControl("board.workspace")}
-									icon={current && ids.length > 0 && !folded ? IconFolderOpen : IconFolder1}
+									icon={IconHashtag}
 									isActive={current}
 									aria-current={current ? "page" : undefined}
 									title={workspace.cwdDisplay}
-									className={ids.length > 0 ? "pr-8" : undefined}
 									onClick={go(hashForBoard(workspace.cwd))}
 								>
-									<span className="min-w-0 flex-1 truncate">{name}</span>
-									{ready > 0 && (
+									<span className="min-w-0 flex-1 truncate">{folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
+									{waiting > 0 && (
 										<>
-											<CountPill count={ready} />
-											<span className="sr-only">{`, ${ready} ready`}</span>
+											<CountPill count={waiting} />
+											<span className="sr-only">{`, ${waitingOnYou(waiting)}`}</span>
 										</>
 									)}
 								</SidebarMenuButton>
-								{ids.length > 0 && (
-									<SidebarMenuAction
-										{...activityControl("board.workspace.fold")}
-										aria-expanded={!folded}
-										aria-label={`${folded ? "Show" : "Hide"} Board sessions in ${name}`}
-										title={folded ? "Show sessions" : "Hide sessions"}
-										onClick={() => toggle(foldKey)}
-									>
-										<IconChevronDownSmall className={`transition-transform ${folded ? "-rotate-90" : ""}`} aria-hidden />
-									</SidebarMenuAction>
-								)}
-								{ids.length > 0 && !folded && (
-									<SidebarMenu aria-label={`Board sessions in ${name}`} className="my-1 ml-[15px] w-auto gap-px border-l border-border pl-1">
-										{ids.map(({ id, name }) => (
-											<SidebarMenuItem key={id}>
-												<SidebarMenuButton
-													{...activityControl("board.session.open")}
-													size="short"
-													dot="filled"
-													onClick={() => {
-														revealSessionTab();
-														location.hash = hashForBoardSession(state, workspace.cwd, id);
-													}}
-												>
-													<span className="min-w-0 flex-1 truncate">{name}</span>
-												</SidebarMenuButton>
-											</SidebarMenuItem>
-										))}
-									</SidebarMenu>
-								)}
 							</SidebarMenuItem>
 						);
 					})}

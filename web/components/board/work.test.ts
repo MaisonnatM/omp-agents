@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { type BoardChange, type BoardState, emptyBoard } from "../../../templates/omp/agent/extensions/board/log";
 import { isThreadNote } from "./board-note";
 import { BOARD_PAGE } from "./module";
-import { readyIn, threadSession, workOf } from "./work";
+import { threadSession, workOf } from "./work";
 
 const user = { kind: "user" } as const;
 const workspace = "/w";
@@ -29,15 +29,10 @@ describe("a Board task whose start failed", () => {
 		expect(workOf(failed, task(failed, 2), [])).toEqual({ kind: "starting" });
 	});
 
-	test("leaves the sidebar's ready count", () => {
-		expect(readyIn(failed, workspace)).toBe(1);
-	});
-
 	test("shows the failed start in its thread, and a reply starts it again", () => {
 		expect(task(failed, 1).replies.flatMap(entry => ("note" in entry && isThreadNote(entry.note) ? [entry.note] : []))).toEqual([{ kind: "start-failed", error: "setup exited 1" }]);
 		const retried = board(post("one"), { op: "start", task: 1, sessionId: null, error: "setup exited 1" }, { op: "reply", by: user, task: 1, text: "try again" });
 		expect(workOf(retried, task(retried, 1), [])).toEqual({ kind: "starting" });
-		expect(readyIn(retried, workspace)).toBe(1);
 	});
 });
 

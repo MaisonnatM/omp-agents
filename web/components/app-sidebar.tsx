@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarContent, SidebarGroup, SidebarMenu } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
-import { folderName, type KnownSessions } from "../labels";
+import { folderName } from "../labels";
 import { withoutHidden, yourMoveCount } from "../pull-requests-model";
 import { useHiddenRepos } from "../pull-requests-state";
 import { pullRequestsStore } from "../reads";
@@ -38,8 +38,6 @@ interface AppSidebarProps {
 	tabs: readonly SidebarTab[];
 	/** The Board, `null` until the server sends it. */
 	board: BoardState | null;
-	/** Every live and past session, which the Board tab names. */
-	known: KnownSessions;
 	/** The open page's own list, shown beneath its row while the sidebar floats, as on a phone; otherwise the page holds it. */
 	list: ReactNode;
 	settings: SettingsRoute;
@@ -61,7 +59,6 @@ export const AppSidebar = memo(function AppSidebar({
 	onTab,
 	tabs,
 	board,
-	known,
 	list,
 	settings,
 	unreadNotices,
@@ -123,7 +120,7 @@ export const AppSidebar = memo(function AppSidebar({
 							</SidebarMenu>
 						</nav>
 					</SidebarGroup>
-					<BoardSidebar route={boardRoute} state={board} workspaces={workspaces} picked={workspace} sessions={known} />
+					<BoardSidebar route={boardRoute} state={board} workspaces={workspaces} picked={workspace} hosts={visible.hosts} />
 				</>
 			) : (
 				<>
@@ -145,6 +142,7 @@ export const AppSidebar = memo(function AppSidebar({
 							projects={projects}
 							pinnedIds={pinned}
 							groups={groups}
+							board={board}
 							query={query}
 							onQuery={setQuery}
 							onTogglePin={togglePin}
