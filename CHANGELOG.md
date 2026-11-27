@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- The Board sidebar now has Threads at the top, as in Slack: it lists every Board thread with replies across all Workspaces, newest reply first, with a count of those you have not read. Click one to open its thread beside the list and reply there.
 - Fixed: when a Board task's session asks you something, such as whether to put a pull request live, the Board thread now shows the question with its answer buttons above the reply box, so you can answer it there instead of opening the session's tab.
 - In the `general` Workspace's Sessions tab, each session shows the folder it ran in, such as `~/code`, `~/tmp`, or `~`, beside its name.
 - The tabs across the top of the window are gone: one page shows at a time, and Back and Forward walk the window's history again. The details sidebar keeps its tabs. Cmd+W, Cmd+T, Cmd+1 to 9, Ctrl+Tab, and the other tab keys no longer do anything in the dashboard.

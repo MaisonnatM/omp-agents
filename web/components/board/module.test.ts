@@ -25,6 +25,15 @@ describe("Board addresses", () => {
 		}
 	});
 
+	test("the Threads view, alone or with a thread open, survives a reload with no Workspace", () => {
+		for (const thread of [null, 12]) {
+			const page: Page = { kind: "board", workspace: null, view: { tab: "threads", thread }, search: null, reply: null, session: null };
+			const hash = hashForPage(page);
+			expect(hash).toBe(thread === null ? "#board/threads" : "#board/threads/12");
+			expect(routeFromHash(hash)).toEqual({ kind: "page", page });
+		}
+	});
+
 	test("a project or pull request a Workspace tab opens survives a reload in that tab", () => {
 		const pageAt = (hash: string): Page => {
 			const route = routeFromHash(hash);
