@@ -9,7 +9,7 @@ import { PageHashContext } from "../../page-hash";
 import { pullRequestsScope, pullRequestsStore, UNREAD } from "../../reads";
 import { COLUMN_MIN, listPlacement, listSplits } from "../../page-list";
 import { hashForPage, type PullRequestsRoute, workspaceSection } from "../../routing";
-import { latestSession, workspaceCwd } from "../../sessions";
+import { latestSession, type ProjectGroup, workspaceCwd } from "../../sessions";
 import { type DashboardActions, DashboardActionsContext, DashboardStatusContext, SessionsTabContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { ViewConversation } from "../pane";
 import { HeaderTitleShown } from "../page-header";
@@ -146,6 +146,9 @@ function ListedTab({ label, split, list, children }: { label: string; split: boo
 	);
 }
 
+/** The Sessions tab lists no projects: the Projects tab beside it shows them, and their sessions stay in their own lists. */
+const NO_PROJECTS: ProjectGroup[] = [];
+
 const sessionsHash = (workspace: string | null, session: string) => hashForPage({ kind: "board", workspace, view: { tab: "sessions", session }, search: null, reply: null, session: null });
 
 /**
@@ -170,7 +173,7 @@ function WorkspaceSessions({ board, core, workspace, session }: { board: BoardSt
 		}),
 		[actions, workspace],
 	);
-	const fallback = tab && latestSession(tab.sessions.lists);
+	const fallback = tab && latestSession(tab.sessions.byWorkspace.lists);
 	const picked = session ?? (fallback === null ? null : fallback.kind === "past" ? fallback.sessionId : (hosts.find(host => host.instanceId === fallback.instanceId)?.sessionId ?? null));
 	const host = picked === null ? null : (hosts.find(each => each.sessionId === picked) ?? null);
 	const past = picked === null || host ? null : (saved.find(each => each.sessionId === picked) ?? null);
@@ -188,10 +191,10 @@ function WorkspaceSessions({ board, core, workspace, session }: { board: BoardSt
 				<DashboardActionsContext.Provider value={rowActions}>
 					<Roster
 						workspaces={workspaces}
-						lists={sessions.lists}
-						projects={sessions.projects}
+						lists={sessions.byWorkspace.lists}
+						projects={NO_PROJECTS}
 						pinnedIds={sessions.pinned}
-						groups={sessions.groups}
+						groups={sessions.byWorkspace.groups}
 						board={board}
 						query={sessions.query}
 						onQuery={sessions.setQuery}
