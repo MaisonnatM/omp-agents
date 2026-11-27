@@ -29,18 +29,17 @@ const BECAUSE_LABEL: Record<AutoStop["because"], string> = {
 	unknown: "Idle",
 };
 
-function Now({ reading, heavy }: { reading: MemoryReading | null; heavy: { slots: number; running: number; queued: number } }) {
+function Now({ reading }: { reading: MemoryReading | null }) {
 	const pressure = reading?.pressure ?? "unknown";
 	const known = reading !== null && pressure !== "unknown";
 	const figures: [string, string][] = [
 		["In use", known ? `${formatBytes(reading.totalBytes - reading.availableBytes)} of ${formatBytes(reading.totalBytes)}` : "—"],
 		["Swap used", known ? formatBytes(reading.swapUsedBytes) : "—"],
 		["Swapped out", known ? `${formatBytes(reading.swapOutBytesPerMin)} a minute` : "—"],
-		["Builds and tests", `${heavy.running} running, ${heavy.queued} waiting, ${heavy.slots} slots`],
 	];
 	return (
 		<Section meta="Pressure is read every 15 seconds from macOS. Under high pressure the dashboard stops one idle thing a tick, under critical three, and never a busy session.">
-			<dl className="grid gap-x-8 gap-y-4 sm:grid-cols-5">
+			<dl className="grid gap-x-8 gap-y-4 sm:grid-cols-4">
 				<div>
 					<dt className="text-xs text-muted-foreground">Pressure</dt>
 					<dd className={`mt-1 text-xl font-semibold ${TONE_CLASS[PRESSURE_TONE[pressure]].text}`}>{PRESSURE_LABEL[pressure]}</dd>
@@ -161,7 +160,7 @@ export function ResourcesTab({ active }: { active: boolean }) {
 	const view = read?.data ?? null;
 	return (
 		<>
-			<Now reading={view?.reading ?? null} heavy={view?.heavy ?? { slots: 0, running: 0, queued: 0 }} />
+			<Now reading={view?.reading ?? null} />
 			{error && <ErrorText>Cannot read memory. {error}</ErrorText>}
 			<History active={active} />
 			<Footprints footprints={view?.footprints ?? []} />

@@ -5,7 +5,7 @@
 import { run } from "./proc";
 import type { MemoryReading, Pressure } from "./shared/resources";
 
-/** The kernel's memory pressure level: 1 normal, 2 warn, 4 critical. */
+/** The kernel's memory pressure level: 1 normal, 2 warn, 4 critical. Its warn alone counts for nothing: it held with 30–45% of memory available while nothing swapped. */
 type KernelLevel = 1 | 2 | 4;
 
 interface RawPressure {
@@ -32,7 +32,7 @@ const RANK: Record<Exclude<Pressure, "unknown">, number> = { normal: 0, warn: 1,
 /** What `raw` alone says, before hysteresis. */
 function instantOf({ kernelLevel, availablePercent, swapOutBytesPerMin }: RawPressure): Exclude<Pressure, "unknown"> {
 	if (kernelLevel === 4 || availablePercent < CRITICAL_AVAILABLE_PERCENT || swapOutBytesPerMin >= CRITICAL_SWAP_OUT_BYTES_PER_MIN) return "critical";
-	if (kernelLevel === 2 || availablePercent < WARN_AVAILABLE_PERCENT || swapOutBytesPerMin >= WARN_SWAP_OUT_BYTES_PER_MIN) return "warn";
+	if (availablePercent < WARN_AVAILABLE_PERCENT || swapOutBytesPerMin >= WARN_SWAP_OUT_BYTES_PER_MIN) return "warn";
 	return "normal";
 }
 
