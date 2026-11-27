@@ -62,7 +62,7 @@ const routineRun = (task: BoardTask): string[] =>
 	task.by.kind === "routine"
 		? [
 				`Routine "${task.by.name}" posted this Board task, and each of its runs replies on it while it is not done. When a run finds nothing worth reporting, change nothing and mark Board task #${task.id} done with quiet set to true and one line saying so, with no Suggestions block: a quiet done notifies nobody.`,
-				`Keep what a run reports small: the done text is a summary of at most about five short lines. When the findings need more, such as lists, logs, or per-item detail, first post them on the thread with the board tool (action reply, task ${task.id}), then mark the task done with only the summary.`,
+				`Keep what a run reports small, and post nothing else on the thread: no replies with lists, logs, or per-item detail. The done text follows the same format as a /ship report: a bold first line with the outcome, then at most about five short bullets, each opening with a bold key word, then **Needs you:**, **Not verified:** and **Done:** lines, each only when it has content, then the Suggestions block. Name counts and the few items that matter, never the full list.`,
 			]
 		: [];
 
