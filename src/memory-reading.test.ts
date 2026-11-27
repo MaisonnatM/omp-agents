@@ -9,8 +9,8 @@ describe("pressureOf", () => {
 		expect(pressureOf(calm, "normal", 0)).toBe("normal");
 	});
 
-	test("each signal alone raises pressure: the kernel level, available memory under 20% then 8%, and swap-outs", () => {
-		expect(pressureOf({ ...calm, kernelLevel: 2 }, "normal", 0)).toBe("warn");
+	test("each signal alone raises pressure: the kernel's critical level, available memory under 20% then 8%, and swap-outs", () => {
+		expect(pressureOf({ ...calm, kernelLevel: 2 }, "normal", 0)).toBe("normal");
 		expect(pressureOf({ ...calm, kernelLevel: 4 }, "normal", 0)).toBe("critical");
 		expect(pressureOf({ ...calm, availablePercent: 19 }, "normal", 0)).toBe("warn");
 		expect(pressureOf({ ...calm, availablePercent: 7 }, "normal", 0)).toBe("critical");
