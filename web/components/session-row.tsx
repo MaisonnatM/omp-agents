@@ -2,6 +2,7 @@
 import { IconCalendarClock, IconCircleX, IconClock, IconFlag1, IconFolderDelete, IconLayoutColumn, IconPause } from "central-icons";
 import { Fragment, memo, type ReactElement, type ReactNode, useContext } from "react";
 import { awaitsCi, awaitsScheduled, awaitsSubagents, type PastSession, type RosterHost, type View, type WatchedChecks } from "../../src/shared/sessions";
+import { GENERAL_DISPLAY, type Workspace, workspaceName } from "../../src/shared/workspaces";
 import { Badge } from "@/components/ui/badge";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator, MenuShortcut, MenuSubmenu, MenuSubmenuContent, MenuSubmenuTrigger } from "@/components/ui/menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -9,7 +10,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { PrivateChip } from "./private-chip";
 import { cn } from "@/lib/utils";
 import type { PaletteAction } from "../command-palette";
-import { folderName, hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, SPLIT_CLICK } from "../labels";
+import { hostLabel, modeOf, pastLabel, PRIVATE_NOTE, SOURCE_LABELS, SPLIT_CLICK } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
 import { isPrivateHost, type RowPlacement, workspaceCwd, workspaceOf } from "../sessions";
@@ -88,12 +89,14 @@ function SessionButton({ view, label, title, badge, facts, when, dot, placement,
 }
 
 /**
- * The workspace a row counts in, before its label, shown only under all workspaces: on a titled row, and on an untitled one,
- * whose label is its directory's name, when that directory is not its workspace's, as a linked worktree's is not.
+ * The badge before a row's age: under all workspaces, the workspace it counts in, on a titled row, and on an untitled one,
+ * whose label is its directory's name, when that directory is not its workspace's, as a linked worktree's is not; in the
+ * General workspace, the directory it ran in, such as `~/tmp` or `~`, unless that is General's own `~/code`.
  */
-export function WorkspaceBadge({ cwdDisplay }: { cwdDisplay: string }) {
-	const name = folderName(cwdDisplay);
-	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
+function rowBadge(row: { cwd: string; cwdDisplay: string; workspace: Workspace | null }, titled: boolean, showWorkspace: boolean): ReactNode {
+	const workspace = workspaceOf(row);
+	const text = showWorkspace ? (titled || workspace.cwd !== row.cwd ? workspaceName(workspace.cwdDisplay) : null) : workspace.cwdDisplay === GENERAL_DISPLAY && workspace.cwd !== row.cwd ? row.cwdDisplay : null;
+	return text === null ? null : <Badge size="compact" className="shrink-0 self-center">{text}</Badge>;
 }
 
 interface RowMenuProps {
@@ -245,7 +248,7 @@ export const PastRow = memo(function PastRow({ session, pinned, placement, showW
 				view={view}
 				label={label}
 				title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-				badge={showWorkspace && (session.title !== null || workspaceCwd(session) !== session.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(session).cwdDisplay} /> : null}
+				badge={rowBadge(session, session.title !== null, showWorkspace)}
 				facts={sessionFacts([session.source !== "omp" && SOURCE_LABELS[session.source]])}
 				when={session.modifiedAt}
 				dot={session.interrupted ? <IconPause aria-hidden={false} aria-label="Interrupted" className="size-3 shrink-0 text-warning-foreground" /> : undefined}
@@ -311,7 +314,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, placement,
 	const status = awaitsSubagents(host) ? "awaiting-subagents" : awaitsScheduled(host) ? "awaiting-scheduled" : host.status;
 	const scheduledAt = status === "awaiting-scheduled" && host.scheduledCheck?.kind === "send" ? ` until ${new Date(host.scheduledCheck.at).toLocaleString()}` : "";
 	const isPrivate = isPrivateHost(host);
-	const workspace = showWorkspace && (host.sessionName !== null || workspaceCwd(host) !== host.cwd) ? <WorkspaceBadge cwdDisplay={workspaceOf(host).cwdDisplay} /> : null;
+	const workspace = rowBadge(host, host.sessionName !== null, showWorkspace);
 	return (
 		<RowMenu entry={{ kind: "live", host }} onScreen={placement !== "hidden"} pinned={pinned} onTogglePin={onTogglePin}>
 			<>
