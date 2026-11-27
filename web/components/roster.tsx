@@ -193,7 +193,7 @@ function ProjectsGroup({ projects, current, open, onOpenChange, row }: ProjectsG
 }
 
 interface RosterProps {
-	/** Set where it fills the sidebar, while the Board is off: it then holds the workspace picker, which calls this. Unset in a Workspace's **Sessions** tab on the Board. */
+	/** Set where it fills the sidebar, while the Board is off: it then holds the workspace picker, which calls this. Unset in a Workspace's **Sessions** tab on the Board, which lists the live sessions without their Workspace's folder. */
 	onPickWorkspace?: (cwd: string | null) => void;
 	/** The workspaces, as {@link listWorkspaces} lists them, which the picker offers. */
 	workspaces: Workspace[];
@@ -350,16 +350,25 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, board, 
 			</SidebarGroup>
 			{filtering && nothing && <p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>}
 			<PinnedGroup pinned={pinned} open={open} showWorkspace={showWorkspace} onTogglePin={onTogglePin} />
-			{folders.shown.map(folder => {
-				const { cwd, cwdDisplay } = folder.group.workspace;
-				const key = `workspace:${cwd}`;
-				return (
-					<WorkspaceFolder key={cwd} folder={folder} board={board} name={workspaceName(cwdDisplay)} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)}>
-						{folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false))}
-					</WorkspaceFolder>
-				);
-			})}
-			{(folders.more > 0 || (allGroups && folders.foldable)) && (
+			{onPickWorkspace === undefined ? (
+				// A Workspace's Sessions tab names its Workspace already, so its live sessions list without the folder.
+				<SidebarGroup className="py-0">
+					<SidebarMenu aria-label="omp sessions" className="gap-px">
+						{folders.shown.flatMap(folder => folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false)))}
+					</SidebarMenu>
+				</SidebarGroup>
+			) : (
+				folders.shown.map(folder => {
+					const { cwd, cwdDisplay } = folder.group.workspace;
+					const key = `workspace:${cwd}`;
+					return (
+						<WorkspaceFolder key={cwd} folder={folder} board={board} name={workspaceName(cwdDisplay)} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)}>
+							{folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false))}
+						</WorkspaceFolder>
+					);
+				})
+			)}
+			{onPickWorkspace !== undefined && (folders.more > 0 || (allGroups && folders.foldable)) && (
 				<SidebarGroup className="py-0">
 					<SidebarMenu>
 						<SidebarMenuItem>
