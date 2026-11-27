@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- Settings › Providers can now order two sign-ins of the same email, such as a team and a personal organization; omp tells them apart by organization.
 - A routine's run no longer posts long replies on its Board thread. It finishes like a /ship report: a bold outcome line, a few short bullets, then Needs you, Not verified, and Done lines when they apply.
 - A Workspace's Board tabs now run Messages, Pull requests, Projects, Routines, Memory, Settings.
 

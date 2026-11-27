@@ -3,7 +3,7 @@ import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
-import { ANTHROPIC_API_KEY_METHOD, type LoginPrompt, type ModelProvider, orderableAccounts, type ProviderAccount, type ProviderLogin, type ProvidersAnswer, providerConnected } from "../../../src/shared/providers";
+import { ANTHROPIC_API_KEY_METHOD, type LoginPrompt, type ModelProvider, type ProviderAccount, type ProviderLogin, type ProvidersAnswer, providerConnected } from "../../../src/shared/providers";
 import { putJson } from "../../api";
 import { readTime } from "../../labels";
 import { providersStore } from "../../reads";
@@ -191,15 +191,15 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 	}, null);
 	const starting = start.pending;
 	const startError = start.error;
-	const orderable = orderableAccounts(provider.accounts);
-	const reorder = useAction(async (emails: string[]) => {
-		const answer = await putJson<ProvidersAnswer>("/api/providers/account-order", { provider: provider.id, emails });
+	const orderable = provider.accounts.filter(account => account.orderable);
+	const reorder = useAction(async (credentialIds: number[]) => {
+		const answer = await putJson<ProvidersAnswer>("/api/providers/account-order", { provider: provider.id, credentialIds });
 		providersStore.update(() => answer);
 	}, null);
 	const moveAccount = (index: number, by: -1 | 1): void => {
-		const emails = orderable.map(({ email }) => email);
-		emails.splice(index + by, 0, ...emails.splice(index, 1));
-		reorder.run(emails);
+		const credentialIds = orderable.map(({ credentialId }) => credentialId);
+		credentialIds.splice(index + by, 0, ...credentialIds.splice(index, 1));
+		reorder.run(credentialIds);
 	};
 	const ordering = orderable.length > 1;
 	const connected = providerConnected(provider);

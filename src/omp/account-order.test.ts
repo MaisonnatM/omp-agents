@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { orderableAccounts } from "../shared/providers";
-import { orderPolicies, rankAccounts, readAccountPolicies, writeAccountOrder } from "./account-order";
+import { orderPolicies, rankAccounts, readAccountPolicies, uniqueSelector, writeAccountOrder } from "./account-order";
 import { agentDir } from "./config";
 
 const work = { email: "maxence@maisonnat.com" };
@@ -38,7 +37,7 @@ describe("orderPolicies", () => {
 	test("reuses each account's own policy, keeping its selector and other fields, and gives descending priorities", () => {
 		const codex = { provider: "openai-codex", account: { email: "x@example.com" }, priority: 4 };
 		const policies = [codex, { provider: "anthropic", account: work, priority: 10, reclaimAbovePct: 5 }, { provider: "anthropic", account: { accountId: "acct-team" }, reservePct: 20 }];
-		expect(orderPolicies(policies, "anthropic", [team, home, work])).toEqual([
+		expect(orderPolicies(policies, "anthropic", [team, home, work].map(identity => ({ identity, selector: identity })))).toEqual([
 			codex,
 			{ provider: "anthropic", account: work, priority: 1, reclaimAbovePct: 5 },
 			{ provider: "anthropic", account: { accountId: "acct-team" }, reservePct: 20, priority: 3 },
@@ -49,21 +48,27 @@ describe("orderPolicies", () => {
 	test("a policy that matches no account, a malformed entry, and the input stay as they are", () => {
 		const stale = { provider: "anthropic", account: { email: "gone@example.com" }, priority: 7 };
 		const policies = [stale, "not a policy"];
-		expect(orderPolicies(policies, "anthropic", [home, work])).toEqual([stale, "not a policy", { provider: "anthropic", account: home, priority: 2 }, { provider: "anthropic", account: work, priority: 1 }]);
+		expect(orderPolicies(policies, "anthropic", [home, work].map(identity => ({ identity, selector: identity })))).toEqual([stale, "not a policy", { provider: "anthropic", account: home, priority: 2 }, { provider: "anthropic", account: work, priority: 1 }]);
 		expect(policies).toEqual([stale, "not a policy"]);
 	});
 });
 
-describe("orderableAccounts", () => {
-	test("keeps the accounts whose email no other shares, in order", () => {
-		const accounts = [
-			{ id: 1, email: "a@example.com" },
-			{ id: 2, email: null },
-			{ id: 3, email: "shared@example.com" },
-			{ id: 4, email: "b@example.com" },
-			{ id: 5, email: "shared@example.com" },
-		];
-		expect(orderableAccounts(accounts).map(account => account.id)).toEqual([1, 4]);
+describe("uniqueSelector", () => {
+	const yampa = { email: "maxence@yampa.ai", accountId: "acct-yampa", orgId: "org-yampa" };
+	const personal = { email: "maxence@yampa.ai", accountId: "acct-yampa", orgId: "org-personal" };
+
+	test("names a sign-in by its email alone when no other shares it", () => {
+		expect(uniqueSelector(home, [work, yampa])).toEqual({ email: home.email });
+	});
+
+	test("adds the organization when two sign-ins of one account share the email", () => {
+		expect(uniqueSelector(yampa, [personal, home])).toEqual({ email: yampa.email, orgId: "org-yampa" });
+		expect(uniqueSelector(personal, [yampa, home])).toEqual({ email: personal.email, orgId: "org-personal" });
+	});
+
+	test("is null for a sign-in another one duplicates, or one with no email, account, or project", () => {
+		expect(uniqueSelector(yampa, [{ ...yampa }])).toBeNull();
+		expect(uniqueSelector({ orgId: "org-1" }, [])).toBeNull();
 	});
 });
 
@@ -86,7 +91,7 @@ describe("writeAccountOrder", () => {
 			].join("\n"),
 		);
 		try {
-			await writeAccountOrder("anthropic", [home, work]);
+			await writeAccountOrder("anthropic", [home, work].map(identity => ({ identity, selector: identity })));
 			expect(await readAccountPolicies()).toEqual([
 				{ provider: "anthropic", account: work, priority: 1, reclaimAbovePct: 5 },
 				{ provider: "anthropic", account: home, priority: 2 },

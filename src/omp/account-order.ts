@@ -11,8 +11,28 @@ import { accountPolicy } from "./modules";
 
 const POLICIES = "auth.accountPolicies";
 
-/** A sign-in Settings can order: its identity, with the email no other sign-in of its provider shares. */
-export type OrderableIdentity = AccountSelector & { email: string };
+/** A sign-in Settings can order: its identity, and the selector that names it and no other sign-in of its provider. */
+export interface OrderableIdentity {
+	identity: AccountSelector;
+	selector: AccountSelector;
+}
+
+/** The selectors `uniqueSelector` tries, fewest fields first; the last takes every field the sign-in has. */
+const SELECTOR_FIELDS: (keyof AccountSelector)[][] = [["email"], ["email", "orgId"], ["accountId"], ["accountId", "orgId"], ["projectId"], ["projectId", "orgId"], ["email", "accountId", "projectId", "orgId"]];
+
+/**
+ * The fewest of `identity`'s fields that match it and none of `others`, such as its email, or its email and organization
+ * when another sign-in shares the email; `null` when every selector of it matches another too.
+ */
+export function uniqueSelector(identity: AccountSelector, others: readonly AccountSelector[]): AccountSelector | null {
+	for (const [index, fields] of SELECTOR_FIELDS.entries()) {
+		if (index < SELECTOR_FIELDS.length - 1 && fields.some(field => !identity[field])) continue;
+		const selector: AccountSelector = Object.fromEntries(fields.flatMap(field => (identity[field] ? [[field, identity[field]]] : [])));
+		if (!selector.email && !selector.accountId && !selector.projectId) continue;
+		if (!others.some(other => accountPolicy.matchesAuthAccountSelector(selector, other))) return selector;
+	}
+	return null;
+}
 
 const isPolicy = (entry: unknown): entry is AccountPolicy => isObject(entry) && typeof entry.provider === "string" && isObject(entry.account);
 
@@ -39,15 +59,15 @@ export function rankAccounts<T>(accounts: readonly T[], provider: string, polici
 /**
  * `policies` with `ordered`, `provider`'s sign-ins the first tried first, given descending priorities from
  * `ordered.length` down to 1, so each ranks above the accounts no policy names. A sign-in's own policy keeps its selector
- * and every other field; a sign-in with none gains `{ provider, account: { email }, priority }` at the end. Every
+ * and every other field; a sign-in with none gains `{ provider, account: selector, priority }` at the end. Every
  * other entry stays as and where it is.
  */
 export function orderPolicies(policies: readonly unknown[], provider: string, ordered: readonly OrderableIdentity[]): unknown[] {
 	const next = [...policies];
-	ordered.forEach((identity, index) => {
+	ordered.forEach(({ identity, selector }, index) => {
 		const priority = ordered.length - index;
 		const at = policyAt(next, provider, identity);
-		if (at === -1) next.push({ provider, account: { email: identity.email }, priority });
+		if (at === -1) next.push({ provider, account: selector, priority });
 		else next[at] = { ...(next[at] as AccountPolicy), priority };
 	});
 	return next;
