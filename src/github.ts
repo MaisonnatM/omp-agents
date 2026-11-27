@@ -9,7 +9,7 @@ import { isObject, str } from "./json";
 import { limit } from "./map-limit";
 import { run, runChecked, runJson } from "./proc";
 import type { ChangeStatus } from "./shared/changes";
-import { type CheckRunState, MERGE_STATES, type MergeState, parseRemote, type Person, type PullRequestEvent, type PullRequestFile, type Repo, type ReviewDecision, type ReviewerState } from "./shared/github";
+import { type CheckRunState, type CheckState, MERGE_STATES, type MergeState, parseRemote, type Person, type PullRequestEvent, type PullRequestFile, type Repo, type ReviewDecision, type ReviewerState } from "./shared/github";
 import { GitHubAccess, quotaReset, type GitHubBudget } from "../templates/omp/agent/extensions/github/access";
 import { CommandError } from "../templates/omp/agent/extensions/github/command";
 import { githubStatus } from "./source-control";
@@ -173,6 +173,52 @@ export const CHECK_RUN: Record<string, CheckRunState> = {
 	SKIPPED: "skipped",
 	STALE: "skipped",
 };
+
+/** A connection's `nodes`, empty when GitHub left them out. */
+export const nodesOf = (connection: unknown): unknown[] => (isObject(connection) && Array.isArray(connection.nodes) ? connection.nodes : []);
+
+/** The head commit's first `first` checks: what {@link rollupState} reads, then `run` more fields on each check run and `status` more on each commit status. */
+export const checkContexts = (first: number, run = "", status = ""): string => `contexts(first: ${first}) { totalCount nodes {
+	... on CheckRun { name status conclusion startedAt checkSuite { workflowRun { workflow { name } } } ${run} }
+	... on StatusContext { context state ${status} }
+} }`;
+
+/** A check run's state from its conclusion once it completes, else a commit status's state. */
+export function contextState(node: Record<string, unknown>): CheckRunState {
+	if (str(node.name) !== undefined) return node.status === "COMPLETED" ? (CHECK_RUN[str(node.conclusion) ?? ""] ?? "skipped") : "pending";
+	return STATUS[str(node.state) ?? ""] ?? "pending";
+}
+
+function workflowOf(node: Record<string, unknown>): string {
+	const run = isObject(node.checkSuite) && isObject(node.checkSuite.workflowRun) ? node.checkSuite.workflowRun : {};
+	return isObject(run.workflow) ? (str(run.workflow.name) ?? "") : "";
+}
+
+/**
+ * The checks GitHub's checks list shows: a rerun or a newer run of a workflow replaces its older run of each job.
+ * The rollup still returns the older run, such as one a concurrency group cancelled, and its `state` still counts it.
+ */
+export function currentContexts(nodes: readonly unknown[]): Record<string, unknown>[] {
+	const latest = new Map<string, Record<string, unknown>>();
+	for (const node of nodes) {
+		if (!isObject(node)) continue;
+		const name = str(node.name);
+		const key = name === undefined ? `status\0${str(node.context) ?? ""}` : `run\0${workflowOf(node)}\0${name}`;
+		const kept = latest.get(key);
+		if (!kept || (str(node.startedAt) ?? "") >= (str(kept.startedAt) ?? "")) latest.set(key, node);
+	}
+	return [...latest.values()];
+}
+
+/** The head commit's checks from its current runs; GitHub's own rollup `state` when the query returned only some of them. */
+export function rollupState(rollup: unknown): CheckState {
+	if (!isObject(rollup)) return "none";
+	const nodes = nodesOf(rollup.contexts);
+	const total = isObject(rollup.contexts) && typeof rollup.contexts.totalCount === "number" ? rollup.contexts.totalCount : 0;
+	if (nodes.length === 0 || total > nodes.length) return STATUS[str(rollup.state) ?? ""] ?? "none";
+	const states = new Set(currentContexts(nodes).map(contextState));
+	return states.has("failing") ? "failing" : states.has("pending") ? "pending" : "passing";
+}
 
 /** A submitted review's state; a pending review is the viewer's unsent draft. */
 export const REVIEW_EVENT: Record<string, NonNullable<PullRequestEvent["review"]>> = {
