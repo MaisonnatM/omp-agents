@@ -7,6 +7,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 - On the Board, a blue pill at the top or bottom edge says how many unread threads sit out of view, as Slack does. Click it to jump to the nearest one, or press Mark all read.
 - In a Board thread, replies that come while you read further up show a blue "new replies" pill at the bottom. Click it to jump to them.
+- Settings › Resources now names a session no dashboard lists by its title, as Past does, with its port beside it, instead of only its port.
 - Memory pressure now reads high only when less than a fifth of memory is free or the Mac is swapping, not whenever macOS raises its own early warning, so Board tasks and routines no longer wait with plenty of memory left.
 - Settings › Resources' chart now has a legend and a scale up to the Mac's full memory, and its always-zero Builds and tests figure is gone.
 - Settings › Resources now shows what each session really holds, counting memory macOS compressed or moved to swap; an idle session used to look ten times smaller than it is.

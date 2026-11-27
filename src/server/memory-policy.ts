@@ -45,11 +45,13 @@ export interface PolicyItem {
 	shared: boolean;
 }
 
-/** An omp no server of this port lists, with why, since when this server has seen it, and its keeper's tree's memory. */
+/** An omp no server of this port lists, with why, since when this server has seen it, its keeper's tree's memory, and its session's title. */
 export interface PolicyStray extends KeptProcess {
 	reason: StrayReason;
 	firstSeen: number;
 	memoryBytes: number;
+	/** The title of the session file its omp holds open, as the Past list names it; `null` when none was found. */
+	title: string | null;
 }
 
 export interface PolicyInput {
@@ -85,7 +87,7 @@ export interface Decision {
 
 const sessionOwner = (session: PolicySession): Owner => ({ kind: "session", instanceId: session.instanceId, title: session.title, private: session.private });
 const itemOwner = (item: PolicyItem): Owner => ({ kind: "process", id: item.id, instanceId: item.instanceIds[0] ?? "", label: item.label });
-const strayOwner = (stray: PolicyStray): Owner => ({ kind: "stray", keeperId: stray.instanceId, port: stray.port, reason: stray.reason, startedAt: stray.startedAt });
+export const strayOwner = (stray: PolicyStray): Owner => ({ kind: "stray", keeperId: stray.instanceId, port: stray.port, reason: stray.reason, startedAt: stray.startedAt, title: stray.title });
 
 const itemStop = (item: PolicyItem, because: AutoStop["because"]): Stop => ({ kind: "item", id: item.id, owner: itemOwner(item), memoryBytes: item.memoryBytes, because });
 const sessionStop = (session: PolicySession, because: AutoStop["because"]): Stop => ({ kind: "session", instanceId: session.instanceId, owner: sessionOwner(session), memoryBytes: session.memoryBytes, because });

@@ -80,6 +80,9 @@ Each automatic stop is kept, the last 100, with its owner, memory, and why: `idl
 
 `listAllKeepers` in `src/keeper-link.ts` reads every port's keeper directory under the sessions root and keeps the keepers whose recorded pid runs, private when that port's private sessions directory holds the session.
 A keeper is a stray when no server lists its session: one in this server's directory that the roster does not list is `unattached`, one of a port no process listens on is `orphan-port`, and one of a port another server listens on is `foreign-live`, which is that server's and never stops here.
+Settings › Resources names a stray by its session's title, as the Past list names it, with its port and reason beside it, and as `Unlisted session on port <port>` when it has none.
+The watch finds that title once per stray, keyed by its port, keeper id, and keeper pid: one `lsof -nP -w -Fpn -p` over the omps, the keepers' children, of every stray first seen in a sample (`openFilesArgv` and `parseOpenSessionFiles` in `src/process-census.ts`) finds the session file each holds open one directory below omp's sessions root, and `readSessionFile` in `src/omp/sessions.ts` reads its title.
+An `lsof` that fails or is missing leaves the strays it was for untitled and reads them again at the next sample; a stray whose omp holds no session file stays untitled.
 `endKept` ends a stray as **End session** does, through its keeper, which reaps what omp started; a keeper that does not greet or exit in 10 seconds is stopped with its tree, and its files go.
 A private stray's session is then deleted through `PrivateSessions.purge` of its port; an ordinary one shows under Past.
 

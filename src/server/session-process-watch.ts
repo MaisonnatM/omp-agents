@@ -4,6 +4,7 @@ import { basename, dirname, join } from "node:path";
 import { endKept, listAllKeepers } from "../keeper-link";
 import { readMemory } from "../memory-reading";
 import { ompDaemons } from "../omp/daemons";
+import { readSessionFile, sessionsDir } from "../omp/sessions";
 import { privateSessionsDir } from "../paths";
 import { readProcessTableWithFootprints } from "../process-census";
 import type { PrivateDeleting } from "../shared/notices";
@@ -12,7 +13,7 @@ import type { LiveSessions } from "./live-sessions";
 import { PrivateSessions } from "./private-sessions";
 import type { ProcessSettingsFile } from "./process-settings-file";
 import type { ResourceHistory } from "./resource-history";
-import { readAppOf, readCwds, readListeningPorts, readSessionFiles, SessionProcessWatch, stopProcesses } from "./session-processes";
+import { readAppOf, readCwds, readListeningPorts, readOpenSessionFiles, readSessionFiles, SessionProcessWatch, stopProcesses } from "./session-processes";
 
 /** The dashboard's parts the process watch reads. */
 export interface SessionProcessWatchParts {
@@ -37,6 +38,8 @@ export function sessionProcessWatch({ sessions, hosts, pathOf, owner, processSet
 		readPorts: readListeningPorts,
 		readCwds,
 		readSessionFiles,
+		readOpenSessionFiles: pids => readOpenSessionFiles(pids, sessionsDir),
+		titleOf: async file => (await readSessionFile(file))?.title ?? null,
 		appOf: readAppOf,
 		stopProcesses,
 		sessions: () =>
