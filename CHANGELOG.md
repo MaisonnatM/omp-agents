@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- Suggested prompts above the composer now use the row's full width. The send, edit, and mark keys show over the end of the hovered row instead of cutting every prompt short.
 - A routine's run no longer posts long replies on its Board thread. It finishes like a /ship report: a bold outcome line, a few short bullets, then Needs you, Not verified, and Done lines when they apply.
 - A Workspace's Board tabs now run Messages, Pull requests, Projects, Routines, Memory, Settings.
 
