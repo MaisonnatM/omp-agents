@@ -48,6 +48,7 @@ import { threadSession, type Work, workOf } from "./work";
 import { authorKey, BoardText, CloseTaskButton, continues, DayDivider, EditButton, MarkUnreadButton, MessageEditor, MessageRow, sameDay, TaskBody, WorkingLine, WorkLabel, Avatar } from "./messages";
 import { markSeen, said, unreadOf, useSeen } from "./seen";
 import { ChannelUnreadPills, taskItemId, ThreadNewReplies } from "./unread-jump";
+import { UserRequestCard } from "../user-request";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -325,6 +326,7 @@ function Thread({ state, task, reply, session, core, workspace, channel, closeHr
 	const woken = wakeTarget(task, { kind: "user" });
 	const wokenName = woken ? sessionLabel(woken, sessions).name : null;
 	const host = target ? (sessions.hosts.find(each => each.sessionId === target) ?? null) : null;
+	const work = workOf(state, task, sessions.hosts);
 	const past = target ? (sessions.past.find(each => each.sessionId === target) ?? null) : null;
 	const instanceId = host?.instanceId ?? null;
 	const view = useMemo<View | null>(() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : past && target ? { kind: "past", sessionId: target } : null), [instanceId, past, target]);
@@ -384,7 +386,8 @@ function Thread({ state, task, reply, session, core, workspace, channel, closeHr
 					location.hash = closeHref;
 				}}
 			>
-				<ThreadComposer task={task} failed={workOf(state, task, sessions.hosts)?.kind === "failed"} name={wokenName} core={core} workspace={workspace} disabled={disabled} onChange={onChange} onSend={() => setSentOn(reply)} />
+				{work?.kind === "waiting" && work.stop.kind === "ask" && <ThreadRequest host={sessions.hosts.find(each => each.sessionId === work.sessionId) ?? null} />}
+				<ThreadComposer task={task} failed={work?.kind === "failed"} name={wokenName} core={core} workspace={workspace} disabled={disabled} onChange={onChange} onSend={() => setSentOn(reply)} />
 			</ThreadMessages>
 		),
 	};
@@ -550,6 +553,18 @@ function ScrollToReply({ reply }: { reply: number }) {
 		scrollToMessage(`reply-${reply}`, { align: "center" });
 	}, [reply, scrollToMessage]);
 	return null;
+}
+
+/** The question the thread's session waits on, such as a ship session's "Put the PR live?", answered in place as its conversation tab does; a reply would only queue behind it. */
+function ThreadRequest({ host }: { host: RosterHost | null }) {
+	const { request } = useDashboardActions();
+	const first = host?.requests[0];
+	if (!host || !first) return null;
+	return (
+		<div className="shrink-0 px-3 pb-2">
+			<UserRequestCard key={first.id} request={first} queued={host.requests.length - 1} onAnswer={answer => request({ t: "answer", instanceId: host.instanceId, requestId: first.id, answer })} shortcuts={false} />
+		</div>
+	);
 }
 
 /** The thread's `@` menu offers sessions only, so a reply can point its session at another. */
