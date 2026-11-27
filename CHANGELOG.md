@@ -6,7 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-27
 
 - The blue count beside a workspace now says everything waiting on you there: its sessions that need you plus its Board threads with replies you have not read. The Sessions tab, the Board tab, and the Dock badge all show the same count.
-- The Board tab's sidebar shows the count of what waits on you instead of ready Board tasks, and no longer lists sessions under each Workspace; they stay on the Sessions tab and in each Board thread.
+- The Board tab's sidebar shows the count of what waits on you instead of ready Board tasks, marks each Workspace with a # as the Board's header does, and no longer lists sessions under each Workspace; they stay on the Sessions tab and in each Board thread.
 - The Dock badge no longer counts sessions the sidebar hides, such as ones in `/tmp` or a hidden workspace.
 - A routine's run no longer posts long replies on its Board thread. It finishes like a /ship report: a bold outcome line, a few short bullets, then Needs you, Not verified, and Done lines when they apply.
 - A Workspace's Board tabs now run Messages, Pull requests, Projects, Routines, Memory, Settings.

@@ -1,5 +1,5 @@
 /** The Board's half of the left sidebar, under its Board tab: the Workspaces, each with a count of what waits on you there. */
-import { IconFolder1 } from "central-icons";
+import { IconHashtag } from "central-icons";
 import { useState } from "react";
 import { revealDetailsTab } from "../../details-tabs";
 import type { RosterHost } from "../../../src/shared/sessions";
@@ -86,7 +86,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts 
 							<SidebarMenuItem key={workspace.cwd}>
 								<SidebarMenuButton
 									{...activityControl("board.workspace")}
-									icon={IconFolder1}
+									icon={IconHashtag}
 									isActive={current}
 									aria-current={current ? "page" : undefined}
 									title={workspace.cwdDisplay}
