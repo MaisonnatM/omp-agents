@@ -8,6 +8,8 @@ The dashboard shows the same lines in Settings › What's new.
 - The blue count beside a workspace now says everything waiting on you there: its sessions that need you plus its Board threads with replies you have not read. The Sessions tab, the Board tab, and the Dock badge all show the same count.
 - The Board tab's sidebar shows the count of what waits on you instead of ready Board tasks, marks each Workspace with a # as the Board's header does, and no longer lists sessions under each Workspace; they stay on the Sessions tab and in each Board thread.
 - The Dock badge no longer counts sessions the sidebar hides, such as ones in `/tmp` or a hidden workspace.
+- Your agents now keep a short list of your own words and what you mean by them, and add to it whenever you correct one, so every new session understands you the same way.
+- A new routine, Learn my words, reads what you typed each day at 7 pm and adds the words you use your own way to that list, with words that only hold in one Workspace under its name.
 - On the Board, a long message a routine posted now shows its first lines only, with Show more to read the rest.
 - On the Board, a message whose thread has replies you haven't read now has a light blue background.
 
