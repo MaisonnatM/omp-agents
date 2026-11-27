@@ -18,7 +18,8 @@ import { AppMark } from "../app-mark";
 import { BOARD_MESSAGE_PRESET, MessageMarkdown } from "../message-markdown";
 import { type KnownSessions, sessionLabel } from "../../labels";
 import { hashForBoardSession, revealSessionTab, revealThreadTab } from "./sidebar";
-import { RoutineAuthorName, RoutineAvatar } from "./routine-author";
+import { RoutineAuthorName } from "./routine-author";
+import { RoutineFace } from "../routines/routine-face";
 import type { Work } from "./work";
 
 export const folder = (display: string): string => display.split("/").filter(Boolean).pop() ?? display;
@@ -84,11 +85,11 @@ function YourAvatar({ size, box }: { size: "message" | "summary"; box: string })
 	);
 }
 
-/** The author's square picture: yours for you, a routine's loop for a routine, omp's mark for a session. */
+/** The author's square picture: yours for you, a routine's face for a routine, omp's mark for a session. */
 export function Avatar({ by, size = "message" }: { by: BoardAuthor; sessions: KnownSessions; size?: "message" | "summary" }) {
 	const box = size === "message" ? "size-9 rounded-lg text-sm" : "size-6 rounded-md text-[11px]";
 	if (by.kind === "user") return <YourAvatar size={size} box={box} />;
-	if (by.kind === "routine") return <RoutineAvatar size={size} box={box} />;
+	if (by.kind === "routine") return <RoutineFace id={by.routineId} className={size === "message" ? "size-9" : "size-6"} />;
 	return (
 		<span aria-hidden className={cn("flex shrink-0 items-center justify-center bg-muted", box)}>
 			<AppMark className={size === "message" ? "size-5" : "size-3.5"} />

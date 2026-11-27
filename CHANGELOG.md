@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- Each routine has its own face again, a colored shape with two eyes like the old Bots had, on its Board messages and in the Routines tab, so you can tell routines apart at a glance.
 - A routine copied into every Workspace now follows the original: editing the original's name, instructions, triggers, or model updates every copy, while each copy keeps its own schedule and on/off switch. Press Detach on a copy, or change its instructions, to make it your own again. Copies that still match their original start following it on the next restart.
 - The blue count beside a workspace now says everything waiting on you there: its sessions that need you plus its Board threads with replies you have not read. The Sessions tab, the Board tab, and the Dock badge all show the same count.
 - The Board tab's sidebar shows the count of what waits on you instead of ready Board tasks, marks each Workspace with a # as the Board's header does, and no longer lists sessions under each Workspace; they stay on the Sessions tab and in each Board thread.
