@@ -310,6 +310,8 @@ export interface RoutineDraft {
 	everyWorkspace: boolean;
 	/** The id of the routine this one was copied from, kept as it was so a save does not drop it; `null` for none. */
 	copyOf: string | null;
+	/** Whether the copy follows its template's name, task, triggers, and model, which its editor then leaves read-only. */
+	linked: boolean;
 }
 
 /** A new routine's form for Workspace `workspace`: a prompt on weekdays at 9:00. */
@@ -329,6 +331,7 @@ export function newDraft(id: string, workspace: string): RoutineDraft {
 		triggers: [],
 		everyWorkspace: false,
 		copyOf: null,
+		linked: false,
 	};
 }
 
@@ -361,6 +364,7 @@ export function draftOf(routine: Routine): RoutineDraft {
 		triggers: routine.triggers.map(({ kind }) => kind),
 		everyWorkspace: routine.everyWorkspace === true,
 		copyOf: routine.copyOf ?? null,
+		linked: routine.linked === true,
 	};
 }
 
@@ -417,6 +421,7 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 		...(draft.launch ? { launch: draft.launch } : {}),
 		...(draft.everyWorkspace ? { everyWorkspace: true } : {}),
 		...(draft.copyOf === null ? {} : { copyOf: draft.copyOf }),
+		...(draft.copyOf !== null && draft.linked ? { linked: true } : {}),
 	};
 	return { ok: spec };
 }
@@ -479,7 +484,7 @@ export function cadenceOf(schedules: readonly Schedule[]): CompactSchedule | nul
 export const withCadence = (current: CompactSchedule | null, cadence: Cadence): CompactSchedule => ({ ...(current ?? DEFAULT_COMPACT), cadence });
 
 /** `routine` to save with `schedule` in place of all its schedules, keeping its triggers, launch, and what makes it a template or a copy. */
-export function specWithSchedule({ id, workspace, name, enabled, task, triggers, launch, everyWorkspace, copyOf }: Routine, schedule: Schedule): RoutineSpec {
+export function specWithSchedule({ id, workspace, name, enabled, task, triggers, launch, everyWorkspace, copyOf, linked }: Routine, schedule: Schedule): RoutineSpec {
 	return {
 		id,
 		workspace,
@@ -491,7 +496,14 @@ export function specWithSchedule({ id, workspace, name, enabled, task, triggers,
 		...(launch ? { launch } : {}),
 		...(everyWorkspace ? { everyWorkspace } : {}),
 		...(copyOf === undefined ? {} : { copyOf }),
+		...(linked ? { linked } : {}),
 	};
+}
+
+/** `spec` as linked copy of `template` saves it: the template's name, task, triggers, and launch, so the save keeps the link. */
+export function followed(spec: RoutineSpec, template: Routine): RoutineSpec {
+	const { launch: _, ...own } = spec;
+	return { ...own, name: template.name, task: template.task, triggers: template.triggers, ...(template.launch ? { launch: template.launch } : {}) };
 }
 
 /** The routine `routine` was copied from, while it still exists; `null` for a routine that is no copy. */

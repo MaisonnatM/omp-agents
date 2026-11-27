@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- A routine copied into every Workspace now follows the original: editing the original's name, instructions, triggers, or model updates every copy, while each copy keeps its own schedule and on/off switch. Press Detach on a copy, or change its instructions, to make it your own again. Copies that still match their original start following it on the next restart.
 - On the Board, a long message a routine posted now shows its first lines only, with Show more to read the rest.
 - On the Board, a message whose thread has replies you haven't read now has a light blue background.
 

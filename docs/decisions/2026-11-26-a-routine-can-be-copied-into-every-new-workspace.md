@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-11-26
 decision-makers: Maxence Maisonnat
+superseded-by: 2026-11-27-a-copied-routine-follows-its-template-until-detached
 ---
 
 # A routine can be copied into every new Workspace

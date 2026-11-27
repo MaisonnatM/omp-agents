@@ -71,8 +71,12 @@ Since a replay loads no extension but `cache-tail.ts`, a proposed extension chan
 A routine with `everyWorkspace: true` is a template, and a routine with `copyOf` is a copy of the template with that id; both fields are part of `RoutineSpec`, so a save, the file, and Settings sync carry them.
 A Workspace has a template when it is the template's own Workspace or one of its routines has that template as `copyOf`.
 `copiesFor` in `src/server/routine-copies.ts` names the copies due among the eligible Workspaces, given what was seen: a template not seen yet goes to every eligible Workspace that does not have it, and a Workspace not seen yet gets every template it does not have.
-A copy is a new routine with a fresh id, the template's name, schedules, triggers, task, launch, and `enabled`, the Workspace as its own, `copyOf` set, and no `everyWorkspace`; no later edit of the template reaches it.
-What was seen is `routine-copies.json` beside the access token, `{ workspaces, templates }`, which only this computer keeps and Settings sync never carries.
+A copy is a new routine with a fresh id, the template's name, schedules, triggers, task, launch, and `enabled`, the Workspace as its own, `copyOf` set, `linked: true`, and no `everyWorkspace`.
+A linked copy follows its template: `applyRoutine` rewrites the name, task, triggers, and launch of every linked copy when the template is saved, and leaves each copy's Workspace, schedules, and `enabled` alone.
+A save of a linked copy whose name, task, triggers, or launch differ from its template's drops `linked`, and so does the editor's **Detach**; deleting the template drops it from all its copies. A copy without `linked` keeps `copyOf` and is an ordinary routine.
+The editor of a linked copy shows **Follows** with the template's name and leaves the name, model, task, and triggers read-only.
+What was seen is `routine-copies.json` beside the access token, `{ workspaces, templates, linked }`, which only this computer keeps and Settings sync never carries.
+Without `linked: true` in it, the next check asks once to link every copy made before copies followed their template; the save keeps the link only on copies still the same as their template, so a copy changed by hand stays its own.
 With no such file yet, `RoutineCopies.check` copies nothing and records the eligible Workspaces and current templates, so the first run adds no copy.
 The seen Workspaces only grow, so a copy you delete stays deleted, and a Workspace hidden then shown again is not new.
 The seen templates are the ones still marked, so a template turned off and on again copies again where it is missing, and turning it off removes no copy.

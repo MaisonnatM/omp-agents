@@ -82,11 +82,11 @@ export function TemplateMark() {
 	);
 }
 
-/** Where a copied routine came from, linking to the routine it was copied from. */
-export function CopiedFrom({ template, className }: { template: Routine; className?: string }) {
+/** Where a copied routine came from, linking to that routine: "Follows" while the copy is linked to it. */
+export function CopiedFrom({ template, linked, className }: { template: Routine; linked: boolean; className?: string }) {
 	return (
 		<p className={cn("text-xs text-muted-foreground", className)}>
-			Copied from{" "}
+			{linked ? "Follows" : "Copied from"}{" "}
 			<a href={hashForRoutines(template.workspace, { kind: "open", id: template.id })} className="font-medium text-foreground hover:underline">
 				{template.name}
 			</a>{" "}

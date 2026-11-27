@@ -37,11 +37,11 @@ describe("copiesFor", () => {
 	test("a template turned on goes to every eligible Workspace that has it neither as its own nor as a copy", () => {
 		const copied = { ...plain, id: "c0", workspace: WEB, copyOf: "t1" };
 		const routines = saved(template, copied);
-		const { copies, seen } = copiesFor(routines, [APP, WEB, API], { workspaces: [APP, WEB, API], templates: [] }, ids());
+		const { copies, seen } = copiesFor(routines, [APP, WEB, API], { workspaces: [APP, WEB, API], templates: [], linked: true }, ids());
 		expect(copies).toEqual([
-			{ id: "copy-1", workspace: API, name: template.name, schedules: [], triggers: template.triggers, task: template.task, enabled: true, launch: template.launch, copyOf: "t1" },
+			{ id: "copy-1", workspace: API, name: template.name, schedules: [], triggers: template.triggers, task: template.task, enabled: true, launch: template.launch, copyOf: "t1", linked: true },
 		]);
-		expect(seen).toEqual({ workspaces: [APP, WEB, API], templates: ["t1"] });
+		expect(seen).toEqual({ workspaces: [APP, WEB, API], templates: ["t1"], linked: true });
 	});
 
 	test("a copy starts disabled when its template is", () => {
@@ -59,26 +59,26 @@ describe("copiesFor", () => {
 	});
 
 	test("the first run, with nothing seen, copies nothing and sees what is there", () => {
-		expect(copiesFor(saved(template), [APP, WEB], null, ids())).toEqual({ copies: [], seen: { workspaces: [APP, WEB], templates: ["t1"] } });
+		expect(copiesFor(saved(template), [APP, WEB], null, ids())).toEqual({ copies: [], links: [], seen: { workspaces: [APP, WEB], templates: ["t1"], linked: true } });
 	});
 
 	test("a deleted copy is not copied again, and repeating copies nothing", () => {
-		const first = copiesFor(saved(template), [APP, WEB], { workspaces: [APP], templates: ["t1"] }, ids());
+		const first = copiesFor(saved(template), [APP, WEB], { workspaces: [APP], templates: ["t1"], linked: true }, ids());
 		expect(first.copies.map(copy => copy.workspace)).toEqual([WEB]);
 		// The copy in WEB was deleted: WEB and the template are both seen, so it stays deleted.
-		expect(copiesFor(saved(template), [APP, WEB], first.seen, ids())).toEqual({ copies: [], seen: first.seen });
+		expect(copiesFor(saved(template), [APP, WEB], first.seen, ids())).toEqual({ copies: [], links: [], seen: first.seen });
 	});
 
 	test("a Workspace left out of the eligible ones gets nothing, and still counts as new once it is eligible", () => {
-		const hidden = copiesFor(saved(template), [APP], { workspaces: [APP], templates: [] }, ids());
-		expect(hidden).toEqual({ copies: [], seen: { workspaces: [APP], templates: ["t1"] } });
+		const hidden = copiesFor(saved(template), [APP], { workspaces: [APP], templates: [], linked: true }, ids());
+		expect(hidden).toEqual({ copies: [], links: [], seen: { workspaces: [APP], templates: ["t1"], linked: true } });
 		expect(copiesFor(saved(template), [APP, WEB], hidden.seen, ids()).copies.map(copy => copy.workspace)).toEqual([WEB]);
 	});
 
 	test("a template turned off and on again copies again where it is missing; a turned-off one copies nowhere", () => {
-		const seen = { workspaces: [APP, WEB], templates: ["t1"] };
+		const seen = { workspaces: [APP, WEB], templates: ["t1"], linked: true as const };
 		const off = copiesFor(saved(plain), [APP, WEB, API], seen, ids());
-		expect(off).toEqual({ copies: [], seen: { workspaces: [APP, WEB, API], templates: [] } });
+		expect(off).toEqual({ copies: [], links: [], seen: { workspaces: [APP, WEB, API], templates: [], linked: true } });
 		expect(copiesFor(saved(template), [APP, WEB, API], off.seen, ids()).copies.map(copy => copy.workspace)).toEqual([WEB, API]);
 	});
 });
@@ -136,6 +136,27 @@ describe("RoutineCopies", () => {
 			[APP, null],
 			[API, "t1"],
 		]);
+	});
+
+	test("links, once, the copies made before copies followed their template that still match it, and only those follow its edits", () => {
+		const { copies, routines, edit } = setUp([APP, WEB, API]);
+		writeFileSync(join(dirs[0]!, "routine-copies.json"), JSON.stringify({ workspaces: [APP, WEB, API], templates: ["t1"] }));
+		const { everyWorkspace: _every, ...copied } = template;
+		edit(() => saved(template, { ...copied, id: "same", workspace: WEB, copyOf: "t1" }, { ...copied, id: "own", workspace: API, copyOf: "t1", task: { kind: "prompt", prompt: "Mine." } }));
+		copies.check();
+		flushJsonFiles();
+		expect(routines().map(routine => [routine.id, routine.linked ?? false])).toEqual([
+			["t1", false],
+			["same", true],
+			["own", false],
+		]);
+
+		edit(list => applyRoutine(list, { op: "save", routine: { ...template, task: { kind: "prompt", prompt: "Updated." } } }, 3));
+		expect(routines().map(routine => routine.task)).toEqual([{ kind: "prompt", prompt: "Updated." }, { kind: "prompt", prompt: "Updated." }, { kind: "prompt", prompt: "Mine." }]);
+
+		edit(list => applyRoutine(list, { op: "save", routine: { ...copied, id: "own", workspace: API, copyOf: "t1", task: { kind: "prompt", prompt: "Updated." } } }, 4));
+		copies.check();
+		expect(routines().find(routine => routine.id === "own")?.linked).toBeUndefined();
 	});
 });
 
