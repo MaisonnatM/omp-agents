@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- A Workspace's Sessions tab now lists its sessions in a column on the left and shows the one you click on the right, like a mail app, instead of leaving the Board to open it. With none picked, it shows the latest session.
 - Fixed: when a Board task's session asks you something, such as whether to put a pull request live, the Board thread now shows the question with its answer buttons above the reply box, so you can answer it there instead of opening the session's tab.
 - In the `general` Workspace's Sessions tab, each session shows the folder it ran in, such as `~/code`, `~/tmp`, or `~`, beside its name.
 - The tabs across the top of the window are gone: one page shows at a time, and Back and Forward walk the window's history again. The details sidebar keeps its tabs. Cmd+W, Cmd+T, Cmd+1 to 9, Ctrl+Tab, and the other tab keys no longer do anything in the dashboard.

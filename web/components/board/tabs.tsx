@@ -1,15 +1,19 @@
 /** The tabs across a Workspace's Board, as across a Slack channel, and every tab but Messages: another page's content kept to the Workspace. */
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
 import { type ReactNode, useContext, useMemo, useRef } from "react";
+import type { View } from "../../../src/shared/sessions";
 import type { BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import { activityControl } from "../../activity";
 import type { WebModuleId } from "../../modules";
 import { PageHashContext } from "../../page-hash";
-import { pullRequestsScope, pullRequestsStore } from "../../reads";
-import { COLUMN_MIN, type ListPage, listPlacement } from "../../page-list";
+import { pullRequestsScope, pullRequestsStore, UNREAD } from "../../reads";
+import { COLUMN_MIN, listPlacement, listSplits } from "../../page-list";
 import { hashForPage, type PullRequestsRoute, workspaceSection } from "../../routing";
-import { workspaceCwd } from "../../sessions";
-import { DashboardStatusContext, SessionsTabContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { latestSession, workspaceCwd } from "../../sessions";
+import { type DashboardActions, DashboardActionsContext, DashboardStatusContext, SessionsTabContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { ViewConversation } from "../pane";
+import { HeaderTitleShown } from "../page-header";
+import { useShowConversation } from "../../pane-store";
 import { Roster } from "../roster";
 import type { CoreData } from "../module-views";
 import { ProjectMemoryTab } from "../memory/project-memory";
@@ -17,7 +21,7 @@ import { RoutinesTab } from "../routines/routines-tab";
 import { ProjectsPage } from "../projects/page";
 import { ProjectsNav } from "../projects/projects-nav";
 import { PullRequestsPage } from "../pull-requests/pull-requests-page";
-import { PageListColumn, useWidth } from "../page-list";
+import { PageListColumn, pageListLabel, useWidth } from "../page-list";
 import { SettingsNav } from "../settings/settings-nav";
 import { SettingsPage } from "../settings/settings-page";
 import { BOARD_TABS, type BoardTab, type BoardTabDef, type BoardView, tabView } from "./module";
@@ -76,7 +80,7 @@ function TabPage({ view, workspace, board, core, disabled }: { view: Exclude<Boa
 	const slice = workspaceSlice(core, workspace);
 	switch (view.tab) {
 		case "sessions":
-			return <WorkspaceSessions board={board} />;
+			return <WorkspaceSessions board={board} core={core} workspace={workspace} session={view.session} />;
 		case "routines":
 			return <RoutinesTab workspace={workspace ?? core.defaultWorkspace} route={view.routine} routines={core.routines} held={core.held.routines ?? null} workspaces={core.workspaces} connected={core.connected} />;
 		case "pull-requests":
@@ -85,7 +89,7 @@ function TabPage({ view, workspace, board, core, disabled }: { view: Exclude<Boa
 			return <ProjectMemoryTab repo={workspace} pinned />;
 		case "projects":
 			return (
-				<ListedTab page={view.page} list={<ProjectsNav state={slice.projects} openId={view.page.open} disabled={disabled} workspace={workspace ?? undefined} />}>
+				<ListedTab label={pageListLabel(view.page)} split={listSplits(view.page)} list={<ProjectsNav state={slice.projects} openId={view.page.open} disabled={disabled} workspace={workspace ?? undefined} />}>
 					<ProjectsPage
 						route={view.page}
 						core={core}
@@ -120,20 +124,21 @@ const settingsHash = (workspace: string | null, section: string) => hashForPage(
 /** Settings kept to the Workspace, with no workspace picker: its sections down the left, the one the address names at the right. */
 function WorkspaceSettings({ workspace, workspaces, section: named }: { workspace: string | null; workspaces: CoreData["workspaces"]; section: string | null }) {
 	const section = workspaceSection(named);
+	const page = { kind: "settings", section } as const;
 	return (
-		<ListedTab page={{ kind: "settings", section }} list={<SettingsNav route={{ section }} group="workspace" hash={value => settingsHash(workspace, value)} />}>
+		<ListedTab label={pageListLabel(page)} split={listSplits(page)} list={<SettingsNav route={{ section }} group="workspace" hash={value => settingsHash(workspace, value)} />}>
 			<SettingsPage key={workspace ?? ""} section={section} cwd={workspace} workspaces={workspaces} scope={{ kind: "workspace", sectionHash: value => settingsHash(workspace, value) }} />
 		</ListedTab>
 	);
 }
 
-/** A tab's page beside its list, in the resizable column the Projects and Settings pages keep at their left; the column takes what leaves the page its floor. */
-function ListedTab({ page, list, children }: { page: ListPage; list: ReactNode; children: ReactNode }) {
+/** A tab's page beside its list, in the resizable column the Projects and Settings pages keep at their left; the column, named `label`, takes what leaves the page its floor, the wider floor of a page that `split`s its list from its open item. */
+function ListedTab({ label, split, list, children }: { label: string; split: boolean; list: ReactNode; children: ReactNode }) {
 	const area = useRef<HTMLDivElement>(null);
-	const placement = listPlacement(page, false, useWidth(area));
+	const placement = listPlacement(split, false, useWidth(area));
 	return (
 		<div ref={area} className="flex min-h-0 min-w-0 flex-1">
-			<PageListColumn page={page} max={placement.at === "column" ? placement.max : COLUMN_MIN}>
+			<PageListColumn label={label} max={placement.at === "column" ? placement.max : COLUMN_MIN}>
 				{list}
 			</PageListColumn>
 			<div className="relative flex min-w-0 flex-1 flex-col">{children}</div>
@@ -141,28 +146,80 @@ function ListedTab({ page, list, children }: { page: ListPage; list: ReactNode; 
 	);
 }
 
-/** The Workspace's **Sessions** tab: its live, interrupted, waiting, and past sessions with search and Resume all; the App keeps the selected Workspace on the open one, so the lists are this Workspace's. */
-function WorkspaceSessions({ board }: { board: BoardState }) {
+const sessionsHash = (workspace: string | null, session: string) => hashForPage({ kind: "board", workspace, view: { tab: "sessions", session }, search: null, reply: null, session: null });
+
+/**
+ * The Workspace's **Sessions** tab, as a mail app's split: its live, interrupted, waiting, and past sessions with search and Resume all in the column at the left,
+ * and at the right the conversation of session `session`, else the latest one listed. A row opens its session here rather than in the panes. The App keeps the
+ * selected Workspace on the open one, so the lists are this Workspace's.
+ */
+function WorkspaceSessions({ board, core, workspace, session }: { board: BoardState; core: CoreData; workspace: string | null; session: string | null }) {
 	const tab = useContext(SessionsTabContext);
+	const actions = useDashboardActions();
+	const { hosts, past: saved } = core.sessions;
+	const latest = useRef(hosts);
+	latest.current = hosts;
+	// A row's click names its session in the address, by session id, which outlives the host running it, so a resumed session stays open.
+	const rowActions = useMemo<DashboardActions>(
+		() => ({
+			...actions,
+			open: (view: View) => {
+				const id = view.kind === "past" ? view.sessionId : latest.current.find(host => host.instanceId === view.instanceId)?.sessionId;
+				if (id) location.hash = sessionsHash(workspace, id);
+			},
+		}),
+		[actions, workspace],
+	);
+	const fallback = tab && latestSession(tab.sessions.lists);
+	const picked = session ?? (fallback === null ? null : fallback.kind === "past" ? fallback.sessionId : (hosts.find(host => host.instanceId === fallback.instanceId)?.sessionId ?? null));
+	const host = picked === null ? null : (hosts.find(each => each.sessionId === picked) ?? null);
+	const past = picked === null || host ? null : (saved.find(each => each.sessionId === picked) ?? null);
+	const instanceId = host?.instanceId ?? null;
+	const view = useMemo<View | null>(() => (instanceId !== null ? { kind: "live", instanceId, agentId: null } : picked !== null ? { kind: "past", sessionId: picked } : null), [instanceId, picked]);
+	const open = useMemo(() => (view ? [view] : []), [view]);
+	useShowConversation(view);
 	if (!tab) return null;
-	const { sessions, workspaces, panes } = tab;
+	const { sessions, workspaces } = tab;
 	return (
-		<div className="min-h-0 flex-1 overflow-y-auto">
-			<div className="mx-auto w-full max-w-3xl px-2 pb-6">
-				<Roster
-					workspaces={workspaces}
-					lists={sessions.lists}
-					projects={sessions.projects}
-					pinnedIds={sessions.pinned}
-					groups={sessions.groups}
-					board={board}
-					query={sessions.query}
-					onQuery={sessions.setQuery}
-					onTogglePin={sessions.togglePin}
-					open={panes}
-					projectOpen={null}
-				/>
-			</div>
-		</div>
+		<ListedTab
+			label="Sessions"
+			split
+			list={
+				<DashboardActionsContext.Provider value={rowActions}>
+					<Roster
+						workspaces={workspaces}
+						lists={sessions.lists}
+						projects={sessions.projects}
+						pinnedIds={sessions.pinned}
+						groups={sessions.groups}
+						board={board}
+						query={sessions.query}
+						onQuery={sessions.setQuery}
+						onTogglePin={sessions.togglePin}
+						open={open}
+						projectOpen={null}
+					/>
+				</DashboardActionsContext.Provider>
+			}
+		>
+			{/* The tab names the Workspace, not the session, so the conversation's header shows its title. */}
+			<HeaderTitleShown.Provider value>
+				{view ? (
+					<ViewConversation
+						key={picked}
+						view={view}
+						focused
+						host={host}
+						lastHost={null}
+						session={past}
+						models={(view.kind === "live" && core.models.get(view.instanceId)) || UNREAD}
+						workspaces={core.workspaces}
+						header
+					/>
+				) : (
+					<p className="m-auto text-sm text-muted-foreground">No sessions in this Workspace yet</p>
+				)}
+			</HeaderTitleShown.Provider>
+		</ListedTab>
 	);
 }
