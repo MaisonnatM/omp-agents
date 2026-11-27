@@ -8,6 +8,9 @@ import type { MentionLists } from "../mentions";
 import type { WindowScope } from "../sessions";
 import type { StartOf } from "../starts";
 import type { Dashboard } from "../use-dashboard";
+import type { SessionLists } from "../use-session-lists";
+import type { View } from "../../src/shared/sessions";
+import type { Workspace } from "../../src/shared/workspaces";
 
 /**
  * What the sidebar, the panes, and the pages ask of the dashboard. Every function is stable for the page's lifetime, so
@@ -91,3 +94,6 @@ export function useMentionLists(): MentionLists {
 
 /** The open projects, oldest first, which a session row's menu offers to move the session to; none while Projects is off or the list has not arrived. */
 export const OpenProjectsContext = createContext<readonly Project[]>([]);
+
+/** What a Workspace's **Sessions** tab on the Board lists: the selected Workspace's session lists, the workspaces, and the panes on screen, whose rows it highlights; `null` outside the App. */
+export const SessionsTabContext = createContext<{ sessions: SessionLists; workspaces: Workspace[]; panes: View[] } | null>(null);

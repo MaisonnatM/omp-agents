@@ -1,9 +1,9 @@
 import { IconMagnifyingGlass } from "central-icons";
-import { memo, type ReactNode, useMemo, useState } from "react";
+import { memo, type ReactNode, useMemo } from "react";
 import type { View } from "../../src/shared/sessions";
 import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";
-import { SidebarContent, SidebarGroup, SidebarMenu } from "@/components/ui/sidebar";
+import { SidebarContent } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
 import { folderName } from "../labels";
@@ -15,13 +15,13 @@ import { shortcutLabels } from "../shortcuts";
 import type { NavRow } from "../sidebar-tabs";
 import type { BoardState } from "../../templates/omp/agent/extensions/board/log";
 import { BoardSidebar } from "./board/sidebar";
-import { SegmentedTab, SegmentedTabs, SegmentedTabsList } from "./segmented-tabs";
+import { BOARD_PAGE } from "./board/module";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { Roster } from "./roster";
-import { type NavCount, NotificationsRow, SettingsRow, SidebarNav } from "./sidebar-nav";
+import { PinnedGroup, Roster } from "./roster";
+import { type NavCount, SidebarNav } from "./sidebar-nav";
 
 const NO_VIEWS: View[] = [];
 
@@ -34,7 +34,7 @@ interface AppSidebarProps {
 	/** The row of the page list the page on screen selects. */
 	row: NavRow | null;
 	onTab: (tab: SidebarTab | "sessions") => void;
-	/** The shown tabs, in the user's order; the Board's is the sidebar's own Board tab, beside Sessions, rather than a row. */
+	/** The shown tabs, in the user's order; while the Board's is among them, the sidebar lists its Workspaces under the page rows instead of the sessions, rather than a row. */
 	tabs: readonly SidebarTab[];
 	/** The Board, `null` until the server sends it. */
 	board: BoardState | null;
@@ -78,8 +78,6 @@ export const AppSidebar = memo(function AppSidebar({
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
 	const hasBoard = tabs.includes("board");
-	const boardRoute = useBoardSide(hasBoard ? page : null);
-	const onBoard = boardRoute !== null;
 	const pageTabs = useMemo(() => tabs.filter(tab => tab !== "board"), [tabs]);
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
@@ -98,71 +96,42 @@ export const AppSidebar = memo(function AppSidebar({
 				</Tooltip>
 			</div>
 			{!connected && <p className="mx-3 mb-1 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">Lost the dashboard server. Retrying…</p>}
-			{hasBoard && (
-				<SegmentedTabs value={onBoard ? "board" : "sessions"} onValueChange={value => onTab(value === "board" ? "board" : "sessions")} className="mx-3 mt-1 mb-1 shrink-0">
-					<SegmentedTabsList aria-label="Sidebar" className="grid w-full grid-cols-2">
-						<SegmentedTab {...activityControl("sidebar.view.sessions")} value="sessions">
-							Sessions
-						</SegmentedTab>
-						<SegmentedTab {...activityControl("sidebar.view.board")} value="board">
-							Board
-						</SegmentedTab>
-					</SegmentedTabsList>
-				</SegmentedTabs>
-			)}
-			{onBoard ? (
+			<SidebarNav
+				tabs={pageTabs}
+				current={row}
+				counts={counts}
+				list={list}
+				newSessionLabel={newSessionLabel}
+				onNewSession={() => openNewSession()}
+				onTab={onTab}
+				settingsRoute={settings}
+				unreadNotices={unreadNotices}
+			/>
+			{hasBoard ? (
 				<>
-					<SidebarGroup className="shrink-0 py-1">
-						<nav aria-label="Pages">
-							<SidebarMenu className="gap-px">
-								<NotificationsRow unread={unreadNotices} active={page?.kind === "notifications"} />
-								<SettingsRow route={settings} active={page?.kind === "settings"} />
-							</SidebarMenu>
-						</nav>
-					</SidebarGroup>
-					<BoardSidebar route={boardRoute} state={board} workspaces={workspaces} picked={workspace} hosts={visible.hosts} />
+					<div className="shrink-0">
+						<PinnedGroup pinned={lists.pinned} open={page ? NO_VIEWS : panes} showWorkspace={false} onTogglePin={togglePin} />
+					</div>
+					<BoardSidebar route={page?.kind === "board" ? page : BOARD_PAGE.home} state={board} workspaces={workspaces} picked={workspace} hosts={visible.hosts} />
 				</>
 			) : (
-				<>
-					<SidebarNav
-						tabs={pageTabs}
-						current={row}
-						counts={counts}
-						list={list}
-						newSessionLabel={newSessionLabel}
-						onNewSession={() => openNewSession()}
-						onTab={onTab}
-						settingsRoute={settings}
-						unreadNotices={unreadNotices}
+				<SidebarContent>
+					<Roster
+						workspaces={workspaces}
+						lists={lists}
+						projects={projects}
+						pinnedIds={pinned}
+						groups={groups}
+						board={board}
+						query={query}
+						onQuery={setQuery}
+						onTogglePin={togglePin}
+						open={page ? NO_VIEWS : panes}
+						projectOpen={page?.kind === "projects" ? page.open : null}
+						onPickWorkspace={onPickWorkspace}
 					/>
-					<SidebarContent>
-						<Roster
-							workspaces={workspaces}
-							lists={lists}
-							projects={projects}
-							pinnedIds={pinned}
-							groups={groups}
-							board={board}
-							query={query}
-							onQuery={setQuery}
-							onTogglePin={togglePin}
-							open={page ? NO_VIEWS : panes}
-							projectOpen={page?.kind === "projects" ? page.open : null}
-							onPickWorkspace={onPickWorkspace}
-						/>
-					</SidebarContent>
-				</>
+				</SidebarContent>
 			)}
 		</div>
 	);
 });
-
-type BoardPage = Extract<Page, { kind: "board" }>;
-
-/** The Board route the sidebar shows: `page` on the Board, the last Board route while Notifications or Settings, opened from the Board side's own rows, shows, `null` for the Sessions side. */
-function useBoardSide(page: Page | null): BoardPage | null {
-	const [last, setLast] = useState<BoardPage | null>(page?.kind === "board" ? page : null);
-	const next = page?.kind === "board" ? page : page?.kind === "notifications" || page?.kind === "settings" ? last : null;
-	if (next !== last) setLast(next);
-	return next;
-}

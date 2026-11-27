@@ -7,6 +7,7 @@ import { useModulesOff } from "../modules-off";
 import type { SplitAxis } from "../pane-navigation";
 import type { Layout, Page } from "../routing";
 import { hashForNewSession } from "../routing";
+import { BOARD_PAGE } from "./board/module";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
 import type { WorkspaceScope } from "../use-workspace-scope";
@@ -84,8 +85,10 @@ export const PageSwitch = memo(function PageSwitch({
 	const scheduleSend = useScheduleSend();
 	const [modulesOff] = useModulesOff();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
-	if (page && isModulePage(page)) {
-		if (modulesOff.has(page.kind)) return <ModuleOffPage page={page} />;
+	// With no pane open, the home is the Board of the selected Workspace while the Board is on.
+	const shown: Page | null = page ?? (layout.panes.length === 0 && !modulesOff.has("board") ? { kind: "board", ...BOARD_PAGE.home } : null);
+	if (shown && isModulePage(shown)) {
+		if (modulesOff.has(shown.kind)) return <ModuleOffPage page={shown} />;
 		const core = {
 			routines,
 			held,
@@ -102,11 +105,11 @@ export const PageSwitch = memo(function PageSwitch({
 			defaultWorkspace,
 			connected,
 		};
-		return <ModulePageView page={page} states={modules} disabled={!connected} core={core} />;
+		return <ModulePageView page={shown} states={modules} disabled={!connected} core={core} />;
 	}
-	switch (page?.kind) {
+	switch (shown?.kind) {
 		case "new": {
-			const cwd = page.cwd ?? defaultWorkspace;
+			const cwd = shown.cwd ?? defaultWorkspace;
 			return (
 				<NewSession
 					cwd={cwd}
@@ -118,26 +121,26 @@ export const PageSwitch = memo(function PageSwitch({
 					onPickCwd={next => {
 						// A failed start's error is about the directory left behind.
 						dismissStart("new");
-						location.hash = hashForNewSession({ cwd: next, projectId: page.projectId });
+						location.hash = hashForNewSession({ cwd: next, projectId: shown.projectId });
 					}}
-					onStart={op => start({ kind: "new", cwd, ...op, projectId: page.projectId })}
-					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, projectId: page.projectId }) }, when)}
-					projectId={page.projectId}
+					onStart={op => start({ kind: "new", cwd, ...op, projectId: shown.projectId })}
+					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, projectId: shown.projectId }) }, when)}
+					projectId={shown.projectId}
 					onDropProject={() => {
-						location.hash = hashForNewSession({ cwd: page.cwd });
+						location.hash = hashForNewSession({ cwd: shown.cwd });
 					}}
 					draftKey={NEW_DRAFT_KEY}
 				/>
 			);
 		}
 		case "scheduled":
-			return <ScheduledSession id={page.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} />;
+			return <ScheduledSession id={shown.id} workspaces={workspaces} connected={connected} completions={newSessionCompletions} />;
 		case "settings":
 			return (
-				<SettingsPage section={page.section} cwd={workspace} workspaces={workspaces} scope={{ kind: "all", onPickWorkspace: pickWorkspace, workspaceList, trustedProjects }} />
+				<SettingsPage section={shown.section} cwd={workspace} workspaces={workspaces} scope={{ kind: "all", onPickWorkspace: pickWorkspace, workspaceList, trustedProjects }} />
 			);
 		case "pull-requests":
-			return <PullRequestsPage hosts={visible.hosts} past={visible.past} route={page} />;
+			return <PullRequestsPage hosts={visible.hosts} past={visible.past} route={shown} />;
 		case "notifications":
 			return <NotificationsPage notices={notices} />;
 		// Get started is a dialog over the home, which `GetStarted` in `web/app.tsx` draws.
@@ -165,7 +168,7 @@ export const PageSwitch = memo(function PageSwitch({
 			}
 			return <EmptyHome live={hosts.length > 0} rosterError={rosterError} />;
 		default: {
-			const never: never = page;
+			const never: never = shown;
 			return never;
 		}
 	}

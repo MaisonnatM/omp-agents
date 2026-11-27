@@ -1,5 +1,5 @@
 /** The Board module's page half, which `WEB_MODULES` in `web/modules.ts` lists; its components are in this folder. See docs/architecture/board.md. */
-import { IconArrowsRepeat, IconBrain, IconBubble2, IconBubbleText, IconFlag1, IconPullRequest, IconSettingsGear1 } from "central-icons";
+import { IconArrowsRepeat, IconBrain, IconBubble2, IconBubbleText, IconFlag1, IconLayersTwo, IconPullRequest, IconSettingsGear1 } from "central-icons";
 import { applyChange, type BoardChange, type BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import { decodeSegment } from "../../hash-segment";
 import type { PageAddresses, StoredPageModule } from "../../modules";
@@ -9,6 +9,7 @@ import { type BoardSearch, scopeOf } from "./search";
 /** The tabs across the top of a Workspace's Board, as across a Slack channel: its Board tasks, then what else the Workspace holds; `module` names the module whose page a tab shows, which hides the tab while it is off. */
 export const BOARD_TABS = [
 	{ id: "messages", label: "Messages", icon: IconBubbleText, module: null },
+	{ id: "sessions", label: "Sessions", icon: IconLayersTwo, module: null },
 	{ id: "pull-requests", label: "Pull requests", icon: IconPullRequest, module: null },
 	{ id: "projects", label: "Projects", icon: IconFlag1, module: "projects" },
 	{ id: "routines", label: "Routines", icon: IconArrowsRepeat, module: null },
@@ -30,7 +31,7 @@ export type RoutineRoute = { kind: "list" } | { kind: "new" } | { kind: "open"; 
  * What a Workspace's Board shows: its Board tasks with Board task `thread`'s Board thread open beside them, its settings on the section `section` names, the first for `null`,
  * its memory, its routines as `routine` names, or the page `page` another tab shows, such as one pull request's.
  */
-export type BoardView = { tab: "messages"; thread: number | null } | { tab: "settings"; section: string | null } | { tab: "memory" } | { tab: "routines"; routine: RoutineRoute } | PageView;
+export type BoardView = { tab: "messages"; thread: number | null } | { tab: "sessions" } | { tab: "settings"; section: string | null } | { tab: "memory" } | { tab: "routines"; routine: RoutineRoute } | PageView;
 
 /** The Board page: Workspace `workspace`'s view, the first Workspace's for `null`; on Messages, `search`'s results in place of the Board tasks, reply `reply` of the open thread highlighted, and session `session`'s tabs in the open thread, the one a reply wakes for `null`. */
 export interface BoardRoute {
@@ -62,6 +63,7 @@ export function tabView(tab: BoardTab): BoardView {
 			return { tab, thread: null };
 		case "settings":
 			return { tab, section: null };
+		case "sessions":
 		case "memory":
 			return { tab };
 		case "routines":
@@ -101,7 +103,7 @@ function parseView(rest: string | null, pages: PageAddresses): BoardView {
 	const tab = BOARD_TABS.find(each => each.id === head)?.id ?? "messages";
 	if (tab === "messages") return { tab, thread: null };
 	if (tab === "settings") return { tab, section: more[0] || null };
-	if (tab === "memory") return { tab };
+	if (tab === "memory" || tab === "sessions") return { tab };
 	if (tab === "routines") return { tab, routine: routineRoute(more) };
 	const page = pages.page(`#${rest}`);
 	return (page && pageView(page)) || tabView(tab);
@@ -113,6 +115,7 @@ function viewRest(view: BoardView, pages: PageAddresses): string | null {
 			return view.thread === null ? null : String(view.thread);
 		case "settings":
 			return view.section === null ? "settings" : `settings/${view.section}`;
+		case "sessions":
 		case "memory":
 			return view.tab;
 		case "routines":

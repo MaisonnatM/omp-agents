@@ -2,7 +2,7 @@
  * The Board page, laid out as a Slack channel: the open Workspace's Board tasks as messages, grouped by author and
  * split by day, each with its thread summary and a hover toolbar, over the composer that posts one; the open Board
  * task's Board thread at the right, as Slack's thread pane. The header's search field, as Slack's, shows its results in
- * place of the Board tasks. The sidebar's Board tab lists the Workspaces, in `./sidebar.tsx`.
+ * place of the Board tasks. The sidebar lists the Workspaces, in `./sidebar.tsx`.
  */
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -128,7 +128,7 @@ function BoardChannel({ route, core, state, disabled, onChange }: BoardPageProps
 					<HeaderTitleShown.Provider value={false}>
 						{/* A column, as the page area beside the page column is, so every tab's page takes the full width. */}
 						<div className="flex min-h-0 min-w-0 flex-1 flex-col">
-							<WorkspaceTab view={view} workspace={open} core={core} disabled={disabled} />
+							<WorkspaceTab view={view} workspace={open} board={state} core={core} disabled={disabled} />
 						</div>
 					</HeaderTitleShown.Provider>
 				)}

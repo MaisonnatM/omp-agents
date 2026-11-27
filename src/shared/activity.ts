@@ -99,8 +99,6 @@ export const CONTROLS = [
 	{ id: "sidebar.right.toggle", label: "Right sidebar toggle", area: "Sidebar" },
 	{ id: "sidebar.workspace", label: "Sidebar workspace picker", area: "Sidebar" },
 	{ id: "sidebar.command-menu", label: "Command menu button", area: "Sidebar" },
-	{ id: "sidebar.view.sessions", label: "Sidebar Sessions tab, which shows the page list and the sessions", area: "Sidebar" },
-	{ id: "sidebar.view.board", label: "Sidebar Board tab, which opens the Board and lists its workspaces", area: "Sidebar" },
 	{ id: "routines.delete", label: "Routine Delete, before it is confirmed", area: "Routines" },
 	{ id: "routines.new", label: "New routine", area: "Routines" },
 	{ id: "routines.run", label: "Routine run, picked on its strip", area: "Routines" },

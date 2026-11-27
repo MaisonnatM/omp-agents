@@ -3,6 +3,7 @@ import type { View } from "../src/shared/sessions";
 import { isWebModuleId, moduleHome, type WebModuleId } from "./modules";
 import { type CorePage, type Layout, openView, type Page, type SettingsRoute, settingsSection, type SidebarTab } from "./routing";
 import { type NavRow, navRowOf } from "./sidebar-tabs";
+import { BOARD_PAGE } from "./components/board/module";
 import { useStoredState } from "./stored-state";
 
 /** The page each core tab shows, but for Sessions, which shows the panes; a module's tab shows its home. */
@@ -25,29 +26,32 @@ interface SidebarTabInput {
 	page: Page | null;
 	/** The tabs that neither show nor apply, since their module is turned off; a page of one selects no row. */
 	absentTabs: ReadonlySet<SidebarTab>;
-	layout: Layout;
-	/** The session the Sessions tab opens when no pane shows one; `null` for none. */
+	/** The session the Sessions tab opens when no pane shows one, while the Board is off; `null` for none. */
 	latestSession: View | null;
+	/** The selected Workspace, whose Board's **Sessions** tab Sessions opens while the Board is on. */
+	workspace: string | null;
+	layout: Layout;
 	navigate: (page: Page) => void;
 	show: (layout: Layout) => void;
 }
 
 /**
  * The row of the page list the page on screen selects, {@link navRowOf}, and the way to show another tab or the sessions.
- * Sessions keeps the panes, or opens the latest session when no pane shows one.
+ * Sessions opens the selected Workspace's **Sessions** tab on the Board; while the Board is off, it keeps the panes, or opens the latest session when no pane shows one.
  * `showTab` keeps its identity across renders.
  */
-export function useSidebarTab({ page, absentTabs, layout, latestSession, navigate, show }: SidebarTabInput): {
+export function useSidebarTab({ page, absentTabs, layout, latestSession, workspace, navigate, show }: SidebarTabInput): {
 	row: NavRow | null;
 	showTab: (tab: SidebarTab | "sessions") => void;
 } {
 	const row = navRowOf(page, absentTabs);
-	const latest = useRef({ layout, latestSession });
-	latest.current = { layout, latestSession };
+	const latest = useRef({ layout, latestSession, workspace, absentTabs });
+	latest.current = { layout, latestSession, workspace, absentTabs };
 	const showTab = useCallback(
 		(next: SidebarTab | "sessions"): void => {
 			if (next !== "sessions") return navigate(isWebModuleId(next) ? moduleHome(next) : TAB_PAGE[next]);
-			const { layout: panes, latestSession: session } = latest.current;
+			const { layout: panes, latestSession: session, workspace, absentTabs } = latest.current;
+			if (!absentTabs.has("board")) return navigate({ kind: "board", ...BOARD_PAGE.home, workspace, view: { tab: "sessions" } });
 			show(panes.panes.length === 0 && session ? openView(panes, session, "replace") : panes);
 		},
 		[navigate, show],

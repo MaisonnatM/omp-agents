@@ -1,6 +1,7 @@
 /** The tabs across a Workspace's Board, as across a Slack channel, and every tab but Messages: another page's content kept to the Workspace. */
 import * as TabsPrimitive from "@ui-sdk/react/tabs";
-import { type ReactNode, useMemo, useRef } from "react";
+import { type ReactNode, useContext, useMemo, useRef } from "react";
+import type { BoardState } from "../../../templates/omp/agent/extensions/board/log";
 import { activityControl } from "../../activity";
 import type { WebModuleId } from "../../modules";
 import { PageHashContext } from "../../page-hash";
@@ -8,7 +9,8 @@ import { pullRequestsScope, pullRequestsStore } from "../../reads";
 import { COLUMN_MIN, type ListPage, listPlacement } from "../../page-list";
 import { hashForPage, type PullRequestsRoute, workspaceSection } from "../../routing";
 import { workspaceCwd } from "../../sessions";
-import { DashboardStatusContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { DashboardStatusContext, SessionsTabContext, useDashboardActions, useDashboardStatus } from "../dashboard-context";
+import { Roster } from "../roster";
 import type { CoreData } from "../module-views";
 import { ProjectMemoryTab } from "../memory/project-memory";
 import { RoutinesTab } from "../routines/routines-tab";
@@ -60,19 +62,21 @@ function workspaceSlice(core: CoreData, cwd: string | null) {
 }
 
 /** A tab other than Messages: the page it names, kept to the Workspace; a project or pull request it opens shows in the tab. */
-export function WorkspaceTab({ view, workspace, core, disabled }: { view: Exclude<BoardView, { tab: "messages" }>; workspace: string | null; core: CoreData; disabled: boolean }) {
+export function WorkspaceTab({ view, workspace, board, core, disabled }: { view: Exclude<BoardView, { tab: "messages" }>; workspace: string | null; board: BoardState; core: CoreData; disabled: boolean }) {
 	const to = useMemo(() => boardPageHash(workspace), [workspace]);
 	return (
 		<PageHashContext.Provider value={to}>
-			<TabPage view={view} workspace={workspace} core={core} disabled={disabled} />
+			<TabPage view={view} workspace={workspace} board={board} core={core} disabled={disabled} />
 		</PageHashContext.Provider>
 	);
 }
 
-function TabPage({ view, workspace, core, disabled }: { view: Exclude<BoardView, { tab: "messages" }>; workspace: string | null; core: CoreData; disabled: boolean }) {
+function TabPage({ view, workspace, board, core, disabled }: { view: Exclude<BoardView, { tab: "messages" }>; workspace: string | null; board: BoardState; core: CoreData; disabled: boolean }) {
 	const { changeModule } = useDashboardActions();
 	const slice = workspaceSlice(core, workspace);
 	switch (view.tab) {
+		case "sessions":
+			return <WorkspaceSessions board={board} />;
 		case "routines":
 			return <RoutinesTab workspace={workspace ?? core.defaultWorkspace} route={view.routine} routines={core.routines} held={core.held.routines ?? null} workspaces={core.workspaces} connected={core.connected} />;
 		case "pull-requests":
@@ -133,6 +137,32 @@ function ListedTab({ page, list, children }: { page: ListPage; list: ReactNode; 
 				{list}
 			</PageListColumn>
 			<div className="relative flex min-w-0 flex-1 flex-col">{children}</div>
+		</div>
+	);
+}
+
+/** The Workspace's **Sessions** tab: its live, interrupted, waiting, and past sessions with search and Resume all; the App keeps the selected Workspace on the open one, so the lists are this Workspace's. */
+function WorkspaceSessions({ board }: { board: BoardState }) {
+	const tab = useContext(SessionsTabContext);
+	if (!tab) return null;
+	const { sessions, workspaces, panes } = tab;
+	return (
+		<div className="min-h-0 flex-1 overflow-y-auto">
+			<div className="mx-auto w-full max-w-3xl px-2 pb-6">
+				<Roster
+					workspaces={workspaces}
+					lists={sessions.lists}
+					projects={sessions.projects}
+					pinnedIds={sessions.pinned}
+					groups={sessions.groups}
+					board={board}
+					query={sessions.query}
+					onQuery={sessions.setQuery}
+					onTogglePin={sessions.togglePin}
+					open={panes}
+					projectOpen={null}
+				/>
+			</div>
 		</div>
 	);
 }

@@ -13,6 +13,7 @@ import {
 	DashboardStatusContext,
 	MentionListsContext,
 	OpenProjectsContext,
+	SessionsTabContext,
 } from "./components/dashboard-context";
 import { LinkPreviewCard } from "./components/link-preview-card";
 import { FileDialog } from "./components/file-dialog";
@@ -32,6 +33,7 @@ import { ProjectTrustDialog } from "./components/project-trust-dialog";
 import { GetStarted } from "./components/get-started";
 import { firstSessionFact } from "./get-started-model";
 import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
+import { BOARD_PAGE } from "./components/board/module";
 import { SidebarFoot } from "./components/sidebar-status";
 import { subjectOf } from "./components/subject";
 import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
@@ -90,7 +92,13 @@ export function App() {
 	const editedGoal = goalHost?.source === "dashboard" && goalHost.goal.kind !== "off" && goalHost.control.phase === "live" && !goalHost.control.readOnly ? goalHost : null;
 	const { absent: absentTabs, shown: tabs } = useSidebarTabs();
 	const settings = useSettingsRoute(page);
-	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, navigate, show });
+	const { row, showTab } = useSidebarTab({ page, absentTabs, layout, latestSession: sessions.latest, workspace, navigate, show });
+	const boardOn = !absentTabs.has("board");
+	// While the Board is on, the selected Workspace follows what shows: the Board's Workspace, or the focused pane's session's, so the sidebar marks it and next and previous session walk its sessions.
+	const shownCwd = page?.kind === "board" ? page.workspace : page ? null : (focused.workspace ?? null);
+	useEffect(() => {
+		if (boardOn && shownCwd !== null && shownCwd !== workspace && workspaces.some(({ cwd }) => cwd === shownCwd)) pickWorkspace(shownCwd);
+	}, [boardOn, shownCwd, workspace, workspaces, pickWorkspace]);
 	const maximized = layout.maximized && !page;
 	const address = page ? hashForPage(page) : hashForLayout(layout);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
@@ -98,8 +106,8 @@ export function App() {
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, windowScope);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
-	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, detailsView });
-	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, detailsView };
+	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, detailsView, boardOn });
+	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, shownWorkspace: focused.workspace, detailsView, boardOn };
 
 	const endHost = useCallback(
 		async (instanceId: string): Promise<boolean> => {
@@ -148,12 +156,15 @@ export function App() {
 	const switchWorkspace = useCallback(
 		(cwd: string | null): void => {
 			pickWorkspace(cwd);
-			// A page such as the pull requests stays; only the panes follow the sidebar into the workspace.
-			const { page, hosts, shownWorkspace } = latest.current;
+			const { page, hosts, shownWorkspace, boardOn } = latest.current;
+			// The Board follows the pick into that Workspace's Board; another page such as the pull requests stays, and only the panes follow the sidebar into the workspace.
+			const board = boardOn && cwd !== null ? { kind: "board" as const, ...BOARD_PAGE.home, workspace: cwd } : null;
+			if (page?.kind === "board" && board) return navigate(board);
 			const next = page ? null : workspaceSession(cwd, hosts, shownWorkspace);
 			if (next) open(next, "replace");
+			else if (!page && board) navigate(board);
 		},
-		[pickWorkspace, open],
+		[pickWorkspace, open, navigate],
 	);
 	/** The palette opens a session from any workspace, so the sidebar switches to that workspace to keep it listed. */
 	const openFromPalette = useCallback(
@@ -220,6 +231,7 @@ export function App() {
 		[state.connected, fork, resume, quick, pullRequestNew, resumeAll, state.ending, pullRequestsScope, windowScope, state.merges, state.reviewDrafts],
 	);
 	const mentionLists = useMemo(() => ({ hosts: visible.hosts, past: visible.past }), [visible]);
+	const sessionsTab = useMemo(() => ({ sessions, workspaces, panes: layout.panes }), [sessions, workspaces, layout.panes]);
 
 	const listPage = listPageOf(page, row);
 	const pageArea = useRef<HTMLDivElement>(null);
@@ -235,6 +247,7 @@ export function App() {
 				<JobsContext.Provider value={state.jobs}>
 				<ScheduledSends.Provider value={state.scheduled}>
 					<OpenProjectsContext.Provider value={projects}>
+					<SessionsTabContext.Provider value={sessionsTab}>
 						<div className="flex h-svh flex-col bg-sidebar">
 							{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
 							<SidebarProvider
@@ -371,6 +384,7 @@ export function App() {
 							</SidebarProvider>
 							<LinkPreviewCard />
 						</div>
+					</SessionsTabContext.Provider>
 					</OpenProjectsContext.Provider>
 				</ScheduledSends.Provider>
 				</JobsContext.Provider>

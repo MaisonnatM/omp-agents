@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- The Board is now the left sidebar's only view: the Sessions | Board switch is gone. The page rows and your pinned sessions sit above the Workspaces, and with no session open the window shows the Board.
+- Each Workspace's Board has a Sessions tab with its live, interrupted, waiting, and past sessions, search, and Resume all. Opening a session marks its Workspace in the sidebar, and next and previous session stay in that Workspace.
+- With the Board turned off, the sidebar lists the sessions as before.
 - On the Board, a blue pill at the top or bottom edge says how many unread threads sit out of view, as Slack does. Click it to jump to the nearest one, or press Mark all read.
 - In a Board thread, replies that come while you read further up show a blue "new replies" pill at the bottom. Click it to jump to them.
 - Settings › Resources now names a session no dashboard lists by its title, as Past does, with its port beside it, instead of only its port.
