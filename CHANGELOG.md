@@ -5,6 +5,7 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- The left sidebar no longer has a Pull requests row; open pull requests from a Workspace's Board, where its Pull requests tab stays.
 - Threads is now the first row of the left sidebar, as in Slack: it lists every Board thread with replies across all Workspaces, newest reply first, with a count of those you have not read. Click one to open its thread beside the list and reply there.
 - Each Workspace's Board has quick links, as a Slack channel's bookmarks: a row under the tabs where **Add a quick link** saves a web address with a name, a click opens it in your browser, and a right-click edits, copies, or removes it.
 - Fixed: a pull request no longer shows Fix CI when its only red check is an older run that a newer run already replaced, such as a cancelled run of a workflow that ran again and passed. Its checks list also shows just the latest run of each check, like GitHub does.

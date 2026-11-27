@@ -1,14 +1,10 @@
 import { IconMagnifyingGlass } from "central-icons";
 import { memo, type ReactNode, useMemo } from "react";
 import type { View } from "../../src/shared/sessions";
-import { agentOn } from "../../src/shared/moves";
 import { Button } from "@/components/ui/button";
 import { SidebarContent } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { activityControl } from "../activity";
-import { withoutHidden, yourMoveCount } from "../pull-requests-model";
-import { useHiddenRepos } from "../pull-requests-state";
-import { pullRequestsStore } from "../reads";
 import type { Page, SettingsRoute, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import type { NavRow } from "../sidebar-tabs";
@@ -20,7 +16,7 @@ import type { WorkspaceScope } from "../use-workspace-scope";
 import { AppMark } from "./app-mark";
 import { useDashboardStatus } from "./dashboard-context";
 import { PinnedGroup, Roster } from "./roster";
-import { type NavCount, SidebarNav } from "./sidebar-nav";
+import { SidebarNav } from "./sidebar-nav";
 
 const NO_VIEWS: View[] = [];
 
@@ -64,17 +60,10 @@ export const AppSidebar = memo(function AppSidebar({
 	onPickWorkspace,
 	onSearch,
 }: AppSidebarProps) {
-	const { connected, pullRequestsScope } = useDashboardStatus();
-	const pullRequestRead = pullRequestsStore.use(pullRequestsScope).read;
-	const [hiddenRepos] = useHiddenRepos();
-	const counts = useMemo(
-		(): Partial<Record<SidebarTab, NavCount>> => ({
-			"pull-requests": { count: pullRequestRead ? yourMoveCount(withoutHidden(pullRequestRead.data, hiddenRepos), agentOn(visible.hosts)) : 0, says: count => `${count} your move` },
-		}),
-		[pullRequestRead, hiddenRepos, visible.hosts],
-	);
+	const { connected } = useDashboardStatus();
 	const hasBoard = tabs.includes("board");
-	const pageTabs = useMemo(() => tabs.filter(tab => tab !== "board"), [tabs]);
+	// Pull requests open from a Workspace's Board, not from the sidebar.
+	const pageTabs = useMemo(() => tabs.filter(tab => tab !== "board" && tab !== "pull-requests"), [tabs]);
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
 			<div className="flex h-(--window-header-height) shrink-0 items-center justify-end pr-2 select-none [-webkit-app-region:drag] *:[-webkit-app-region:no-drag]">
@@ -95,7 +84,7 @@ export const AppSidebar = memo(function AppSidebar({
 			<SidebarNav
 				tabs={pageTabs}
 				current={row}
-				counts={counts}
+				counts={{}}
 				list={list}
 				onTab={onTab}
 				settingsRoute={settings}
