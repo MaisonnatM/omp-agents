@@ -91,11 +91,11 @@ function SessionButton({ view, label, title, badge, facts, when, dot, placement,
 /**
  * The badge before a row's age: under all workspaces, the workspace it counts in, on a titled row, and on an untitled one,
  * whose label is its directory's name, when that directory is not its workspace's, as a linked worktree's is not; in the
- * General workspace, the directory it ran in, such as `~/tmp` or `~`, unless that is General's own `~/code`.
+ * General workspace, the directory it ran in, such as `~/code`, `~/tmp`, or `~`.
  */
 function rowBadge(row: { cwd: string; cwdDisplay: string; workspace: Workspace | null }, titled: boolean, showWorkspace: boolean): ReactNode {
 	const workspace = workspaceOf(row);
-	const text = showWorkspace ? (titled || workspace.cwd !== row.cwd ? workspaceName(workspace.cwdDisplay) : null) : workspace.cwdDisplay === GENERAL_DISPLAY && workspace.cwd !== row.cwd ? row.cwdDisplay : null;
+	const text = showWorkspace ? (titled || workspace.cwd !== row.cwd ? workspaceName(workspace.cwdDisplay) : null) : workspace.cwdDisplay === GENERAL_DISPLAY ? row.cwdDisplay : null;
 	return text === null ? null : <Badge size="compact" className="shrink-0 self-center">{text}</Badge>;
 }
 
