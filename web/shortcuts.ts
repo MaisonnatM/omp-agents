@@ -14,14 +14,6 @@ export type ShortcutId =
 	| "newSession"
 	| "sessionSearch"
 	| "find"
-	| "closeTab"
-	| "closeOtherTabs"
-	| "reopenClosedTab"
-	| "pinTab"
-	| "newTab"
-	| "nextTab"
-	| "previousTab"
-	| "selectTab"
 	| "openPullRequest"
 	| "setGoal"
 	| "previousSession"
@@ -44,8 +36,6 @@ export type ShortcutId =
 	| "getStarted"
 	| "back"
 	| "forward"
-	| "moveTabLeft"
-	| "moveTabRight"
 	| "help"
 	| "restore"
 	| "browserRestore"
@@ -96,9 +86,6 @@ export interface Chord {
 
 /** A chord, or G then a key, as GitHub and Gmail go to a page. Both keys of a pair type text, so pairs work only outside text fields. */
 export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
-
-/** Closes the header tab on screen, leaving its session running. */
-export const CLOSE_TAB: Chord = { key: "w", mod: true };
 
 /** A binding for each of 1 to 9 with `modifiers` held, in order, so a handler's key is the digit less one. */
 const digitKeys = (modifiers: Omit<Chord, "key">, scope: Scope): Binding[] =>
@@ -169,44 +156,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	{ id: "sessionSearch", category: "sessions", label: "Search the sidebar's sessions", keys: [{ chord: { key: "f", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "find", category: "general", label: "Find text in the focused conversation, or in the pull request the page shows", keys: [{ chord: { key: "f", mod: true }, scope: "anywhere" }] },
-	{ id: "closeTab", category: "general", label: "Close the header tab on screen; its session keeps running", keys: [{ chord: CLOSE_TAB, scope: "anywhere" }] },
-	{
-		id: "closeOtherTabs",
-		category: "general",
-		label: "Close every header tab but the pinned ones and the one on screen",
-		command: "Close other tabs",
-		keys: [{ chord: { key: "w", mod: true, alt: true }, scope: "anywhere" }],
-	},
-	{ id: "newTab", category: "general", label: "Open a new header tab on a new session", command: "New tab", keys: [{ chord: { key: "t", mod: true }, scope: "anywhere" }] },
-	{
-		id: "reopenClosedTab",
-		category: "general",
-		label: "Reopen the last closed header tab, where it was",
-		command: "Reopen closed tab",
-		keys: [{ chord: { key: "t", mod: true, shift: true }, scope: "anywhere" }],
-	},
-	{ id: "pinTab", category: "general", label: "Pin or unpin the header tab on screen", command: "Pin or unpin tab", keys: [{ chord: { key: "p", ctrl: true, shift: true }, scope: "anywhere" }] },
-	{
-		id: "nextTab",
-		category: "general",
-		label: "Go to the next header tab",
-		command: "Next tab",
-		keys: [
-			{ chord: { key: "Tab", ctrl: true }, scope: "anywhere" },
-			{ chord: { key: "ArrowRight", mod: true, alt: true }, scope: "anywhere" },
-		],
-	},
-	{
-		id: "previousTab",
-		category: "general",
-		label: "Go to the previous header tab",
-		command: "Previous tab",
-		keys: [
-			{ chord: { key: "Tab", ctrl: true, shift: true }, scope: "anywhere" },
-			{ chord: { key: "ArrowLeft", mod: true, alt: true }, scope: "anywhere" },
-		],
-	},
-	{ id: "selectTab", category: "general", label: "Go to header tab 1–9", keys: digitKeys({ mod: true }, "anywhere") },
 	{ id: "openPullRequest", category: "sessions", label: "Review, push, and open a pull request for the focused session's branch", command: "Open pull request", keys: [] },
 	{ id: "setGoal", category: "sessions", label: "Set or edit the focused session's objective and token budget", command: "Set or edit goal", keys: [] },
 	{
@@ -292,8 +241,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [{ chord: { key: ",", mod: true }, scope: "anywhere" }] },
 	{ id: "back", category: "general", label: "Go back", command: "Go back", keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }] },
 	{ id: "forward", category: "general", label: "Go forward", command: "Go forward", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
-	{ id: "moveTabLeft", category: "general", label: "Move the focused header tab left", keys: [{ chord: { key: "ArrowLeft", alt: true, shift: true }, scope: "anywhere" }] },
-	{ id: "moveTabRight", category: "general", label: "Move the focused header tab right", keys: [{ chord: { key: "ArrowRight", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "help", category: "general", label: "Open or close the keyboard shortcuts in Settings", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Leave a maximized pane, or close the pane a split added", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{ id: "browserRestore", category: "sessions", label: "Put a maximized Browser back in the sidebar", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },

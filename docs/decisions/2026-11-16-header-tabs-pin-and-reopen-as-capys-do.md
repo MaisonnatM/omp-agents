@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 2026-11-27-the-main-content-has-no-tabs
 date: 2026-11-16
 decision-makers: Maxence
 ---
@@ -32,7 +33,7 @@ The dashboard's command menu already uses Cmd+Shift+P to pin a session, which Ct
 
 ## Confirmation
 
-`web/header-tabs.test.ts` checks pinning, the pinned refusal to close, reopening at the old place and in the right group, and storing; `web/shortcuts.test.ts` checks Cmd+Shift+T and Ctrl+Shift+P on macOS and elsewhere.
+The header tabs' test, deleted with them on 2026-11-27, checked pinning, the pinned refusal to close, reopening at the old place and in the right group, and storing; `web/shortcuts.test.ts` checked Cmd+Shift+T and Ctrl+Shift+P on macOS and elsewhere.
 A headless browser closed a tab and pressed Cmd+Shift+T to see it back in place, then pinned a tab from its menu and reloaded to see it still first.
 
 ## Revisit when

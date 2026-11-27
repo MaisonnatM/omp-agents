@@ -1,7 +1,7 @@
 import { type Dispatch, useEffect, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
 import type { PaletteEvent, PaletteState } from "./command-palette";
-import { followMouseHistoryButtons, goInHeaderTab, useHeaderTabHistory } from "./header-tab-history";
+import { followMouseHistoryButtons, goInHistory, useWindowHistory } from "./window-history";
 import { MODULE_LIST, type WebModuleId } from "./modules";
 import { adjacentSession, closePane, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
 import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
@@ -100,8 +100,8 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 				if (page?.kind === "settings") show(layout);
 				else navigate({ kind: "settings", ...settings });
 			},
-			back: () => goInHeaderTab(-1),
-			forward: () => goInHeaderTab(1),
+			back: () => goInHistory(-1),
+			forward: () => goInHistory(1),
 			"pull-requests": () => {
 				const { page } = latest.current;
 				// The Pull requests page lists the pull requests itself; its shortcut then has nothing to open.
@@ -146,7 +146,7 @@ export function usePageShortcuts(input: PageShortcutInput): ReadonlySet<Shortcut
 	const canOpenPullRequest = input.openPullRequest !== null;
 	const canSetGoal = input.setGoal !== null;
 	const canMaximize = input.page === null && input.layout.panes.length > 1;
-	const { canGoBack, canGoForward } = useHeaderTabHistory();
+	const { canGoBack, canGoForward } = useWindowHistory();
 	/** Commands that would do nothing now. */
 	const unavailable = useMemo(
 		() =>

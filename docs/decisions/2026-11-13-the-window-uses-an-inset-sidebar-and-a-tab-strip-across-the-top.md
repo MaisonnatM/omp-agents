@@ -48,7 +48,7 @@ The frame before this had the sidebar's tab bar for Pull requests, Tickets, Bots
 
 ## Confirmation
 
-`web/header-tabs.test.ts` checks that visiting a page opens or focuses its tab and that a reorder survives this browser's copy, and `web/sessions.test.ts` checks that an ended session on screen shows under its folder without moving the folder.
+The header tabs' test, deleted with them on 2026-11-27, checked that visiting a page opens or focuses its tab and that a reorder survives this browser's copy, and `web/sessions.test.ts` checks that an ended session on screen shows under its folder without moving the folder.
 A smoke run shot the home, Pull requests, Todo, and a past session at 1440 and 1024 pixels in both themes, the closed sidebar, and a 390-pixel phone.
 
 ## Revisit when

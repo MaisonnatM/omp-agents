@@ -1,4 +1,4 @@
-/** `ClosableTab`, the shell the header's tabs and the details sidebar's tabs share, and `useTabRowEdges`, which fades the ends of a row of them that scrolls. */
+/** `ClosableTab`, the shell of the details sidebar's tabs, and `useTabRowEdges`, which fades the ends of a row of them that scrolls. */
 import { IconCrossMedium } from "central-icons";
 import { type ComponentProps, type CSSProperties, type ReactNode, type RefObject, useEffect, useState } from "react";
 import type { ControlId } from "../../src/shared/activity";

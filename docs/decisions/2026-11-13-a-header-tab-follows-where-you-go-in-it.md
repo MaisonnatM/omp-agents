@@ -30,7 +30,7 @@ Maxence asked that clicking a session or a page stop opening a new tab, as in Ca
 
 ## Confirmation
 
-`web/header-tabs.test.ts` checks that going somewhere stays in the same tab, that only a new-tab request adds one, and that going to what another tab shows focuses it.
+The header tabs' test, deleted with them on 2026-11-27, checked that going somewhere stays in the same tab, that only a new-tab request adds one, and that going to what another tab shows focuses it.
 A browser smoke clicked Todo, Notes, the +, Bots, Pull requests, and Calendar in the sidebar and saw two tabs, then closed the one on screen and went Back.
 
 ## Revisit when

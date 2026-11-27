@@ -49,16 +49,14 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("b", "KeyB")).toEqual([]);
 });
 
-test("browser-reserved chords stay the browser's, apart from the app's tab, settings, and pull request copy bindings", () => {
+test("browser-reserved chords stay the browser's, apart from the app's settings and pull request copy bindings", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		expect(pressOn(mac, "w", "KeyW", mod)).toEqual(["closeTab"]);
-		expect(pressOn(mac, "t", "KeyT", mod)).toEqual(["newTab"]);
 		expect(pressOn(mac, ",", "Comma", mod)).toEqual(["settings"]);
 		expect(pressOn(mac, "W", "KeyW", { ...mod, shift: true })).toEqual([]);
-		expect(pressOn(mac, "T", "KeyT", { ...mod, shift: true })).toEqual(["reopenClosedTab"]);
+		expect(pressOn(mac, "T", "KeyT", { ...mod, shift: true })).toEqual([]);
 		expect(pressOn(mac, "X", "KeyX", { ...mod, shift: true })).toEqual([]);
-		for (const [key, code] of [["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["w", "KeyW"], ["t", "KeyT"], ["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
 		expect(pressOn(mac, "K", "KeyK", { ...mod, shift: true })).toEqual(["copyPullRequestNumber"]);
@@ -70,7 +68,7 @@ test("browser-reserved chords stay the browser's, apart from the app's tab, sett
 	expect(pressOn(true, ",", "KeyM", { meta: true })).toEqual(["settings"]);
 });
 
-test("⌘1–9 go to the header tabs and ⌥1–9 open the sidebar's sessions on macOS, Ctrl and Alt elsewhere, including AZERTY", () => {
+test("⌥1–9 open the sidebar's sessions on macOS, Alt elsewhere, and ⌘1–9 take no shortcut, including AZERTY", () => {
 	const azerty = ["&", "é", "\"", "'", "(", "-", "è", "_", "ç"];
 	// macOS Option turns each digit into a symbol.
 	const option = ["¡", "™", "£", "¢", "∞", "§", "¶", "•", "ª"];
@@ -79,8 +77,8 @@ test("⌘1–9 go to the header tabs and ⌥1–9 open the sidebar's sessions on
 		for (let index = 0; index < 9; index++) {
 			const key = String(index + 1);
 			const code = `Digit${key}`;
-			expect(shortcutsFor(keyEvent(key, code, mod), null, mac)).toEqual([{ id: "selectTab", scope: "anywhere", key: index }]);
-			expect(pressOn(mac, azerty[index]!, code, mod)).toEqual(["selectTab"]);
+			expect(shortcutsFor(keyEvent(key, code, mod), null, mac)).toEqual([]);
+			expect(pressOn(mac, azerty[index]!, code, mod)).toEqual([]);
 			expect(shortcutsFor(keyEvent(mac ? option[index]! : key, code, { alt: true }), null, mac)).toEqual([{ id: "jumpToSession", scope: "anywhere", key: index }]);
 			expect(pressOn(mac, key, code)).toEqual(["answer"]);
 			expect(pressOn(mac, key, code, { ...mod, shift: true })).toEqual([]);
@@ -145,28 +143,19 @@ test("↓ and ↑, or J and K, step through sessions, pull requests, sport logs,
 	expect(shortcutsFor(keyEvent("j", "KeyJ"), null, false).map(({ scope }) => scope)).not.toContain("anywhere");
 });
 
-test("Ctrl+Shift+P pins or unpins the header tab on every platform, as in Capy, Cmd+Shift+P takes no shortcut, and Cmd+Alt+P opens the directory picker", () => {
-	expect(press("P", "KeyP", { ctrl: true, shift: true })).toEqual(["pinTab"]);
-	expect(pressOn(true, "P", "KeyP", { ctrl: true, shift: true })).toEqual(["pinTab"]);
+test("Ctrl+Shift+P and Cmd+Shift+P take no shortcut, and Cmd+Alt+P opens the directory picker", () => {
+	expect(press("P", "KeyP", { ctrl: true, shift: true })).toEqual([]);
+	expect(pressOn(true, "P", "KeyP", { ctrl: true, shift: true })).toEqual([]);
 	expect(pressOn(true, "P", "KeyP", { meta: true, shift: true })).toEqual([]);
 	expect(press("p", "KeyP", { ctrl: true })).toEqual([]);
 	expect(press("π", "KeyP", { ctrl: true, alt: true })).toEqual(["directory"]);
 });
 
-test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+↑↓ step through sessions, Cmd+Alt+←→ and Ctrl+Tab through header tabs, and Alt+Shift+arrows move a row of the pull request list", () => {
+test("Cmd+[ and Cmd+] go back and forward, Cmd+Alt+↑↓ step through sessions, and Alt+Shift+arrows move a row of the pull request list", () => {
 	expect(press("[", "BracketLeft", { ctrl: true })).toEqual(["back"]);
 	expect(press("]", "BracketRight", { ctrl: true })).toEqual(["forward"]);
 	expect(press("ArrowUp", "ArrowUp", { ctrl: true, alt: true })).toEqual(["previousSession"]);
 	expect(press("ArrowDown", "ArrowDown", { ctrl: true, alt: true })).toEqual(["nextSession"]);
-	expect(press("ArrowLeft", "ArrowLeft", { ctrl: true, alt: true })).toEqual(["previousTab"]);
-	expect(press("ArrowRight", "ArrowRight", { ctrl: true, alt: true })).toEqual(["nextTab"]);
-	for (const mac of [false, true]) {
-		expect(pressOn(mac, "Tab", "Tab", { ctrl: true })).toEqual(["nextTab"]);
-		expect(pressOn(mac, "Tab", "Tab", { ctrl: true, shift: true })).toEqual(["previousTab"]);
-	}
-	expect(pressOn(true, "Tab", "Tab", { meta: true })).toEqual([]);
-	expect(pressOn(true, "∑", "KeyW", { meta: true, alt: true })).toEqual(["closeOtherTabs"]);
-	expect(press("w", "KeyW", { ctrl: true, alt: true })).toEqual(["closeOtherTabs"]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual([]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual(["moveUp"]);
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
@@ -337,13 +326,13 @@ test("the Keyboard tab's rule holds: modifier chords work anywhere, single keys 
 test("the command palette runs a command as its keys do: the highest registration first, until one takes it", () => {
 	const stack = createShortcutStack();
 	const ran: string[] = [];
-	stack.add(0, (): ShortcutHandlers => ({ newTab: () => void ran.push("app"), settings: () => void ran.push("settings") }));
-	const remove = stack.add(1, (): ShortcutHandlers => ({ newTab: () => false, closeTab: () => void ran.push("dialog") }));
+	stack.add(0, (): ShortcutHandlers => ({ help: () => void ran.push("app"), settings: () => void ran.push("settings") }));
+	const remove = stack.add(1, (): ShortcutHandlers => ({ help: () => false, find: () => void ran.push("dialog") }));
 	const handlers = stack.handlers();
-	expect(Object.keys(handlers).toSorted()).toEqual(["closeTab", "newTab", "settings"]);
-	expect(handlers.newTab?.(0)).toBe(true);
+	expect(Object.keys(handlers).toSorted()).toEqual(["find", "help", "settings"]);
+	expect(handlers.help?.(0)).toBe(true);
 	expect(ran).toEqual(["app"]);
 	remove();
-	expect(handlers.closeTab?.(0)).toBe(false);
+	expect(handlers.find?.(0)).toBe(false);
 	expect(ran).toEqual(["app"]);
 });

@@ -298,13 +298,13 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, address, cla
 				<div
 					className={cn(
 						"absolute top-[calc((var(--window-header-height)-1.75rem)/2)] flex items-center gap-0.5 [-webkit-app-region:no-drag]",
-						// A closed sidebar leaves no strip: its toggle floats over the header tabs' left end, past the desktop app's window buttons, which `HeaderTabs` keeps clear.
+						// A closed sidebar leaves no strip: its toggle floats over the header's left end, past the desktop app's window buttons, which `WindowHeader` keeps clear.
 						floatingOpen ? "z-50" : panel.floating ? "left-[9px] z-20" : panel.open ? "right-[9px] z-10" : "left-[calc(env(titlebar-area-x,0px)+9px)] z-20",
 					)}
 					style={floatingOpen ? { left: panel.width - 9 - 28 } : undefined}
 				>
 					<SidebarToggle side={side} open={panel.open} onToggle={onToggle} />
-					{/* A docked sidebar holds back and forward at its right edge, so the header tabs start where the page does; otherwise `HeaderTabs` shows them. */}
+					{/* A docked sidebar holds back and forward at its right edge; otherwise `WindowHeader` shows them. */}
 					{panel.open && !panel.floating && <HistoryButtons />}
 				</div>
 			)}

@@ -5,7 +5,7 @@ import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui
 import { errorText } from "../src/json";
 import { AppSidebar } from "./components/app-sidebar";
 import { CommandPalette } from "./components/command-palette/command-palette";
-import { HeaderTabs } from "./components/header-tabs";
+import { WindowHeader } from "./components/header-controls";
 import {
 	type DashboardActions,
 	DashboardActionsContext,
@@ -249,9 +249,9 @@ export function App() {
 					<OpenProjectsContext.Provider value={projects}>
 					<SessionsTabContext.Provider value={sessionsTab}>
 						<div className="flex h-svh flex-col bg-sidebar">
-							{/* The sidebar runs the window's height; the header's tabs sit right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
+							{/* The sidebar runs the window's height; the header sits right of it, above the page and the details sidebar, each an inset panel on the sidebar's color. */}
 							<SidebarProvider
-								className="group/window grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--window-header-height)_minmax(0,1fr)] pr-1.5 pb-1.5 [grid-template-areas:'sidebar_tabs_tabs'_'sidebar_page_details']"
+								className="group/window grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[var(--window-header-height)_minmax(0,1fr)] pr-1.5 pb-1.5 [grid-template-areas:'sidebar_header_header'_'sidebar_page_details']"
 							>
 								<DashboardSidebar side="left" className="[grid-area:sidebar]" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")} address={address}>
 									<AppSidebar
@@ -271,7 +271,7 @@ export function App() {
 									/>
 									<SidebarFoot usage={state.usage} />
 								</DashboardSidebar>
-								<HeaderTabs className="[grid-area:tabs]" address={address} hosts={state.hosts} past={state.past} />
+								<WindowHeader className="[grid-area:header]" />
 								<SidebarInset className={cn("inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5", detailsView && sidebars.panels.right.open && !sidebars.panels.right.floating && "rounded-r-none border-r-0")}>
 									<div ref={pageArea} className="flex min-h-0 flex-1">
 										{listPage && placement?.at === "column" && (

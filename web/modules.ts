@@ -50,7 +50,7 @@ export interface PageModule<Id extends string, Route, Shortcut extends string = 
 	/** The route the tab opens. */
 	readonly home: Route;
 	readonly address: PageAddress<Route>;
-	/** What the window and a header tab call the page. */
+	/** What the window calls the page. */
 	title(route: Route): string;
 	/** The views Settings › Activity counts, in its order, and the one each route shows. */
 	readonly views: readonly { key: ModuleViewKey<Id>; label: string }[];

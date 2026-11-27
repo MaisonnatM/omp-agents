@@ -18,7 +18,7 @@
   }
 }
 
-/* What shows only while its `group/reveal` is hovered or holds the focus, and always on a touch screen, which has no hover: a header tab's ×, a page title's trailing controls. */
+/* What shows only while its `group/reveal` is hovered or holds the focus, and always on a touch screen, which has no hover: a details sidebar tab's ×, a page title's trailing controls. */
 @custom-variant revealed {
   @media (hover: hover) {
     &:is(:where(.group\/reveal):hover *) {
@@ -43,7 +43,7 @@
   color-scheme: light;
   --radius: var(--aui-radius-lg);
   --page-header-height: 3rem;
-  /* The window's top row of header tabs: a 1.75rem tab with the 0.375rem gap the page keeps from the window's edges above and below it. */
+  /* The window's top row, `WindowHeader`: a 1.75rem control with the 0.375rem gap the page keeps from the window's edges above and below it. */
   --window-header-height: 2.5rem;
   /* How far past a header's own padding its content starts on a phone, where the floating Sessions sidebar's toggle sits over its left corner. */
   --sidebar-toggle-clearance: 2.25rem;
@@ -259,7 +259,7 @@
   --shadow-3: var(--shadow-3);
   --shadow-2: var(--shadow-2);
   --shadow-1: var(--shadow-1);
-  /* The lift of the inset panels and the active header tab, under their border. */
+  /* The lift of the inset panels and the active details sidebar tab, under their border. */
   --shadow-raised: 0 1px 2px var(--shadow-color);
   --color-shadow-color: var(--shadow-color);
   @keyframes shimmer {
