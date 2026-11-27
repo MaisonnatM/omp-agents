@@ -288,7 +288,7 @@ function checksOf(rollup: Record<string, unknown>): { checks: CheckState; approv
 	const state = STATUS[str(rollup.state) ?? ""] ?? "none";
 	const nodes = nodesOf(rollup.contexts);
 	const rest = nodes.filter(node => !awaitsApproval(node)).map(parseCheck).filter(check => check !== null);
-	const failingChecks = rest.filter(check => check.state === "failing").map(check => check.name);
+	const failingChecks = [...new Set(rest.filter(check => check.state === "failing").map(check => check.name))];
 	if (state !== "failing" || totalOf(rollup.contexts) > nodes.length || !nodes.some(awaitsApproval)) return { checks: state, approvalRequired: false, failingChecks };
 	const checks = failingChecks.length > 0 ? "failing" : rest.some(check => check.state === "pending") ? "pending" : "passing";
 	return { checks, approvalRequired: true, failingChecks };

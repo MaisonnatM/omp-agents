@@ -127,9 +127,10 @@ describe("parseListAnswer", () => {
 												statusCheckRollup: {
 													state: "FAILURE",
 													contexts: {
-														totalCount: 2,
+														totalCount: 3,
 														nodes: [
 															{ name: "lint", status: "COMPLETED", conclusion: "SUCCESS" },
+															{ name: "pytest", status: "COMPLETED", conclusion: "FAILURE" },
 															{ name: "pytest", status: "COMPLETED", conclusion: "FAILURE" },
 														],
 													},
