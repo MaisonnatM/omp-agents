@@ -20,6 +20,13 @@ The edit records session `DASHBOARD_SESSION`, `dashboard`, so its memories' sour
 It answers the whole view after the edit, or 400 with every reason the memory gave, joined by spaces.
 The kinds, the slug, line, and body limits, the raw op, and the source tag live in `templates/omp/agent/extensions/project-memory/contract.ts`, which imports nothing, so the tool, the server, and the page share one copy.
 
+## Glossary
+
+`GET /api/glossary` answers a `GlossaryView`: the same main checkouts as the project memory, those with a `GLOSSARY.md` that defines at least one term, by folder name.
+`glossaryView` in `src/glossary.ts` reads each file at every request, so the tab shows the file as it is on disk and keeps no copy.
+`parseGlossary` splits the file into its `##` sections and their terms: a term starts at a line that opens with a bold name and a colon, `**Term**:` or a list item `- **Term**: definition`, and runs to the next blank line, term, or heading; its `_Avoid_:` line, split on commas, gives the words to avoid.
+Terms above every heading sit in a section with title `null`; prose that is not a term is left out.
+
 ## Bookmarks
 
 `GET /api/bookmarks` answers a `BookmarksView`: every bookmark newest first, whether Zen's profile was read, and the X sync's state.

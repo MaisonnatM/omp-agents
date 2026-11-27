@@ -5,6 +5,7 @@ import { readXVideo } from "./bookmarks/x-video";
 import { zenDir, zenProfileDir } from "./bookmarks/zen";
 import type { ModuleCore, ServerModule } from "./modules";
 import { BOOKMARKS_FLAGS } from "./omp/bookmarks-extension";
+import { glossaryView } from "./glossary";
 import { dataDir, HOME } from "./paths";
 import { EDIT_SHAPE, editProjectMemory, MemoryEditRefused, parseEdit, projectMemoryView } from "./project-memory";
 import { fail } from "./server/http";
@@ -17,7 +18,7 @@ const X_FILE = join(dataDir, "bookmarks-x.json");
 /** The omp extension every session loads, which gives it the `bookmarks` tool. */
 const BOOKMARKS_EXTENSION = { source: join(import.meta.dir, "omp", "bookmarks-extension.ts"), bundle: "bookmarks-extension.js" };
 
-/** `GET` and `PUT /api/project-memory`, and `GET /api/bookmarks`, `POST /api/bookmarks/x-sync`, and `GET /api/bookmarks/x-video`. */
+/** `GET` and `PUT /api/project-memory`, `GET /api/glossary`, and `GET /api/bookmarks`, `POST /api/bookmarks/x-sync`, and `GET /api/bookmarks/x-video`. */
 export function memoryRoutes({ get, media, write }: RouteKit, core: ModuleCore): Routes {
 	const roots = () => repositoriesOf(core.workspaces());
 	const xFetch = (url: string, init?: RequestInit) => fetch(url, init);
@@ -31,6 +32,7 @@ export function memoryRoutes({ get, media, write }: RouteKit, core: ModuleCore):
 				err => (err instanceof MemoryEditRefused ? fail(400, err.message) : null),
 			),
 		},
+		"/api/glossary": { GET: get(async () => Response.json(glossaryView(await roots()))) },
 		"/api/bookmarks": { GET: get(async () => Response.json(bookmarks.view())) },
 		"/api/bookmarks/x-sync": { POST: write(() => null, () => bookmarks.syncX()) },
 		"/api/bookmarks/x-video": { GET: media((params, req) => readXVideo(xFetch, params.get("url"), req.headers.get("range"))) },
