@@ -28,8 +28,6 @@ export interface ProjectMemoryRepo {
 	/** The repository's folder name. */
 	name: string;
 	memories: ProjectMemoryEntry[];
-	/** The text of the repository's `GLOSSARY.md`, the words its interface, docs, and code use; `null` when it has none. */
-	glossary: string | null;
 }
 
 /** `GET /api/project-memory`: every workspace repository, those with memories first, then by name. */
