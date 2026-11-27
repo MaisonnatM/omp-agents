@@ -28,6 +28,7 @@ import { useDashboardActions } from "../dashboard-context";
 import { ToggleSwitch } from "../toggle-switch";
 import { HEALTH_TICK, INSTANT, OPEN_SPRING, RunIcon, TaskIcon, TemplateMark, TRIGGER_MARKS } from "./routine-marks";
 import { RoutineOpen } from "./routine-open";
+import { RoutineFace } from "./routine-face";
 
 /** A click on one of these inside a row works the control, and leaves the row as it is. */
 const ROW_CONTROLS = "button, a, input, [role='switch'], [role='group']";
@@ -165,7 +166,8 @@ export function RoutineRow({ routine, template, open, connected, now }: RoutineR
 	return (
 		<li className="group/row relative">
 			{/* The name's button is the row's control for the keyboard and the screen reader; a click elsewhere on the row is the pointer's shortcut to it. */}
-			<div onClick={clickRow} className="cursor-pointer space-y-1 px-4 py-3 hover:bg-hover/50">
+			<div onClick={clickRow} className="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 px-4 py-3 hover:bg-hover/50">
+				<RoutineFace id={id} className={cn("row-span-3 mt-0.5 size-9", !here && "opacity-60")} />
 				<div className="flex min-h-7 items-center gap-2">
 					<button
 						type="button"
