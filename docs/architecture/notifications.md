@@ -32,8 +32,8 @@ The heartbeat check (`HEALTH_KINDS`) runs on the server that owns the unattended
 - The stopped notice lists `InterruptedSessions.midTurn`, the interrupted dashboard sessions whose turn ran when they stopped, each with its listed session file's title and `cwdDisplay`, `null` without a listed file; none gives no notice.
   `presentNotice` names each as the sidebar names a past session: its title, else its folder's name, else **Untitled session**.
   Its **Continue all** sends the sidebar's `resume-all` with the notice's session ids.
-- The heartbeat notice lists `earlyRuns` in `src/routine-health.ts`, the routine runs that exited early, oldest first; none gives no notice.
-  `presentNotice` heads it **N routine runs exited early**, lists each routine's name with why, and links to the first routine's open row.
+- The heartbeat notice lists `erroredRuns` in `src/routine-health.ts`, the routine runs that errored, oldest first; none gives no notice.
+  `presentNotice` heads it **N routine runs errored**, lists each routine's name, and links to the first routine's open row.
 
 A check that fails keeps what the last one found for its kind, and the marks for it, and logs each distinct error once.
 A repository GitHub did not answer for keeps its pull requests' notices the same way.

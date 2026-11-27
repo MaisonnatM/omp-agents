@@ -5,10 +5,9 @@ import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { readCreditRuns } from "../omp/stats";
 import { displayPath } from "../paths";
 import { loadPullRequests } from "../pull-requests";
-import { earlyRuns } from "../routine-health";
+import { erroredRuns } from "../routine-health";
 import { agentOn } from "../shared/moves";
 import type { RosterHost } from "../shared/sessions";
-import { macSleeps, sleptWithin } from "../sleep-log";
 import { waitingOnYou } from "../slack-messages";
 import type { PullRequestList } from "../shared/github";
 import type { InterruptedSessions } from "./interrupted";
@@ -79,15 +78,7 @@ export function noticeSources(deps: NoticeSourcesDeps): NoticeSources {
 				const saved = files.savedOf(sessionId);
 				return { sessionId, title: saved?.title ?? null, cwdDisplay: saved ? displayPath(saved.cwd) : null };
 			}),
-		earlyRuns: async () => {
-			const sleeps = await macSleeps();
-			return earlyRuns(
-				routines.value,
-				Date.now(),
-				(task, at) => boardRunTurn(deps.board(), task, at, files.pathOf),
-				(from, to) => sleptWithin(sleeps, from, to),
-			);
-		},
+		erroredRuns: async () => erroredRuns(routines.value, Date.now(), (task, at) => boardRunTurn(deps.board(), task, at, files.pathOf)),
 		now: Date.now,
 	};
 }

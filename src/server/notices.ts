@@ -10,7 +10,7 @@ import type { DashboardNews, DashboardUpdateOutcome } from "../shared/dashboard-
 import type { PlanUsage } from "../shared/models";
 import type { CreditsSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject, StoppedSession, UpdateSubject } from "../shared/notices";
 import { usesClause } from "../shared/notices";
-import type { EarlyRun } from "../routine-health";
+import type { ErroredRun } from "../routine-health";
 import type { SlackFound } from "../slack-messages";
 
 export interface NoticeSources {
@@ -39,8 +39,8 @@ export interface NoticeSources {
 	creditRuns(): Promise<Omit<CreditsSubject, "kind">[]>;
 	/** The interrupted dashboard sessions that stopped while their turn ran. */
 	stoppedSessions(): StoppedSession[];
-	/** The routine runs that exited early, which the daily heartbeat lists. */
-	earlyRuns(): Promise<EarlyRun[]>;
+	/** The routine runs that errored, which the daily heartbeat lists. */
+	erroredRuns(): Promise<ErroredRun[]>;
 	now(): number;
 }
 
@@ -102,7 +102,7 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	plan: "used-up plans",
 	credits: "providers out of credits",
 	stopped: "sessions that stopped mid-turn",
-	"routine-health": "routine runs that exited early",
+	"routine-health": "routine runs that errored",
 };
 
 /**
@@ -166,10 +166,10 @@ function stoppedNotices(sessions: StoppedSession[], at: number): Unscoped[] {
 	return [{ id: `stopped:${sorted.map(({ sessionId }) => sessionId).join(",")}`, at, kind: "stopped", sessions: sorted }];
 }
 
-/** One notice for every run in `runs`, none when it is empty. Its id names each run and why, so a run that exits early later makes it news again. */
-function healthNotices(runs: EarlyRun[], at: number): Unscoped[] {
+/** One notice for every run in `runs`, none when it is empty. Its id names each run, so a run that errors later makes it news again. */
+function healthNotices(runs: ErroredRun[], at: number): Unscoped[] {
 	if (runs.length === 0) return [];
-	return [{ id: `routine-health:${runs.map(run => `${run.routineId}@${run.at}:${run.exit}`).join(",")}`, at, kind: "routine-health", runs }];
+	return [{ id: `routine-health:${runs.map(run => `${run.routineId}@${run.at}`).join(",")}`, at, kind: "routine-health", runs }];
 }
 
 export class Notices {
@@ -316,7 +316,7 @@ export class Notices {
 			case "stopped":
 				return all(stoppedNotices(this.#sources.stoppedSessions(), this.#sources.now()), false);
 			case "routine-health":
-				return all(healthNotices(await this.#sources.earlyRuns(), this.#sources.now()), false);
+				return all(healthNotices(await this.#sources.erroredRuns(), this.#sources.now()), false);
 		}
 	}
 
