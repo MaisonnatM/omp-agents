@@ -27,6 +27,8 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 	const ended: string[] = [];
 	const lands: { workspace: string; branch: string; sessionId: string | undefined }[] = [];
 	const holds: { checkouts: Promise<void> | null; merges: Promise<void> | null; waking: Promise<void> | null } = { checkouts: null, merges: null, waking: null };
+	/** Why unattended work waits, while set. */
+	const holding = { reason: null as string | null };
 	let runner: BoardRunner;
 	const apply = (change: BoardChange): boolean => {
 		const applied = applyChange(state, change, now);
@@ -70,6 +72,7 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 		},
 		landable: () => landable,
 		owner: () => owns,
+		holdsUnattended: () => holding.reason,
 		now: () => now,
 	};
 	runner = new BoardRunner(() => state, apply, core);
@@ -87,6 +90,7 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 		lands,
 		working,
 		holds,
+		holding,
 		state: () => state,
 		tick: (ms: number) => {
 			now += ms;
@@ -113,6 +117,22 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
 describe("BoardRunner", () => {
+	test("a ready Board task waits to start while unattended work waits, and the sweep starts it once that ends", async () => {
+		const board = harness();
+		board.holding.reason = "Memory pressure is critical, so unattended work waits until it eases.";
+		board.runner.changed();
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "First" });
+		await settle();
+		expect(board.starts).toEqual([]);
+		expect(board.events.some(event => event.op === "start")).toBe(false);
+		await board.runner.sweep();
+		expect(board.starts).toEqual([]);
+		board.holding.reason = null;
+		await board.runner.sweep();
+		await settle();
+		expect(board.starts.map(start => start.cwd)).toEqual(["/w-wt/board-1"]);
+	});
+
 	test("starts one session on each ready Board task in its own worktree, and one on a dependent once its need is done", async () => {
 		const board = harness();
 		board.runner.changed();

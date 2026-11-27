@@ -172,6 +172,17 @@ export function presentNotice(notice: Notice, now: number): NoticePresentation {
 				toast: { kind: "news", duration: Infinity },
 			};
 		}
+		case "private-deleting":
+			return {
+				...NEWS,
+				source: "sessions",
+				headline: `${notice.title} is deleted at ${timeLabel(notice.deletesAt, now)}`,
+				preview: "This private session has been idle for the hours the idle session stop allows. Send it a message to keep it.",
+				link: { href: hashForSession(notice.sessionId), external: false },
+				face: { kind: "warning" },
+				// It comes minutes before the deletion, which you may not watch.
+				toast: { kind: "news", duration: Infinity },
+			};
 		case "rebase-stopped":
 			return {
 				...NEWS,

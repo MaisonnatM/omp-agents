@@ -5,6 +5,11 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- Sessions a dashboard can no longer list, such as old Bot conversations, now end on their own 10 minutes after the dashboard starts, instead of holding memory forever. Their conversation stays under Past.
+- Idle private sessions now stop after the same hours as other idle sessions. A notification says so 5 minutes before, because ending a private session deletes it.
+- When the Mac runs low on memory, the dashboard stops idle things one at a time, cheapest first, until memory is fine again. Board tasks and routine runs wait meanwhile. Busy sessions are never stopped, and a session you start yourself is never refused.
+- Settings › Resources shows memory pressure and swap over the last 24 hours, what each session uses with a Stop button, what would stop next, and every automatic stop. The sidebar's foot shows the pressure at a glance.
+- MCP servers now start in a session only when it first uses one of their tools, and stop after 10 idle minutes.
 - A routine copied into every Workspace now follows the original: editing the original's name, instructions, triggers, or model updates every copy, while each copy keeps its own schedule and on/off switch. Press Detach on a copy, or change its instructions, to make it your own again. Copies that still match their original start following it on the next restart.
 - The blue count beside a workspace now says everything waiting on you there: its sessions that need you plus its Board threads with replies you have not read. The Sessions tab, the Board tab, and the Dock badge all show the same count.
 - The Board tab's sidebar shows the count of what waits on you instead of ready Board tasks, marks each Workspace with a # as the Board's header does, and no longer lists sessions under each Workspace; they stay on the Sessions tab and in each Board thread.
@@ -153,42 +158,3 @@ The dashboard shows the same lines in Settings › What's new.
 - A session waiting on CI no longer lists its pull requests under its row; its row shows a clock with how many still wait on checks and a red cross with how many fail.
 - Fixed: the "routine runs exited early" notification no longer lists a run that started late only because the Mac was asleep, such as the catch-up runs when you open the lid.
 - Fixed: a routine set to post its output When it fails no longer counts as exited early each time it hands work to its Bot on purpose.
-
-## 2026-11-24
-
-- The session details sidebar's Overview tab has a Jobs section that lists the commands the agent runs in the background, live, with how long each has run and its last line of output.
-- When a job's output counts its progress, such as 23/60, its row shows a progress bar, the pass and fail counts, and about how long is left.
-- Click a job to read its last 15 lines as they come in; a job that fails opens by itself and shows in red.
-- A session's row in the left sidebar shows a small spinner and a count while it runs background jobs, even when its agent is idle.
-- Each Your move row shows the session its fix goes to, or "no session", the badge's tooltip says where the fix goes, and the heading buttons ask, for example, "Confirm 4? · 3 to sessions, 1 new".
-- Fix CI, Address comments, and Resolve conflicts on a pull request now go to the session that already worked on it, resuming that session if it ended, instead of starting a new session each click.
-- Reply and Fix CI at the top of Your move do the same for each pull request, and start a new session only for a pull request no session worked on.
-- A step in a project's plan has a play button: it opens a new session in the project, already set to work on that step and its sub-steps, with the prompt written for you.
-- An eval run that a session starts with the eval runner now shows in that session's Subagents list, with the task it works on while it runs, then whether it passed, its cost, and its minutes; click it to read the run's conversation.
-- The prompt that Start session writes for the steps you picked now asks the session to tick each one it finishes.
-- Sessions waiting on a pull request's checks or a scheduled send now sit in one top-level Waiting section between the workspaces and Past, each with a line per pull request showing whether its checks are running, failing, or passing; click a line to open the pull request.
-- Once every pull request a session watches passes its checks, the session leaves Waiting on CI and shows the blue dot, so you see that CI went green without being pinged.
-- A session waiting on a scheduled send keeps the calendar clock.
-- The sidebar's **Scheduled** group is gone; scheduled messages still show above their session's composer with **Send now**, **Edit**, and **Cancel**.
-- A session that ended its turn to wait on a scheduled check, such as a follow-up it scheduled or a pull request it watches, no longer shows the blue idle dot: its row shows a calendar clock, it lists with the sessions waiting on work, it adds nothing to the waiting count, and the idle stop no longer ends it.
-- The extension tests now run against a temporary omp config, so a killed test run can no longer leave a broken test marketplace in your `~/.omp` that makes `omp plugin marketplace update` fail.
-- The Board is gone: its page, channels, threads, and the board tool agents used to post there.
-- Projects keep working on their own: the Projects page, the brief each session in a project gets, and the project_list and project_update tools agents use.
-- Your existing projects move over by themselves the first time the dashboard starts, with their plan, decisions, and messages as log lines; the Board's leftover inbox folder is deleted.
-- Agents can add a whole project plan, with its sub-steps, in one project_update call.
-- The eval set's 11 tasks that failed the same way in every run now tell the agent the interface their checks expect, such as an exact error message, a dependency's name, or an output's shape, so a run is no longer failed for guessing a name differently.
-- The eval runner takes `--jobs N` to run N tasks at once; each run and its recorded result stay the same, only the wall time drops.
-- A done Board thread with messages you have not read now stays in its channel's list, and in the channel's unread badge, until you open it; before, the badge counted it while the list hid it.
-- The eval set now scores what its tickets ask for: each run sees the pull request's description, only the tests that the change made pass decide the score, and a new column shows the share of those tests that passed. Runs can now use git, uv, and vitest inside their clone.
-- When a land stops because an existing test changed, its message now says exactly how to mark the change as intended, or to put new tests in a new file instead.
-- A new Friday routine receipt, off until you turn it on, lists what each routine did and cost this week and says which to keep, slow down, or retire.
-- Each routine now shows what its runs cost: the row adds up the Bot's turns over the kept runs, and an open run shows its own tokens and cost.
-- A Bot now ends a routine run that found nothing new quietly by default, with no notification and no unread dot, so only runs with news reach you.
-- New routines, whether you or a Bot create them, now start with New conversation each run checked, so each run no longer re-reads the Bot's whole earlier conversation. Your existing routines keep their setting.
-- A routine that runs a command can now post its output to the Bot only when the command fails or prints something different from last time: pick When it fails or its output changes in the routine's editor. A cheap check can then run often and wake the Bot only on news.
-- Wake-up messages the dashboard sends a session no longer show in its conversation: a watched pull request's change, a Board mention, and a follow-up the agent scheduled for itself. The agent still reads and acts on each one. Messages you schedule yourself still show.
-- New conversation each run now works for routines that run a command too: when the command's output is posted to the Bot, it opens a new conversation. A run that posts nothing leaves the conversation alone.
-- A routine that sends a message can now start a new conversation on each run: check New conversation each run in the routine's editor. When the Bot is busy, the run's message joins the current conversation as before.
-- A Bot or session that answers you in a Board thread now ends its post on suggested prompts when it leaves you a next step, so the reply box offers them as it does under a session's "finished" post.
-- A Bot whose conversation stopped still offers the prompts its last reply suggested under its composer.
-- Settings › Sync can now carry your Board projects between machines: each project's name, goal, decisions, archive, and plan steps with their state arrive on every machine, while its sessions and messages stay where they happened.

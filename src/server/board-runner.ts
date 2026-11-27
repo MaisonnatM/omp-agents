@@ -202,6 +202,8 @@ export class BoardRunner implements ModuleRun {
 	 */
 	#seen: Map<number, ReadUpTo> | null = null;
 	#stopSweep: (() => void) | null = null;
+	/** Why the ready Board tasks wait to start, which the sweep checks again; `null` when none waits on it. */
+	#held: string | null = null;
 
 	constructor(state: () => BoardState, apply: (change: BoardChange) => boolean, core: ModuleRunCore) {
 		this.#state = state;
@@ -233,6 +235,10 @@ export class BoardRunner implements ModuleRun {
 			if (asked !== null) void this.#land(task, asked);
 			if (seen && !starting.has(task.id)) this.#deliver(task, seen.get(task.id) ?? { replies: 0, edited: 0 });
 		}
+		const holds = ready.length > 0 ? this.#core.holdsUnattended() : null;
+		if (holds !== null && holds !== this.#held) console.error(`omp-agents: Board tasks wait to start: ${holds}`);
+		this.#held = holds;
+		if (holds !== null) return;
 		for (const task of ready) {
 			// A merge running on the branch, or the last round's session finishing its turn in the worktree, holds the start; each calls this again when it ends.
 			if (this.#starting.has(task.id) || this.#landing.has(task.id) || startedOn(task).some(sessionId => !this.#ended.has(sessionId) && this.#core.alive(sessionId))) continue;
@@ -247,6 +253,8 @@ export class BoardRunner implements ModuleRun {
 	 */
 	async sweep(): Promise<void> {
 		if (!this.#core.owner()) return;
+		// Ready Board tasks that waited on memory start once it eases.
+		if (this.#held !== null && this.#core.holdsUnattended() === null) this.changed();
 		const now = this.#core.now();
 		const holders = new Set<string>();
 		for (const task of this.#state().tasks) {

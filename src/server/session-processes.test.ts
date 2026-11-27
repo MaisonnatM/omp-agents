@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { UnitSnapshot } from "../omp/module-types/processes";
 import { parsePs } from "../process-census";
-import { LIST_REUSE_MS, SessionProcessWatch, type WatchedSession } from "./session-processes";
+import type { KeptProcess } from "../keeper-link";
+import type { PrivateDeleting } from "../shared/notices";
+import type { Pressure } from "../shared/resources";
+import { LIST_REUSE_MS, SessionProcessWatch, STRAY_STOP_ID, type WatchedSession } from "./session-processes";
 
 const T0 = Date.parse("Fri Oct 3 09:00:00 2026");
 const minutes = (count: number): number => T0 + count * 60_000;
@@ -22,8 +25,10 @@ const SCOPE = { kind: "project", dir: "/repo" } as const;
 const BROWSER_UNIT: UnitSnapshot = { id: "u1", kind: "proc", scope: SCOPE, key: "browser", generation: "g1", state: "running", pids: [300], startedAt: T0, supervised: true };
 const API_UNIT: UnitSnapshot = { id: "u2", kind: "proc", scope: SCOPE, key: "api", generation: "g2", state: "running", pids: [], startedAt: T0, owner: "sa", command: "bun api.ts", supervised: true };
 
-const A: WatchedSession = { instanceId: "a", sessionId: "sa", file: "/sessions/a.jsonl", pid: 100, cwd: "/repo", status: "idle", waitsOnWork: false, stopsWhenIdle: true };
-const B: WatchedSession = { instanceId: "b", sessionId: "sb", file: "/sessions/b.jsonl", pid: 200, cwd: "/repo/wt", status: "working", waitsOnWork: false, stopsWhenIdle: true };
+const A: WatchedSession = { instanceId: "a", title: "A", sessionId: "sa", file: "/sessions/a.jsonl", pid: 100, cwd: "/repo", status: "idle", waitsOnWork: false, stopsWhenIdle: true, private: false };
+const B: WatchedSession = { instanceId: "b", title: "B", sessionId: "sb", file: "/sessions/b.jsonl", pid: 200, cwd: "/repo/wt", status: "working", waitsOnWork: false, stopsWhenIdle: true, private: false };
+/** This server's port, whose keepers' directory it owns. */
+const PORT = 4317;
 
 /** A watch over a computer whose processes, services, sessions, and clock the test sets; a stop takes what it stopped off the computer. */
 function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
@@ -54,6 +59,11 @@ function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
 			[400, "/repo/front"],
 			[500, "/"],
 		]),
+		pressure: "normal" as Pressure,
+		/** Every port's running keepers. */
+		keepers: [] as KeptProcess[],
+		/** The private sessions the last sample named as about to be deleted. */
+		warnings: [] as PrivateDeleting[],
 	};
 	const stopped: string[] = [];
 	/** The session file in each process's environment, by pid. */
@@ -83,6 +93,17 @@ function computer(services: UnitSnapshot[] = [BROWSER_UNIT, API_UNIT]) {
 		now: () => state.now,
 		owner: () => state.owner,
 		settings: () => ({ stopIdleAfterMinutes: state.minutes, stopIdleSessionsAfterHours: state.hours }),
+		readMemory: async () => ({ pressure: state.pressure, totalBytes: 0, availableBytes: 0, swapUsedBytes: 0, swapOutBytesPerMin: 0, swapOutBytes: 0, calmTicks: 0, at: state.now }),
+		readKeepers: () => state.keepers,
+		port: PORT,
+		endStray: async keeper => {
+			stopped.push(`stray ${keeper.instanceId}`);
+			state.keepers = state.keepers.filter(each => each !== keeper && each.instanceId !== keeper.instanceId);
+		},
+		record: () => {},
+		warn: warnings => {
+			state.warnings = warnings;
+		},
 	});
 	/** Samples at `count` minutes past the start. */
 	const tickAt = (count: number): Promise<void> => {
@@ -229,13 +250,62 @@ describe("SessionProcessWatch", () => {
 		expect(stopped).toEqual([]);
 	});
 
-	test("a session the idle session stop leaves alone never ends: one started in a terminal or a private one", async () => {
+	test("a session started in a terminal never ends, and a private one ends at the hours like any other, named in the warnings its last five minutes", async () => {
 		const { state, stopped, tickAt } = computer([]);
 		state.minutes = null;
-		state.sessions = [{ ...A, stopsWhenIdle: false }, { ...B, status: "idle", stopsWhenIdle: false }];
+		state.sessions = [{ ...A, private: true }, { ...B, status: "idle", stopsWhenIdle: false }];
 		await tickAt(0);
-		await tickAt(48 * 60);
+		await tickAt(24 * 60 - 6);
+		expect(state.warnings).toEqual([]);
+		await tickAt(24 * 60 - 5);
+		expect(state.warnings).toEqual([{ sessionId: "sa", title: "A", deletesAt: minutes(24 * 60) }]);
 		expect(stopped).toEqual([]);
+		await tickAt(24 * 60);
+		await tickAt(48 * 60);
+		expect(stopped).toEqual(["session a"]);
+	});
+
+	test("an omp no server lists ends after the grace, or on a Stop, while another live server's never does", async () => {
+		const { state, stopped, tickAt, watch } = computer([]);
+		state.minutes = null;
+		state.sessions = [{ ...A, status: "working" }];
+		const keeper = (instanceId: string, port: number): KeptProcess => ({ port, instanceId, keeperPid: 150, private: false, startedAt: T0 });
+		// Port 3000 is listened on by pid 400; nothing listens on port 4500.
+		state.keepers = [keeper("a", PORT), keeper("lost", PORT), keeper("old", 4500), keeper("theirs", 3000), keeper("asked", PORT)];
+		await tickAt(0);
+		expect(stopped).toEqual([]);
+		await watch.stop("theirs", STRAY_STOP_ID);
+		await watch.stop("asked", STRAY_STOP_ID);
+		expect(stopped).toEqual(["stray asked"]);
+		await tickAt(10);
+		expect(stopped.toSorted()).toEqual(["stray asked", "stray lost", "stray old"]);
+		await tickAt(60);
+		expect(stopped).toHaveLength(3);
+	});
+
+	test("unattended work waits until memory is read at normal pressure, and while it is not; the user's work never waits", async () => {
+		const { state, tickAt, watch } = computer([]);
+		expect(watch.admit("unattended")).toEqual({ go: false, reason: "Memory has not been read yet, so unattended work waits until it is." });
+		expect(watch.admit("interactive")).toEqual({ go: true });
+		await tickAt(0);
+		expect(watch.admit("unattended")).toEqual({ go: true });
+		state.pressure = "warn";
+		await tickAt(1);
+		expect(watch.admit("unattended")).toEqual({ go: false, reason: "Memory is under pressure, so unattended work waits until it eases." });
+		expect(watch.admit("interactive")).toEqual({ go: true });
+	});
+
+	test("warn pressure stops the biggest process of a session idle 5 minutes, one per sample, and records it", async () => {
+		const { state, stopped, tickAt, watch } = computer([]);
+		state.minutes = null;
+		state.hours = null;
+		await tickAt(0);
+		state.pressure = "warn";
+		await tickAt(4);
+		expect(stopped).toEqual([]);
+		await tickAt(5);
+		expect(stopped).toEqual(["job 110,111"]);
+		expect((await watch.view()).stops.map(stop => [stop.owner.kind, stop.because])).toEqual([["process", "warn"]]);
 	});
 
 	test("a server that first sees a session idle counts from its file's last write, and one it first sees busy from now", async () => {

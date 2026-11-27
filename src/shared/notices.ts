@@ -113,7 +113,16 @@ export interface RoutineHealthSubject {
 /** A rebase **Keep rebased** stopped, on a conflict or a failure, which it does not try again until the pull request's head or its base moves. */
 export type RebaseStoppedSubject = { kind: "rebase-stopped" } & RebaseStop;
 
-export type NoticeSubject = UpdateSubject | UndoneSubject | PullRequestSubject | SlackSubject | ProviderSubject | StoppedSubject | RoutineHealthSubject | RebaseStoppedSubject;
+/** A private session the idle session stop deletes at `deletesAt` unless it is used first, which the bell says five minutes before. */
+export interface PrivateDeleting {
+	sessionId: string;
+	title: string;
+	deletesAt: number;
+}
+
+export type PrivateDeletingSubject = { kind: "private-deleting" } & PrivateDeleting;
+
+export type NoticeSubject = UpdateSubject | UndoneSubject | PullRequestSubject | SlackSubject | ProviderSubject | StoppedSubject | RoutineHealthSubject | RebaseStoppedSubject | PrivateDeletingSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -132,6 +141,7 @@ export type Notice = { id: string; at: number; seen: boolean; read: boolean } & 
 	| StoppedSubject
 	| RoutineHealthSubject
 	| RebaseStoppedSubject
+	| PrivateDeletingSubject
 );
 
 /** `update` installs the release, rewrites the routing, or pulls omp-agents and restarts it; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */

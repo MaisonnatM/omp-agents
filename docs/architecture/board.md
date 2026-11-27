@@ -49,6 +49,7 @@ The dashboard calls the run's `changed` after every change to the module, and `t
 `BoardRunner` in `src/server/board-runner.ts` does the rest while its server is the owner:
 
 - It starts a session on each Board task `unstartedReady` lists and records the `start`.
+  Under memory pressure it starts none and leaves them ready, and the sweep starts them once the pressure eases; see [Unattended work waits on memory](session-processes.md#unattended-work-waits-on-memory).
   `boardCheckout` in `src/server/board-checkout.ts`, through the core's `checkout`, first gives the Board task its branch `board/<id>` (`taskBranch`) and worktree `<repository>-wt/board-<id>`.
   It reuses the worktree that has the branch, or adds one, from the branch or else the default branch; then it asks project trust to admit the worktree, and only then runs the `setup` commands of the repository's `.omp/land.json`.
   A worktree whose admission or setup failed is removed again, so the next try sets it up anew.

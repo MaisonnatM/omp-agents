@@ -66,6 +66,8 @@ export interface UnattendedWorkDeps {
 	stopping: AbortSignal;
 	/** The Workspaces the dashboard shows, which take copies of the routines marked for every Workspace. */
 	workspaces(): string[];
+	/** Why unattended work waits now, such as memory pressure; `null` when it may start. */
+	holdsUnattended(): string | null;
 }
 
 /** The unattended work's parts, which the dashboard starts, ticks, and stops. */
@@ -107,6 +109,7 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 			return change.op === "reply" ? change.task : modules.board.value.tasks.at(-1)!.id;
 		},
 		turnOf: (task, at) => boardRunTurn(modules.board.value, task, at, deps.pathOf),
+		holdsUnattended: deps.holdsUnattended,
 	});
 	const scheduledRunner = new ScheduledRunner({
 		file: scheduled,
@@ -153,6 +156,7 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 		land: (workspace, branch, sessionId) => landBoardBranch(workspace, branch, sessionId, admit),
 		landable: workspace => configAt(workspace) !== null,
 		owner: ownerHeld,
+		holdsUnattended: deps.holdsUnattended,
 		now: Date.now,
 	});
 	const autoContinue = new AutoContinue({

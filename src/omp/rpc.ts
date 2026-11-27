@@ -219,7 +219,7 @@ async function drive(link: (agentArgs: string[]) => Promise<KeeperLink>, onFrame
 export async function startRpc(instanceId: string, cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: AdmittedLaunch): Promise<RpcChild> {
 	await launch.admit(cwd);
 	return drive(
-		agentArgs => startKeeper(keepersDir, instanceId, { cwd, argv: [...ompCommand, ...agentArgs], env: childEnv(), frameModule: rpcFrameFile, meta: { startedAt: Date.now(), cwd } }),
+		agentArgs => startKeeper(keepersDir, instanceId, { cwd, argv: [...ompCommand, ...agentArgs], env: childEnv({ OMP_MCP_LAZY: "1" }), frameModule: rpcFrameFile, meta: { startedAt: Date.now(), cwd } }),
 		onFrame,
 		launch,
 	);

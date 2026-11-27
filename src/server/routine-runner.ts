@@ -31,6 +31,8 @@ export interface RoutineRunnerDeps {
 	postBoard(change: Extract<BoardChange, { op: "post" | "reply" }>): number;
 	/** The turn the session on Board task `task` took on the run at `at`, once it ended; `null` before then. */
 	turnOf(task: number, at: number): RunTurn | null;
+	/** Why unattended work waits now, such as memory pressure; `null` when a run may start. */
+	holdsUnattended(): string | null;
 }
 
 /** Why a run a stopped server left sending failed: its post may have reached the Board or not. */
@@ -47,6 +49,8 @@ export class RoutineRunner {
 	readonly #lane = new SerialLane();
 	/** Command reports that ended outside a full wake, for the next tick at a full wake to post. */
 	readonly #reports: HeldReport[] = [];
+	/** Why queued runs last waited, so the log says it once. */
+	#held: string | null = null;
 
 	constructor(deps: RoutineRunnerDeps) {
 		this.#deps = deps;
@@ -82,7 +86,7 @@ export class RoutineRunner {
 			this.#recordUsage();
 			const now = this.#deps.now();
 			for (const routine of this.#deps.file.value) if (isDue(routine, now)) this.#claim(routine, now, []);
-			await this.#drain();
+			await this.#drainUnlessHeld();
 		});
 	}
 
@@ -114,8 +118,20 @@ export class RoutineRunner {
 				// Runs are keyed by their time, so a second claim in the same millisecond takes the next one.
 				else this.#claim(routine, Math.max(now, (routine.runs[0]?.at ?? 0) + 1), seen);
 			}
-			if (await this.#deps.fullyAwake()) await this.#drain();
+			if (await this.#deps.fullyAwake()) await this.#drainUnlessHeld();
 		});
+	}
+
+	/** Starts the queued runs unless unattended work waits, which leaves them queued for a later tick; a run the user asked for with **Run now** does not wait. */
+	async #drainUnlessHeld(): Promise<void> {
+		const holds = this.#deps.holdsUnattended();
+		if (holds !== null) {
+			if (holds !== this.#held && this.#deps.file.value.some(routine => routine.runs.some(run => run.outcome.kind === "queued"))) console.error(`omp-agents: routine runs wait to start: ${holds}`);
+			this.#held = holds;
+			return;
+		}
+		this.#held = null;
+		await this.#drain();
 	}
 
 	/** Saves the run before anything starts from it, so a crash after the claim loses no slot. */

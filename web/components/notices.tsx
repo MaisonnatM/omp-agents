@@ -72,6 +72,7 @@ function originOf(notice: Notice): { logo: ReactNode; label: string } {
 		case "stopped":
 		case "routine-health":
 		case "rebase-stopped":
+		case "private-deleting":
 			return { logo: <IconExclamationCircle className={cn(mark, "text-amber-600 dark:text-amber-400")} />, label: "omp-agents" };
 		default: {
 			const unhandled: never = notice;

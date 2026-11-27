@@ -47,6 +47,9 @@
   **Navigation** lists the 15 most common moves from one view to another and the time spent on each view.
   **Active time** charts the minutes you used the dashboard each day, up to five minutes between two uses, with a table of each day's active time, visits, and changes sent.
   Only the server that runs the unattended work keeps activity, in `activity.db` in its data directory; a browser under automation records nothing.
+- **Resources** shows this Mac's memory pressure, memory in use, and swap, with a 24-hour chart that marks each Jetsam event, when macOS killed processes for memory.
+  **Who holds memory** lists sessions, jobs, services, strays, and the dashboard, largest first, with **Stop** or **End session**; **What stops next** and **Automatic stops** follow.
+  The sidebar's **Memory** row opens it.
 - **Storage** measures session files, attachments, and isolation sandboxes, and cleans them up with omp's cleanup and the package caches; see [Storage](storage.md).
 - **Worktrees** lists every Git worktree in repositories where a session ran; **Show another repository**, below the list, lists one more.
   A session directory that is gone or outside Git is skipped; a path you enter that is not in a repository says so.

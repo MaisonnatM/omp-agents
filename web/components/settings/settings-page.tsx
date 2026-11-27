@@ -23,6 +23,7 @@ import { ExtensionsTab } from "./extensions-tab";
 import { PhoneAccessTab } from "./phone-access-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { ProvidersTab } from "./providers-tab";
+import { ResourcesTab } from "./resources-tab";
 import { ModelsTab } from "./routing-tab";
 import { SourceControlTab } from "./source-control-tab";
 import { SyncTab } from "./sync-tab";
@@ -133,6 +134,7 @@ export function SettingsPage({
 		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
 		keyboard: <KeyboardTab />,
+		resources: <ResourcesTab active={section === "resources"} />,
 		integrations: <IntegrationsTab active={section === "integrations"} />,
 		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,

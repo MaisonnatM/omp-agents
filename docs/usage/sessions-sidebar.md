@@ -140,6 +140,8 @@
   Only the server that runs unattended work, the first one started, stops processes.
 - The idle session stop stops a session's omp once the session has been idle, with no subagent still running, for the time **Stop idle sessions** in [Settings](settings.md) names, 12 hours by default.
   The session then shows under Past with its worktree kept, and **Resume** picks it back up; it is not **End session**.
-  It stops only sessions the dashboard started, and leaves terminal sessions and private sessions running.
+  It stops only sessions the dashboard started, and leaves terminal sessions running.
+  A private session stops too, which deletes it, so the bell warns five minutes before.
+- Under memory pressure, the dashboard stops omps no server lists, then idle jobs and services, then sessions settled longest, one owner a minute under warn and three under critical, and holds Board tasks and routine runs until it eases; the Resources page shows what goes next.
 - When a session ends or its omp exits, the server stops the services it owned and the jobs it left running.
   A session started from the dashboard also has the rest of its processes ended when it ends, as before.

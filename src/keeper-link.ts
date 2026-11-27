@@ -2,12 +2,13 @@
  * The server's side of a session keeper (`src/keeper.ts`): it starts one for each session the dashboard starts, finds
  * the ones a previous server left running, and connects to one as the process omp's `RpcClient` drives.
  */
-import { closeSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, rmSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync } from "node:fs";
 import { createConnection } from "node:net";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { isObject } from "./json";
 import { HELLO, type KeeperMeta, pidFileOf, STOP } from "./keeper-wire";
 import type { RpcProcess } from "./omp/module-types/rpc";
+import { keepersDir, privateSessionsDir } from "./paths";
 import { stopTree } from "./process-census";
 import { keeperScript } from "./server/resources";
 
@@ -271,4 +272,85 @@ export function listKeepers(dir: string): string[] {
 		if (id !== name && !ids.includes(id)) rmSync(join(dir, name), { force: true });
 	}
 	return ids;
+}
+
+/** A keeper running on this computer, whichever port's server started it; its files are the only record of it. */
+export interface KeptProcess {
+	/** The port of the server that started it, which names its directory. */
+	port: number;
+	instanceId: string;
+	keeperPid: number;
+	/** Its session is private, so ending it deletes it. */
+	private: boolean;
+	/** When it wrote its pid file, which it does as it starts. */
+	startedAt: number;
+}
+
+/** Whether a process `pid` runs; one this user may not signal runs too. */
+function running(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		return isObject(error) && error.code === "EPERM";
+	}
+}
+
+/** The entries of directory `dir`; none when it cannot be read. */
+function entriesOf(dir: string): string[] {
+	try {
+		return readdirSync(dir);
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * Every keeper whose process runs, in every port's directory under `sessionsRoot`, private when its port's directory
+ * under `privateRoot` holds its session. Reads only: another port's files are its server's to clean.
+ */
+export function listAllKeepers(sessionsRoot = dirname(keepersDir), privateRoot = dirname(privateSessionsDir)): KeptProcess[] {
+	return entriesOf(sessionsRoot)
+		.filter(port => /^\d+$/.test(port))
+		.flatMap(port => {
+			const dir = join(sessionsRoot, port);
+			return entriesOf(dir).flatMap(name => {
+				if (!name.endsWith(".sock")) return [];
+				const instanceId = name.slice(0, -".sock".length);
+				const pidFile = pidFileOf(join(dir, name));
+				let keeperPid: number;
+				let startedAt: number;
+				try {
+					keeperPid = Number(readFileSync(pidFile, "utf8").trim());
+					startedAt = statSync(pidFile).mtimeMs;
+				} catch {
+					return [];
+				}
+				if (!Number.isSafeInteger(keeperPid) || keeperPid <= 1 || !running(keeperPid)) return [];
+				return [{ port: Number(port), instanceId, keeperPid, private: existsSync(join(privateRoot, port, instanceId)), startedAt }];
+			});
+		});
+}
+
+/** How long a kept omp gets to exit once asked to stop; its keeper sends SIGKILL after 6 s. */
+const END_TIMEOUT_MS = 10_000;
+
+/**
+ * Ends `keeper`'s omp through the keeper, as **End session** does, so the keeper reaps what omp started; a keeper that
+ * does not greet, or does not exit in {@link END_TIMEOUT_MS}, is stopped with its tree. Holds when repeated, and leaves
+ * none of its files. Only for a keeper no server holds a connection to.
+ */
+export async function endKept(keeper: KeptProcess, sessionsRoot = dirname(keepersDir)): Promise<void> {
+	const dir = join(sessionsRoot, String(keeper.port));
+	try {
+		const link = await connect(dir, keeper.instanceId, GREET_TIMEOUT_MS);
+		link.process.kill();
+		const ended = await Promise.race([link.ended, Bun.sleep(END_TIMEOUT_MS).then(() => null)]);
+		if (ended === null) link.detach();
+	} catch {
+		// No keeper greeted: it is gone, or stuck, which the tree stop below covers.
+	}
+	if (running(keeper.keeperPid)) await stopTree(keeper.keeperPid, STUCK_GRACE_MS);
+	const socket = socketOf(dir, keeper.instanceId);
+	for (const path of [socket, logOf(dir, keeper.instanceId), pidFileOf(socket)]) rmSync(path, { force: true });
 }

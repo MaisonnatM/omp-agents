@@ -65,6 +65,8 @@ export const pinsFile = join(configDir, "pins.json");
 export const preferencesFile = join(configDir, "preferences.json");
 /** When the idle stop ends a session's processes, beside {@link tokenFile}. */
 export const processesFile = join(configDir, "processes.json");
+/** The Resources page's history, one JSON Lines file per day, beside {@link tokenFile}; only the owner server writes it. */
+export const resourcesDir = join(configDir, "resources");
 /** The model profiles Settings › Models saved, beside {@link tokenFile}; omp's own `config.yml` never holds them. */
 export const modelProfilesFile = join(configDir, "model-profiles.json");
 /** The fallback lists the composer's Extra usage switch parked, beside {@link tokenFile}. */
