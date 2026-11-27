@@ -41,7 +41,7 @@ The page runs in a narrow window as often as a wide one.
 ## Confirmation
 
 `web/routines-model.test.ts` holds the countdown, past-run, strip, and cadence words and shapes, `web/routing.test.ts` and the Bots model's test, since retired, the card's address and what the page shows for it, and `web/activity.test.ts` its view.
-Review checks that `web/components/routines/routines-card.tsx` is what `#bots/<id>/routines` and `#bots/<id>/routines/<routine id>` render.
+Review checked that `RoutinesCard`, since replaced by the Routines tab's sidebar beside the open routine, is what `#bots/<id>/routines` and `#bots/<id>/routines/<routine id>` render.
 
 ## Revisit when
 
