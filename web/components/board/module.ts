@@ -141,7 +141,8 @@ export type BoardControlId =
 	| "board.search.all"
 	| "board.thread.search"
 	| "board.message.edit"
-	| "board.message.unread";
+	| "board.message.unread"
+	| "board.message.expand";
 
 export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, BoardChange, never, BoardControlId> = {
 	id: "board",
@@ -216,6 +217,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		{ id: "board.thread.search", label: "Board thread search button", area: "Board" },
 		{ id: "board.message.edit", label: "Board message Edit button, which edits your message and resends it to its session", area: "Board" },
 		{ id: "board.message.unread", label: "Board thread reply Mark unread button, which marks the thread unread from that reply and closes it", area: "Board" },
+		{ id: "board.message.expand", label: "Board routine message Show more button, which shows the whole message in place", area: "Board" },
 	],
 	store: {
 		apply(state, change) {

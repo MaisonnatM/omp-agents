@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- On the Board, a long message a routine posted now shows its first lines only, with Show more to read the rest.
+- On the Board, a message whose thread has replies you haven't read now has a light blue background.
+
 - The Routines notification now appears only when a routine run errors.
 - A routine run that was shorter than usual, started late, or ended with no reply no longer raises a notification.
 - Replying on a done Board task, or picking one of its suggestions, now goes back to the session that did the work, with its whole conversation, instead of starting a new session that re-reads the thread. A new session still starts when that one cannot come back, or after you closed the task.
