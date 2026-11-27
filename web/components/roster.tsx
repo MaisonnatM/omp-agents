@@ -89,25 +89,15 @@ interface WorkspaceFolderProps {
 	/** The Board, whose threads with unread replies in this workspace count with its sessions that need you. */
 	board: BoardState | null;
 	onOpenChange: () => void;
-	onNewSession: () => void;
 	/** The folder's session rows, in order. */
 	children: ReactNode;
 }
 
-/** A workspace in the roster: a folder of its session rows, or with none its name alone; hovering it offers a new session there. */
-function WorkspaceFolder({ folder: { group, rows }, board, name, open, onOpenChange, onNewSession, children }: WorkspaceFolderProps) {
+/** A workspace in the roster: a folder of its session rows, or with none its name alone. */
+function WorkspaceFolder({ folder: { group, rows }, board, name, open, onOpenChange, children }: WorkspaceFolderProps) {
 	const waiting = waitingIn(board, useSeen(), group.hosts, group.workspace.cwd);
-	const newHere = (
-		<SidebarGroupActions className="top-0 h-7 opacity-0 transition-opacity group-hover/workspace:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
-			<Tooltip content={`New session in ${name}`} side="right">
-				<SidebarGroupAction aria-label={`New session in ${name}`} onClick={onNewSession}>
-					<IconPlusSmall />
-				</SidebarGroupAction>
-			</Tooltip>
-		</SidebarGroupActions>
-	);
 	return (
-		<SidebarGroup className="group/workspace py-0" collapsible={rows > 0} open={open} onOpenChange={onOpenChange} headerActions={rows > 0 && newHere}>
+		<SidebarGroup className="group/workspace py-0" collapsible={rows > 0} open={open} onOpenChange={onOpenChange}>
 			<SidebarGroupLabel icon={rows > 0 && open ? IconFolderOpen : IconFolder1} title={group.workspace.cwdDisplay} className="h-7 text-[13px] text-foreground/85 hover:text-foreground">
 				{name}
 				{waiting > 0 && (
@@ -117,12 +107,10 @@ function WorkspaceFolder({ folder: { group, rows }, board, name, open, onOpenCha
 					</>
 				)}
 			</SidebarGroupLabel>
-			{rows > 0 ? (
+			{rows > 0 && (
 				<SidebarMenu aria-label={`omp sessions in ${name}`} className="ml-[15px] w-auto gap-px border-l border-border pl-1">
 					{children}
 				</SidebarMenu>
-			) : (
-				newHere
 			)}
 		</SidebarGroup>
 	);
@@ -205,7 +193,7 @@ function ProjectsGroup({ projects, current, open, onOpenChange, row }: ProjectsG
 }
 
 interface RosterProps {
-	/** Set where it fills the sidebar, while the Board is off: it then holds the workspace picker, which calls this. Unset in a Workspace's **Sessions** tab on the Board. */
+	/** Set where it fills the sidebar, while the Board is off: it then holds the workspace picker, which calls this. Unset in a Workspace's **Sessions** tab on the Board, which lists the live sessions without their Workspace's folder. */
 	onPickWorkspace?: (cwd: string | null) => void;
 	/** The workspaces, as {@link listWorkspaces} lists them, which the picker offers. */
 	workspaces: Workspace[];
@@ -265,7 +253,7 @@ export function PinnedGroup({ pinned, open, showWorkspace, onTogglePin }: Pinned
  */
 export function Roster({ workspaces, lists, projects, pinnedIds, groups, board, query, onQuery, onTogglePin, open, projectOpen, onPickWorkspace }: RosterProps) {
 	const [modulesOff] = useModulesOff();
-	const { start, dismissStart, openNewSession } = useDashboardActions();
+	const { start, dismissStart } = useDashboardActions();
 	const { connected, starts: { resumeAll }, scope: { workspace } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const [pastOpen, setPastOpen] = useStoredState(PAST_OPEN_KEY, raw => raw === "true");
@@ -362,16 +350,25 @@ export function Roster({ workspaces, lists, projects, pinnedIds, groups, board, 
 			</SidebarGroup>
 			{filtering && nothing && <p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>}
 			<PinnedGroup pinned={pinned} open={open} showWorkspace={showWorkspace} onTogglePin={onTogglePin} />
-			{folders.shown.map(folder => {
-				const { cwd, cwdDisplay } = folder.group.workspace;
-				const key = `workspace:${cwd}`;
-				return (
-					<WorkspaceFolder key={cwd} folder={folder} board={board} name={workspaceName(cwdDisplay)} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)} onNewSession={() => openNewSession(cwd)}>
-						{folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false))}
-					</WorkspaceFolder>
-				);
-			})}
-			{(folders.more > 0 || (allGroups && folders.foldable)) && (
+			{onPickWorkspace === undefined ? (
+				// A Workspace's Sessions tab names its Workspace already, so its live sessions list without the folder.
+				<SidebarGroup className="py-0">
+					<SidebarMenu aria-label="omp sessions" className="gap-px">
+						{folders.shown.flatMap(folder => folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false)))}
+					</SidebarMenu>
+				</SidebarGroup>
+			) : (
+				folders.shown.map(folder => {
+					const { cwd, cwdDisplay } = folder.group.workspace;
+					const key = `workspace:${cwd}`;
+					return (
+						<WorkspaceFolder key={cwd} folder={folder} board={board} name={workspaceName(cwdDisplay)} open={!collapsed.has(key)} onOpenChange={() => toggleGroup(key)}>
+							{folder.group.hosts.filter(host => !awaitsScheduled(host)).map(host => hostRow(host, false, false))}
+						</WorkspaceFolder>
+					);
+				})
+			)}
+			{onPickWorkspace !== undefined && (folders.more > 0 || (allGroups && folders.foldable)) && (
 				<SidebarGroup className="py-0">
 					<SidebarMenu>
 						<SidebarMenuItem>

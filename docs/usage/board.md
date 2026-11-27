@@ -6,12 +6,12 @@ The Board fills the left sidebar: under the page rows and your pinned sessions i
 
 ## The page
 
-- **Threads**, at the top of the sidebar's Board half as in Slack, lists every Board thread with a reply across all Workspaces, the latest reply first, with a count of those with replies you have not read.
+- **Threads**, the first row of the left sidebar, above Notifications, as in Slack, lists every Board thread with a reply across all Workspaces, the latest reply first, with a count of those with replies you have not read.
   Each card names its Workspace and Board task, shows the Board task, **N more replies**, and the last two replies, the unread ones tinted blue; a click on the card's title, a reply link, or its **Reply…** field opens the Board thread beside the list, where you reply. **Show older threads** loads 30 more.
   Its address is `#board/threads`, and `#board/threads/<n>` opens it with Board task `n`'s thread open.
 - The sidebar lists your Workspaces; a count beside one says what waits on you there: its sessions that need you, plus its Board threads with replies you have not read. The Dock badge counts the same way.
   The Workspace of the session in front stays marked in the sidebar, and next and previous session walk that Workspace's sessions.
-  A Workspace's **Sessions** tab lists its live, interrupted, waiting, and past sessions, with search and **Resume all**; a click opens the session in the panes, beside others as before.
+  A Workspace's **Sessions** tab lists its live, interrupted, waiting, and past sessions, with search and **Resume all**, in a column at the left, with no Workspace folder and without the projects its **Projects** tab shows, so a project's sessions list with the rest; a click shows that session's conversation at the right, and `#board/sessions/<session id>?workspace=<encoded dir>` opens it there. With none picked, the latest session shows.
   The sessions behind a Workspace's Board tasks also show in each Board thread; a click on one in a thread opens the Board thread of the Board task it works on with that session's tab in front, even when a later session took the Board task over.
   The address names the session as `session=<id>`, so a reload keeps it.
 - With the Board turned off in Settings › Modules, the sidebar lists the sessions under the page rows instead, as before the Board.

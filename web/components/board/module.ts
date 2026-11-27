@@ -32,7 +32,7 @@ export type RoutineRoute = { kind: "list" } | { kind: "new" } | { kind: "open"; 
  * its memory, its routines as `routine` names, or the page `page` another tab shows, such as one pull request's.
  * `threads` is no Workspace's: Slack's Threads view, every Workspace's Board threads with replies, Board task `thread`'s open beside them.
  */
-export type BoardView = { tab: "messages"; thread: number | null } | { tab: "threads"; thread: number | null } | { tab: "sessions" } | { tab: "settings"; section: string | null } | { tab: "memory" } | { tab: "routines"; routine: RoutineRoute } | PageView;
+export type BoardView = { tab: "messages"; thread: number | null } | { tab: "threads"; thread: number | null } | { tab: "sessions"; session: string | null } | { tab: "settings"; section: string | null } | { tab: "memory" } | { tab: "routines"; routine: RoutineRoute } | PageView;
 
 /** The Board page: Workspace `workspace`'s view, the first Workspace's for `null`; on Messages, `search`'s results in place of the Board tasks, reply `reply` of the open thread highlighted, and session `session`'s tabs in the open thread, the one a reply wakes for `null`. */
 export interface BoardRoute {
@@ -65,6 +65,7 @@ export function tabView(tab: BoardTab): BoardView {
 		case "settings":
 			return { tab, section: null };
 		case "sessions":
+			return { tab, session: null };
 		case "memory":
 			return { tab };
 		case "routines":
@@ -97,7 +98,7 @@ function routineRest(routine: RoutineRoute): string {
 	}
 }
 
-/** The view the address's rest names: a number is a Board thread, `threads` the Threads view and `threads/<n>` it with Board thread n open, `settings/<section>` a settings section, `routines/<more>` the Routines tab, `<tab>/<more>` the page `#<tab>/<more>` names in that tab, Messages for an unknown one. */
+/** The view the address's rest names: a number is a Board thread, `threads` the Threads view and `threads/<n>` it with Board thread n open, `settings/<section>` a settings section, `sessions/<id>` the Sessions tab with that session open, `routines/<more>` the Routines tab, `<tab>/<more>` the page `#<tab>/<more>` names in that tab, Messages for an unknown one. */
 function parseView(rest: string | null, pages: PageAddresses): BoardView {
 	if (rest !== null && /^\d+$/.test(rest)) return { tab: "messages", thread: Number(rest) };
 	const [head, ...more] = rest?.split("/") ?? [];
@@ -105,7 +106,8 @@ function parseView(rest: string | null, pages: PageAddresses): BoardView {
 	const tab = BOARD_TABS.find(each => each.id === head)?.id ?? "messages";
 	if (tab === "messages") return { tab, thread: null };
 	if (tab === "settings") return { tab, section: more[0] || null };
-	if (tab === "memory" || tab === "sessions") return { tab };
+	if (tab === "memory") return { tab };
+	if (tab === "sessions") return { tab, session: more[0] ? decodeSegment(more[0]) : null };
 	if (tab === "routines") return { tab, routine: routineRoute(more) };
 	const page = pages.page(`#${rest}`);
 	return (page && pageView(page)) || tabView(tab);
@@ -120,6 +122,7 @@ function viewRest(view: BoardView, pages: PageAddresses): string | null {
 		case "settings":
 			return view.section === null ? "settings" : `settings/${view.section}`;
 		case "sessions":
+			return view.session === null ? view.tab : `${view.tab}/${encodeURIComponent(view.session)}`;
 		case "memory":
 			return view.tab;
 		case "routines":

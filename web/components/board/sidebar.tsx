@@ -6,7 +6,7 @@ import { revealDetailsTab } from "../../details-tabs";
 import type { RosterHost } from "../../../src/shared/sessions";
 import { GENERAL_DISPLAY, type Workspace, workspaceName } from "../../../src/shared/workspaces";
 import type { BoardState } from "../../../templates/omp/agent/extensions/board/log";
-import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { waitingOnYou } from "../../labels";
@@ -78,6 +78,24 @@ export function hashForBoardSession(state: BoardState, workspace: string, sessio
 export const revealSessionTab = () => revealDetailsTab(THREAD_TABS, "session", "thread");
 export const revealThreadTab = () => revealDetailsTab(THREAD_TABS, "thread", "thread");
 
+/** The **Threads** row, Slack's, first in the sidebar's page list: it opens every Workspace's Board threads, with the count of those with unread replies. */
+export function ThreadsRow({ state, active }: { state: BoardState | null; active: boolean }) {
+	const seen = useSeen();
+	const unread = state?.tasks.filter(task => unreadOf(task, seen[task.id]) > 0).length ?? 0;
+	return (
+		<SidebarMenuItem>
+			<SidebarMenuButton {...activityControl("board.threads")} size="short" asChild icon={IconBubble3} isActive={active} aria-label={unread > 0 ? `Threads, ${unread} with unread replies` : undefined}>
+				<a href={hashForThreads()}>Threads</a>
+			</SidebarMenuButton>
+			{unread > 0 && (
+				<SidebarMenuBadge aria-hidden>
+					<CountPill count={unread} />
+				</SidebarMenuBadge>
+			)}
+		</SidebarMenuItem>
+	);
+}
+
 const go = (hash: string) => () => {
 	location.hash = hash;
 };
@@ -119,24 +137,8 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts 
 	useShortcuts({ moveUp: () => moveFocused(-1), moveDown: () => moveFocused(1) });
 	if (state === null) return <p className="px-4 py-2 text-xs text-muted-foreground">Loading the Board…</p>;
 	const onThreads = route.view.tab === "threads";
-	const unreadThreads = state.tasks.filter(task => unreadOf(task, seen[task.id]) > 0).length;
 	return (
 		<SidebarContent>
-			<SidebarGroup>
-				<SidebarMenu aria-label="Board views">
-					<SidebarMenuItem>
-						<SidebarMenuButton {...activityControl("board.threads")} icon={IconBubble3} isActive={onThreads} aria-current={onThreads ? "page" : undefined} onClick={go(hashForThreads())}>
-							<span className="min-w-0 flex-1 truncate">Threads</span>
-							{unreadThreads > 0 && (
-								<>
-									<CountPill count={unreadThreads} />
-									<span className="sr-only">{`, ${unreadThreads} with unread replies`}</span>
-								</>
-							)}
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				</SidebarMenu>
-			</SidebarGroup>
 			<SidebarGroup collapsible open={!folded} onOpenChange={() => setFolded(was => !was)}>
 				<SidebarGroupLabel>Workspaces</SidebarGroupLabel>
 				<SidebarMenu ref={list} aria-label="Board workspaces" className="gap-px">

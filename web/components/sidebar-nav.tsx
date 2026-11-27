@@ -1,5 +1,4 @@
-/** The left sidebar's page list: New session, Notifications with its unread count, each shown tab's page with its count, and Settings; while the sidebar floats, the page on screen holds its own list beneath its row. */
-import { IconEditBig } from "central-icons";
+/** The left sidebar's page list: Notifications with its unread count, each shown tab's page with its count, and Settings; while the sidebar floats, the page on screen holds its own list beneath its row. */
 import { Fragment, type ReactNode } from "react";
 import { SidebarGroup, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuNested } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,17 +24,16 @@ interface SidebarNavProps {
 	counts: Partial<Record<SidebarTab, NavCount>>;
 	/** The current row's own list, shown beneath it, or after the last row for a tab the user hid; `null` for none, as when the page holds its list itself. */
 	list: ReactNode;
-	/** The New session row's label, naming the selected workspace. */
-	newSessionLabel: string;
-	onNewSession: () => void;
 	onTab: (tab: SidebarTab) => void;
 	/** The settings section and workspace the Settings row opens. */
 	settingsRoute: SettingsRoute;
 	/** How many notices are unread, after the Notifications row's label. */
 	unreadNotices: number;
+	/** The row above all others, such as the Board's **Threads**; `null` for none. */
+	first: ReactNode;
 }
 
-export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNewSession, onTab, settingsRoute, unreadNotices }: SidebarNavProps) {
+export function SidebarNav({ tabs, current, counts, list, onTab, settingsRoute, unreadNotices, first }: SidebarNavProps) {
 	const sub = list !== null && (
 		<SidebarMenuNested>
 			<ScrollArea className="ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[30svh] pl-1">
@@ -47,13 +45,7 @@ export function SidebarNav({ tabs, current, counts, list, newSessionLabel, onNew
 		<SidebarGroup className="shrink-0 py-1">
 			<nav aria-label="Pages">
 				<SidebarMenu className="gap-px">
-					<SidebarMenuItem>
-						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
-							<SidebarMenuButton size="short" icon={IconEditBig} isActive={current === "new"} aria-label={newSessionLabel} onClick={onNewSession}>
-								{newSessionLabel}
-							</SidebarMenuButton>
-						</Tooltip>
-					</SidebarMenuItem>
+					{first}
 					<NotificationsRow unread={unreadNotices} active={current === "notifications"} />
 					{tabs.map(tab => {
 						const { label, icon } = TAB_ROWS[tab];

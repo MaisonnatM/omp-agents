@@ -21,8 +21,8 @@ import { textFileUrl } from "./file-paths";
 import { PageSwitch } from "./components/page-switch";
 import { useModulesOff } from "./modules-off";
 import { openProjects, type Project } from "../src/shared/projects";
-import { PageList, PageListColumn, useWidth } from "./components/page-list";
-import { listPageOf, listPlacement } from "./page-list";
+import { PageList, PageListColumn, pageListLabel, useWidth } from "./components/page-list";
+import { listPageOf, listPlacement, listSplits } from "./page-list";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/use-notice-toasts";
 import { RenderBoundary } from "./components/render-boundary";
@@ -236,7 +236,7 @@ export function App() {
 	const listPage = listPageOf(page, row);
 	const pageArea = useRef<HTMLDivElement>(null);
 	const pageAreaWidth = useWidth(pageArea);
-	const placement = listPage && listPlacement(listPage, sidebars.panels.left.floating, pageAreaWidth);
+	const placement = listPage && listPlacement(listSplits(listPage), sidebars.panels.left.floating, pageAreaWidth);
 	const pageList = useMemo(() => listPage && <PageList page={listPage} sectionTarget={sectionTarget} onSectionTarget={setSectionTarget} />, [listPage, sectionTarget]);
 	const showSearch = useCallback(() => dispatchPalette({ type: "open" }), [dispatchPalette]);
 	const unreadNotices = useMemo(() => state.notices.filter(notice => !notice.read).length, [state.notices]);
@@ -275,7 +275,7 @@ export function App() {
 								<SidebarInset className={cn("inset-panel [grid-area:page] group-has-[#sessions-sidebar[inert]]/window:ml-1.5", detailsView && sidebars.panels.right.open && !sidebars.panels.right.floating && "rounded-r-none border-r-0")}>
 									<div ref={pageArea} className="flex min-h-0 flex-1">
 										{listPage && placement?.at === "column" && (
-											<PageListColumn page={listPage} max={placement.max}>
+											<PageListColumn label={pageListLabel(listPage)} max={placement.max}>
 												{pageList}
 											</PageListColumn>
 										)}

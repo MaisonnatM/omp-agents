@@ -27,13 +27,15 @@ export function listPageOf(page: Page | null, row: NavRow | null): ListPage | nu
 	return page !== null && row !== null && listsOwnPage(page, row) ? page : null;
 }
 
+/** Whether `page` splits its list from its open item, so the page beside the column needs the wider floor. */
+export const listSplits = (page: ListPage): boolean => isModulePage(page) && moduleOf(page).split === true;
+
 /**
- * Where `page`'s list goes and how wide the column may get. A floating sidebar, as on a phone, and a page area too narrow
- * to give the page its floor beside the narrowest column, nest the list under its row; otherwise the column holds it, up
- * to what leaves the page its floor.
+ * Where a list goes and how wide the column may get, for a page that `split`s its list from its open item or not. A
+ * floating sidebar, as on a phone, and a page area too narrow to give the page its floor beside the narrowest column,
+ * nest the list under its row; otherwise the column holds it, up to what leaves the page its floor.
  */
-export function listPlacement(page: ListPage, floating: boolean, room: number): { at: "sidebar" } | { at: "column"; max: number } {
-	const split = isModulePage(page) && moduleOf(page).split;
+export function listPlacement(split: boolean, floating: boolean, room: number): { at: "sidebar" } | { at: "column"; max: number } {
 	const max = Math.min(COLUMN_MAX, room - (split ? SPLIT_PAGE_MIN : PAGE_MIN));
 	return floating || max < COLUMN_MIN ? { at: "sidebar" } : { at: "column", max };
 }
