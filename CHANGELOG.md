@@ -5,6 +5,8 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- Memory pressure now reads high only when less than a fifth of memory is free or the Mac is swapping, not whenever macOS raises its own early warning, so Board tasks and routines no longer wait with plenty of memory left.
+- Settings › Resources' chart now has a legend and a scale up to the Mac's full memory, and its always-zero Builds and tests figure is gone.
 - Settings › Resources now shows what each session really holds, counting memory macOS compressed or moved to swap; an idle session used to look ten times smaller than it is.
 - A Board task or routine run that waits because memory is low now says so on the Board, with the reason, until it starts.
 - Sessions a dashboard can no longer list, such as old Bot conversations, now end on their own 10 minutes after the dashboard starts, instead of holding memory forever. Their conversation stays under Past.

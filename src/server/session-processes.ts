@@ -223,7 +223,7 @@ export class SessionProcessWatch {
 		return this.#lane.run(async () => {
 			const last = this.#last;
 			if (!last || last.at <= asked - LIST_REUSE_MS) await this.#fresh();
-			return { reading: this.#reading, footprints: this.#footprints, ladder: this.#decision?.ladder ?? [], stops: this.#stops, heavy: { slots: 0, running: 0, queued: 0 } };
+			return { reading: this.#reading, footprints: this.#footprints, ladder: this.#decision?.ladder ?? [], stops: this.#stops };
 		});
 	}
 

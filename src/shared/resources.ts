@@ -59,7 +59,6 @@ export interface ResourcesView {
 	footprints: Footprint[];
 	ladder: LadderEntry[];
 	stops: AutoStop[];
-	heavy: { slots: number; running: number; queued: number };
 }
 
 /** One minute of history: the reading, the memory each owner class held, and the Jetsam events since the last sample. */
