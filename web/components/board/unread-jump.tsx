@@ -57,10 +57,10 @@ function useShownItems() {
 
 /** A solid blue pill floating at the scroller's top or bottom edge, centred, as Slack's new messages bar and the scroll-to-end arrow do. */
 function Pill({ edge, children }: { edge: "top" | "bottom"; children: ReactNode }) {
-	return <div className={`absolute start-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-lg bg-sky-600 p-0.5 text-white shadow-md rtl:translate-x-1/2 dark:bg-sky-500 ${edge === "top" ? "top-4" : "bottom-4"}`}>{children}</div>;
+	return <div className={`absolute start-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-full bg-sky-600 p-0.5 text-white shadow-md rtl:translate-x-1/2 dark:bg-sky-500 ${edge === "top" ? "top-4" : "bottom-4"}`}>{children}</div>;
 }
 
-const ON_BLUE = "hover:bg-white/15 hover:text-white active:bg-white/25";
+const ON_BLUE = "rounded-full px-3 hover:bg-white/15 hover:text-white active:bg-white/25";
 
 /** The channel's pills: `↑ N unread threads` while unread ones sit above what shows, `↓` below, each with **Mark all read**; the open thread's task counts as read. */
 export function ChannelUnreadPills({ tasks, open }: { tasks: readonly BoardTask[]; open: number | null }) {
