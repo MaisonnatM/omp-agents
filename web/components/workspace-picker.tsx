@@ -3,8 +3,8 @@ import { IconFolder1, IconFolderAddRight, IconFolderOpen } from "central-icons";
 import { useState } from "react";
 import { errorText } from "../../src/json";
 import type { ControlId } from "../../src/shared/activity";
-import type { Workspace } from "../../src/shared/workspaces";
-import { folderName, sameDir } from "../labels";
+import { type Workspace, workspaceName } from "../../src/shared/workspaces";
+import { sameDir } from "../labels";
 import { createWorkspace } from "../reads";
 import type { ShortcutId } from "../shortcuts";
 import { CommandPicker, type PickerItem } from "./command-picker";
@@ -17,7 +17,7 @@ export function workspaceItems(workspaces: Workspace[], current: string | null, 
 		keywords: [workspace.cwdDisplay],
 		label: (
 			<span className="flex min-w-0 flex-col">
-				<span className="truncate">{folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
+				<span className="truncate">{workspaceName(workspace.cwdDisplay)}</span>
 				<span className="truncate text-xs text-muted-foreground">{workspace.cwdDisplay}</span>
 			</span>
 		),
@@ -62,7 +62,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 	};
 	return (
 		<CommandPicker
-			trigger={folderName(workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd) ?? cwd}
+			trigger={workspaceName(workspaceLabel(cwd, workspaces))}
 			icon={IconFolder1}
 			control={control}
 			ariaLabel={`Working directory: ${cwd}`}

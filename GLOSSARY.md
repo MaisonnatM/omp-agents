@@ -118,6 +118,10 @@ _Avoid_: Session list, inbox
 A repository's main checkout, or a directory outside git, that sessions run in, which the sidebar's **Workspaces** label filters by; a session in a linked git worktree counts in its repository's workspace.
 _Avoid_: repo, folder
 
+**General workspace**:
+The Workspace named `general`, backed by `~/code` and pinned first on the Board, where every session that ran in a home folder directory outside every repository, such as `~`, `~/code`, or `~/tmp`, counts; its Board tasks run in `~/code` with no worktree or branch, and routines marked "Add to every new Workspace" are not copied into it.
+_Avoid_: misc workspace
+
 **Project code**:
 The extensions, hooks, tools, TypeScript slash commands, MCP servers, settings, and language server configs a repository commits for its own sessions, which omp would run with your permissions; skills, agents, and rules are prompt text, not project code.
 _Avoid_: Project setup, plugins

@@ -509,6 +509,11 @@ export class SessionFactsIndex {
 		return { pullRequests: session.pullRequests, ship: own?.scan.ship ?? null, issues: own?.scan.issues ?? NO_ISSUES, arenas: session.arenas, worktree: session.worktree, branch: session.branch, workspace, gone };
 	}
 
+	/** Ask git which workspace each of `cwds` counts in, before a list shows their sessions; a fraction of a second, where a refresh first reads every transcript. */
+	placeDirs(cwds: readonly string[]): Promise<boolean> {
+		return this.placement.place(cwds, dir => this.#git.worktreeAt(dir));
+	}
+
 	/** Whether omp last started session `sessionPath` as `omp -p` or `--mode json`; `false` before its first scan. */
 	headless(sessionPath: string): boolean {
 		return this.#own(sessionPath)?.headless ?? false;

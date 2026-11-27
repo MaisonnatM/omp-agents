@@ -24,7 +24,8 @@ import {
 	primaryAction,
 	topFrame,
 } from "../../command-palette";
-import { age, ALL_WORKSPACES, folderName, hostLabel, pastLabel } from "../../labels";
+import { workspaceName } from "../../../src/shared/workspaces";
+import { age, ALL_WORKSPACES, hostLabel, pastLabel } from "../../labels";
 import { MODULE_LIST } from "../../modules";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
@@ -251,7 +252,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 		});
 		return [
 			workspaceItem("workspace:all", ALL_WORKSPACES, undefined, IconLayersTwo, null),
-			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, folderName(cwdDisplay) ?? cwdDisplay, cwdDisplay, IconFolder1, cwd)),
+			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, workspaceName(cwdDisplay), cwdDisplay, IconFolder1, cwd)),
 		];
 	}, [workspaces, workspace, onPickWorkspace]);
 

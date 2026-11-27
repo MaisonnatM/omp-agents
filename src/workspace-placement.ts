@@ -2,14 +2,24 @@
  * Which workspace each session directory counts in: any directory of a repository, a linked worktree, a subfolder, or a test
  * repository nested in another checkout, counts in its outermost main checkout. Git is asked once per directory, and a directory
  * git no longer knows, gone or left behind by a removed worktree, waits for a main checkout seen since to claim it by its name,
- * so it never lists as a workspace of its own; one still gone after that never lists at all.
+ * so it never lists as a workspace of its own; one still gone after that never lists at all. A directory of the home folder outside
+ * every repository, such as `~` or `~/tmp`, counts in the General workspace until a main checkout claims it.
  */
+import { existsSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 import { mainCheckoutOf, type WorktreeAt } from "./git";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
-import { workspaceFor } from "./paths";
-import type { Workspace } from "./shared/workspaces";
+import { GENERAL_DIR, HOME, workspaceFor } from "./paths";
+import { inAppData, type Workspace } from "./shared/workspaces";
+
+/** The home folder, and the General workspace its directories outside every repository count in, `null` when that folder is missing. */
+export interface GeneralPlacement {
+	home: string;
+	general: Workspace | null;
+}
+
+const DEFAULT_GENERAL: GeneralPlacement = { home: HOME, general: existsSync(GENERAL_DIR) ? workspaceFor(GENERAL_DIR) : null };
 
 /**
  * The main checkout among `mains` whose worktrees a directory `cwd` git no longer knows was likely one of: worktree tools name
@@ -28,6 +38,12 @@ function mainCheckoutOfStray(cwd: string, gone: boolean, mains: Iterable<string>
 }
 
 export class WorkspacePlacement {
+	readonly #general: GeneralPlacement;
+
+	constructor(general: GeneralPlacement = DEFAULT_GENERAL) {
+		this.#general = general;
+	}
+
 	/**
 	 * The workspace each directory git was asked about counts in, `null` when it counts in itself; a resolved workspace stays after
 	 * its worktree is removed. A directory outside any repository is `null` here until a main checkout claims it.
@@ -56,9 +72,10 @@ export class WorkspacePlacement {
 		await mapLimit(unasked, PROBE_PARALLEL, async cwd => {
 			const at = await worktreeAt(cwd);
 			const main = at && mainCheckoutOf(at);
-			if (at === null) this.#strays.set(cwd, await access(cwd).then(() => false, () => true));
+			const gone = at === null && (await access(cwd).then(() => false, () => true));
+			if (at === null) this.#strays.set(cwd, gone);
 			const outer = main === null ? null : await this.#outermost(main, worktreeAt);
-			const workspace = outer !== null && outer !== cwd ? workspaceFor(outer) : null;
+			const workspace = outer !== null && outer !== cwd ? workspaceFor(outer) : at === null && !gone ? this.#generalFor(cwd) : null;
 			this.#workspaces.set(cwd, workspace);
 			if (workspace) placed = true;
 		});
@@ -86,6 +103,13 @@ export class WorkspacePlacement {
 			this.#mainCheckouts.set(main, outer);
 		}
 		return outer;
+	}
+
+	/** The General workspace for `cwd`, a directory still there outside every repository: one of the home folder's, not in an app's data. */
+	#generalFor(cwd: string): Workspace | null {
+		const { home, general } = this.#general;
+		const inHome = cwd === home || cwd.startsWith(`${home}/`);
+		return general !== null && cwd !== general.cwd && inHome && !inAppData(cwd) ? general : null;
 	}
 
 	/** Count each stray directory that a known main checkout claims in that checkout; returns whether any was claimed. */

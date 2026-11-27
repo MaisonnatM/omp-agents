@@ -9,6 +9,8 @@ The dashboard shows the same lines in Settings › What's new.
 - Each Workspace's Board has a Sessions tab with its live, interrupted, waiting, and past sessions, search, and Resume all. Opening a session marks its Workspace in the sidebar, and next and previous session stay in that Workspace.
 - With the Board turned off, the sidebar lists the sessions as before.
 - On Pull requests, a row whose CI fails now names the failing checks, such as "failing: pytest, lint", instead of only "checks failing". Hover to read the full list.
+- New: a `general` Workspace, pinned first on the Board, gathers every session you ran outside a repository, in `~/code`, `~/tmp`, or your home folder. Posting there starts the session in `~/code`, with no worktree or branch.
+- Fixed: right after the dashboard starts, a session that ran in a Board task's or other worktree folder, such as `board-61` or `home-design-fixes`, no longer shows that folder as a Workspace of its own until every past conversation has been read; it counts in its repository from the first list.
 - On the Board, a blue pill at the top or bottom edge says how many unread threads sit out of view, as Slack does. Click it to jump to the nearest one, or press Mark all read.
 - In a Board thread, replies that come while you read further up show a blue "new replies" pill at the bottom. Click it to jump to them.
 - Settings › Resources now names a session no dashboard lists by its title, as Past does, with its port beside it, instead of only its port.

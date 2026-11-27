@@ -105,6 +105,8 @@ export class SessionFiles {
 			const changed = [...listed.filter(session => !this.#same(session)).map(session => session.path), ...[...this.#byPath.keys()].filter(path => !next.has(path))];
 			if (changed.length === 0) return false;
 			const continued = await this.#continuedAmong(listed, changed);
+			// Placed before the list adopts them, so no session in a worktree lists its directory as a workspace of its own meanwhile.
+			await this.facts.placeDirs(listed.map(session => session.cwd).filter(Boolean));
 			this.#adopt(next);
 			this.#continued = continued;
 			return true;
@@ -125,6 +127,7 @@ export class SessionFiles {
 			if (changes.size === 0) return false;
 			const sessions = [...this.#files.filter(file => !changes.has(file.path)), ...[...changes.values()].filter(session => session !== null)];
 			const continued = await this.#continuedAmong(sessions, changes.keys());
+			await this.facts.placeDirs([...changes.values()].flatMap(session => (session?.cwd ? [session.cwd] : [])));
 			this.#place(changes);
 			this.#continued = continued;
 			return true;
@@ -216,7 +219,7 @@ export class SessionFiles {
 				return copy === undefined || this.facts.headless(copy);
 			})
 			.map(session => {
-				const facts = this.facts.factsOf(session.path);
+				const facts = this.facts.factsOf(session.path, session.cwd);
 				const stopped = session.source === "omp" && interrupted(session.id);
 				const kept = this.#rows.get(session.path);
 				if (kept && kept.saved === session && kept.interrupted === stopped && sameFacts(kept.facts, facts)) return kept.row;
