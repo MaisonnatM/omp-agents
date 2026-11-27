@@ -20,6 +20,7 @@
 - **New memory** asks for a slug, a kind, a line, and a body, and **Add memory** records it.
 - **Delete**, clicked twice, removes the open memory.
 - Each change is recorded in the repository's `refs/omp/memory` as made by this page, and a change the memory refuses, such as a slug already taken, shows why under the form.
+- With one repository picked, as on a Workspace's Memory tab, **Glossary** shows when the repository has a `GLOSSARY.md`, and opens it beside the table, rendered; click it again, or **×** or Escape, to close it.
 
 ## Bookmarks
 

@@ -11,6 +11,7 @@ export type MemoryControlId =
 	| "memory.project.repo"
 	| "memory.project.open"
 	| "memory.project.add"
+	| "memory.project.glossary"
 	| "memory.project.save"
 	| "memory.project.delete"
 	| "memory.bookmarks.folder"
@@ -88,6 +89,7 @@ export const MEMORY_PAGE: PageModule<"memory", MemoryRoute, MemoryShortcutId, Me
 		{ id: "memory.project.repo", label: "Project memory repository picker", area: "Memory" },
 		{ id: "memory.project.open", label: "Project memory row", area: "Memory" },
 		{ id: "memory.project.add", label: "Project memory New memory button", area: "Memory" },
+		{ id: "memory.project.glossary", label: "Project memory Glossary button", area: "Memory" },
 		{ id: "memory.project.save", label: "Project memory Save button", area: "Memory" },
 		{ id: "memory.project.delete", label: "Project memory Delete button", area: "Memory" },
 		{ id: "memory.bookmarks.folder", label: "Bookmarks folder tree row and folder picker", area: "Memory" },

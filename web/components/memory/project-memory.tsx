@@ -1,5 +1,5 @@
 /** The Memory page's Project memory tab: one repository's memories, or every repository's, in a table grouped by kind, beside the open memory, which is edited, added, or deleted there. */
-import { IconBrain, IconFolderOpen, IconPlusSmall } from "central-icons";
+import { IconBook, IconBrain, IconFolderOpen, IconPlusSmall } from "central-icons";
 import { useRef, useState } from "react";
 import { MEMORY_KINDS, type MemoryKind, type RawOp } from "../../../templates/omp/agent/extensions/project-memory/contract";
 import { everyWord } from "../../../src/shared/every-word";
@@ -11,6 +11,7 @@ import { editProjectMemory, PROJECT_MEMORY_URL } from "../../api";
 import { type Editable, useEditableRead } from "../../editable-read";
 import { dateLabel } from "../../labels";
 import { useShortcuts } from "../../shortcuts";
+import { MarkdownDocument } from "../file-text";
 import { CommandPicker } from "../command-picker";
 import { CountPill } from "../count-pill";
 import { useReturnFocus } from "../list-page";
@@ -29,8 +30,8 @@ interface Row {
 
 const rowKey = (repo: ProjectMemoryRepo, slug: string): string => `${repo.root}\n${slug}`;
 
-/** The memory open beside the table: one by its row key, or a new one being written. */
-type Open = { key: string } | "new" | null;
+/** What is open beside the table: one memory by its row key, a new one being written, or the repository's glossary. */
+type Open = { key: string } | "new" | "glossary" | null;
 
 /** The key of a draft: the row's key, or `""` for the new one, which no row key can be. */
 const draftKey = (row: Row | null): string => row?.key ?? "";
@@ -109,8 +110,9 @@ function RepoMemory({ scope, repos, view, pinned }: { scope: ProjectMemoryRepo |
 	const found = all.filter(({ repo, memory }) => matches(`${memory.slug}\n${memory.line}\n${memory.body}${scope === null ? `\n${repo.name}` : ""}`));
 	const groups = (kind === null ? MEMORY_KINDS : [kind]).map(each => ({ kind: each, rows: found.filter(row => row.memory.kind === each) })).filter(group => group.rows.length > 0);
 	const shownRows = groups.flatMap(group => group.rows);
-	const entry = open !== null && open !== "new" ? (all.find(row => row.key === open.key) ?? null) : null;
+	const entry = typeof open === "object" && open !== null ? (all.find(row => row.key === open.key) ?? null) : null;
 	const shown = (open === "new" && scope !== null) || entry !== null;
+	const glossary = open === "glossary" ? (scope?.glossary ?? null) : null;
 	useReturnFocus(shown ? draftKey(entry) : null, key => key, key => (key === "" ? newButton.current : rowButtons.current.get(key)), shownRows);
 	const target = entry?.repo ?? scope;
 	const send = (ops: RawOp[]): Promise<ProjectMemoryView> => (target === null ? Promise.reject(new Error("No repository to save in.")) : view.write(() => editProjectMemory({ root: target.root, ops })));
@@ -150,6 +152,11 @@ function RepoMemory({ scope, repos, view, pinned }: { scope: ProjectMemoryRepo |
 				</div>
 				<div className="ml-auto flex items-center gap-2">
 					<SearchField label="Search memories" placeholder="Search" query={query} onQuery={setQuery} className="w-36" />
+					{scope?.glossary != null && (
+						<Button variant="ghost" size="compact" leadingIcon={IconBook} active={glossary !== null} aria-pressed={glossary !== null} onClick={() => setOpen(glossary === null ? "glossary" : null)} {...activityControl("memory.project.glossary")}>
+							Glossary
+						</Button>
+					)}
 					{scope !== null && (
 						<Button ref={newButton} variant="ghost" size="compact" leadingIcon={IconPlusSmall} onClick={() => setOpen("new")} {...activityControl("memory.project.add")}>
 							New memory
@@ -185,7 +192,17 @@ function RepoMemory({ scope, repos, view, pinned }: { scope: ProjectMemoryRepo |
 						</div>
 					}
 					detail={
-						shown ? (
+						glossary !== null && scope !== null ? (
+							<section aria-label="Glossary">
+								<DetailBar
+									leading="GLOSSARY.md"
+									previous={{ label: "Previous memory", icon: CH_PREVIOUS, shortcut: "memoryProjectPrevious" }}
+									next={{ label: "Next memory", icon: CH_NEXT, shortcut: "memoryProjectNext" }}
+									close={{ label: "Close the glossary", icon: CH_CLOSE, shortcut: "memoryProjectClose", onClick: () => setOpen(null) }}
+								/>
+								<MarkdownDocument text={glossary} path={`${scope.root}/GLOSSARY.md`} className="px-6 py-4" />
+							</section>
+						) : shown ? (
 							<section key={draftKey(entry)} aria-label={entry?.memory.slug ?? "New memory"}>
 								<DetailBar
 									leading={entry === null ? "New memory" : <span className="font-mono">{entry.memory.slug}</span>}

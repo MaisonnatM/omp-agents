@@ -3,6 +3,8 @@
  * `project_memory` tool's own code, so an edit from the page is checked and recorded as the tool's are. See
  * docs/architecture/memory-page.md.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { MEMORY_KINDS, type MemoryKind, type RawOp } from "../templates/omp/agent/extensions/project-memory/contract";
 import { applyMemoryOps, type Memory, memoryTip, parseOps, readMemory } from "../templates/omp/agent/extensions/project-memory/memory";
 import { placeOf } from "../templates/omp/agent/extensions/project-memory/repo";
@@ -16,13 +18,22 @@ export class MemoryEditRefused extends Error {}
 
 const byNewest = (a: ProjectMemoryEntry, b: ProjectMemoryEntry): number => (a.updated !== b.updated ? (a.updated < b.updated ? 1 : -1) : a.slug < b.slug ? -1 : 1);
 
-/** The repository whose main checkout is `root`: its memories, newest first; `null` when `root` is not in a git repository. */
+/** The text of `root`'s `GLOSSARY.md`; `null` when it has none. */
+function glossaryOf(root: string): string | null {
+	try {
+		return readFileSync(join(root, "GLOSSARY.md"), "utf8");
+	} catch {
+		return null;
+	}
+}
+
+/** The repository whose main checkout is `root`: its memories, newest first, and its glossary; `null` when `root` is not in a git repository. */
 function repoOf(root: string): ProjectMemoryRepo | null {
 	const place = placeOf(root);
 	if (!place) return null;
 	const { memories } = readMemory(place.root.commonDir, memoryTip(place.root.commonDir));
 	const entries = Object.entries(memories).map(([slug, memory]: [string, Memory]) => ({ slug, ...memory }));
-	return { root, rootDisplay: displayPath(root), name: place.root.name, memories: entries.sort(byNewest) };
+	return { root, rootDisplay: displayPath(root), name: place.root.name, memories: entries.sort(byNewest), glossary: glossaryOf(root) };
 }
 
 /** Every repository among `roots`, each a main checkout: those with memories first, then by name. */
