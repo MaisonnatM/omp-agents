@@ -9,6 +9,8 @@ export const MAX_TEXT = 8000;
 /** The longest body or reply a routine's run posts: its prompt, up to 20,000 characters, with its Trigger events or its command's report. */
 export const MAX_ROUTINE_TEXT = 128_000;
 export const MAX_LABELS = 12;
+/** The longest quick link address. */
+export const MAX_URL = 2048;
 
 /**
  * Who wrote a Board task or a reply: the user on the Board page, a top-level session through the `board` tool, or a
@@ -41,6 +43,8 @@ export type BoardChange = (
 	| { op: "woke"; task: number; sessionId: string }
 	| { op: "expire"; task: number }
 	| { op: "land"; task: number; outcome: LandOutcome; text: string }
+	| { op: "link"; by: { kind: "user" }; workspace: string; url: string; title: string; replaces?: string }
+	| { op: "unlink"; by: { kind: "user" }; workspace: string; url: string }
 ) & { request?: string };
 
 /** How a merge the server ran for "Merge on main" went: it landed, it failed and reopens the Board task, or it was refused, as where the repository has no land config, which keeps the Board task done. */
@@ -96,12 +100,21 @@ export interface BoardTask {
 	replies: BoardReply[];
 }
 
+/** A link the user keeps under a Workspace's tabs, as a Slack channel's bookmarks bar: its web address and the name it shows. */
+export interface QuickLink {
+	workspace: string;
+	url: string;
+	title: string;
+}
+
 export interface BoardState {
 	tasks: BoardTask[];
 	/** The number the next post takes. */
 	nextId: number;
 	/** The inbox files of the last {@link REQUESTS_KEPT} `board` tool changes, newest last. */
 	requests: string[];
+	/** Every Workspace's quick links, each Workspace's in the order they were added. */
+	links: QuickLink[];
 }
 
 /**
@@ -115,7 +128,7 @@ export const MAX_EXITS = 3;
 
 export type BoardStatus = { kind: "done" } | { kind: "claimed"; sessionId: string } | { kind: "failed"; error: string } | { kind: "waiting"; on: number } | { kind: "ready" };
 
-export const emptyBoard = (): BoardState => ({ tasks: [], nextId: 1, requests: [] });
+export const emptyBoard = (): BoardState => ({ tasks: [], nextId: 1, requests: [], links: [] });
 
 const findTask = (state: BoardState, id: number): BoardTask | undefined => state.tasks.find(task => task.id === id);
 
@@ -184,14 +197,27 @@ export function resumable(task: BoardTask): string | null {
 /** The text of `change` an event keeps, on one line for a title, trimmed for a body. */
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 
+const isAbsolute = (path: string): boolean => /^(\/|[A-Za-z]:[\\/])/.test(path);
+
+/** Workspace `workspace`'s quick link to `url`. */
+const findLink = (state: BoardState, workspace: string, url: string): QuickLink | undefined => state.links.find(link => link.workspace === workspace && link.url === url);
+
 /** Why `state` refuses `change`, or `null` when it takes it. */
 export function refusal(state: BoardState, change: BoardChange): string | null {
 	if (change.op === "post") {
 		if (!oneLine(change.title)) return "A Board task needs a title.";
-		if (!/^(\/|[A-Za-z]:[\\/])/.test(change.workspace)) return "A Board task's workspace must be an absolute path.";
+		if (!isAbsolute(change.workspace)) return "A Board task's workspace must be an absolute path.";
 		for (const id of change.needs ?? []) if (!findTask(state, id)) return `There is no Board task #${id} to wait on.`;
 		return null;
 	}
+	if (change.op === "link") {
+		if (!isAbsolute(change.workspace)) return "A quick link's workspace must be an absolute path.";
+		if (!/^https?:$/.test(URL.parse(change.url)?.protocol ?? "")) return "A quick link needs an http or https address.";
+		if (!oneLine(change.title)) return "A quick link needs a name.";
+		if (change.replaces !== undefined && !findLink(state, change.workspace, change.replaces)) return `There is no quick link to ${change.replaces}.`;
+		return change.url !== change.replaces && findLink(state, change.workspace, change.url) ? `This Workspace already has a quick link to ${change.url}.` : null;
+	}
+	if (change.op === "unlink") return findLink(state, change.workspace, change.url) ? null : `There is no quick link to ${change.url}.`;
 	const task = findTask(state, change.task);
 	if (!task) return `There is no Board task #${change.task}.`;
 	const status = statusOf(state, task);
@@ -236,11 +262,20 @@ function exitsInARow(task: BoardTask): number {
 
 /** `state` with `event` folded in; the event was checked with {@link refusal} before it was appended. */
 export function fold(state: BoardState, event: BoardEvent): BoardState {
-	const folded = foldTasks(state, event);
+	const folded = event.op === "link" || event.op === "unlink" ? foldLinks(state, event) : foldTasks(state, event);
 	return event.request === undefined ? folded : { ...folded, requests: [...folded.requests, event.request].slice(-REQUESTS_KEPT) };
 }
 
-function foldTasks(state: BoardState, event: BoardEvent): BoardState {
+/** `state` with a quick link added, replaced in place, or removed. */
+function foldLinks(state: BoardState, event: Extract<BoardEvent, { op: "link" | "unlink" }>): BoardState {
+	const at = (url: string) => state.links.findIndex(link => link.workspace === event.workspace && link.url === url);
+	if (event.op === "unlink") return { ...state, links: state.links.filter((_, index) => index !== at(event.url)) };
+	const link: QuickLink = { workspace: event.workspace, url: event.url, title: oneLine(event.title) };
+	const replaced = event.replaces === undefined ? -1 : at(event.replaces);
+	return { ...state, links: replaced < 0 ? [...state.links, link] : state.links.with(replaced, link) };
+}
+
+function foldTasks(state: BoardState, event: Exclude<BoardEvent, { op: "link" | "unlink" }>): BoardState {
 	const { at } = event;
 	if (event.op === "post") {
 		const id = event.id ?? state.nextId;
@@ -456,6 +491,14 @@ export function parseChange(value: unknown, server = false): BoardChange | null 
 			const outcome = LAND_OUTCOMES.includes(value.outcome) ? (value.outcome as LandOutcome) : typeof value.landed === "boolean" ? (value.landed ? "landed" : "failed") : null;
 			return server && isId(value.task) && outcome !== null && isText(value.text, MAX_TEXT) ? { op: "land", task: value.task, outcome, text: value.text } : null;
 		}
+		case "link": {
+			const { url, title, replaces } = value;
+			return parseAuthor(value.by, server)?.kind === "user" && isText(value.workspace, 4096) && isText(url, MAX_URL) && isText(title, MAX_TITLE) && (replaces === undefined || isText(replaces, MAX_URL))
+				? { op: "link", by: { kind: "user" }, workspace: value.workspace, url, title, ...(replaces === undefined ? {} : { replaces }) }
+				: null;
+		}
+		case "unlink":
+			return parseAuthor(value.by, server)?.kind === "user" && isText(value.workspace, 4096) && isText(value.url, MAX_URL) ? { op: "unlink", by: { kind: "user" }, workspace: value.workspace, url: value.url } : null;
 		default:
 			return null;
 	}

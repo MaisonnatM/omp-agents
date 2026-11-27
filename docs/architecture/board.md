@@ -26,6 +26,7 @@ It imports nothing, so the starter kit can ship it.
   `parseChange` refuses them from the page and the tool, and drops a `renew` line an older Board wrote while a claim lasted 15 minutes.
   It also refuses there the routine author, `{ kind: "routine", routineId, name }`, which only the server's routine runner posts and replies as; see [Routines](routines.md#the-runner).
   A post's or reply's text holds at most `MAX_TEXT` characters, and a routine's `MAX_ROUTINE_TEXT`, 128,000, so a whole run's prompt, trigger events, and command report fit.
+- `link` adds a quick link to a Workspace, an http or https address with a name, or with `replaces` changes the one at that address in place; `unlink` removes one. Only the page sends them, as the user, and `links` keeps every Workspace's in the order they were added.
 - A change from the `board` tool carries `request`, the name of the inbox file it came in; the Board keeps the last `REQUESTS_KEPT` of them in `requests`, so a file a crash left behind after it was applied changes nothing the second time.
 
 `statusOf` says whether a Board task is done, claimed, failed, waiting on another, or ready: `failed` when its last `start` failed, carrying that start's error, which the page shows with "Reply to try again".

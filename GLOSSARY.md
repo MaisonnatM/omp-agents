@@ -134,6 +134,10 @@ _Avoid_: Allowed project, approved folder, trusted workspace
 A session id the server keeps at the top of the roster in every window.
 _Avoid_: Favorite, bookmark
 
+**Quick link**:
+A web address with a name that you keep in the row under a Workspace's tabs on the Board, as a Slack channel's bookmarks.
+_Avoid_: Bookmark (the Memory page's browser and x.com bookmarks)
+
 **Notice**:
 An entry on the Notifications page: what a check found or how an update went.
 _Avoid_: Alert, notification (reserved for session notifications)

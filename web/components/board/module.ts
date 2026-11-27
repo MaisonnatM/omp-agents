@@ -155,7 +155,9 @@ export type BoardControlId =
 	| "board.message.expand"
 	| "board.unread.jump"
 	| "board.unread.read-all"
-	| "board.thread.new-replies";
+	| "board.thread.new-replies"
+	| "board.quick-link"
+	| "board.quick-link.add";
 
 export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, BoardChange, never, BoardControlId> = {
 	id: "board",
@@ -214,6 +216,8 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	},
 	controls: [
 		{ id: "board.tab", label: "Board tab across the top of a Workspace", area: "Board" },
+		{ id: "board.quick-link", label: "Board quick link under a Workspace's tabs", area: "Board" },
+		{ id: "board.quick-link.add", label: "Board Add a quick link button", area: "Board" },
 		{ id: "board.workspace", label: "Board sidebar workspace row", area: "Board" },
 		{ id: "board.threads", label: "Board sidebar Threads row, which lists every Board thread with replies", area: "Board" },
 		{ id: "board.task.open", label: "Board task message, which opens its thread", area: "Board" },
