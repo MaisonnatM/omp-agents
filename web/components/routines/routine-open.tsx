@@ -256,7 +256,7 @@ function Footer({ routine, template, disabled }: { routine: Routine; template: R
 	}
 	return (
 		<div className="flex items-center justify-end gap-1">
-			{template && <CopiedFrom template={template} className="mr-auto min-w-0 truncate" />}
+			{template && <CopiedFrom template={template} linked={routine.linked === true} className="mr-auto min-w-0 truncate" />}
 			<Button variant="ghost" size="compact" leadingIcon={IconPencil} render={<a href={hashForRoutines(workspace, { kind: "edit", id })} />}>Edit</Button>
 			<Button {...activityControl("routines.delete")} variant="ghost" size="compact" leadingIcon={IconTrashCan} disabled={disabled} onClick={() => setConfirming(true)}>
 				Delete

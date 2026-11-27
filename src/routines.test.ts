@@ -215,3 +215,40 @@ describe("applyRoutine", () => {
 		}
 	});
 });
+
+describe("linked copies", () => {
+	const template: RoutineSpec = { ...spec, id: "t1", everyWorkspace: true, launch: { model: null, thinking: "high", skill: null } };
+	const copy: RoutineSpec = { ...spec, id: "c1", workspace: "/work/api", schedules: [evening], enabled: false, launch: template.launch, copyOf: "t1", linked: true };
+	const detachedCopy: RoutineSpec = { ...copy, id: "c2", workspace: "/work/site", linked: undefined };
+	const { linked: _, ...detached } = detachedCopy;
+	const start = [template, copy, detached].reduce<Routine[]>((routines, routine) => applyRoutine(routines, { op: "save", routine }, 1), []);
+	const byId = (routines: Routine[], id: string): Routine => routines.find(routine => routine.id === id)!;
+
+	test("a template's save reaches its linked copies' name, task, triggers, and launch, and leaves their schedules, switch, and the detached copy alone", () => {
+		const { launch: _launch, ...noLaunch } = template;
+		const edited = { ...noLaunch, name: "Notes v2", task: { kind: "prompt" as const, prompt: "New prompt." }, triggers: [{ kind: "slack" as const }], schedules: [daily] };
+		const after = applyRoutine(start, { op: "save", routine: edited }, 2);
+		expect(byId(after, "c1")).toMatchObject({ name: "Notes v2", task: edited.task, triggers: edited.triggers, schedules: [evening], enabled: false, linked: true });
+		expect(byId(after, "c1").launch).toBeUndefined();
+		expect(byId(after, "c2")).toMatchObject({ name: "Notes", task: spec.task });
+	});
+
+	test("a linked copy's own schedule and switch keep it linked; a changed prompt detaches it", () => {
+		const rescheduled = applyRoutine(start, { op: "save", routine: { ...copy, schedules: [daily], enabled: true } }, 2);
+		expect(byId(rescheduled, "c1")).toMatchObject({ schedules: [daily], enabled: true, linked: true });
+		const reworded = applyRoutine(start, { op: "save", routine: { ...copy, task: { kind: "prompt", prompt: "Mine." } } }, 2);
+		expect(byId(reworded, "c1").linked).toBeUndefined();
+		expect(byId(applyRoutine(reworded, { op: "save", routine: { ...template, name: "Renamed" } }, 3), "c1").name).toBe("Notes");
+	});
+
+	test("deleting the template detaches its copies", () => {
+		const after = applyRoutine(start, { op: "remove", id: "t1" }, 2);
+		expect(byId(after, "c1")).toMatchObject({ copyOf: "t1", task: spec.task });
+		expect(byId(after, "c1").linked).toBeUndefined();
+	});
+
+	test("the parser keeps `linked` only on a copy", () => {
+		expect(parseRoutineSpec(copy)?.ok.linked).toBe(true);
+		expect(parseRoutineSpec({ ...spec, linked: true })?.ok.linked).toBeUndefined();
+	});
+});

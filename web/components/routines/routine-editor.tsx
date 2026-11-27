@@ -6,7 +6,8 @@ import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { blankSchedule, type CommandPostChoice, dayName, type EveryUnit, type RoutineDraft, type ScheduleDraft, specOf, TRIGGER_WORDS, WEEK, WEEKDAYS } from "../../routines-model";
+import { blankSchedule, type CommandPostChoice, dayName, type EveryUnit, followed, type RoutineDraft, type ScheduleDraft, specOf, TRIGGER_WORDS, WEEK, WEEKDAYS } from "../../routines-model";
+import { hashForRoutines } from "../../routing";
 import { useDraftModelSelection } from "../../use-draft-model";
 import { useSkills } from "../../use-skills";
 import { PageFrame } from "../list-page";
@@ -152,6 +153,7 @@ interface RoutineEditorProps {
 
 export function RoutineEditor({ initial, isNew, workspaces, template, connected, saving, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
+	const following = template !== null && draft.linked;
 	const [tried, setTried] = useState(false);
 	const id = useId();
 	const models = useDraftModelSelection(draft.workspace || initial.workspace, { model: initial.launch?.model ?? null, thinking: initial.launch?.thinking ?? null });
@@ -178,14 +180,30 @@ export function RoutineEditor({ initial, isNew, workspaces, template, connected,
 				onSubmit={event => {
 					event.preventDefault();
 					setTried(true);
-					if ("ok" in result) onSave(result.ok);
+					if ("ok" in result) onSave(template && following ? followed(result.ok, template) : result.ok);
 				}}
 			>
-				{template && <CopiedFrom template={template} />}
+				{template && draft.linked ? (
+					<div className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2">
+						<div className="mr-auto min-w-0 space-y-0.5">
+							<CopiedFrom template={template} linked />
+							<p className="text-xs text-muted-foreground">Its name, model, task, and triggers come from the template. Its Workspace, schedules, and switch are its own.</p>
+						</div>
+						<Button variant="ghost" size="compact" render={<a href={hashForRoutines(template.workspace, { kind: "edit", id: template.id })} />}>
+							Edit template
+						</Button>
+						<Button type="button" variant="outline" size="compact" onClick={() => set("linked", false)}>
+							Detach
+						</Button>
+					</div>
+				) : (
+					template && <CopiedFrom template={template} linked={false} />
+				)}
 				<Field label="Name" htmlFor={`${id}-name`}>
 					<input
 						id={`${id}-name`}
 						autoFocus
+						disabled={following}
 						value={draft.name}
 						placeholder="Morning notes"
 						onChange={event => set("name", event.target.value)}
@@ -205,10 +223,11 @@ export function RoutineEditor({ initial, isNew, workspaces, template, connected,
 					</span>
 					<span className="space-y-0.5">
 						<span className="block">{EVERY_WORKSPACE}</span>
-						<span className="block text-xs text-muted-foreground">Copies this routine into each Workspace you start working in. Each copy is its own routine.</span>
+						<span className="block text-xs text-muted-foreground">Copies this routine into each Workspace you start working in. Each copy keeps its own schedules and switch, and follows this routine's name, model, task, and triggers until you detach it.</span>
 					</span>
 				</label>
 
+				<fieldset disabled={following} className="min-w-0 space-y-6 [&_textarea:disabled]:opacity-60">
 				<Field label="Model" hint="The session that takes each Board task starts on this model and effort, with this skill.">
 					<div className="flex flex-wrap items-center gap-2">
 						<ModelPicker {...models.picker} disabled={!connected} />
@@ -266,6 +285,7 @@ export function RoutineEditor({ initial, isNew, workspaces, template, connected,
 						</Choice>
 					</div>
 				</Field>
+				</fieldset>
 
 				<Field label="Schedules" hint="Runs at the soonest of these. A missed time still starts one run. With a trigger, a routine needs no schedule.">
 					<div className="space-y-3">
@@ -286,6 +306,7 @@ export function RoutineEditor({ initial, isNew, workspaces, template, connected,
 					</div>
 				</Field>
 
+				<fieldset disabled={following} className="min-w-0">
 				<Field label="Triggers" hint="Also runs when one of these sees something new, and tells the run what it saw. What happens while the dashboard is closed starts nothing.">
 					<div className="space-y-3">
 						{TRIGGER_KINDS.map(kind => (
@@ -299,6 +320,7 @@ export function RoutineEditor({ initial, isNew, workspaces, template, connected,
 						))}
 					</div>
 				</Field>
+				</fieldset>
 
 				<div className="flex items-center gap-3 border-t border-border pt-4">
 					<Button type="submit" disabled={!connected} loading={saving}>

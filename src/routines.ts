@@ -118,8 +118,10 @@ export interface Routine {
 	runs: RoutineRun[];
 	/** Set on a template: the owner server copies it into each Workspace you start working in, as {@link copyOf}. */
 	everyWorkspace?: true;
-	/** On a copy: the id of the template it was copied from. Each copy is its own routine, which no edit of the template changes. */
+	/** On a copy: the id of the template it was copied from. */
 	copyOf?: string;
+	/** On a copy that follows its template: each save of the template rewrites the copy's name, task, triggers, and launch; left out once detached. */
+	linked?: true;
 }
 
 /** A computer a routine runs on: Settings sync's stable id for it and its name as its owner sees it. */
@@ -210,6 +212,7 @@ export function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 		routine.enabled === spec.enabled &&
 		routine.everyWorkspace === spec.everyWorkspace &&
 		routine.copyOf === spec.copyOf &&
+		routine.linked === spec.linked &&
 		JSON.stringify([routine.launch ?? null, routine.schedules, routine.triggers, routine.task]) === JSON.stringify([spec.launch ?? null, spec.schedules, spec.triggers, spec.task])
 	);
 }
@@ -221,16 +224,18 @@ export function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 export function applyRoutine(routines: Routine[], change: Exclude<RoutineChange, { op: "run-now" }>, now: number): Routine[] {
 	switch (change.op) {
 		case "save": {
-			const index = routines.findIndex(routine => routine.id === change.routine.id);
-			if (index === -1) return [...routines, { ...change.routine, machine: null, createdAt: now, scheduledAt: null, runs: [] }];
+			const spec = linkedIfSame(routines, change.routine);
+			const index = routines.findIndex(routine => routine.id === spec.id);
+			if (index === -1) return [...routines, { ...spec, machine: null, createdAt: now, scheduledAt: null, runs: [] }];
 			const stored = routines[index]!;
-			if (isSameSpec(stored, change.routine)) return routines;
-			const machine = change.routine.enabled ? stored.machine : null;
-			return routines.with(index, { ...change.routine, machine, createdAt: stored.createdAt, scheduledAt: stored.scheduledAt, runs: stored.runs });
+			if (isSameSpec(stored, spec)) return routines;
+			const machine = spec.enabled ? stored.machine : null;
+			return followTemplate(routines.with(index, { ...spec, machine, createdAt: stored.createdAt, scheduledAt: stored.scheduledAt, runs: stored.runs }), spec);
 		}
 		case "remove": {
 			const kept = routines.filter(routine => routine.id !== change.id);
-			return kept.length === routines.length ? routines : kept;
+			if (kept.length === routines.length) return routines;
+			return kept.map(routine => (routine.linked && routine.copyOf === change.id ? unlinked(routine) : routine));
 		}
 		case "enable": {
 			const index = routines.findIndex(routine => routine.id === change.id);
@@ -243,6 +248,32 @@ export function applyRoutine(routines: Routine[], change: Exclude<RoutineChange,
 			return unhandled;
 		}
 	}
+}
+
+/** A routine's fields a linked copy takes from its template; its Workspace, switch, and schedules stay its own. */
+const templateFields = (routine: RoutineSpec): string => JSON.stringify([routine.name, routine.task, routine.triggers, routine.launch ?? null]);
+
+function unlinked<T extends RoutineSpec>(routine: T): T {
+	const { linked: _, ...rest } = routine;
+	return rest as T;
+}
+
+/** `spec`, detached when it says it is linked but its template is gone or differs from it in a {@link templateFields} field. */
+function linkedIfSame(routines: readonly Routine[], spec: RoutineSpec): RoutineSpec {
+	if (!spec.linked) return spec;
+	const template = routines.find(routine => routine.id === spec.copyOf);
+	return template && templateFields(template) === templateFields(spec) ? spec : unlinked(spec);
+}
+
+/** `routines` with every copy linked to `template` given its {@link templateFields}. */
+function followTemplate(routines: Routine[], template: RoutineSpec): Routine[] {
+	const fields = templateFields(template);
+	if (!routines.some(routine => routine.linked && routine.copyOf === template.id && templateFields(routine) !== fields)) return routines;
+	return routines.map(routine => {
+		if (!routine.linked || routine.copyOf !== template.id || templateFields(routine) === fields) return routine;
+		const { launch: _, ...rest } = routine;
+		return { ...rest, name: template.name, task: template.task, triggers: template.triggers, ...(template.launch ? { launch: template.launch } : {}) };
+	});
 }
 
 const isIntIn = (value: unknown, min: number, max: number): value is number => isSafeInteger(value) && value >= min && value <= max;
@@ -346,18 +377,19 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
  */
 export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	if (!isObject(value)) return null;
-	const { id, name, enabled, workspace, everyWorkspace, copyOf } = value;
+	const { id, name, enabled, workspace, everyWorkspace, copyOf, linked } = value;
 	const launch = parseLaunch(value.launch);
 	const schedules = parseSchedules(value.schedules);
 	const triggers = parseTriggers(value.triggers);
 	const task = parseRoutineTask(value.task);
 	if (!isNonEmpty(id) || !isNonEmpty(workspace) || !workspace.startsWith("/") || !isNonEmpty(name) || typeof enabled !== "boolean" || launch === null || !schedules || !triggers || !task) return null;
 	if (schedules.ok.length === 0 && triggers.ok.length === 0) return null;
-	if (!(everyWorkspace === undefined || typeof everyWorkspace === "boolean") || !(copyOf === undefined || isNonEmpty(copyOf))) return null;
+	if (!(everyWorkspace === undefined || typeof everyWorkspace === "boolean") || !(copyOf === undefined || isNonEmpty(copyOf)) || !(linked === undefined || typeof linked === "boolean")) return null;
 	const spec: RoutineSpec = { id, workspace, name, schedules: schedules.ok, triggers: triggers.ok, task: task.ok, enabled };
 	if (launch) spec.launch = launch;
 	if (everyWorkspace) spec.everyWorkspace = true;
 	if (copyOf !== undefined) spec.copyOf = copyOf;
+	if (copyOf !== undefined && linked) spec.linked = true;
 	return { ok: spec };
 }
 

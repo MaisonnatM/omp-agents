@@ -66,7 +66,8 @@ export class SessionRoutines {
 				"A command routine runs its shell command in the Workspace first and posts its prompt and the command's report, as its `post` rule allows: always, only failures, or only when the output changed.",
 				"Each result, and each refusal of an unknown `id`, lists the Workspace's routines by id and name; to list them without changing anything, call `delete_routine` with an empty `id`. Pass null as `id` to add one.",
 				"Save only what the user asked for; a new routine is disabled unless they asked to turn it on.",
-				"`everyWorkspace: true` also copies the routine into every Workspace the user works in that lacks it, now and as new ones appear; each copy is its own routine, which later edits here do not change. Leave it out to keep the routine's current setting.",
+				"`everyWorkspace: true` also copies the routine into every Workspace the user works in that lacks it, now and as new ones appear; each copy keeps its own schedules and switch and follows this routine's name, task, triggers, and launch, so later edits here reach it. Leave it out to keep the routine's current setting.",
+				"Changing a copy's name, task, triggers, or launch detaches it from its template, so it stops following it.",
 			].join(" "),
 			parameters: {
 				type: "object",
@@ -95,11 +96,12 @@ export class SessionRoutines {
 				const workspace = await this.#workspace(caller);
 				const stored = args.id === null || args.id === undefined ? null : this.#own(args.id, workspace);
 				const id = stored?.id ?? randomUUID();
-				// A copy stays a copy of its template; `everyWorkspace` left out keeps what the routine had.
-				const parsed = parseRoutineSpec({ ...args, id, workspace, launch: args.launch ?? undefined, everyWorkspace: args.everyWorkspace ?? stored?.everyWorkspace, copyOf: stored?.copyOf });
+				// A copy stays a copy of its template, linked while it was; `everyWorkspace` left out keeps what the routine had.
+				const parsed = parseRoutineSpec({ ...args, id, workspace, launch: args.launch ?? undefined, everyWorkspace: args.everyWorkspace ?? stored?.everyWorkspace, copyOf: stored?.copyOf, linked: stored?.linked });
 				if (!parsed) throw new Error("The routine is not valid: check every field against this tool's description.");
 				this.#deps.apply({ op: "save", routine: parsed.ok });
-				return `Saved routine "${parsed.ok.name}" (id ${id}) in ${workspace}, ${parsed.ok.enabled ? "enabled" : "disabled"}.\n${this.#listed(workspace)}`;
+				const detached = stored?.linked && !this.#deps.routines().find(routine => routine.id === id)?.linked ? " It no longer follows its template." : "";
+				return `Saved routine "${parsed.ok.name}" (id ${id}) in ${workspace}, ${parsed.ok.enabled ? "enabled" : "disabled"}.${detached}\n${this.#listed(workspace)}`;
 			},
 		};
 	}
