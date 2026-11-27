@@ -29,9 +29,11 @@ interface SidebarNavProps {
 	settingsRoute: SettingsRoute;
 	/** How many notices are unread, after the Notifications row's label. */
 	unreadNotices: number;
+	/** The row above all others, such as the Board's **Threads**; `null` for none. */
+	first: ReactNode;
 }
 
-export function SidebarNav({ tabs, current, counts, list, onTab, settingsRoute, unreadNotices }: SidebarNavProps) {
+export function SidebarNav({ tabs, current, counts, list, onTab, settingsRoute, unreadNotices, first }: SidebarNavProps) {
 	const sub = list !== null && (
 		<SidebarMenuNested>
 			<ScrollArea className="ml-[15px] border-l border-border" viewportClassName="scroll-fade max-h-[30svh] pl-1">
@@ -43,6 +45,7 @@ export function SidebarNav({ tabs, current, counts, list, onTab, settingsRoute, 
 		<SidebarGroup className="shrink-0 py-1">
 			<nav aria-label="Pages">
 				<SidebarMenu className="gap-px">
+					{first}
 					<NotificationsRow unread={unreadNotices} active={current === "notifications"} />
 					{tabs.map(tab => {
 						const { label, icon } = TAB_ROWS[tab];

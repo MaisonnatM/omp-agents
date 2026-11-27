@@ -38,7 +38,8 @@ import { newIdsOnOpen } from "../../details-tabs";
 import { type KnownSessions, sessionLabel } from "../../labels";
 import type { BoardRoute, BoardView } from "./module";
 import { boardTabsOn, ChannelTabs, WorkspaceTab } from "./tabs";
-import { boardWorkspaces, hashForBoard, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
+import { boardWorkspaces, hashForBoard, hashForThreads, revealSessionTab, revealThreadTab, THREAD_TABS } from "./sidebar";
+import { ThreadsList } from "./threads-view";
 import { replyText } from "./search";
 import { BoardSearchField, type BoardSearchFieldHandle, SearchResults } from "./search-view";
 import { boardActions, SessionActions } from "./actions";
@@ -71,14 +72,41 @@ function BoardChannel({ route, core, state, disabled, onChange }: BoardPageProps
 	const [off] = useModulesOff();
 	const searchField = useRef<BoardSearchFieldHandle>(null);
 	if (state === null) return <BoardLoading />;
-	const { open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
+	const { workspaces, open: openWorkspace } = boardWorkspaces(state, core.workspaces, core.workspace, route);
 	const open = openWorkspace?.cwd ?? null;
 	const name = openWorkspace ? workspaceName(openWorkspace.cwdDisplay) : "No workspace";
 	const tasks = state.tasks.filter(task => task.workspace === open);
 	const tabs = boardTabsOn(off);
 	// A tab whose module is off is gone, so its address opens Messages.
-	const view: BoardView = tabs.some(each => each.id === route.view.tab) ? route.view : { tab: "messages", thread: null };
+	const view: BoardView = route.view.tab === "threads" || tabs.some(each => each.id === route.view.tab) ? route.view : { tab: "messages", thread: null };
 	const thread = view.tab !== "messages" || view.thread === null ? null : (tasks.find(task => task.id === view.thread) ?? null);
+	if (view.tab === "threads") {
+		const picked = view.thread === null ? null : (state.tasks.find(task => task.id === view.thread) ?? null);
+		const pickedWorkspace = picked && workspaces.find(each => each.cwd === picked.workspace);
+		return (
+			<div className="flex h-full min-h-0 flex-1">
+				<section aria-label="Threads" className="flex min-w-[360px] flex-1 flex-col">
+					<Header leading={<IconBubble3 aria-hidden className="size-4 shrink-0 text-muted-foreground" />} title="Threads" />
+					<ThreadsList state={state} workspaces={workspaces} sessions={core.sessions} open={picked?.id ?? null} />
+				</section>
+				{picked && pickedWorkspace && (
+					<Thread
+						key={picked.id}
+						state={state}
+						task={picked}
+						reply={route.reply}
+						session={route.session}
+						core={core}
+						workspace={pickedWorkspace}
+						channel={workspaceName(pickedWorkspace.cwdDisplay)}
+						closeHref={hashForThreads()}
+						disabled={disabled}
+						onChange={onChange}
+					/>
+				)}
+			</div>
+		);
+	}
 	return (
 		<div className="flex h-full min-h-0 flex-1">
 			<section aria-label="Board" className="flex min-w-[360px] flex-1 flex-col">
@@ -314,8 +342,8 @@ const STEP = 16;
 
 const clampThread = (width: number, room: number): number => Math.round(Math.max(MIN_THREAD, Math.min(MAX_THREAD, room - MIN_CHANNEL, width)));
 
-/** The Board thread as Slack's thread pane, at the width you drag its left edge to, under the session details sidebar's tab row: **Thread**, the Board task, a line with the reply count, the replies, and the reply box; then the conversation and sidebar tabs of the session its replies wake. Escape closes it. */
-function Thread({ state, task, reply, session, core, workspace, channel, closeHref, onSearch, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; session: string | null; core: CoreData; workspace: Workspace; channel: string; closeHref: string; onSearch: () => void; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
+/** The Board thread as Slack's thread pane, at the width you drag its left edge to, under the session details sidebar's tab row: **Thread**, the Board task, a line with the reply count, the replies, and the reply box; then the conversation and sidebar tabs of the session its replies wake. Escape closes it. Its magnifier, shown with `onSearch`, searches the thread. */
+function Thread({ state, task, reply, session, core, workspace, channel, closeHref, onSearch, disabled, onChange }: { state: BoardState; task: BoardTask; reply: number | null; session: string | null; core: CoreData; workspace: Workspace; channel: string; closeHref: string; onSearch?: () => void; disabled: boolean; onChange: (change: BoardChange) => Promise<void> }) {
 	const sessions = core.sessions;
 	const replyCount = said(task).length;
 	useEffect(() => markSeen(task.id, replyCount), [task.id, replyCount]);
@@ -393,11 +421,13 @@ function Thread({ state, task, reply, session, core, workspace, channel, closeHr
 	};
 	const close = (
 		<>
-			<Tooltip content="Search in thread">
-				<Button {...activityControl("board.thread.search")} variant="ghost" size="icon-xs" aria-label="Search in thread" onClick={onSearch}>
-					<IconMagnifyingGlass />
-				</Button>
-			</Tooltip>
+			{onSearch && (
+				<Tooltip content="Search in thread">
+					<Button {...activityControl("board.thread.search")} variant="ghost" size="icon-xs" aria-label="Search in thread" onClick={onSearch}>
+						<IconMagnifyingGlass />
+					</Button>
+				</Tooltip>
+			)}
 			<Button {...activityControl("board.thread.close")} variant="ghost" size="icon-xs" aria-label="Close thread" render={<a href={closeHref} />}>
 				<IconCrossMedium />
 			</Button>

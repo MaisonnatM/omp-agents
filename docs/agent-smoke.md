@@ -78,7 +78,7 @@ Besides a live session's own hash, the routes are:
 - `#past/<session id>`, `#session/<session id>`;
 - `#pull-requests`, `#pull-requests/<owner>/<repo>/<number>`, `#pull-requests/<owner>/<repo>/<number>/files`, `#pull-requests/<owner>/<repo>/<number>/files/<encoded path>`;
 - `#sport`, `#sport?day=<YYYY-MM-DD>`, `#sport/journal`, `#sport/journal?open=<log id>`, `#sport/progress`;
-- `#board`, `#board?workspace=<encoded dir>`, `#board/<Board task number>?workspace=<encoded dir>`;
+- `#board`, `#board?workspace=<encoded dir>`, `#board/<Board task number>?workspace=<encoded dir>`, `#board/threads`, `#board/threads/<Board task number>`;
 - `#notifications`;
 - `#new`, `#new/<encoded cwd>`, `#scheduled/<send id>`;
 - `#get-started`, which always opens Get started's setup dialog over the home, even after local dismissal;

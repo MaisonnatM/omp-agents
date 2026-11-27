@@ -1,12 +1,12 @@
-/** The Board's half of the left sidebar, under the page rows and the pinned sessions: the Workspaces, each with a count of what waits on you there. */
-import { IconHashtag } from "central-icons";
+/** The Board's half of the left sidebar, under the page rows and the pinned sessions: **Threads**, as Slack's, then the Workspaces, each with a count of what waits on you there. */
+import { IconBubble3, IconHashtag } from "central-icons";
 import { useEffect, useRef, useState } from "react";
 import { parseStrings } from "../../../src/json";
 import { revealDetailsTab } from "../../details-tabs";
 import type { RosterHost } from "../../../src/shared/sessions";
 import { GENERAL_DISPLAY, type Workspace, workspaceName } from "../../../src/shared/workspaces";
 import type { BoardState } from "../../../templates/omp/agent/extensions/board/log";
-import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { activityControl } from "../../activity";
 import { waitingOnYou } from "../../labels";
@@ -17,12 +17,16 @@ import { useStoredState } from "../../stored-state";
 import { useDragOrder } from "../../use-drag-order";
 import { CountPill } from "../count-pill";
 import { type BoardRoute, pageView } from "./module";
-import { useSeen, waitingIn } from "./seen";
+import { unreadOf, useSeen, waitingIn } from "./seen";
 import { namedIn, threadSession } from "./work";
 
 /** The Board's Messages address: Workspace `workspace`, Board task `thread`'s thread open, with `search`'s results shown, its reply `reply` highlighted, or session `session`'s tabs in it. */
 export const hashForBoard = (workspace: string | null, thread: number | null = null, { search = null, reply = null, session = null }: Partial<Pick<BoardRoute, "search" | "reply" | "session">> = {}): string =>
 	hashForPage({ kind: "board", workspace, view: { tab: "messages", thread }, search, reply, session });
+
+/** The Threads view's address, with Board task `thread`'s thread open beside the list, or session `session`'s tabs in it. */
+export const hashForThreads = (thread: number | null = null, { reply = null, session = null }: Partial<Pick<BoardRoute, "reply" | "session">> = {}): string =>
+	hashForPage({ kind: "board", workspace: null, view: { tab: "threads", thread }, search: null, reply, session });
 
 /** Links in Workspace `workspace`'s tabs: a project or pull request page opens in the Board tab that shows it, any other page at its own address. */
 export const boardPageHash =
@@ -74,6 +78,24 @@ export function hashForBoardSession(state: BoardState, workspace: string, sessio
 export const revealSessionTab = () => revealDetailsTab(THREAD_TABS, "session", "thread");
 export const revealThreadTab = () => revealDetailsTab(THREAD_TABS, "thread", "thread");
 
+/** The **Threads** row, Slack's, first in the sidebar's page list: it opens every Workspace's Board threads, with the count of those with unread replies. */
+export function ThreadsRow({ state, active }: { state: BoardState | null; active: boolean }) {
+	const seen = useSeen();
+	const unread = state?.tasks.filter(task => unreadOf(task, seen[task.id]) > 0).length ?? 0;
+	return (
+		<SidebarMenuItem>
+			<SidebarMenuButton {...activityControl("board.threads")} size="short" asChild icon={IconBubble3} isActive={active} aria-label={unread > 0 ? `Threads, ${unread} with unread replies` : undefined}>
+				<a href={hashForThreads()}>Threads</a>
+			</SidebarMenuButton>
+			{unread > 0 && (
+				<SidebarMenuBadge aria-hidden>
+					<CountPill count={unread} />
+				</SidebarMenuBadge>
+			)}
+		</SidebarMenuItem>
+	);
+}
+
 const go = (hash: string) => () => {
 	location.hash = hash;
 };
@@ -114,6 +136,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts 
 	};
 	useShortcuts({ moveUp: () => moveFocused(-1), moveDown: () => moveFocused(1) });
 	if (state === null) return <p className="px-4 py-2 text-xs text-muted-foreground">Loading the Board…</p>;
+	const onThreads = route.view.tab === "threads";
 	return (
 		<SidebarContent>
 			<SidebarGroup collapsible open={!folded} onOpenChange={() => setFolded(was => !was)}>
@@ -121,7 +144,7 @@ export function BoardSidebar({ route, state, workspaces: sidebar, picked, hosts 
 				<SidebarMenu ref={list} aria-label="Board workspaces" className="gap-px">
 					{workspaces.map(workspace => {
 						const waiting = waitingIn(state, seen, hosts, workspace.cwd);
-						const current = workspace.cwd === open?.cwd;
+						const current = !onThreads && workspace.cwd === open?.cwd;
 						const item = drag("workspaces", workspace.cwd, (dragged, where) => setOrder(moveKey(cwds, dragged, workspace.cwd, where)));
 						return (
 							<SidebarMenuItem

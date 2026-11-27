@@ -13,7 +13,7 @@ import type { Page, SettingsRoute, SidebarTab } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import type { NavRow } from "../sidebar-tabs";
 import type { BoardState } from "../../templates/omp/agent/extensions/board/log";
-import { BoardSidebar } from "./board/sidebar";
+import { BoardSidebar, ThreadsRow } from "./board/sidebar";
 import { BOARD_PAGE } from "./board/module";
 import type { SessionLists } from "../use-session-lists";
 import type { WorkspaceScope } from "../use-workspace-scope";
@@ -100,6 +100,7 @@ export const AppSidebar = memo(function AppSidebar({
 				onTab={onTab}
 				settingsRoute={settings}
 				unreadNotices={unreadNotices}
+				first={hasBoard && <ThreadsRow state={board} active={page?.kind === "board" && page.view.tab === "threads"} />}
 			/>
 			{hasBoard ? (
 				<>

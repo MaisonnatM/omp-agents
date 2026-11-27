@@ -66,7 +66,7 @@ function workspaceSlice(core: CoreData, cwd: string | null) {
 }
 
 /** A tab other than Messages: the page it names, kept to the Workspace; a project or pull request it opens shows in the tab. */
-export function WorkspaceTab({ view, workspace, board, core, disabled }: { view: Exclude<BoardView, { tab: "messages" }>; workspace: string | null; board: BoardState; core: CoreData; disabled: boolean }) {
+export function WorkspaceTab({ view, workspace, board, core, disabled }: { view: Exclude<BoardView, { tab: "messages" | "threads" }>; workspace: string | null; board: BoardState; core: CoreData; disabled: boolean }) {
 	const to = useMemo(() => boardPageHash(workspace), [workspace]);
 	return (
 		<PageHashContext.Provider value={to}>
@@ -75,7 +75,7 @@ export function WorkspaceTab({ view, workspace, board, core, disabled }: { view:
 	);
 }
 
-function TabPage({ view, workspace, board, core, disabled }: { view: Exclude<BoardView, { tab: "messages" }>; workspace: string | null; board: BoardState; core: CoreData; disabled: boolean }) {
+function TabPage({ view, workspace, board, core, disabled }: { view: Exclude<BoardView, { tab: "messages" | "threads" }>; workspace: string | null; board: BoardState; core: CoreData; disabled: boolean }) {
 	const { changeModule } = useDashboardActions();
 	const slice = workspaceSlice(core, workspace);
 	switch (view.tab) {

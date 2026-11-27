@@ -30,8 +30,9 @@ export type RoutineRoute = { kind: "list" } | { kind: "new" } | { kind: "open"; 
 /**
  * What a Workspace's Board shows: its Board tasks with Board task `thread`'s Board thread open beside them, its settings on the section `section` names, the first for `null`,
  * its memory, its routines as `routine` names, or the page `page` another tab shows, such as one pull request's.
+ * `threads` is no Workspace's: Slack's Threads view, every Workspace's Board threads with replies, Board task `thread`'s open beside them.
  */
-export type BoardView = { tab: "messages"; thread: number | null } | { tab: "sessions"; session: string | null } | { tab: "settings"; section: string | null } | { tab: "memory" } | { tab: "routines"; routine: RoutineRoute } | PageView;
+export type BoardView = { tab: "messages"; thread: number | null } | { tab: "threads"; thread: number | null } | { tab: "sessions"; session: string | null } | { tab: "settings"; section: string | null } | { tab: "memory" } | { tab: "routines"; routine: RoutineRoute } | PageView;
 
 /** The Board page: Workspace `workspace`'s view, the first Workspace's for `null`; on Messages, `search`'s results in place of the Board tasks, reply `reply` of the open thread highlighted, and session `session`'s tabs in the open thread, the one a reply wakes for `null`. */
 export interface BoardRoute {
@@ -97,10 +98,11 @@ function routineRest(routine: RoutineRoute): string {
 	}
 }
 
-/** The view the address's rest names: a number is a Board thread, `settings/<section>` a settings section, `sessions/<id>` the Sessions tab with that session open, `routines/<more>` the Routines tab, `<tab>/<more>` the page `#<tab>/<more>` names in that tab, Messages for an unknown one. */
+/** The view the address's rest names: a number is a Board thread, `threads` the Threads view and `threads/<n>` it with Board thread n open, `settings/<section>` a settings section, `sessions/<id>` the Sessions tab with that session open, `routines/<more>` the Routines tab, `<tab>/<more>` the page `#<tab>/<more>` names in that tab, Messages for an unknown one. */
 function parseView(rest: string | null, pages: PageAddresses): BoardView {
 	if (rest !== null && /^\d+$/.test(rest)) return { tab: "messages", thread: Number(rest) };
 	const [head, ...more] = rest?.split("/") ?? [];
+	if (head === "threads") return { tab: "threads", thread: more[0] && /^\d+$/.test(more[0]) ? Number(more[0]) : null };
 	const tab = BOARD_TABS.find(each => each.id === head)?.id ?? "messages";
 	if (tab === "messages") return { tab, thread: null };
 	if (tab === "settings") return { tab, section: more[0] || null };
@@ -115,6 +117,8 @@ function viewRest(view: BoardView, pages: PageAddresses): string | null {
 	switch (view.tab) {
 		case "messages":
 			return view.thread === null ? null : String(view.thread);
+		case "threads":
+			return view.thread === null ? "threads" : `threads/${view.thread}`;
 		case "settings":
 			return view.section === null ? "settings" : `settings/${view.section}`;
 		case "sessions":
@@ -130,6 +134,7 @@ function viewRest(view: BoardView, pages: PageAddresses): string | null {
 
 export type BoardControlId =
 	| "board.workspace"
+	| "board.threads"
 	| "board.tab"
 	| "board.task.open"
 	| "board.post"
@@ -160,7 +165,8 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	listsItself: true,
 	home: { workspace: null, view: { tab: "messages", thread: null }, search: null, reply: null, session: null },
 	/**
-	 * `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace, `#board/<tab>?workspace=<cwd>` another tab,
+	 * `#board` opens the first workspace's Board tasks, `#board/<n>?workspace=<cwd>` Board task n's thread in that workspace, `#board/threads` the Threads view of every Workspace's
+	 * Board threads, `#board/threads/<n>` it with Board task n's thread open, `#board/<tab>?workspace=<cwd>` another tab,
 	 * `#board/settings/<section>?workspace=<cwd>` one of its settings, `#board/routines/<id>?workspace=<cwd>` one of its routines open (`/edit` its editor, `routines/new` a new
 	 * one's), and `#board/<page>?workspace=<cwd>`, for `#<page>` a project's or pull request's address, that page in the tab its kind names; on Messages, `q` searches in the
 	 * `in` scope, `reply` highlights a reply of the thread, and `session` shows that session's tabs in it.
@@ -168,7 +174,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	address: {
 		parse: (rest, query, pages) => {
 			const view = parseView(rest, pages);
-			const thread = view.tab === "messages" ? view.thread : null;
+			const thread = view.tab === "messages" || view.tab === "threads" ? view.thread : null;
 			const q = view.tab === "messages" ? (query.get("q")?.trim() ?? "") : "";
 			const reply = query.get("reply");
 			return {
@@ -192,11 +198,12 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 			return params.size === 0 ? null : params.toString();
 		},
 	},
-	title: ({ view, search }) => (view.tab !== "messages" ? `Board · ${boardTab(view.tab).label}` : search ? `Board · Search “${search.query}”` : view.thread === null ? "Board" : `Board · #${view.thread}`),
+	title: ({ view, search }) => (view.tab === "threads" ? (view.thread === null ? "Board · Threads" : `Board · Threads · #${view.thread}`) : view.tab !== "messages" ? `Board · ${boardTab(view.tab).label}` : search ? `Board · Search “${search.query}”` : view.thread === null ? "Board" : `Board · #${view.thread}`),
 	views: [
 		{ key: "board", label: "Board" },
 		{ key: "board/thread", label: "A Board thread" },
 		{ key: "board/search", label: "Board search results" },
+		{ key: "board/threads", label: "The Board's Threads view" },
 		...BOARD_TABS.filter(each => each.id !== "messages").map(each => ({ key: `board/${each.id}` as const, label: `The Board's ${each.label} tab` })),
 	],
 	view: ({ view, search }) => (view.tab !== "messages" ? `board/${view.tab}` : search ? "board/search" : view.thread === null ? "board" : "board/thread"),
@@ -208,6 +215,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 	controls: [
 		{ id: "board.tab", label: "Board tab across the top of a Workspace", area: "Board" },
 		{ id: "board.workspace", label: "Board sidebar workspace row", area: "Board" },
+		{ id: "board.threads", label: "Board sidebar Threads row, which lists every Board thread with replies", area: "Board" },
 		{ id: "board.task.open", label: "Board task message, which opens its thread", area: "Board" },
 		{ id: "board.post", label: "Board composer Send button or Enter", area: "Board" },
 		{ id: "board.reply", label: "Board thread reply Send button or Enter", area: "Board" },
