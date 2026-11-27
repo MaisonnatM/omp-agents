@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { claudeCodeFormat } from "../foreign/claude-code";
@@ -108,6 +108,20 @@ describe("SessionFiles", () => {
 		await files.refresh();
 		expect(await files.refreshFacts()).toBe(true);
 		expect(titles(files)).toEqual(["one-shot", "kept"]);
+	});
+
+	test("a listed session in a linked worktree counts in its main checkout before its transcript is read", async () => {
+		const { root, project, files } = setup();
+		const main = join(realpathSync(root), "app");
+		const linked = join(realpathSync(root), "app-wt", "fix");
+		mkdirSync(main);
+		const git = (...args: string[]) => Bun.spawnSync(["git", "-C", main, ...args], { stderr: "ignore" });
+		git("init", "-q");
+		git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init");
+		git("worktree", "add", "-q", "-b", "fix", linked);
+		writeLines(join(project, "linked.jsonl"), [{ type: "session", version: 3, id: "linked", timestamp: at, cwd: linked }, message("u1", null, at, "user", "hello"), message("a1", "u1", at, "assistant", "hi")]);
+		await files.scan();
+		expect(files.past(new Set(), () => false).map(session => session.workspace?.cwd)).toEqual([main]);
 	});
 
 	test("a refresh adds a file that appeared and drops one that is gone", async () => {
