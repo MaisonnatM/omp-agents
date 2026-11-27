@@ -5,7 +5,7 @@ import { endKept, listAllKeepers } from "../keeper-link";
 import { readMemory } from "../memory-reading";
 import { ompDaemons } from "../omp/daemons";
 import { privateSessionsDir } from "../paths";
-import { readProcessTable } from "../process-census";
+import { readProcessTableWithFootprints } from "../process-census";
 import type { PrivateDeleting } from "../shared/notices";
 import { awaitsScheduled, awaitsSubagents, type RosterHost } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
@@ -33,7 +33,7 @@ export interface SessionProcessWatchParts {
 export function sessionProcessWatch({ sessions, hosts, pathOf, owner, processSettings, privateSessions, history, port, warn }: SessionProcessWatchParts): SessionProcessWatch {
 	return new SessionProcessWatch({
 		...ompDaemons(),
-		readTable: readProcessTable,
+		readTable: readProcessTableWithFootprints,
 		readPorts: readListeningPorts,
 		readCwds,
 		readSessionFiles,

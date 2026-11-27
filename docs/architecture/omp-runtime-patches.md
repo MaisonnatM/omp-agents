@@ -15,7 +15,7 @@ A source checkout needs the matching pi-natives addon in `packages/natives/nativ
 Build once with all six applied, since a CLI built without one of them drops it.
 Install the rebuilt `dist/cli.js` together with the files `gen:bundle` writes beside it, the `CHANGELOG-*.md`, `docs-index.generated.txt`, and data files the bundle loads by name, over the installed `pi-coding-agent/dist/`.
 Keep the old data files beside the new ones until every running session restarts, since a running session loads them by its own hashed names.
-Then copy each source file the patches change, as `git diff --name-only v19.0.0 -- packages/ai/src packages/coding-agent/src` lists them, over the installed one in `pi-ai/src/` or `pi-coding-agent/src/`, keeping a rollback copy of everything replaced.
+Then copy each source file the patches change or add, as `git diff --name-only v19.0.0 -- packages/ai/src packages/coding-agent/src` and `git ls-files --others --exclude-standard -- packages/ai/src packages/coding-agent/src` list them, over or beside the installed one in `pi-ai/src/` or `pi-coding-agent/src/`, keeping a rollback copy of everything replaced and a list of the files added, such as `usage-aware-routing.ts`.
 Already-running sessions keep their loaded code until restarted.
 
 ## Lazy MCP servers

@@ -49,8 +49,12 @@ export type ServerMsg =
 	/** Answers this socket's `dequeue` or `interrupt` with the messages it took back, steers before follow-ups, each queue oldest first. Nothing answers when none was still waiting. */
 	| { t: "withdrawn"; view: LiveView; reqId: number; messages: WithdrawnMessage[] }
 	| ModuleMsg
-	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
-	| { t: "routines"; routines: Routine[] }
+	/**
+	 * Every routine, whole, sent when a socket opens and after every change, including each run's progress. `held` is why
+	 * the queued runs wait to start, such as memory pressure, `null` when none waits; only the server that runs routines
+	 * sends one, and it lives only in memory.
+	 */
+	| { t: "routines"; routines: Routine[]; held: string | null }
 	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
 	| { t: "scheduled"; sends: ScheduledSend[] }
 	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
@@ -74,8 +78,12 @@ export type ServerMsg =
 	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
 	| { t: "done"; ack: number; error: string | null };
 
-/** Stored module `id`'s state, whole, sent when a socket opens and after every change. */
-export type ModuleMsg<I extends StoredModuleId = StoredModuleId> = { [K in I]: { t: "module"; id: K; value: ModuleValues[K] } }[I];
+/**
+ * Stored module `id`'s state, whole, sent when a socket opens and after every change. `held` is why the module's own
+ * work waits to start, such as a ready Board task under memory pressure, `null` when none waits; only the server that
+ * runs the unattended work sends one, and it lives only in memory, never in the module's file.
+ */
+export type ModuleMsg<I extends StoredModuleId = StoredModuleId> = { [K in I]: { t: "module"; id: K; value: ModuleValues[K]; held: string | null } }[I];
 /** Change stored module `id`'s state by `change`, which that module parses; every socket then gets the state as it is after. A refused change changes nothing. */
 export type ModuleChangeMsg<I extends StoredModuleId = StoredModuleId> = { [K in I]: { t: "module-change"; id: K; change: ModuleChanges[K] } }[I];
 

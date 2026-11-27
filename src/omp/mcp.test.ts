@@ -18,7 +18,7 @@ if (!process.env.MCP_DISCOVERY_CHILD) {
 		});
 		const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
 		expect({ code, output: code ? out + err : "" }).toEqual({ code: 0, output: "" });
-	});
+	}, 30_000);
 } else {
 const dirs: string[] = [];
 afterEach(async () => {

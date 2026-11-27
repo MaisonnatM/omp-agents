@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { emptyBoard } from "../templates/omp/agent/extensions/board/log";
 import type { TrustAsk } from "../src/shared/project-trust";
 import { EMPTY_SPORT } from "../src/shared/sport";
 import { log, measurement } from "../src/sport-fixtures";
@@ -115,11 +116,19 @@ describe("dashboard state", () => {
 	test("a stored module's state is null until the server first sends it, then the latest one sent", () => {
 		expect(blank().modules.sport).toBeNull();
 		const sent = { ...EMPTY_SPORT, metrics: [{ id: "max", label: "Max", unit: "kg", better: "higher" as const }] };
-		expect(reduce(blank(), { t: "module", id: "sport", value: sent }).modules.sport).toBe(sent);
+		expect(reduce(blank(), { t: "module", id: "sport", value: sent, held: null }).modules.sport).toBe(sent);
+	});
+
+	test("why unattended work waits shows with the Board's state and the routines, and goes once the server sends none", () => {
+		const reason = "Memory pressure is critical, so unattended work waits until it eases.";
+		const held = reduce(reduce(blank(), { t: "module", id: "board", value: emptyBoard(), held: reason }), { t: "routines", routines: [], held: reason });
+		expect(held.held).toEqual({ board: reason, routines: reason });
+		const eased = reduce(reduce(held, { t: "module", id: "board", value: emptyBoard(), held: null }), { t: "routines", routines: [], held: null });
+		expect(eased.held).toEqual({ board: null, routines: null });
 	});
 
 	test("a module change shows at once whole, and a refused one shows none of it", () => {
-		const loaded = reduce(blank(), { t: "module", id: "sport", value: EMPTY_SPORT });
+		const loaded = reduce(blank(), { t: "module", id: "sport", value: EMPTY_SPORT, held: null });
 		const done = log("a", "2026-11-17");
 		expect(reduce(loaded, { t: "module-change", id: "sport", change: [{ op: "add-log", log: done }] }).modules.sport?.log).toEqual([done]);
 		expect(reduce(loaded, { t: "module-change", id: "sport", change: [{ op: "add-log", log: done }, { op: "add-measurement", measurement: measurement("m", "max", 117, "2026-11-17") }] })).toBe(loaded);

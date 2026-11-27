@@ -282,6 +282,7 @@ export function App() {
 																	models={state.models}
 																	modules={state.modules}
 																	routines={state.routines}
+																	held={state.held}
 																	workspaceList={state.workspaceList}
 																	trustedProjects={state.trustedProjects}
 																	newSessionCompletions={state.newSessionCompletions}

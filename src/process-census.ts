@@ -16,6 +16,8 @@ export interface ProcessRow {
 	started: string;
 	/** Resident memory in KiB. */
 	rssKb: number;
+	/** macOS's footprint in KiB, which counts compressed and swapped pages that `rssKb` misses; set only where {@link readProcessTableWithFootprints} read it. */
+	footprintKb?: number;
 	/** `ps`'s `%cpu`: percent of one core, so a busy process can pass 100; on macOS a decaying average of recent use. */
 	cpuPercent: number;
 	/** The command line, as `ps` prints it. */
@@ -255,6 +257,42 @@ export async function readProcessTable(): Promise<ProcessTable | null> {
 		return code === 0 ? parsePs(text) : null;
 	} catch {
 		return null;
+	}
+}
+
+/** `top` printing every process's footprint once, which {@link parseFootprints} reads; macOS only. */
+export const FOOTPRINTS_ARGV = ["top", "-l", "1", "-stats", "pid,mem"];
+
+const TOP_LINE = /^\s*(\d+)\s+(\d+(?:\.\d+)?)([BKMGT])[+-]?\s*$/;
+const TOP_UNIT_KB: Record<string, number> = { B: 1 / 1024, K: 1, M: 1024, G: 1024 ** 2, T: 1024 ** 3 };
+
+/** Each pid's footprint in KiB from {@link FOOTPRINTS_ARGV}'s output, such as `35795  4151M`; other lines are skipped. */
+export function parseFootprints(text: string): Map<number, number> {
+	const found = new Map<number, number>();
+	for (const line of text.split("\n")) {
+		const match = TOP_LINE.exec(line);
+		if (match) found.set(Number(match[1]), Math.round(Number(match[2]) * (TOP_UNIT_KB[match[3] as string] ?? 1)));
+	}
+	return found;
+}
+
+/** Every process now with its footprint where `top` gave one; `null` when `ps` failed. Without `top`, rows keep only `rssKb`. */
+export async function readProcessTableWithFootprints(): Promise<ProcessTable | null> {
+	const [table, footprints] = await Promise.all([readProcessTable(), readFootprints()]);
+	for (const [pid, kb] of footprints) {
+		const row = table?.get(pid);
+		if (row) row.footprintKb = kb;
+	}
+	return table;
+}
+
+async function readFootprints(): Promise<Map<number, number>> {
+	try {
+		const top = Bun.spawn(FOOTPRINTS_ARGV, { env: psEnv(), stdout: "pipe", stderr: "ignore", timeout: PS_TIMEOUT_MS });
+		const [text, code] = await Promise.all([new Response(top.stdout).text(), top.exited]);
+		return code === 0 ? parseFootprints(text) : new Map();
+	} catch {
+		return new Map();
 	}
 }
 

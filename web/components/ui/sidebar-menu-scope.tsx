@@ -304,11 +304,12 @@ export function useMenuScope(
     [containerRef, inNested, setActiveIndex]
   );
 
-  // Arrow/Home/End over every row button in DOM order.
+  // Arrow/Home/End over every row button in DOM order. A key with a modifier is a shortcut, such as Alt+Shift+↑ moving the row, so it passes on.
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key))
         return;
+      if (e.altKey || e.shiftKey || e.metaKey || e.ctrlKey) return;
       const container = containerRef.current;
       if (!container) return;
       const items = Array.from(

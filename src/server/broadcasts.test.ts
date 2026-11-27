@@ -49,7 +49,7 @@ function setup(initial: PastSession[]) {
 	const preferences = new PreferencesFile(join(dir, "preferences.json"));
 	const reviewDrafts = new ReviewDraftsFile(join(dir, "review-drafts.json"));
 	const lists = new ListRegistry({
-		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
+		routines: { msg: () => ({ t: "routines", routines: routines.value, held: null }), apply: change => routines.apply(change, 1000) },
 		scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, 1000) },
 		workspaces: {
 			msg: () => ({
@@ -68,7 +68,7 @@ function setup(initial: PastSession[]) {
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 		merges: { msg: () => ({ t: "merges", list: [] }) },
 		jobs: { msg: () => ({ t: "jobs", jobs: {} }) },
-	}, { sport, projects: new ProjectsFile(join(dir, "project-list.json")), board: new BoardLog(join(dir, "board-events.jsonl")) }, kind => broadcasts.pushList(kind));
+	}, { sport, projects: new ProjectsFile(join(dir, "project-list.json")), board: new BoardLog(join(dir, "board-events.jsonl")) }, kind => broadcasts.pushList(kind), () => null);
 	const broadcasts = new Broadcasts({
 		roster: () => roster,
 		past: () => sessions,

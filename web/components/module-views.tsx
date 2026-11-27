@@ -8,6 +8,7 @@ import type { Routine } from "../../src/routines";
 import type { ProjectList } from "../../src/shared/projects";
 import type { RosterHost } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";
+import type { Held } from "../dashboard-state";
 import type { ModulePage, ModuleRoutes, ModuleStates, WebModuleId } from "../modules";
 import type { Completions } from "../pane-store";
 import type { ModelList } from "../reads";
@@ -24,6 +25,8 @@ import type { KnownSessions } from "../labels";
 export interface CoreData {
 	/** Every routine, which a Board's Routines tab lists by Workspace. */
 	routines: Routine[];
+	/** Why unattended work waits to start, which a held ready Board task and a held routine run show. */
+	held: Held;
 	/** The projects, `null` until the server first sends them, which a Board's Projects tab lists. */
 	projects: ProjectList | null;
 	/** The sessions are listed, so `workspaces` holds every workspace the sidebar offers. */

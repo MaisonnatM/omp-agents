@@ -7,11 +7,15 @@ The dashboard shows the same lines in Settings › What's new.
 
 - On the Board, a pill at the top or bottom edge says how many unread threads sit out of view, as Slack does. Click it to jump to the nearest one, or press Mark all read.
 - In a Board thread, replies that come while you read further up show a "new replies" pill at the bottom. Click it to jump to them.
+- Settings › Resources now shows what each session really holds, counting memory macOS compressed or moved to swap; an idle session used to look ten times smaller than it is.
+- A Board task or routine run that waits because memory is low now says so on the Board, with the reason, until it starts.
 - Sessions a dashboard can no longer list, such as old Bot conversations, now end on their own 10 minutes after the dashboard starts, instead of holding memory forever. Their conversation stays under Past.
 - Idle private sessions now stop after the same hours as other idle sessions. A notification says so 5 minutes before, because ending a private session deletes it.
 - When the Mac runs low on memory, the dashboard stops idle things one at a time, cheapest first, until memory is fine again. Board tasks and routine runs wait meanwhile. Busy sessions are never stopped, and a session you start yourself is never refused.
 - Settings › Resources shows memory pressure and swap over the last 24 hours, what each session uses with a Stop button, what would stop next, and every automatic stop. The sidebar's foot shows the pressure at a glance.
 - MCP servers now start in a session only when it first uses one of their tools, and stop after 10 idle minutes.
+- On the Board tab, drag a Workspace up or down the sidebar to put the list in your own order, as in Slack, or focus it and press Alt+Shift+↑ or ↓. The order follows you to every machine through Settings › Sync, and a new Workspace shows at the bottom.
+- Each routine has its own face again, a colored shape with two eyes like the old Bots had, on its Board messages and in the Routines tab, so you can tell routines apart at a glance.
 - A routine copied into every Workspace now follows the original: editing the original's name, instructions, triggers, or model updates every copy, while each copy keeps its own schedule and on/off switch. Press Detach on a copy, or change its instructions, to make it your own again. Copies that still match their original start following it on the next restart.
 - The blue count beside a workspace now says everything waiting on you there: its sessions that need you plus its Board threads with replies you have not read. The Sessions tab, the Board tab, and the Dock badge all show the same count.
 - The Board tab's sidebar shows the count of what waits on you instead of ready Board tasks, marks each Workspace with a # as the Board's header does, and no longer lists sessions under each Workspace; they stay on the Sessions tab and in each Board thread.
