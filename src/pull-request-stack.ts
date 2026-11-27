@@ -3,7 +3,7 @@
  * chained to it by base branches, whoever opened them, not only those the Pull requests page lists.
  */
 import { createCache } from "./cache";
-import { AVATAR, authorOf, dataOf, ghPolledGraphql, STATUS } from "./github";
+import { AVATAR, authorOf, checkContexts, dataOf, ghPolledGraphql, rollupState } from "./github";
 import { isObject, str } from "./json";
 import { type PullRequest, type Repo, repoKey, type StackedPullRequest, samePullRequest } from "./shared/github";
 
@@ -11,7 +11,7 @@ const OPEN_QUERY = `query($owner: String!, $repo: String!, $endCursor: String) {
 	repository(owner: $owner, name: $repo) { pullRequests(states: OPEN, first: 100, after: $endCursor) {
 		nodes {
 			number title isDraft isCrossRepository headRefName baseRefName updatedAt author { login ${AVATAR} }
-			commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+			commits(last: 1) { nodes { commit { statusCheckRollup { state ${checkContexts(30)} } } } }
 		}
 		pageInfo { hasNextPage endCursor }
 	} }
@@ -27,7 +27,6 @@ function parseOpen(node: unknown, { owner, repo }: Repo): StackedPullRequest | n
 	if (title === undefined || head === undefined || base === undefined || Number.isNaN(updatedAt)) return null;
 	const commits = isObject(node.commits) && Array.isArray(node.commits.nodes) ? node.commits.nodes : [];
 	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
-	const rollup = isObject(commit.statusCheckRollup) ? str(commit.statusCheckRollup.state) : undefined;
 	return {
 		owner,
 		repo,
@@ -35,7 +34,7 @@ function parseOpen(node: unknown, { owner, repo }: Repo): StackedPullRequest | n
 		title,
 		author: authorOf(node.author),
 		state: node.isDraft === true ? "draft" : "open",
-		checks: STATUS[rollup ?? ""] ?? "none",
+		checks: rollupState(commit.statusCheckRollup),
 		head,
 		base,
 		updatedAt,

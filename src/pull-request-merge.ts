@@ -2,7 +2,7 @@
  * Merging a pull request on GitHub: the merge itself, the steps a merge that waits until it is ready takes (update the
  * branch, retarget it, mark it ready, arm auto-merge), and the reads that say which step comes next.
  */
-import { dataOf, ghGraphql, ghMutation, ghPolledGraphql, mergeStateOf, STATUS } from "./github";
+import { checkContexts, dataOf, ghGraphql, ghMutation, ghPolledGraphql, mergeStateOf, rollupState } from "./github";
 import { isObject, str } from "./json";
 import { type CheckState, type MergeState, type PullRequest, pullRequestName, prKey, type UpdateMethod } from "./shared/github";
 import type { MergeMethod } from "./shared/source-control";
@@ -31,7 +31,7 @@ export interface MergeStatus {
 const STATUS_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	repository(owner: $owner, name: $repo) { autoMergeAllowed pullRequest(number: $number) {
 		id title state isDraft headRefName headRefOid baseRefName mergeStateStatus autoMergeRequest { enabledAt }
-		commits(last: 1) { nodes { commit { parents(first: 2) { nodes { oid } } statusCheckRollup { state } } } }
+		commits(last: 1) { nodes { commit { parents(first: 2) { nodes { oid } } statusCheckRollup { state ${checkContexts(100)} } } } }
 	} }
 }`;
 
@@ -47,7 +47,6 @@ export function parseMergeStatus(answer: unknown, pr: PullRequest): MergeStatus 
 	if (!node || !id || title === undefined || !branch || !head || !base || !state) throw new Error(`GitHub has no pull request ${pullRequestName(pr)}`);
 	const commits = isObject(node.commits) && Array.isArray(node.commits.nodes) ? node.commits.nodes : [];
 	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
-	const rollup = isObject(commit.statusCheckRollup) ? str(commit.statusCheckRollup.state) : undefined;
 	return {
 		id,
 		state,
@@ -57,7 +56,7 @@ export function parseMergeStatus(answer: unknown, pr: PullRequest): MergeStatus 
 		base,
 		title,
 		mergeState: mergeStateOf(node.mergeStateStatus),
-		checks: STATUS[rollup ?? ""] ?? "none",
+		checks: rollupState(commit.statusCheckRollup),
 		parents: isObject(commit.parents) && Array.isArray(commit.parents.nodes) ? commit.parents.nodes.flatMap(parent => (isObject(parent) && typeof parent.oid === "string" ? [parent.oid] : [])) : [],
 		autoArmed: isObject(node.autoMergeRequest),
 		autoAllowed: repository.autoMergeAllowed === true,

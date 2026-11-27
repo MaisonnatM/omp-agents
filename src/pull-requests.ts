@@ -3,7 +3,7 @@
  * merged PRs and the open PRs that ask the viewer for a review.
  */
 import { createCache } from "./cache";
-import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, ghPolledGraphql, ghRest, mergeStateOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
+import { AVATAR, authorOf, CHANGE, checkContexts, contextState, currentContexts, dataOf, ghGraphql, ghPolledGraphql, ghRest, mergeStateOf, nodesOf, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, rollupState } from "./github";
 import { GithubQuotaPaused } from "./github-quota";
 import { GitHubQuotaError } from "../templates/omp/agent/extensions/github/access";
 import { errorText, isObject, num, str } from "./json";
@@ -18,11 +18,9 @@ const MERGED_DAYS = 7;
 /** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
 const THREADS = 100;
 
-/** The head commit's first `first` checks, by name and state; `reasons` adds what each check reported, so a failure says why. */
-const CONTEXTS = (first: number, reasons = false): string => `contexts(first: ${first}) { totalCount nodes {
-	... on CheckRun { name status conclusion detailsUrl ${reasons ? "title summary annotations(first: 5) { nodes { annotationLevel title message } }" : ""} }
-	... on StatusContext { context state targetUrl ${reasons ? "description" : ""} }
-} }`;
+/** The head commit's first `first` checks with each one's link; `reasons` adds what each check reported, so a failure says why. */
+const CONTEXTS = (first: number, reasons = false): string =>
+	checkContexts(first, `detailsUrl ${reasons ? "title summary annotations(first: 5) { nodes { annotationLevel title message } }" : ""}`, `targetUrl ${reasons ? "description" : ""}`);
 
 /** The pull request's author, its requested reviewers, and its latest reviews, which its row in the list and its details both show. */
 const REVIEW_FIELDS = `author { login ${AVATAR} }
@@ -67,8 +65,6 @@ const SEARCHES: [alias: string, role: PullRequestRole][] = [
 	["reviewing", "reviewer"],
 	["merged", "author"],
 ];
-
-const nodesOf = (connection: unknown): unknown[] => (isObject(connection) && Array.isArray(connection.nodes) ? connection.nodes : []);
 
 /** Pending requests first, then latest reviews, each person once; the author's own comments are left out. */
 function parseReviewers(node: Record<string, unknown>, author: string): Reviewer[] {
@@ -281,15 +277,15 @@ function awaitsApproval(node: unknown): boolean {
 }
 
 /**
- * The head commit's checks, leaving out the failing ones that wait on approval, so the pull request files under **Approval** rather than CI to fix.
+ * The head commit's current checks, leaving out the failing ones that wait on approval, so the pull request files under **Approval** rather than CI to fix.
  * An approved gate still counts: it stays red until it reruns. GitHub's rollup stands when it has more checks than the query returned.
  */
 function checksOf(rollup: Record<string, unknown>): { checks: CheckState; approvalRequired: boolean; failingChecks: string[] } {
-	const state = STATUS[str(rollup.state) ?? ""] ?? "none";
-	const nodes = nodesOf(rollup.contexts);
+	const state = rollupState(rollup);
+	const nodes = currentContexts(nodesOf(rollup.contexts));
 	const rest = nodes.filter(node => !awaitsApproval(node)).map(parseCheck).filter(check => check !== null);
 	const failingChecks = [...new Set(rest.filter(check => check.state === "failing").map(check => check.name))];
-	if (state !== "failing" || totalOf(rollup.contexts) > nodes.length || !nodes.some(awaitsApproval)) return { checks: state, approvalRequired: false, failingChecks };
+	if (state !== "failing" || totalOf(rollup.contexts) > nodesOf(rollup.contexts).length || !nodes.some(awaitsApproval)) return { checks: state, approvalRequired: false, failingChecks };
 	const checks = failingChecks.length > 0 ? "failing" : rest.some(check => check.state === "pending") ? "pending" : "passing";
 	return { checks, approvalRequired: true, failingChecks };
 }
@@ -312,12 +308,9 @@ function parseCheck(node: unknown): PullRequestCheck | null {
 	if (!isObject(node)) return null;
 	const reason = reasonOf(node);
 	const name = str(node.name);
-	if (name !== undefined) {
-		const state = node.status === "COMPLETED" ? (CHECK_RUN[str(node.conclusion) ?? ""] ?? "skipped") : "pending";
-		return { name, state, url: str(node.detailsUrl) ?? null, ...(reason && { reason }) };
-	}
+	if (name !== undefined) return { name, state: contextState(node), url: str(node.detailsUrl) ?? null, ...(reason && { reason }) };
 	const context = str(node.context);
-	return context === undefined ? null : { name: context, state: STATUS[str(node.state) ?? ""] ?? "pending", url: str(node.targetUrl) ?? null, ...(reason && { reason }) };
+	return context === undefined ? null : { name: context, state: contextState(node), url: str(node.targetUrl) ?? null, ...(reason && { reason }) };
 }
 
 function lifecycleTime(value: unknown): number | null {
@@ -351,7 +344,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 	const commits = nodesOf(node.commits);
 	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
 	const rollup = isObject(commit.statusCheckRollup) ? commit.statusCheckRollup.contexts : null;
-	const checkRuns = nodesOf(rollup)
+	const checkRuns = currentContexts(nodesOf(rollup))
 		.map(parseCheck)
 		.filter(check => check !== null)
 		.toSorted((a, b) => CHECK_ORDER.indexOf(a.state) - CHECK_ORDER.indexOf(b.state) || a.name.localeCompare(b.name));
