@@ -113,9 +113,9 @@ function AuthorName({ by, sessions, state, workspace }: { by: BoardAuthor; sessi
 }
 
 /** One message row: avatar, name, and time, or for a grouped one only the time on hover in the avatar's place. */
-function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted = false, toolbar, children }: { by: BoardAuthor; at: number; sessions: KnownSessions; state: BoardState; workspace: string; grouped: boolean; highlighted?: boolean; toolbar?: ReactNode; children: ReactNode }) {
+function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted = false, unread = false, toolbar, children }: { by: BoardAuthor; at: number; sessions: KnownSessions; state: BoardState; workspace: string; grouped: boolean; highlighted?: boolean; unread?: boolean; toolbar?: ReactNode; children: ReactNode }) {
 	return (
-		<div className={cn("group/message relative flex gap-2 px-6 hover:bg-accent/40", grouped ? "py-0.5" : "pt-2 pb-1", highlighted && "bg-accent hover:bg-accent")}>
+		<div className={cn("group/message relative flex gap-2 px-6 hover:bg-accent/40", grouped ? "py-0.5" : "pt-2 pb-1", unread && "bg-sky-50 hover:bg-sky-100/70 dark:bg-sky-950/40 dark:hover:bg-sky-950/60", highlighted && "bg-accent hover:bg-accent")}>
 			<div className="flex w-9 shrink-0 justify-end">
 				{grouped ? (
 					<time dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()} className="pt-0.5 text-xs text-muted-foreground tabular-nums opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100">
@@ -200,12 +200,31 @@ function BoardText({ text, editedAt }: { text: string; editedAt?: number }) {
 	);
 }
 
-/** The message's text, or `editor` in its place while you edit it, and its labels. */
-function TaskBody({ task, editor }: { task: BoardTask; editor?: ReactNode }) {
+/** A routine's message on the Board's main list is long, so it shows its first lines faded out, with **Show more** to open it in place. */
+const ROUTINE_PREVIEW_CHARS = 240;
+const ROUTINE_PREVIEW_LINES = 3;
+function ShortText({ text, editedAt }: { text: string; editedAt?: number }) {
+	const [expanded, setExpanded] = useState(false);
+	const long = text.length > ROUTINE_PREVIEW_CHARS || text.split("\n").length > ROUTINE_PREVIEW_LINES;
+	if (!long) return <BoardText text={text} editedAt={editedAt} />;
+	return (
+		<div className="flex min-w-0 flex-col items-start">
+			<div className={cn("w-full", !expanded && "max-h-16 overflow-hidden [mask-image:linear-gradient(to_bottom,black_40%,transparent)]")}>
+				<BoardText text={text} editedAt={editedAt} />
+			</div>
+			<button type="button" {...activityControl("board.message.expand")} onClick={() => setExpanded(open => !open)} className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline">
+				{expanded ? "Show less" : "Show more"}
+			</button>
+		</div>
+	);
+}
+
+/** The message's text, or `editor` in its place while you edit it, and its labels; `short` cuts a routine's message to its first lines. */
+function TaskBody({ task, editor, short = false }: { task: BoardTask; editor?: ReactNode; short?: boolean }) {
 	const labels = Object.entries(task.labels);
 	return (
 		<>
-			{editor ?? <BoardText text={task.text || task.title} editedAt={task.editedAt} />}
+			{editor ?? (short && task.by.kind === "routine" ? <ShortText text={task.text || task.title} editedAt={task.editedAt} /> : <BoardText text={task.text || task.title} editedAt={task.editedAt} />)}
 			{labels.length > 0 && (
 				<span className="flex flex-wrap items-center gap-1.5 pt-0.5">
 					{labels.map(([key, value]) => (

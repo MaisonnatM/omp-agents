@@ -5,6 +5,9 @@ The dashboard shows the same lines in Settings › What's new.
 
 ## 2026-11-27
 
+- On the Board, a long message a routine posted now shows its first lines only, with Show more to read the rest.
+- On the Board, a message whose thread has replies you haven't read now has a light blue background.
+
 - The Routines notification now appears only when a routine run errors.
 - A routine run that was shorter than usual, started late, or ended with no reply no longer raises a notification.
 - A routine's run no longer posts long replies on its Board thread. It finishes like a /ship report: a bold outcome line, a few short bullets, then Needs you, Not verified, and Done lines when they apply.
