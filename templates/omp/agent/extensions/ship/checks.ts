@@ -1,4 +1,5 @@
-import { commands, positionals } from "../shell/commands";
+import { resolve } from "node:path";
+import { commands, located, positionals } from "../shell/commands";
 import type { Contract, ShipState, Stage } from "./stages";
 
 /** Whether `path` names a file inside the repository: relative, and never climbing out through `..`. */
@@ -109,25 +110,42 @@ export function isCheckCommand(words: string[], declared: string[][]): boolean {
 	return false;
 }
 
+/** The last bash check that exited 0 after the last tool call that may have changed files, and that call. */
+function lastCheck(runs: ToolRun[], declared: string[][]): { check?: ToolRun; lastEdit?: ToolRun } {
+	let lastEdit: ToolRun | undefined;
+	let check: ToolRun | undefined;
+	for (const run of runs) {
+		if (EDIT_TOOLS[run.name] && (run.ok || run.name === "task")) {
+			lastEdit = run;
+			check = undefined;
+		} else if (run.name === "bash" && run.ok && run.input.async !== true && typeof run.input.command === "string" && commands(run.input.command).some(words => isCheckCommand(words, declared))) {
+			check = run;
+		}
+	}
+	return { check, lastEdit };
+}
+
 /**
  * Why `stage` may not be recorded yet, or `undefined` when it may: a stage that claims the change works needs a bash check,
  * such as the tests or the typecheck, that exited 0 in this session after the last tool call that may have changed files.
  */
 export function verificationRefusal(stage: Stage, runs: ToolRun[], declared: string[][]): string | undefined {
-	let lastEdit: ToolRun | undefined;
-	let checked = false;
-	for (const run of runs) {
-		if (EDIT_TOOLS[run.name] && (run.ok || run.name === "task")) {
-			lastEdit = run;
-			checked = false;
-		} else if (run.name === "bash" && run.ok && run.input.async !== true && typeof run.input.command === "string" && commands(run.input.command).some(words => isCheckCommand(words, declared))) {
-			checked = true;
-		}
-	}
-	if (checked) return undefined;
+	const { check, lastEdit } = lastCheck(runs, declared);
+	if (check) return undefined;
 	const since = lastEdit ? ` since the last \`${lastEdit.name}\` call` : "";
 	const checks = declared.length > 0 ? `, such as ${declared.map(words => `\`${words.join(" ")}\``).join(", ")} from .omp/land.json,` : "";
 	return `${stage} is not recorded: no test, typecheck, or lint command passed in this session${since}, so nothing shows the change works. Run the repository's checks${checks} in this session with bash and without async, fix what fails, then record ${stage} again and quote each check's result line in your report.`;
+}
+
+/**
+ * The directory the check `verificationRefusal` accepts ran in, from its `cd` or its bash `cwd`, resolved from the session's `cwd`:
+ * the checkout the change was verified in, which may be a worktree the session never moved into. `undefined` when no check passed since the last file change, or a variable names its directory.
+ */
+export function checkedCheckout(runs: ToolRun[], declared: string[][], cwd: string): string | undefined {
+	const { check } = lastCheck(runs, declared);
+	if (typeof check?.input.command !== "string") return undefined;
+	const from = typeof check.input.cwd === "string" ? resolve(cwd, check.input.cwd) : cwd;
+	return located(check.input.command, from).findLast(({ words }) => isCheckCommand(words, declared))?.dir ?? undefined;
 }
 
 /** One commit of the branch with the files it changes. */

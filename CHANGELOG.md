@@ -3,6 +3,10 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-27
+
+- Fixed: the ship workflow no longer refuses a session's draft or ready step when the session started outside the pull request's folder. It now checks the folder where the session ran its tests.
+
 ## 2026-11-26
 
 - Interrupted sessions no longer show under their workspace in the sidebar. **Resume all** in the Workspaces header still brings them back.
