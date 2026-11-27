@@ -6,6 +6,7 @@ The dashboard shows the same lines in Settings › What's new.
 ## 2026-11-27
 
 - A routine's run no longer posts long replies on its Board thread. It finishes like a /ship report: a bold outcome line, a few short bullets, then Needs you, Not verified, and Done lines when they apply.
+- A Workspace's Board tabs now run Messages, Pull requests, Projects, Routines, Memory, Settings.
 
 ## 2026-11-26
 
