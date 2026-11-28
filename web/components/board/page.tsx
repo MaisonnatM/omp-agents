@@ -7,6 +7,7 @@
 import { IconAiBotHead, IconArrowUpRight, IconBubble3, IconChevronRightSmall, IconCrossMedium, IconHashtag, IconMagnifyingGlass } from "central-icons";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { PastSession, PromptImage, RosterHost, View } from "../../../src/shared/sessions";
+import type { TrustAsk } from "../../../src/shared/project-trust";
 import { type Workspace, workspaceName } from "../../../src/shared/workspaces";
 import { Header, HeaderTitleShown } from "../page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +17,7 @@ import { splitSuggestions } from "../../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { MessageScroller, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
-import { putJson } from "../../api";
+import { putJson, trustProject } from "../../api";
 import { useShowConversation } from "../../pane-store";
 import { UNREAD } from "../../reads";
 import { activityControl } from "../../activity";
@@ -51,6 +52,7 @@ import { markSeen, said, unreadOf, useSeen } from "./seen";
 import { ChannelUnreadPills, taskItemId, ThreadNewReplies } from "./unread-jump";
 import { QuickLinks } from "./quick-links";
 import { UserRequestCard } from "../user-request";
+import { ProjectTrustDialog } from "../project-trust-dialog";
 
 interface BoardPageProps {
 	route: BoardRoute;
@@ -417,6 +419,7 @@ function Thread({ state, task, reply, session, core, workspace, channel, closeHr
 				}}
 			>
 				{work?.kind === "waiting" && work.stop.kind === "ask" && <ThreadRequest host={sessions.hosts.find(each => each.sessionId === work.sessionId) ?? null} />}
+				{work?.kind === "failed" && work.trust && <ThreadTrust ask={work.trust} connected={!disabled} />}
 				<ThreadComposer task={task} failed={work?.kind === "failed"} name={wokenName} core={core} workspace={workspace} disabled={disabled} onChange={onChange} onSend={() => setSentOn(reply)} />
 			</ThreadMessages>
 		),
@@ -595,6 +598,30 @@ function ThreadRequest({ host }: { host: RosterHost | null }) {
 	return (
 		<div className="shrink-0 px-3 pb-2">
 			<UserRequestCard key={first.id} request={first} queued={host.requests.length - 1} onAnswer={answer => request({ t: "answer", instanceId: host.instanceId, requestId: first.id, answer })} shortcuts={false} />
+		</div>
+	);
+}
+
+/** A start the project's untrusted agent code refused: **Review and trust** opens the trust dialog, and once the trust is saved the server starts the Board task again. */
+function ThreadTrust({ ask, connected }: { ask: TrustAsk; connected: boolean }) {
+	const [open, setOpen] = useState(false);
+	return (
+		<div className="flex shrink-0 items-center gap-3 px-3 pb-2">
+			<p className="min-w-0 flex-1 text-xs text-muted-foreground">The agent code in {ask.rootDisplay} needs your trust before a session starts here.</p>
+			<Button {...activityControl("board.trust")} type="button" size="compact" disabled={!connected} onClick={() => setOpen(true)}>
+				Review and trust
+			</Button>
+			{open && (
+				<ProjectTrustDialog
+					ask={ask}
+					connected={connected}
+					onTrust={async () => {
+						await trustProject(ask);
+						setOpen(false);
+					}}
+					onCancel={() => setOpen(false)}
+				/>
+			)}
 		</div>
 	);
 }

@@ -166,6 +166,23 @@ describe("the Board's projection", () => {
 		expect(unstartedReady(replied).map(each => each.id)).toEqual([1]);
 	});
 
+	test("a start untrusted agent code refused keeps its trust ask, and the server's retry makes the Board task ready again", () => {
+		const trust = { root: WS, rootDisplay: "~/work/app", code: [{ kind: "land-config", id: ".omp/land.json", name: ".omp/land.json", hash: "h", change: "new" as const }] };
+		const change = parseChange({ op: "start", task: 1, sessionId: null, error: "Not trusted.", trust }, true);
+		expect(change).toEqual({ op: "start", task: 1, sessionId: null, error: "Not trusted.", trust });
+		expect(parseChange({ op: "start", task: 1, sessionId: null, error: "Not trusted.", trust: { root: WS } }, true)).toEqual({ op: "start", task: 1, sessionId: null, error: "Not trusted." });
+		expect(parseChange({ op: "retry", task: 1 })).toBeNull();
+		expect(parseChange({ op: "retry", task: 1 }, true)).toEqual({ op: "retry", task: 1 });
+		const posted = play([[0, { op: "post", by: user, workspace: WS, title: "One" }]]);
+		expect(applyChange(posted, { op: "retry", task: 1 }, 1)).toEqual({ error: "Board task #1 has no failed start to try again." });
+		const failed = play([[1, change!]], posted);
+		expect(statusOf(failed, task(failed, 1))).toEqual({ kind: "failed", error: "Not trusted.", trust });
+		const retried = play([[2, { op: "retry", task: 1 }]], failed);
+		expect(statusOf(retried, task(retried, 1))).toEqual({ kind: "ready" });
+		expect(unstartedReady(retried).map(each => each.id)).toEqual([1]);
+		expect(task(retried, 1).replies.map(entry => ("note" in entry ? entry.note.kind : null))).toEqual(["start-failed"]);
+	});
+
 	test(`after ${MAX_EXITS} sessions in a row exit without marking it done, a Board task fails instead of starting another; the user's reply between rounds resets the count`, () => {
 		const round = (at: number, sessionId: string): [number, BoardChange][] => [
 			[at, { op: "start", task: 1, sessionId }],

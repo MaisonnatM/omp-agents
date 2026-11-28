@@ -106,6 +106,18 @@ describe("the trust gate", () => {
 		expect(page.projects()).toEqual([{ root: dir, rootDisplay: dir, pieces: 1 }]);
 	});
 
+	test("a trust names its project to the listener, even when another server saved it first, and a forget does not", async () => {
+		const dir = repo({ ".omp/extensions/a.ts": "export default () => {};" });
+		const path = trustPath();
+		const trusted: string[] = [];
+		const page = new ProjectTrustFile(path, root => trusted.push(root));
+		const code = (await page.untrustedCode(dir))?.code ?? [];
+		new ProjectTrustFile(path).apply({ op: "trust", root: dir, code });
+		expect(page.apply({ op: "trust", root: dir, code })).toBe(false);
+		page.apply({ op: "forget", root: dir });
+		expect(trusted).toEqual([dir]);
+	});
+
 	test("a file that holds something else moves aside, and every piece asks again", async () => {
 		const dir = repo({ ".omp/extensions/a.ts": "export default () => {};" });
 		const path = trustPath();

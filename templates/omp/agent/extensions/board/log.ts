@@ -26,9 +26,20 @@ export interface BoardLaunch {
 }
 
 /**
+ * The agent code a start found the user has not trusted, as the dashboard's trust dialog lists it: `TrustAsk` in the
+ * dashboard's `src/shared/project-trust.ts`, which this file cannot import, so `kind` is any of its piece kinds.
+ */
+export interface BoardTrustAsk {
+	root: string;
+	rootDisplay: string;
+	code: { kind: string; id: string; name: string; hash: string; change: "new" | "changed" }[];
+}
+
+/**
  * What the page and the `board` tool ask for. The server stamps each with the time, and a post with its number,
- * then appends it to the log. `start`, `woke`, `expire`, and `land` come only from the server itself: auto-start, the
- * wake path, a session that exited without marking its Board task done, and the merge it runs for a bare "Merge on main".
+ * then appends it to the log. `start`, `retry`, `woke`, `expire`, and `land` come only from the server itself:
+ * auto-start, a failed start tried again once the user trusted the agent code that refused it, the wake path, a session
+ * that exited without marking its Board task done, and the merge it runs for a bare "Merge on main".
  * `close` comes only from the user on the page. `request` names the inbox file a `board` tool change came in, so the
  * same file applied again after a crash changes nothing.
  */
@@ -39,7 +50,8 @@ export type BoardChange = (
 	| { op: "close"; by: { kind: "user" }; task: number }
 	| { op: "claim"; sessionId: string; task: number }
 	| { op: "done"; sessionId: string; task: number; text?: string; quiet?: boolean }
-	| { op: "start"; task: number; sessionId: string | null; error?: string; branch?: string }
+	| { op: "start"; task: number; sessionId: string | null; error?: string; trust?: BoardTrustAsk; branch?: string }
+	| { op: "retry"; task: number }
 	| { op: "woke"; task: number; sessionId: string }
 	| { op: "expire"; task: number }
 	| { op: "land"; task: number; outcome: LandOutcome; text: string }
@@ -59,8 +71,8 @@ export interface BoardClaim {
 	at: number;
 }
 
-/** The session auto-start opened on a Board task since it last became ready, which owns it, or why the last start failed. */
-export type BoardStart = { sessionId: string; at: number } | { sessionId: null; at: number; error: string };
+/** The session auto-start opened on a Board task since it last became ready, which owns it, or why the last start failed, with `trust` when it was untrusted agent code. */
+export type BoardStart = { sessionId: string; at: number } | { sessionId: null; at: number; error: string; trust?: BoardTrustAsk };
 
 /** A grey line of a Board thread, which the Board writes, not a person or a session. */
 export type BoardNote =
@@ -126,7 +138,7 @@ const REQUESTS_KEPT = 100;
 /** How many sessions in a row may exit without marking a Board task done before the Board stops starting new ones on it. */
 export const MAX_EXITS = 3;
 
-export type BoardStatus = { kind: "done" } | { kind: "claimed"; sessionId: string } | { kind: "failed"; error: string } | { kind: "waiting"; on: number } | { kind: "ready" };
+export type BoardStatus = { kind: "done" } | { kind: "claimed"; sessionId: string } | { kind: "failed"; error: string; trust?: BoardTrustAsk } | { kind: "waiting"; on: number } | { kind: "ready" };
 
 export const emptyBoard = (): BoardState => ({ tasks: [], nextId: 1, requests: [], links: [] });
 
@@ -141,7 +153,7 @@ export function statusOf(state: BoardState, task: BoardTask): BoardStatus {
 	const holder = holderOf(task);
 	if (holder !== null) return { kind: "claimed", sessionId: holder };
 	const { start } = task;
-	if (start !== null && start.sessionId === null) return { kind: "failed", error: start.error };
+	if (start !== null && start.sessionId === null) return { kind: "failed", error: start.error, ...(start.trust ? { trust: start.trust } : {}) };
 	const on = task.needs.find(id => findTask(state, id)?.doneAt === null);
 	return on === undefined ? { kind: "ready" } : { kind: "waiting", on };
 }
@@ -242,6 +254,8 @@ export function refusal(state: BoardState, change: BoardChange): string | null {
 		case "start":
 			// A session that came up after its Board task was claimed, closed, or done would hold nothing.
 			return task.start === null && status.kind === "ready" ? null : `Board task #${task.id} is not ready to start.`;
+		case "retry":
+			return status.kind === "failed" ? null : `Board task #${task.id} has no failed start to try again.`;
 		case "woke":
 		case "land":
 			return null;
@@ -341,11 +355,14 @@ function foldTasks(state: BoardState, event: Exclude<BoardEvent, { op: "link" | 
 				...state,
 				tasks: edit(event.task, task =>
 					sessionId === null
-						? note({ ...task, start: { sessionId, at, error } }, { kind: "start-failed", error })
+						? note({ ...task, start: { sessionId, at, error, ...(event.trust ? { trust: event.trust } : {}) } }, { kind: "start-failed", error })
 						: note({ ...task, start: { sessionId, at } }, { kind: "started", sessionId, ...(event.branch ? { branch: event.branch } : {}) }),
 				),
 			};
 		}
+		case "retry":
+			// The thread keeps the failed start's note; the next `start` follows it.
+			return { ...state, tasks: edit(event.task, task => ({ ...task, start: null })) };
 		case "woke":
 			return { ...state, tasks: edit(event.task, task => note(task, { kind: "woke", sessionId: event.sessionId })) };
 		case "expire":
@@ -441,6 +458,15 @@ export function parseLaunch(value: unknown): BoardLaunch | undefined | null {
 
 const LAND_OUTCOMES: readonly unknown[] = ["landed", "failed", "refused"] satisfies LandOutcome[];
 
+const isTrustCode = (value: unknown): value is BoardTrustAsk["code"][number] =>
+	isRecord(value) && isText(value.kind, 40) && isText(value.id, 4096) && isText(value.name, 4096) && isText(value.hash, 200) && (value.change === "new" || value.change === "changed");
+
+/** The trust ask `value` holds, `null` for anything but one. */
+const parseTrustAsk = (value: unknown): BoardTrustAsk | null =>
+	isRecord(value) && isText(value.root, 4096) && isText(value.rootDisplay, 4096) && Array.isArray(value.code) && value.code.length <= 1000 && value.code.every(isTrustCode)
+		? { root: value.root, rootDisplay: value.rootDisplay, code: value.code }
+		: null;
+
 /** The change `value` holds, or `null` when it holds none; `server` admits the changes only the server makes. */
 export function parseChange(value: unknown, server = false): BoardChange | null {
 	if (!isRecord(value)) return null;
@@ -473,15 +499,20 @@ export function parseChange(value: unknown, server = false): BoardChange | null 
 				? { op: "done", task: value.task, sessionId: value.sessionId, ...(typeof value.text === "string" ? { text: value.text } : {}), ...(value.quiet ? { quiet: true } : {}) }
 				: null;
 		// A `worktree` an older start kept reads as nothing: the branch names where its sessions work.
-		case "start":
+		case "start": {
 			if (!server || !isId(value.task) || !(value.sessionId === null || isText(value.sessionId, 200))) return null;
+			const trust = parseTrustAsk(value.trust);
 			return {
 				op: "start",
 				task: value.task,
 				sessionId: value.sessionId as string | null,
 				...(isText(value.error, MAX_TEXT) ? { error: value.error } : {}),
+				...(trust ? { trust } : {}),
 				...(isText(value.branch, 200) && value.branch ? { branch: value.branch } : {}),
 			};
+		}
+		case "retry":
+			return server && isId(value.task) ? { op: "retry", task: value.task } : null;
 		case "woke":
 			return server && isId(value.task) && isText(value.sessionId, 200) ? { op: "woke", task: value.task, sessionId: value.sessionId } : null;
 		case "expire":

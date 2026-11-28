@@ -34,6 +34,12 @@ describe("a Board task whose start failed", () => {
 		const retried = board(post("one"), { op: "start", task: 1, sessionId: null, error: "setup exited 1" }, { op: "reply", by: user, task: 1, text: "try again" });
 		expect(workOf(retried, task(retried, 1), [])).toEqual({ kind: "starting" });
 	});
+
+	test("carries the trust ask of a start untrusted agent code refused, for the thread's Review and trust", () => {
+		const trust = { root: "/w", rootDisplay: "/w", code: [{ kind: "tool" as const, id: ".omp/tools/t.ts", name: ".omp/tools/t.ts", hash: "h", change: "new" as const }] };
+		const refused = board(post("one"), { op: "start", task: 1, sessionId: null, error: "Not trusted.", trust });
+		expect(workOf(refused, task(refused, 1), [])).toEqual({ kind: "failed", error: "Not trusted.", trust });
+	});
 });
 
 describe("a ready Board task the server holds from starting", () => {

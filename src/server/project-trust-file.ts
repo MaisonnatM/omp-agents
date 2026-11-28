@@ -29,9 +29,19 @@ export class UntrustedProjectError extends Error {
 }
 
 export class ProjectTrustFile extends ReducerFile<ProjectTrust, [TrustChange]> {
-	constructor(path: string) {
+	readonly #trusted: ((root: string) => void) | undefined;
+
+	/** `trusted` hears each project trusted through this file, even when another server on this computer saved that trust first. */
+	constructor(path: string, trusted?: (root: string) => void) {
 		// Shared: every server on this computer trusts into one file, and a trust one page gives must not undo another's.
 		super(path, { parse: parseProjectTrust, holds: "a list of trusted projects", empty: {}, reduce: applyTrust, shared: true });
+		this.#trusted = trusted;
+	}
+
+	override apply(change: TrustChange): boolean {
+		const changed = super.apply(change);
+		if (change.op === "trust") this.#trusted?.(change.root);
+		return changed;
 	}
 
 	/** The projects trusted, as Settings › Workspaces lists them. */

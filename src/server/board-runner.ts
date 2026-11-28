@@ -6,9 +6,10 @@
  * when the user closes it; and returns a Board task to ready when its session exits without marking it done. What it
  * ends and lands it reads from the log, so a restart picks up what the last server left. See docs/architecture/board.md.
  */
-import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardState, type BoardTask, branchOf, holderOf, landsOnReply, MAX_TEXT, MERGE_REPLY, resumable, startedOn, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
+import { type BoardAuthor, type BoardChange, type BoardLaunch, type BoardState, type BoardTask, branchOf, holderOf, landsOnReply, MAX_TEXT, MERGE_REPLY, resumable, startedOn, statusOf, unstartedReady, wakeTarget } from "../../templates/omp/agent/extensions/board/log";
 import { errorText } from "../json";
 import type { ModuleRun, ModuleRunCore } from "../modules";
+import { UntrustedProjectError } from "./project-trust-file";
 import { DASHBOARD_PROMPT_PREFIX } from "../shared/transcript";
 import { repeat } from "./loops";
 
@@ -225,6 +226,16 @@ export class BoardRunner implements ModuleRun {
 		return this.#held;
 	}
 
+	/** Tries again each Board task whose start the agent code in project `root` refused, now that the user trusted it; the change starts them. */
+	trusted(root: string): void {
+		if (!this.#core.owner()) return;
+		const state = this.#state();
+		for (const task of state.tasks) {
+			const status = statusOf(state, task);
+			if (status.kind === "failed" && status.trust?.root === root) this.#change({ op: "retry", task: task.id });
+		}
+	}
+
 	/** Starts what became ready, lands what the user asked to merge, wakes who a new reply is for, and re-prompts who an edit is for; called after every change to the Board. */
 	changed(): void {
 		const state = this.#state();
@@ -317,7 +328,7 @@ export class BoardRunner implements ModuleRun {
 			try {
 				dir = await this.#core.checkout(first.workspace, branch);
 			} catch (error) {
-				if (ready()) this.#change({ op: "start", task: id, sessionId: null, error: `Could not make its worktree on ${branch}: ${errorText(error)}` });
+				if (ready()) this.#change({ op: "start", task: id, sessionId: null, error: `Could not make its worktree on ${branch}: ${errorText(error)}`, ...(error instanceof UntrustedProjectError ? { trust: error.ask } : {}) });
 				return;
 			}
 			const task = ready();
@@ -330,7 +341,7 @@ export class BoardRunner implements ModuleRun {
 			const started = await this.#core.start(checkout.dir, startPrompt(task, checkout, landable), task.launch ?? undefined, `board:${task.workspace}#${id}`);
 			const now = ready();
 			if (!("sessionId" in started)) {
-				if (now) this.#change({ op: "start", task: id, sessionId: null, error: started.error });
+				if (now) this.#change({ op: "start", task: id, sessionId: null, error: started.error, ...(started.trust ? { trust: started.trust } : {}) });
 				return;
 			}
 			if (!now) {

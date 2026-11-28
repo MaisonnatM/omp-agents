@@ -3,6 +3,11 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-28
+
+- A Board task that could not start because you have not trusted its project's agent code now says Review and trust to try again.
+- Its thread has a Review and trust button that opens the trust dialog; once you trust the code, the Board task starts again on its own.
+
 ## 2026-11-27
 
 - The left sidebar no longer has a Pull requests row; open pull requests from a Workspace's Board, where its Pull requests tab stays.
