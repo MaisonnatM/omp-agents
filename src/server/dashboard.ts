@@ -121,7 +121,10 @@ export class Dashboard {
 		now: Date.now,
 		onChange: () => this.#broadcasts.pushList("review-drafts"),
 	});
-	readonly #projectTrust = new ProjectTrustFile(projectTrustFile);
+	// A trust the user gives here starts again the Board tasks that project's code refused.
+	readonly #projectTrust = new ProjectTrustFile(projectTrustFile, root => {
+		for (const run of this.#moduleRuns.values()) run.trusted?.(root);
+	});
 	readonly #admit = (dir: string): Promise<void> => this.#projectTrust.admit(dir);
 	readonly #onLiveUpdate: (instanceId: string, update: SessionUpdate) => void;
 	readonly #takeOver: () => void;

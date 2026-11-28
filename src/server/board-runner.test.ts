@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { applyChange, type BoardChange, type BoardEvent, type BoardState, emptyBoard, type LandOutcome, statusOf } from "../../templates/omp/agent/extensions/board/log";
 import type { ModuleRunCore } from "../modules";
+import type { TrustAsk } from "../shared/project-trust";
 import { BoardRunner, GONE_MS } from "./board-runner";
+import { UntrustedProjectError } from "./project-trust-file";
 
 /** A promise the test resolves itself, to hold a checkout, a merge, or a wake mid-way. */
 function gate(): { wait: Promise<void>; open: () => void } {
@@ -12,9 +14,10 @@ function gate(): { wait: Promise<void>; open: () => void } {
 /**
  * A runner over an in-memory Board, with the sessions it started, the wakes it sent, the sessions it ended, and the
  * merges it ran. `/w` is a repository, whose Board tasks get a worktree at `/w-wt/board-<id>`; `/plain` is outside git.
- * `checkouts`, `merges`, and `waking` hold each checkout, merge, or wake on that promise.
+ * `checkouts`, `merges`, and `waking` hold each checkout, merge, or wake on that promise; a checkout in a Workspace in
+ * `untrusted` is refused for its agent code, as project trust refuses it.
  */
-function harness({ owner = true, stopped = new Set<string>(), working = new Set<string>(), unreachable = new Set<string>(), outcome = "landed" as LandOutcome, landable = true } = {}) {
+function harness({ owner = true, stopped = new Set<string>(), working = new Set<string>(), unreachable = new Set<string>(), outcome = "landed" as LandOutcome, landable = true, untrusted = new Set<string>() } = {}) {
 	let state: BoardState = emptyBoard();
 	let now = 1000;
 	let next = 0;
@@ -63,6 +66,7 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 		},
 		async checkout(workspace, branch) {
 			await holds.checkouts;
+			if (untrusted.has(workspace)) throw new UntrustedProjectError(trustAsk(workspace));
 			return workspace === "/plain" ? null : `${workspace}-wt/${branch.replace("/", "-")}`;
 		},
 		async land(workspace, branch, sessionId) {
@@ -94,6 +98,7 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 		ended,
 		lands,
 		working,
+		untrusted,
 		holds,
 		holding,
 		heldChanges,
@@ -122,6 +127,8 @@ function harness({ owner = true, stopped = new Set<string>(), working = new Set<
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
+const trustAsk = (root: string): TrustAsk => ({ root, rootDisplay: root, code: [{ kind: "land-config", id: ".omp/land.json", name: ".omp/land.json", hash: "h", change: "new" }] });
+
 describe("BoardRunner", () => {
 	test("a ready Board task waits to start while unattended work waits, and the sweep starts it once that ends", async () => {
 		const board = harness();
@@ -137,6 +144,25 @@ describe("BoardRunner", () => {
 		await board.runner.sweep();
 		await settle();
 		expect(board.starts.map(start => start.cwd)).toEqual(["/w-wt/board-1"]);
+	});
+
+	test("a start untrusted agent code refused records the trust ask, and once the user trusts that project the Board task starts again", async () => {
+		const board = harness({ untrusted: new Set(["/w"]) });
+		board.runner.changed();
+		board.apply({ op: "post", by: { kind: "user" }, workspace: "/w", title: "First" });
+		await settle();
+		expect(board.starts).toEqual([]);
+		expect(statusOf(board.state(), board.state().tasks[0]!)).toEqual({ kind: "failed", error: `Could not make its worktree on board/1: ${new UntrustedProjectError(trustAsk("/w")).message}`, trust: trustAsk("/w") });
+		board.untrusted.delete("/w");
+		// A trust in another project leaves it failed.
+		board.runner.trusted("/other");
+		await settle();
+		expect(board.events.some(event => event.op === "retry")).toBe(false);
+		board.runner.trusted("/w");
+		await settle();
+		expect(board.events.filter(event => event.op === "retry")).toEqual([{ op: "retry", task: 1, at: 1000 }]);
+		expect(board.starts.map(start => start.cwd)).toEqual(["/w-wt/board-1"]);
+		expect(board.state().tasks[0]?.start?.sessionId).toBe("s1");
 	});
 
 	test("a held ready Board task's reason is what the pages hear, until its session starts", async () => {

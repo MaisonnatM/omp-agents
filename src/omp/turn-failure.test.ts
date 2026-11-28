@@ -64,15 +64,6 @@ const recorded = {
 		errorMessage:
 			'402 {"error":{"message":"Team budget exceeded. Current spend: $40.04, limit: $40.00. Team owners can edit this budget in AI Gateway Budgets & Spend (https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fbudgets&title=AI+Gateway+Budgets+%26+Spend).","type":"quota_for_entity_exceeded"}}',
 	},
-	openrouterMaxTokens: {
-		api: "openrouter",
-		provider: "openrouter",
-		model: "openai/gpt-6-luna",
-		errorStatus: 402,
-		errorId: 402,
-		errorMessage:
-			"402 This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 59774. To increase, visit https://openrouter.ai/settings/credits and add more credits",
-	},
 	streamTimeout: { api: "openai-completions", provider: "minimax-code", model: "MiniMax-M3", errorId: 397312, errorMessage: "OpenAI completions stream timed out while waiting for the first event" },
 	anthropicNotFound: {
 		api: "anthropic-messages",
@@ -149,7 +140,8 @@ describe("turnFailureOf", () => {
 	});
 
 	test("an error that is neither a usage limit nor transient, an abort, or a reply ends the turn on none", () => {
-		expect(endedOn(failed(recorded.openrouterMaxTokens))).toBeNull();
+		// omp holds a 402 that names no balance or quota, as a subscription a model needs, for no usage limit.
+		expect(endedOn(failed({ api: "openrouter", provider: "openrouter", model: "openai/gpt-6-luna", errorStatus: 402, errorMessage: "402 This model requires a subscription to the provider's paid plan." }))).toBeNull();
 		expect(endedOn(failed(recorded.usagePreflight))).toBeNull();
 		expect(endedOn({ ...failed(recorded.minimaxTokenPlan), stopReason: "aborted" })).toBeNull();
 		expect(endedOn({ ...failed(recorded.anthropicNotFound), stopReason: "aborted" })).toBeNull();

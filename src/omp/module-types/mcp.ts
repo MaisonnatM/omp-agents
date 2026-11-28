@@ -49,8 +49,11 @@ export interface McpToolCallResult {
 	isError?: boolean;
 }
 export interface McpClientModule {
-	/** Connects and initializes `config` as omp's sessions do, over its HTTP, SSE, or stdio transport. */
-	connectToServer(name: string, config: McpServerConfig, options?: { signal?: AbortSignal }): Promise<McpConnection>;
+	/**
+	 * Connects and initializes `config` as omp's sessions do, over its HTTP, SSE, or stdio transport. `live` asks the server
+	 * itself for discovery and every list, not the list omp's MCP host keeps for its sessions; omp before 19.1 always did.
+	 */
+	connectToServer(name: string, config: McpServerConfig, options?: { signal?: AbortSignal; live?: boolean }): Promise<McpConnection>;
 	/** Every tool the connected server offers, following its cursor. */
 	listTools(connection: McpConnection, options?: { signal?: AbortSignal }): Promise<McpToolDefinition[]>;
 	/** `tools/call` of `toolName` with `args` on the connected server. */

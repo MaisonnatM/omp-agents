@@ -139,7 +139,7 @@ function MessageRow({ by, at, sessions, state, workspace, grouped, highlighted =
 	);
 }
 
-/** What a Board task in work shows: shimmering while a session starts or works, in red why its session did not start with how to retry, in muted text why the server holds its start, else in amber what its session waits on you for, then `detail`. */
+/** What a Board task in work shows: shimmering while a session starts or works, in red why its session did not start with how to retry, which for untrusted agent code is its thread's **Review and trust**, in muted text why the server holds its start, else in amber what its session waits on you for, then `detail`. */
 function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 	if (work.kind === "failed")
 		return (
@@ -148,7 +148,7 @@ function WorkLabel({ work, detail }: { work: Work; detail: string | null }) {
 				<span title={work.error} className="truncate text-muted-foreground">
 					{work.error}
 				</span>
-				<span className="shrink-0 text-muted-foreground">Reply to try again</span>
+				<span className="shrink-0 text-muted-foreground">{work.trust ? "Review and trust to try again" : "Reply to try again"}</span>
 			</span>
 		);
 	if (work.kind === "held")

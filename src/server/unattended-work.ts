@@ -125,7 +125,7 @@ export function unattendedWork(deps: UnattendedWorkDeps): UnattendedWork {
 			let instanceId: string;
 			if (result.ok) instanceId = result.instanceId;
 			else if (result.owner?.here) instanceId = result.owner.instanceId;
-			else return { error: result.error };
+			else return { error: result.error, ...(result.trust ? { trust: result.trust } : {}) };
 			const sessionId = sessions.get(instanceId)?.sessionId;
 			return sessionId ? { sessionId } : { error: "The session exited as it started." };
 		},

@@ -6,6 +6,7 @@ import { MEDIA_KEY_PARAM, MEDIA_KEY_STORAGE_KEY, SOCKET_PROTOCOL, SOCKET_TOKEN_P
 import type { BookmarksView, ProjectMemoryEdit, ProjectMemoryView } from "../src/shared/memory-page";
 import type { BranchRelease } from "../src/shared/git";
 import { isObject } from "../src/json";
+import type { TrustAsk, TrustChange } from "../src/shared/project-trust";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
 import { record } from "./activity";
 
@@ -201,3 +202,8 @@ export async function changeWorktrees(request: WorktreeRemovalRequest, signal?: 
 
 /** Removes the linked worktree of `cwd`'s repository that has `branch` checked out, unless something keeps it. */
 export const releaseWorktree = (cwd: string, branch: string): Promise<BranchRelease> => putJson("/api/worktree/release", { cwd, branch });
+
+/** Trusts every piece of agent code `ask` lists, as the trust dialog's **Trust and start** does. */
+export async function trustProject(ask: TrustAsk): Promise<void> {
+	await putJson("/api/project-trust", { op: "trust", root: ask.root, code: ask.code.map(({ id, hash }) => ({ id, hash })) } satisfies TrustChange);
+}

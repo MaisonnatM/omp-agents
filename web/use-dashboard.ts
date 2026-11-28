@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { PinChange } from "../src/shared/pins";
-import type { TrustChange } from "../src/shared/project-trust";
 import type { ModuleChanges, StoredModuleId } from "../src/modules";
 import type { ClientMsg, ModuleChangeMsg, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import { errorText } from "../src/json";
-import { openSocket, putJson } from "./api";
+import { openSocket, trustProject } from "./api";
 import { clearDraft, liveDraftKey, NEW_DRAFT_KEY, putDraft } from "./composer-drafts";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyDictationMessage, dictationDisconnected } from "./dictation";
@@ -344,7 +343,7 @@ export function useDashboard(): Dashboard {
 	const dismissTrust = useCallback((reqId: number) => dispatch({ t: "trust-dismiss", reqId }), []);
 	const trustAndStart = useCallback(
 		async ({ op, trust }: RefusedStart) => {
-			await putJson("/api/project-trust", { op: "trust", root: trust.root, code: trust.code.map(({ id, hash }) => ({ id, hash })) } satisfies TrustChange);
+			await trustProject(trust);
 			start(op);
 		},
 		[start],

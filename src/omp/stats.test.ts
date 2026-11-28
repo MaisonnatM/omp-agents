@@ -45,11 +45,11 @@ describe("creditRuns", () => {
 		]);
 	});
 
-	test("a request that works ends the run, a 402 that asks for a smaller request is no billing cap, and a refusal over a day old is out", () => {
+	test("a request that works ends the run, a 402 that names no balance or quota is no billing cap, and a refusal over a day old is out", () => {
 		const db = statsWith([
 			["openrouter", 1, { error: INSUFFICIENT }],
 			["openrouter", 2, "worked"],
-			["deepseek", 3, { error: "402 This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 1200." }],
+			["deepseek", 3, { error: "402 This model requires a subscription to the provider's paid plan." }],
 			["moonshot", -1, { error: "402 Insufficient balance" }],
 		]);
 		expect(providersWithRuns(db)).toEqual([]);

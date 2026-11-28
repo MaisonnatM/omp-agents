@@ -3,6 +3,12 @@
 Each update to omp-agents adds a few lines here, newest first, in everyday words.
 The dashboard shows the same lines in Settings › What's new.
 
+## 2026-11-28
+
+- A Board task that could not start because you have not trusted its project's agent code now says Review and trust to try again.
+- Its thread has a Review and trust button that opens the trust dialog; once you trust the code, the Board task starts again on its own.
+- With omp 19.1 or newer, refreshing an MCP server's tools, or changing its settings, asks the server again instead of showing the list omp kept from earlier.
+
 ## 2026-11-27
 
 - The left sidebar no longer has a Pull requests row; open pull requests from a Workspace's Board, where its Pull requests tab stays.
@@ -115,73 +121,3 @@ The dashboard shows the same lines in Settings › What's new.
 - Opening a Board thread from the message list now always shows its Thread tab first, not the session's conversation.
 - The Board no longer starts a second session on a task while the session working on it is still busy. Under heavy load a session could miss renewing its claim, and the Board then kept starting new sessions on the same task, about 30 for one task, each stopping because another held it.
 - Each Workspace in the Board sidebar now has a chevron that hides or shows the Board sessions listed under it; clicking the Workspace's name still opens its Board.
-
-## 2026-11-25
-
-- A finished Board task's suggested next steps now sit under the thread's reply box, as they do under a session's composer, with the same keys: Enter sends one, Tab fills it in to edit first. They no longer show as buttons under the last message.
-- A Board thread summary now shows omp's mark once, however many sessions replied, instead of one identical mark per session.
-- A Board task whose session stopped for you now says so in the Board's message list, in amber, in place of "Working on it…": "Asks you" with its question, "Waiting for your input", or "Waiting for your reply". Clicking a question opens the session's conversation, where you answer it.
-- A Board session that changes something you can see now puts its screenshots in the message that closes the task, so the thread shows them.
-- Board messages from a session now show omp's mark as the picture and "omp agent" as the name, with the session's title beside it, instead of the title's first letter on a color as if the session were a person.
-- The Board sidebar now has **Notifications**, with its unread count, and **Settings** rows above the Workspaces, as the Sessions sidebar does.
-- The Board sidebar's Bot groups now look and fold like the workspace groups in Sessions, smaller than before, and the Workspaces and Bots headers each fold their whole list.
-- A Board task that already has a thread now shows "Working on it…" inside its thread summary, in place of "Last reply", with the working session's face first, as Slack does, instead of a second row under it.
-- The Board sidebar's Bot groups, Pinned, each section, and Other Bots, now fold open and shut when you click them, instead of opening the gallery of every Bot.
-- You can now edit your own messages on the Board and in a Board thread: hover one, click the pencil (**Edit message**), change it, and press Enter or **Save**. The session working on it stops what it was doing and picks up the new text; the message shows "(edited)".
-- Clicking a session on the Board, in its sidebar, on a message's author, on "Working on it…", or with **Open its session**, now opens that session's conversation in its Board thread instead of leaving the Board for Sessions.
-- Board sessions no longer merge their own work. Each ends by telling you in its Board thread what it did and suggesting next steps, such as Merge on main, then stops.
-- Click a suggested next step under a finished Board task, or type a reply, and a new session takes it from there with the whole thread.
-- A Board task's thread summary now shows a small blue pill with the number of replies you haven't read yet, as in Slack; opening the thread clears it.
-- The Board now jumps to the bottom when you post a message or reply in a thread, even if you had scrolled up, and keeps following new messages from there; a thread opened on a picked reply holds still until you reply.
-- The Board's **Bots** group now lists the Bots under your own groups, Pinned, each section, and Other Bots, instead of one All Bots row, with smaller faces.
-- The Board's sidebar now has a **Bots** group under the Workspaces: **All Bots** shows every Bot, whatever its Workspace, and each Bot is listed under it. A Workspace's **Bots** tab still shows only the Bots kept to it.
-- The tab row under a Workspace's name on the Board is gone; the Board shows its tasks, and the Board thread keeps its own tabs.
-- Fixed: the rule under the Board's tabs no longer flickers a pixel up and down when you click a tab.
-- A Board task still in work now reads "Working on it…" followed by its session's name, instead of "<session> is on it…", and its open thread shows the same line under the replies.
-- The Board's composers now take files: the paperclip, a drop, or a paste attaches images and documents to a Board task or a reply. Images show in the message and reach the session; before, they vanished when you sent.
-- You can now search the Board as you search Slack, from the field in its header.
-- The Board's search finds the Board tasks and replies holding every word you type, in the open Workspace, the open Board thread, or all Workspaces.
-- A Board search result opens its Board thread with the reply highlighted.
-- The Board's **Pull requests** tab now lists only the pull requests of that Workspace's repositories, whatever Workspace the sidebar picker shows, so every Board tab keeps to its Workspace.
-- Fixed: the browser tool sessions use for screenshots could not save a picture or read a script inside a worktree or in /tmp when the session had started in the main checkout. Run the starter kit's install again to pick this up.
-- In the Board's left sidebar, each Workspace now lists only its running sessions; stopped ones no longer show there.
-- A Board thread no longer shows grey lines for a session starting on, claiming, renewing, or finishing its Board task; lines for a failed start, a lapsed lease, or a woken session stay.
-- A session the Board starts now finishes on its own: it lands its work on `main` (or opens a draft PR where the repository ships through pull requests), posts its outcome in the Board thread, and ends itself, so you no longer merge or end Board sessions by hand. A reply resumes it, and it finishes the same way again.
-- A Board thread now shows only what was said: no grey lines at all, and no suggested prompts under its reply box.
-- A project made from a Board's **Projects** tab now belongs to that Workspace and shows there right away, before any session joins it; it no longer shows in another Workspace's tab.
-- A rule now separates the Board's tabs from the content below them, as in Slack.
-- A Board message still in work now shows a shimmering "<session> is on it…" line under it, styled like the reply line, instead of the ready and claimed badges. Board messages no longer show their #number or what they wait on.
-- A Board thread no longer gets a "#5 is done, so this Board task is ready" line when the Board task it waited on finishes; its ready badge already says so.
-- The Board thread's tab row is now a session's right sidebar: besides **Thread** and the session's conversation, its + opens that session's **Overview**, **Diffs**, **PRs**, **Artifacts**, **Review**, and **Linear** tabs, and a tab you open stays open across threads. A session's right sidebar header line now sits level with the page header beside it.
-- The Board now has tabs under the Workspace's name, as a Slack channel does: **Messages**, the Board tasks, then **Bots**, **Pull requests**, **Memory**, **Projects**, and **Settings**, each showing only what belongs to that Workspace; Settings lists just the sections that read one workspace, such as Models, Files, and Worktrees.
-- In a Board thread's reply box, typing an at sign now lists your sessions straight away, so a reply can point its session at another one; the other at-sign suggestions stay out of the thread for now.
-- A session's Board reply can now suggest what to answer next: the Board thread's reply box lists those prompts, and a click, a number key, or Enter sends one.
-- A session the Board starts is now named after its Board task's work, such as "Fix sidebar badge count", instead of "Claim Board task 5 on omp-agents".
-- The Board thread's pane now has tabs, as a session's right sidebar does: **Thread** for the Board task and its replies, and a tab named after the session working on it that shows that session's conversation, with its composer while it runs. Its header line now sits level with the Board's.
-- A reply in a Board thread now reaches a session even after its Board task is done: it wakes the session that finished it. The reply box is now the full New session composer, so you pick the model, thinking level, and skill the woken session runs on, and the Board's message box drops its workspace picker; the sidebar switches Workspaces.
-- On the Board, your messages and replies now show your Slack profile picture when Slack is connected in Settings › Integrations.
-- Board messages and replies now show as formatted text, with lists, code, and links, and sessions are told to write their Board replies as a short lead line and a list instead of one long paragraph.
-- The Board thread's pane can be resized: drag its left edge, and the page remembers the width. Its reply box is now the session composer, with suggestions when you type a slash or an at sign, dictation, and an unsent reply kept per thread.
-- The Board's header now matches the other pages, its message box spans the channel, messages use the app's text size, the thread pane narrows on small windows, and Escape closes the thread wherever the cursor is.
-- In the Board tab of the sidebar, a Workspace's sessions now sit a little apart from the Workspace above them.
-- The Board now looks and works like a Slack channel: pictures and names on each message, messages grouped by author and split by day, a reply line under each message, a hover toolbar with **Reply in thread**, and a Slack-style thread pane that Escape closes.
-- The dashboard uses less CPU with many sessions open: idle sessions no longer check their running programs every 10 seconds, and the session list only resends rows that changed.
-- Long replies stream more smoothly: only the part still being written is redrawn, instead of the whole reply on every word.
-- Pull requests refresh with fewer GitHub calls at once, so the dashboard stays under GitHub's limits.
-- Opening the dashboard with very large sessions uses less memory, and searching conversations is faster.
-- The Board's message box is now the New session composer: pick the model, thinking level, and skill the session starts on, with `/` suggestions and dictation; the **Needs** picker is gone, and the thread's reply box uses the session composer.
-- The Board now has its own tab at the top of the sidebar, beside Sessions; under it the sidebar lists the Board's workspaces and their sessions, and the page gets the full width.
-- New **Board** page: post a message in a workspace and a new session starts on it as a Board task; pick what it **Needs** so it waits for another one to finish, follow each one's thread on the right, and reply to reach the session working on it, which wakes it if it stopped.
-- Sessions get a `board` tool to post, claim, and finish Board tasks; a claim lasts 15 minutes unless renewed, and a Board task whose session went quiet gets a new one.
-- Behind the scenes: the Board keeps an append-only log in `board-events.jsonl`, and stored modules can run their own background work.
-- `/ship` now runs the no-comments pass at the end of Implement, before the checks and the draft PR, so reviews start from a diff without stray comments.
-- A long question from a session now reads as a bold first line over plain text that keeps its line breaks and lists, instead of one wall of bold text.
-- A session asking several questions now offers Next beside Back once a question is answered, so you can move both ways between them.
-- Fixed: a dev server or test browser that a session started in the background, such as with nohup, now counts as that session's process, so it stops once the session sits idle or ends instead of running on and filling the Mac's memory.
-- Apps a session opens, such as Docker Desktop, stay running when the session ends.
-- Behind the scenes: a decay check now scores the runs that drop a skill or extension, where before every such run failed its tests because the run's folder name held a colon.
-- Behind the scenes: menus, dialogs, tabs, tooltips, and the command palette now run on one interface library, UI SDK, in place of three, so they behave the same way everywhere.
-- The New session page has a Background menu in its header: pick Retro grid, Aurora, Fire, Eclipse, Black hole, Horizon, Galaxy, or Globe; the dashboard remembers your pick.
-- A session waiting on CI no longer lists its pull requests under its row; its row shows a clock with how many still wait on checks and a red cross with how many fail.
-- Fixed: the "routine runs exited early" notification no longer lists a run that started late only because the Mac was asleep, such as the catch-up runs when you open the lid.
-- Fixed: a routine set to post its output When it fails no longer counts as exited early each time it hands work to its Bot on purpose.

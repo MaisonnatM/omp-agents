@@ -156,6 +156,7 @@ export type BoardControlId =
 	| "board.unread.jump"
 	| "board.unread.read-all"
 	| "board.thread.new-replies"
+	| "board.trust"
 	| "board.quick-link"
 	| "board.quick-link.add";
 
@@ -240,6 +241,7 @@ export const BOARD_PAGE: StoredPageModule<"board", BoardRoute, BoardState, Board
 		{ id: "board.unread.jump", label: "Board unread threads pill, which scrolls to the nearest unread thread out of view", area: "Board" },
 		{ id: "board.unread.read-all", label: "Board unread threads pill Mark all read button, which marks every thread in the Workspace read", area: "Board" },
 		{ id: "board.thread.new-replies", label: "Board thread new replies pill, which scrolls to the replies that came while you read further up", area: "Board" },
+		{ id: "board.trust", label: "Board thread Review and trust button, which opens the trust dialog for a Board task whose start untrusted agent code refused", area: "Board" },
 	],
 	store: {
 		apply(state, change) {

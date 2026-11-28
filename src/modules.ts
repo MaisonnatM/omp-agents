@@ -9,6 +9,7 @@ import type { RouteKit, Routes } from "./server/route-kit";
 import type { SessionJoin } from "./server/start";
 import { MODULES_OFF_KEY, parseModulesOff } from "./shared/modules-off";
 import type { ModelOption } from "./shared/models";
+import type { TrustAsk } from "./shared/project-trust";
 import type { PagePreferences } from "./shared/preferences";
 import { PROJECTS_MODULE } from "./projects-module";
 import { SPORT_MODULE } from "./sport-module";
@@ -42,9 +43,9 @@ export interface ModuleRunCore {
 	/**
 	 * Starts a new session in `cwd` on `prompt`, as the page's New session does, on the model, thinking level, and skill
 	 * `launch` names, else omp's defaults. `task` is the work's identity, such as `board:<workspace>#<id>`, so a session
-	 * already started on it is adopted rather than a second one started.
+	 * already started on it is adopted rather than a second one started. `trust` says the project's agent code refused it.
 	 */
-	start(cwd: string, prompt: string, launch: { model: ModelOption | null; thinking: string | null; skill: string | null } | undefined, task: string): Promise<{ sessionId: string } | { error: string }>;
+	start(cwd: string, prompt: string, launch: { model: ModelOption | null; thinking: string | null; skill: string | null } | undefined, task: string): Promise<{ sessionId: string } | { error: string; trust?: TrustAsk }>;
 	/**
 	 * Sends `text` to session `sessionId` as a follow-up, resuming it first when it stopped, on the model, thinking level,
 	 * and skill `launch` names; `interrupt` first stops a running turn, and queues the user's own waiting messages after
@@ -87,6 +88,8 @@ export interface ModuleRun {
 	changed(): void;
 	/** Why the module's own work waits to start, such as memory pressure; `null` when none waits. Kept only in memory, never in the module's file. */
 	held(): string | null;
+	/** The user trusted the agent code in project `root`, so work it refused may start again. */
+	trusted?(root: string): void;
 }
 
 /** A file a module ships beside the server's code: `source` in a checkout, and in a packaged app the bundle `bundle`. */
