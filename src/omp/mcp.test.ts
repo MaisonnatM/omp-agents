@@ -39,11 +39,11 @@ function remote() {
 			if (!body.id) return new Response(null, { status: 202 });
 			let result: unknown;
 			if (body.method === "initialize") result = { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "test", version: "1" } };
-			else {
+			else if (body.method === "tools/list") {
 				lists++;
 				headers.push(req.headers);
 				result = body.params?.cursor ? { tools: [{ name: "second" }] } : { tools: [{ name: "first", description: " First tool " }], nextCursor: "page2" };
-			}
+			} else return Response.json({ jsonrpc: "2.0", id: body.id, error: { code: -32601, message: "Method not found" } });
 			return Response.json({ jsonrpc: "2.0", id: body.id, result });
 		},
 	});

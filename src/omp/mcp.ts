@@ -240,7 +240,8 @@ async function overConnection<T>(
 	const signal = AbortSignal.timeout(TIMEOUT_MS);
 	let connection: McpConnection | undefined;
 	try {
-		connection = await mcpClient.connectToServer(name, { ...expanded, headers }, { signal });
+		// Live: this module keeps its own minute-old lists, so `fresh` and a config write must reach the server.
+		connection = await mcpClient.connectToServer(name, { ...expanded, headers }, { signal, live: true });
 		return await run(connection, signal);
 	} catch (err) {
 		// omp's HTTP transport throws `MCPTransportError`, `failure: "http_status"` with the status as `code`, on a refused
